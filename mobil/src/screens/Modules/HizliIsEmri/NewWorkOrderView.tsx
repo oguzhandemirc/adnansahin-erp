@@ -21,6 +21,9 @@ import ScannedRollsModal from './wizard/ScannedRollsModal';
 import ScannerRollStrip from '../../../components/ScannerRollStrip';
 import CancelledRollSheet from '../../../components/CancelledRollSheet';
 import { useCameraUnusable } from '../../../hooks/useCameraUnusable';
+import { useHardwareScanMode } from '../../../hooks/useScanMethod';
+import OrderLinkFooterButton from './wizard/OrderLinkFooterButton';
+import LastBatchHint from './wizard/LastBatchHint';
 import { colors, spacing, radius } from '../../../theme';
 
 interface NewWorkOrderViewProps {
@@ -64,6 +67,7 @@ export default function NewWorkOrderView({
   const online = useOnlineStatus();
   // Ayarlar → "Kamera arızalı" — listeden seçim kaçış yollarının tek kaynağı.
   const cameraUnusable = useCameraUnusable();
+  const hardware = useHardwareScanMode();
 
   // Başarı ekranı durumunu kabuğa bildir (geri tuşu + liste tazeleme için).
   const hasResult = !!wo.result;
@@ -271,10 +275,14 @@ export default function NewWorkOrderView({
             <Icon source="alert-circle" size={18} color={colors.dangerDark} />
             <Text style={styles.errorBannerText}>{wo.submitError}</Text>
           </View>
-        ) : stepHint ? (
+        ) : stepHint && (showErrors || step > 0) ? (
           <Text style={[styles.hint, showErrors && styles.hintError]} numberOfLines={2}>
             {stepHint}
           </Text>
+        ) : step === 0 ? (
+          // Adım ①'de "en az bir top okutun" sürekli yazılmaz (gövdedeki boş kart zaten söylüyor);
+          // yalnız İLERİ'ye eksikle basınca kırmızı çıkar. Yerinde son parti göstergesi durur.
+          <LastBatchHint />
         ) : null}
 
         <View style={styles.navRow}>
@@ -290,6 +298,8 @@ export default function NewWorkOrderView({
                 <Text style={styles.navBtnSideText}>Geri</Text>
               </View>
             </TouchableRipple>
+          ) : hardware ? (
+            <OrderLinkFooterButton count={wo.orderLineIds.length} onPress={() => setOrderPickerOpen(true)} />
           ) : null}
 
           <TouchableRipple
@@ -332,6 +342,8 @@ export default function NewWorkOrderView({
         visible={scannerOpen}
         onDismiss={() => setScannerOpen(false)}
         onScan={(b) => void wo.handleScan(b)}
+        // El terminali: adım ①'de tuş doğrudan top ekler (modal açılmaz).
+        listenWhileHidden={step === 0}
         title="Stok Topu Okut"
         continuous
         trigger="tap"
