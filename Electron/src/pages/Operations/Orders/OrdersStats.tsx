@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { orderSevkBucketLabel } from "./order-cell-text";
 import type { OrderStats } from "./service";
 
 export type OrderStatsView = "sade" | "onerilen" | "genis";
@@ -35,13 +36,7 @@ const MONEY_FMT = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 
 /** Durum kovası → etiket + ton. Sıra üretim akışını izler. */
 const STATUS_ORDER = ["PENDING", "APPROVED", "PARTIAL_SHIPPED", "COMPLETED", "CANCELLED"] as const;
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Bekliyor",
-  APPROVED: "Onaylı",
-  PARTIAL_SHIPPED: "Kısmi Sevk",
-  COMPLETED: "Tamamlandı",
-  CANCELLED: "İptal",
-};
+// Etiket süzgeçteki kova etiketiyle aynı tek kaynaktan (`orderSevkBucketLabel`).
 const STATUS_TONE: Record<string, string> = {
   PENDING: "text-amber-600 dark:text-amber-400",
   APPROVED: "text-sky-600 dark:text-sky-400",
@@ -158,7 +153,7 @@ export function OrdersStats({
       {STATUS_ORDER.filter((s) => data.byStatus[s] != null).map((s) => (
         <Chip
           key={s}
-          label={STATUS_LABEL[s] ?? s}
+          label={orderSevkBucketLabel(s)}
           count={data.byStatus[s]!}
           tone={STATUS_TONE[s] ?? ""}
           onClick={() => onApplyFilter({ "filter[status]": s })}

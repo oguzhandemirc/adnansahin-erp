@@ -30,6 +30,9 @@ export interface AppPreferences {
   menuOrder?: Record<string, string[]>;
   /** Tablo sütun sırası — queryKey → sütun id listesi. */
   tableOrder?: Record<string, string[]>;
+  /** Liste filtre kaydı — tablo anahtarı → son kullanılan süzgeç + sıralama (arama hariç; hazır tarih
+   *  göreli `datePreset`). Şekli `filter-row/filter-persist.ts` sahiplenir ve okurken süzer. */
+  tableFilters?: Record<string, { query: string; savedAt: string }>;
   /** Tablo sütun görünürlüğü — queryKey → { columnId: visible }. */
   tableVisibility?: Record<string, Record<string, boolean>>;
   /** Sekme sırası — sekme seti anahtarı → sekme key listesi. */
@@ -74,6 +77,9 @@ export interface AppPreferences {
      *   genis    — + iş emri yok, bu hafta terminli, tutar
      */
     statsView?: "sade" | "onerilen" | "genis";
+    /** "Excel (stok kalemi bazında)" modalının son seçimi — şekli `stock-line-export/options.ts`
+     *  sahiplenir ve okurken süzer (bozuk/eski → varsayılan); burada bilerek `unknown`. */
+    stockLineExport?: unknown;
   };
   /** Dashboard widget düzeni — gizli widget'lar + grup/öğe sırası. */
   dashboard?: {

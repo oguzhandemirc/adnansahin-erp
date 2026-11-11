@@ -8,6 +8,8 @@ import {
   disposeTabRouter,
 } from "@/components/layout/tabs/tab-routers";
 import { recallRoute } from "@/components/layout/tabs/route-memory";
+import { idsToClose, nextActiveAfterClose, type CloseScope } from "@/components/layout/tabs/tab-close";
+import { TABS_STORAGE_KEY, purgeTabsOnFreshLaunch, tabsStorage } from "./tabs-storage";
 
 export interface TabItem {
   /** Kararlı kimlik — router registry + React key. */
@@ -48,16 +50,19 @@ interface TabsState {
   /** N. sekmeye geç (0 tabanlı, sınır dışıysa yok sayılır). */
   selectIndex: (index: number) => void;
   reorder: (fromId: string, toId: string) => void;
-  closeOthers: (id: string) => void;
+  /** Toplu kapatma (sağ tık menüsü / "Tümünü kapat"): çapaya göre kapsam; "all" çapasızdır. */
+  closeTabs: (scope: CloseScope, anchorId?: string | null) => void;
+  /** Son TOPLU kapatmadan (≥2 sekme) önceki liste; "Geri al" bununla döner. Kalıcı değil, çıkışta silinir. */
+  lastBulkClose: { tabs: TabItem[]; activeId: string | null; closedIds: string[] } | null;
+  /** Son toplu kapatmayı geri al: kapananlar eski yerine, sonradan açılanlar sona; etkin sekme eskisi. */
+  undoBulkClose: () => void;
   /** Sekme başlığını güncelle (detay sayfaları entity adını öğrendikten sonra çağırır). */
   updateTabTitle: (id: string, title: string) => void;
   /**
-   * TÜM sekmeleri kapat — çıkışta çağrılır (`store/auth.logout`).
+   * TÜM sekmeleri kapat — oturum sınırında çağrılır (`bindTabsToSession`).
    *
-   * ⚠️ Defter KALICI (`persist`): temizlenmezse bir sonraki kullanıcı, önceki
-   * kişinin açtığı sekmeleri (ve başlıklarındaki müşteri/sipariş adlarını)
-   * hazır bulurdu. Ortak kullanılan fabrika bilgisayarında bu hem karıştırıcı
-   * hem sızıntıdır. `set` ile boşaltmak persist'i de günceller.
+   * Temizlenmezse bir sonraki kullanıcı öncekinin sekmelerini (başlıklarındaki
+   * müşteri/sipariş adlarıyla) hazır bulurdu. `set` ile boşaltmak kalıcı kopyayı da günceller.
    */
   resetTabs: () => void;
 }
@@ -71,13 +76,17 @@ function newId(): string {
   }
 }
 
+// Yeni açılış (reload değil) önceki sekmeleri getirmez — store kurulmadan, hidrasyondan önce.
+purgeTabsOnFreshLaunch();
+
 export const useTabsStore = create<TabsState>()(
   persist(
     (set, get) => ({
       tabs: [],
       activeId: null,
 
-      resetTabs: () => set({ tabs: [], activeId: null }),
+      resetTabs: () => set({ tabs: [], activeId: null, lastBulkClose: null }),
+      lastBulkClose: null,
 
       openTab: (rawPath, opts = {}) => {
         const { state, forceNew, background } = opts;
@@ -154,19 +163,37 @@ export const useTabsStore = create<TabsState>()(
         set({ tabs: tabs.map((t) => (t.id === id ? { ...t, path: pathname, title } : t)) });
       },
 
-      closeTab: (id) => {
+      closeTab: (id) => get().closeTabs("self", id),
+
+      closeTabs: (scope, anchorId = null) => {
         const { tabs, activeId } = get();
-        const idx = tabs.findIndex((t) => t.id === id);
-        if (idx < 0) return;
-        const next = tabs.filter((t) => t.id !== id);
-        disposeTabRouter(id);
-        let nextActive = activeId;
-        if (activeId === id) {
-          // Komşuya odaklan: önce sağdaki, yoksa soldaki.
-          const neighbor = next[idx] ?? next[idx - 1] ?? null;
-          nextActive = neighbor?.id ?? null;
-        }
-        set({ tabs: next, activeId: nextActive });
+        const closed = new Set(idsToClose(tabs, anchorId, scope));
+        if (closed.size === 0) return;
+        closed.forEach((id) => disposeTabRouter(id));
+        set({
+          tabs: tabs.filter((t) => !closed.has(t.id)),
+          activeId: nextActiveAfterClose(tabs, activeId, closed),
+          // Tekli kapatma geri alma anlık görüntüsünü EZMEZ (toplu kapatmanın hemen ardından X'e basmak "Geri al"ı yemesin).
+          ...(closed.size >= 2 ? { lastBulkClose: { tabs, activeId, closedIds: [...closed] } } : {}),
+        });
+      },
+
+      undoBulkClose: () => {
+        const { tabs, lastBulkClose } = get();
+        if (!lastBulkClose) return;
+        const openIds = new Set(tabs.map((t) => t.id));
+        const bulkClosed = new Set(lastBulkClose.closedIds);
+        const snapIds = new Set(lastBulkClose.tabs.map((t) => t.id));
+        // Toplu kapananlar eski sırasına döner; o arada ELLE kapatılan sekme diriltilmez, yeni açılanlar sona.
+        // Router'lar `getTabRouter` ile yoldan yeniden kurulur.
+        const restored = lastBulkClose.tabs.filter((t) => openIds.has(t.id) || bulkClosed.has(t.id));
+        const next = [...restored, ...tabs.filter((t) => !snapIds.has(t.id))];
+        const prevActive = lastBulkClose.activeId;
+        set({
+          tabs: next,
+          activeId: prevActive && next.some((t) => t.id === prevActive) ? prevActive : get().activeId,
+          lastBulkClose: null,
+        });
       },
 
       setActive: (id) => set({ activeId: id }),
@@ -200,24 +227,37 @@ export const useTabsStore = create<TabsState>()(
       updateTabTitle: (id, title) => {
         set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, title } : t)) }));
       },
-
-      closeOthers: (id) => {
-        const { tabs } = get();
-        tabs.forEach((t) => {
-          if (t.id !== id) disposeTabRouter(t.id);
-        });
-        const keep = tabs.find((t) => t.id === id);
-        set({ tabs: keep ? [keep] : [], activeId: keep?.id ?? null });
-      },
     }),
     {
-      name: "teks.tabs",
-      // Yalnız sekme listesi + aktif sekme kalıcı; memory router'lar açılışta
-      // her sekme için yeniden kurulur (filtreler/scroll yeniden başlamaz).
+      name: TABS_STORAGE_KEY,
+      // Yalnız pencere ömrü (F5'te korunur); yeni oturum/açılış her zaman Anasayfa'dan başlar.
+      storage: tabsStorage,
+      // Yalnız sekme listesi + aktif sekme; memory router'lar yeniden kurulur.
       partialize: (s) => ({ tabs: s.tabs, activeId: s.activeId }),
     },
   ),
 );
+
+interface SessionSnapshot {
+  user: { userId: string } | null;
+  isHydrated: boolean;
+}
+
+/**
+ * OTURUM SINIRI = SEKME SIFIRI: kimlik değişince (çıkış, 401/oturum düşmesi, yeni giriş)
+ * defter boşalır; kabuk boş defterle bağlanınca tek sekme Anasayfa açılır. Açılıştaki
+ * hidrasyon (`isHydrated` henüz false) sınır değildir — F5 sekmeleri korur.
+ * Auth store parametre: tabs → auth statik bağı kurulmaz (testler auth'u mocklar).
+ */
+export function bindTabsToSession<S extends SessionSnapshot>(auth: {
+  subscribe: (listener: (state: S, prev: S) => void) => () => void;
+}): () => void {
+  return auth.subscribe((state, prev) => {
+    if (!prev.isHydrated || state.user === prev.user) return;
+    if (state.user && prev.user && state.user.userId === prev.user.userId) return;
+    useTabsStore.getState().resetTabs();
+  });
+}
 
 /** Aktif sekmenin pathname'i (sidebar/komut paleti aktif vurgusu için). */
 export const selectActivePath = (s: TabsState): string | null =>

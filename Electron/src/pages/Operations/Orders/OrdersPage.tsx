@@ -10,15 +10,16 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table/DataTable";
 import { ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { CopyMenuItem } from "@/components/data-table/row-menu-items";
-import { DataTableToolbar } from "@/components/data-table/DataTableToolbar";
 import { RefreshButton } from "@/components/RefreshButton";
 import { PermissionGate } from "@/components/PermissionGate";
 import { useDataTable } from "@/hooks/useDataTable";
-import { useHideCancelled } from "@/hooks/useHideCancelled";
-import { ToolbarToggle } from "@/components/data-table/ToolbarToggle";
+import { SHOW_CANCELLED_PARAM, useHideCancelledInUrl } from "@/hooks/useHideCancelled";
 import { usePricingEnabled, useFeatureFlags } from "@/hooks/usePricingEnabled";
-import { type FilterDef } from "@/components/data-table/FilterBar";
 import { OrdersFilterRow } from "./OrdersFilterRow";
+import { ORDER_FILTERS, orderPersistConfig } from "./orders-filter-defs";
+import { DataTableTools } from "@/components/data-table/DataTableTools";
+import { SavedViewsMenu } from "@/components/data-table/SavedViewsMenu";
+import { StockLineExportDialog } from "./stock-line-export/StockLineExportDialog";
 import { buildOrderColumns } from "./columns";
 import { resolveOrderFilters, canBulkCreateWorkOrder } from "./orders-regime";
 import { orderService } from "./service";
@@ -26,87 +27,14 @@ import { OrderDetailSheet } from "./OrderDetailSheet";
 import { OrderFormDialog } from "./OrderFormDialog";
 import { OrderCancelDialog } from "./OrderCancelDialog";
 import { BulkCreateWorkOrderAction } from "./BulkCreateWorkOrderAction";
-import { customerService } from "@/pages/Customers/service";
-import { itemService } from "@/pages/Items/service";
-import { colorService } from "@/pages/Colors/service";
-import { branchLookupService } from "@/pages/Operations/Shipments/service";
-import type { BranchLookupItem } from "@/pages/Operations/Shipments/types";
 import { useTabsStore } from "@/store/tabs";
 import { useIsTabActive } from "@/components/layout/tabs/tab-active";
 import type { Order } from "./types";
 import { type OrderFormValues } from "./schema";
-import { loadAllForPicker } from "@/lib/picker-loader";
 import { useAttemptToken } from "@/lib/attemptToken";
 import { usePreferences } from "@/providers/PreferencesProvider";
 import { OrdersStats, type OrderStatsView } from "./OrdersStats";
 import { useOrderStats } from "./useOrderStats";
-
-const FILTERS: FilterDef[] = [
-  {
-    kind: "multi-select",
-    key: "status",
-    label: "Durum",
-    options: [
-      { value: "PENDING", label: "Bekliyor" },
-      { value: "APPROVED", label: "Onaylı" },
-      { value: "PARTIAL_SHIPPED", label: "Kısmi Sevk" },
-      { value: "COMPLETED", label: "Tamamlandı" },
-      { value: "CANCELLED", label: "İptal" },
-    ],
-  },
-  {
-    // "İş Emri" rollup filtresi — backend'de hesaplanır (OrderService.extraWhere →
-    // filter[woState]); rozet kolonuyla aynı semantik (work-order-rollup.ts).
-    kind: "multi-select",
-    key: "woState",
-    label: "İş Emri",
-    options: [
-      { value: "NONE", label: "İş emri yok" },
-      { value: "PLANNED", label: "Planlandı" },
-      { value: "IN_PROGRESS", label: "Üretimde" },
-      { value: "COMPLETED", label: "Üretildi" },
-    ],
-  },
-  { kind: "multi-lookup", key: "customerId", label: "Müşteri", service: customerService, queryKey: "customers" },
-  {
-    // Şube SEÇİLEN MÜŞTERİ(LER)E bağlı (dependent-lookup): müşteri seçilmeden
-    // pasif, seçilince yalnız o müşterilerin şubeleri. Müşteri ÇOKLU olabilir —
-    // ham CSV `/api/customer-branches`e aynen geçer, BaseService onu `in` yapar.
-    // Backend filter[branchId] (scalar) otomatik.
-    kind: "dependent-lookup",
-    key: "branchId",
-    label: "Şube",
-    dependsOn: "customerId",
-    queryKey: "branch-lookup",
-    placeholderNoParent: "Şube (önce müşteri)",
-    fetchOptions: (customerId) =>
-      loadAllForPicker(branchLookupService, {
-          sortBy: "name",
-          sortOrder: "asc",
-          filters: { isActive: "true", customerId },
-        })
-        .then((r) => r.data),
-    getLabel: (it) => {
-      const b = it as Partial<BranchLookupItem> & { id: string };
-      if (!b.name) return b.id;
-      return b.city ? `${b.name} (${b.city})` : b.name;
-    },
-  },
-  // Kumaş/renk kalem-içi filtredir (`OrderService.extraWhere` → `lines.some`).
-  // Çoklu seçimde de TEK `some` bloğu kalır: kumaş ∈ seçilenler VE renk ∈
-  // seçilenler AYNI kalemde eşleşmeli ("kırmızı VEYA mavi patos kalemi").
-  { kind: "multi-lookup", key: "itemId", label: "Kumaş", service: itemService, queryKey: "items" },
-  { kind: "multi-lookup", key: "colorId", label: "Renk", service: colorService, queryKey: "colors" },
-  {
-    kind: "dateRange",
-    label: "Tarih",
-    defaultField: "createdAt",
-    fieldOptions: [
-      { value: "createdAt", label: "Sipariş Tarihi" },
-      { value: "deadline", label: "Termin" },
-    ],
-  },
-];
 
 const QUERY_KEY = "orders";
 
@@ -246,6 +174,7 @@ export function OrdersPage() {
   const [selected, setSelected] = useState<Order | null>(null);
   const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [stockLineOpen, setStockLineOpen] = useState(false);
   const [editing, setEditing] = useState<Order | null>(null);
   // İdempotency anahtarı — create mantıksal deneme kimliği (kk1.md). Form create modunda
   // her açılışta, başarılı create'te ve kesin 4xx'te yenilenir; belirsiz hatada SABİT kalır
@@ -297,22 +226,24 @@ export function OrdersPage() {
     [pricingEnabled, productionEnabled],
   );
   const filters = useMemo(
-    () => resolveOrderFilters(FILTERS, productionEnabled),
+    () => resolveOrderFilters(ORDER_FILTERS, productionEnabled),
     [productionEnabled],
   );
 
-  const { showCancelled, setShowCancelled, forceFilters } = useHideCancelled();
+  const { showCancelled, setShowCancelled, forceFilters } = useHideCancelledInUrl();
+  const persistFilters = useMemo(() => orderPersistConfig(filters, productionEnabled), [filters, productionEnabled]);
 
-  const { table, query, search, setSearch, pagination, fetchAll } = useDataTable<Order>({
+  const { table, query, search, setSearch, pagination, fetchAll, listScope, filtersReady } = useDataTable<Order>({
     queryKey: QUERY_KEY,
     fetchFn: orderService.listCursor,
     columns,
     defaultPageSize: 50,
     forceFilters,
+    persistFilters,
   });
 
-  // ── Özet şeridi ──────────────────────────────────────────────────────────
-  const statsQuery = useOrderStats(forceFilters);
+  // ── Özet şeridi ── (kayıtlı süzgeç geri yüklenene dek beklenir: çift istek yok)
+  const statsQuery = useOrderStats(forceFilters, filtersReady);
   const { prefs, setPreference, ready: prefsReady } = usePreferences();
   const statsView: OrderStatsView = prefs.orders?.statsView ?? "onerilen";
   const setStatsView = (v: OrderStatsView) =>
@@ -424,21 +355,12 @@ export function OrdersPage() {
         }
       />
 
-      <DataTableToolbar
+      <StockLineExportDialog
+        open={stockLineOpen}
+        onOpenChange={setStockLineOpen}
         fetchAll={fetchAll}
-        search={search}
-        onSearchChange={setSearch}
-        placeholder="Sipariş no, iş emri no, firma veya kumaş ara..."
-        table={table}
-        exportName="Siparişler"
-        actions={
-          <ToolbarToggle
-            checked={showCancelled}
-            onCheckedChange={setShowCancelled}
-            label="İptalleri göster"
-            title="İptal edilmiş siparişler varsayılan olarak gizlidir."
-          />
-        }
+        listScope={listScope}
+        productionEnabled={productionEnabled}
       />
       {/* ⚠️ SIRA SÖZLEŞMESİ (2026-09-04): özet şerit FİLTRELERİN ÜSTÜNDE.
           Kullanıcı gerekçesi: şerit "hangi kümeyi süzüyorum"un cevabı; filtre
@@ -458,13 +380,39 @@ export function OrdersPage() {
         />
       </div>
 
-      {/* 30 günlük varsayılan pencere KALDIRILDI (2026-08-26, kullanıcı kararı):
-          "ABC Tekstil'in 200 siparişi" sorusu pencere açıkken cevaplanamıyordu.
-          Sıralama maliyeti `orders_active_createdAt_idx` ile karşılanıyor.
-          ⚠️ Liste `filters` (rejim-duyarlı) kullanır, ham `FILTERS` DEĞİL —
-          ticaret kurulumunda üretim filtreleri süzülür (`resolveOrderFilters`).
-          Satır TEK SATIR + yatay kaydırma: `OrdersFilterRow`. */}
-      <OrdersFilterRow filters={filters} />
+      {/* 30 günlük varsayılan pencere KALDIRILDI (2026-08-26, kullanıcı kararı). Filtreler TEK SATIR
+          (2026-11-06): arama + Görünüm ("Nerede?" sekmeleri) + Termin penceresi + kutular + "+ Filtre".
+          ⚠️ Rejim-duyarlı `filters` verilir, ham `ORDER_FILTERS` DEĞİL (ticarette üretim süzgeci düşer). */}
+      <OrdersFilterRow
+        filters={filters}
+        productionEnabled={productionEnabled}
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Sipariş no, iş emri no, firma veya kumaş ara..."
+        showCancelled={showCancelled}
+        setShowCancelled={setShowCancelled}
+        forceFilters={forceFilters}
+        cancelledUrlKey={SHOW_CANCELLED_PARAM}
+        trailing={
+          <>
+            <SavedViewsMenu compact />
+            <DataTableTools
+              table={table}
+              exportName="Siparişler"
+              fetchAll={fetchAll}
+              compact
+              extraExports={[
+                {
+                  key: "stock-line",
+                  label: "Excel (stok kalemi bazında)…",
+                  title: "Kumaş + renk başına tek satır: sipariş, sevk, açık, üretimde, depoda hazır",
+                  onSelect: () => setStockLineOpen(true),
+                },
+              ]}
+            />
+          </>
+        }
+      />
 
       <DataTable<Order>
         table={table}

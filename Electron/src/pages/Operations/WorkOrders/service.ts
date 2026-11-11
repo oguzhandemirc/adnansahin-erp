@@ -1,6 +1,7 @@
 import { createCrudService } from "@/services/crudService";
 import apiClient from "@/services/apiClient";
-import type { ApiResponse } from "@/types/api";
+import type { ApiResponse, ListScope } from "@/types/api";
+import { buildScopeQueryString } from "@/lib/query-builder";
 import type { TravelerCardConfig } from "@/services/featureFlagService";
 import type {
   WorkOrder,
@@ -599,6 +600,17 @@ export const workOrderService = {
   quickStart: (payload: QuickStartPayload): Promise<ApiResponse<QuickStartResult>> =>
     apiClient
       .post<ApiResponse<QuickStartResult>>("/api/work-orders/quick-start", payload)
+      .then((r) => r.data),
+
+  /**
+   * "Şu an hangi fasonda / hangi aşamada" seçenekleri. Listenin O ANKİ kapsamı (süzgeç +
+   * arama + tarih) aynen gider; sunucu faceted sayar → seçenek sayısı = seçilince liste toplamı.
+   */
+  whereOptions: (scope?: ListScope) =>
+    apiClient
+      .get<ApiResponse<WorkOrderWhereOptions>>(
+        `/api/work-orders/where-options${scope ? buildScopeQueryString(scope) : ""}`,
+      )
       .then((r) => r.data),
 };
 
@@ -1275,4 +1287,15 @@ export interface DispatchDyeOverlay {
   stepNote: string | null;
   /** Sevk iptal/kabul edildiyse talimat düzenlenemez (editör disabled). */
   instructionLocked: boolean;
+}
+
+/** `GET /api/work-orders/where-options` yanıtı — sayıya göre azalan, sonra ad. */
+export interface WorkOrderPlaceOption {
+  id: string;
+  name: string;
+  workOrderCount: number;
+}
+export interface WorkOrderWhereOptions {
+  firms: WorkOrderPlaceOption[];
+  stages: WorkOrderPlaceOption[];
 }

@@ -1,37 +1,55 @@
-import { FilterBar, type FilterDef } from "@/components/data-table/FilterBar";
+import { useMemo, type ReactNode } from "react";
+import type { FilterDef } from "@/components/data-table/FilterBar";
+import { FilterRow } from "@/components/data-table/filter-row/FilterRow";
+import { dateRowFilter, defRowFilter, localToggleRowFilter, urlToggleRowFilter } from "@/components/data-table/filter-row/def-row-filters";
+import type { RowFilter } from "@/components/data-table/filter-row/row-filter";
+import { FASON_FIRMA_KEY, FASON_GUN_KEY, NEREDE_FILTER_KEY } from "./order-nerede";
+import { FasonFirmaFilter, FasonGunFilter, OrdersViewSelect } from "./order-where-filters";
+
+/** Satırda hep duran süzgeçler; geri kalanı "+ Filtre"de (kullanıcı tasarımı 2026-11-06). */
+const PRIMARY_KEYS = ["customerId", "status"];
+
+export interface OrdersFilterRowProps {
+  /** Rejime göre süzülmüş tanımlar (`resolveOrderFilters`) — ticarette üretim süzgeci yok. */
+  filters: FilterDef[];
+  productionEnabled: boolean;
+  search: string;
+  onSearchChange: (v: string) => void;
+  placeholder: string;
+  showCancelled: boolean;
+  setShowCancelled: (v: boolean) => void;
+  forceFilters: Record<string, string>;
+  /** "İptaller dahil" URL'de duruyorsa anahtarı — ✕/Temizle onu da TEK URL yazımıyla siler. */
+  cancelledUrlKey?: string;
+  trailing?: ReactNode;
+}
 
 /**
- * Sipariş filtreleri — TEK SATIR + yatay kaydırma (2026-09-04, kullanıcı kararı).
- *
- * Sipariş ekranında yedi filtre var (durum · iş emri · müşteri · şube · kumaş ·
- * renk · tarih). Ortak `FilterBar` satırı `flex-wrap` olduğu için dar pencerede
- * İKİ-ÜÇ satıra taşıyor ve listeye kalan dikey alanı yiyordu; özet şeridi de
- * üste alınınca bu kayıp iyice görünür oldu. Çözüm dikeyde büyümek yerine
- * yatayda kaydırmak: satır tek kalır, taşan filtreler sağa kayar.
- *
- * ⚠️ ORTAK BİLEŞENE DOKUNULMADI — kural `FilterBar`ın kendisine değil, YALNIZ
- * sipariş ekranındaki örneğine uygulanır. `[&>div]` seçicisi `FilterBar`ın kök
- * `div`'ini hedefler; arbitrary-variant'ın özgüllüğü (0,1,1) kökteki
- * `flex-wrap` sınıfını (0,1,0) yener. `[&>div>*]:shrink-0` ise filtre
- * kontrollerinin `min-w-[140px]` tabanının altına ezilmesini engeller.
- *
- * ⚠️ Radix popover/select içerikleri PORTAL'a (document.body) çizilir; bu
- * yüzden `overflow-x-auto` kabı açılır listeleri KIRPMAZ.
- *
- * ⚠️ Kapsayıcıdaki `shrink-0` LOAD-BEARING: `PageShell` bir dikey flex kabıdır
- * ve `overflow` görünür olmayan bir flex çocuğunda `min-height: auto` SIFIRA
- * düşer — yani dikey alan daralınca bu satır ezilip kaybolabilirdi (eski çıplak
- * `FilterBar` görünür overflow'lu olduğu için bu riski taşımıyordu).
- *
- * Bekçi: `orders-layout.guard.test.tsx`.
+ * Siparişler — TEK SATIR filtre çubuğu:
+ * `[Ara][Görünüm][Termin][Müşteri][Sevk durumu][…][+ Filtre] … [Temizle][Kayıtlı][Sütunlar]`.
+ * Süzme SUNUCUDA; çubuk yalnız URL yazar (liste · cursor · özet şeridi tek where).
  */
-export const ORDERS_FILTER_ROW_CLASS =
-  "shrink-0 overflow-x-auto [&>div]:flex-nowrap [&>div>*]:shrink-0";
+export function OrdersFilterRow(p: OrdersFilterRowProps) {
+  const { filters, productionEnabled, showCancelled, setShowCancelled, forceFilters, cancelledUrlKey } = p;
+  const { primary, more } = useMemo(() => {
+    const date = filters.find((f): f is Extract<FilterDef, { kind: "dateRange" }> => f.kind === "dateRange");
+    const keyed = filters.filter((f): f is Exclude<FilterDef, { kind: "dateRange" }> => f.kind !== "dateRange");
+    const head: RowFilter[] = [
+      { id: "nerede", label: "Görünüm", keys: [NEREDE_FILTER_KEY], render: ({ autoOpen }) => <OrdersViewSelect productionEnabled={productionEnabled} forceFilters={forceFilters} autoOpen={autoOpen} /> },
+      ...(date ? [dateRowFilter(date, { field: "deadline", label: "Termini geçmiş" })] : []),
+      ...PRIMARY_KEYS.flatMap((k) => keyed.filter((d) => d.key === k).map((d) => defRowFilter(d, filters))),
+    ];
+    const tail: RowFilter[] = keyed.filter((d) => !PRIMARY_KEYS.includes(d.key)).map((d) => defRowFilter(d, filters));
+    if (productionEnabled) {
+      tail.push(
+        { id: "fasonFirma", label: "Fason firma", keys: [FASON_FIRMA_KEY], render: ({ autoOpen }) => <FasonFirmaFilter autoOpen={autoOpen} /> },
+        { id: "fasonGun", label: "Fasonda gün", keys: [FASON_GUN_KEY], render: ({ autoOpen }) => <FasonGunFilter autoOpen={autoOpen} /> },
+      );
+    }
+    // Etkinken "İptaller dahil" kutusu, ✕ varsayılana (gizli) döndürür. URL'deyse ✕/Temizle anahtarı siler.
+    tail.push(cancelledUrlKey ? urlToggleRowFilter("iptal", "İptaller dahil", cancelledUrlKey, setShowCancelled) : localToggleRowFilter("iptal", "İptaller dahil", showCancelled, setShowCancelled));
+    return { primary: head, more: tail };
+  }, [filters, productionEnabled, forceFilters, showCancelled, setShowCancelled, cancelledUrlKey]);
 
-export function OrdersFilterRow({ filters }: { filters: FilterDef[] }) {
-  return (
-    <div data-testid="orders-filter-row" className={ORDERS_FILTER_ROW_CLASS}>
-      <FilterBar filters={filters} />
-    </div>
-  );
+  return <FilterRow search={p.search} onSearchChange={p.onSearchChange} placeholder={p.placeholder} primary={primary} more={more} trailing={p.trailing} />;
 }

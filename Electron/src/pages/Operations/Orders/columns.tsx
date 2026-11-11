@@ -1,14 +1,12 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { AlertTriangle } from "lucide-react";
-import { isMeasuredUnit } from "@/lib/item-unit";
 import { safeFormat } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { StatusBadge, orderStatusTones } from "@/components/operations/StatusBadge";
+import { StatusBadge } from "@/components/operations/StatusBadge";
 import { DeadlineBadge } from "@/components/operations/DeadlineBadge";
 import { SortableHeader } from "@/components/data-table/SortableHeader";
 import { useOpenTarget } from "@/components/layout/tabs/use-tab-target";
-import { orderStatusLabels } from "@/types/enums";
 import {
   collectLinkedWorkOrders,
   deriveWoRollup,
@@ -17,33 +15,18 @@ import {
   woRollupTones,
 } from "./work-order-rollup";
 import { deriveDeadlineRisk } from "./deadline-risk";
+import { neredeExportText } from "./order-nerede";
+import { NeredeCell, SevkCell } from "./OrderNeredeCells";
+import {
+  dayText,
+  distinctLineLabels,
+  lineLabelsText,
+  orderMetreParts,
+  orderMetreText,
+  orderSevkText,
+  totalAmountText,
+} from "./order-cell-text";
 import type { Order, OrderLine } from "./types";
-
-/**
- * Sipariş kalemlerindeki benzersiz kumaş/renk etiketleri — her zaman BİZDEKİ ad.
- * Satırdaki müşteri override'ı (customerItemName/customerColorName) burada
- * bilinçli basılmaz: override yalnız adın ilk girildiği siparişin satırında dolu
- * olduğundan (sonraki siparişlerde alan kilitli → NULL) aynı kumaş listede iki
- * farklı adla görünüyordu. Müşterideki ad detay panelinde "Müşteride:" rozetiyle
- * etiketli gösterilir. Renksiz kalemler renk listesine girmez.
- */
-function distinctLineLabels(
-  lines: OrderLine[] | undefined,
-  kind: "item" | "color",
-): { key: string; label: string; hex?: string | null }[] {
-  const map = new Map<string, { label: string; hex?: string | null }>();
-  for (const l of lines ?? []) {
-    if (kind === "item") {
-      const label = l.item?.name;
-      if (label && !map.has(l.itemId)) map.set(l.itemId, { label });
-    } else {
-      if (!l.colorId) continue;
-      const label = l.color?.name;
-      if (label && !map.has(l.colorId)) map.set(l.colorId, { label, hex: l.color?.hex });
-    }
-  }
-  return [...map.entries()].map(([key, v]) => ({ key, ...v }));
-}
 
 function LineLabelsCell({
   lines,
@@ -89,16 +72,15 @@ function LineLabelsCell({
   );
 }
 
-/** Dışa aktarma metni: rollup etiketi + (n) — NONE ise "—". */
+/** Dışa aktarma metni: yalnız rollup etiketi — NONE ise "—". Sayı Excel'de ayrı
+ *  "İE sayısı" sütunundadır (metne gömülü sayı süzülemez/toplanamaz). */
 function rollupExportText(order: Order): string {
-  const { state, activeCount } = deriveWoRollup(order.lines);
-  if (state === "NONE") return "—";
-  const label = woRollupLabels[state];
-  return activeCount > 1 ? `${label} (${activeCount})` : label;
+  const { state } = deriveWoRollup(order.lines);
+  return state === "NONE" ? "—" : woRollupLabels[state];
 }
 
 /**
- * "İş Emri" rollup hücresi (named — rules-of-hooks: useOpenTarget hook'u).
+ * "Üretim" (iş emri) rollup hücresi (named — rules-of-hooks: useOpenTarget hook'u).
  * Tek aktif WO'da rozet tıklanabilir (İE detayını açar); birden çok WO'da pasif
  * rozet + sayaç, navigasyon detay panelindeki listeden yapılır.
  */
@@ -158,6 +140,17 @@ function WorkOrderRollupCell({ order }: { order: Order }) {
   );
 }
 
+/** "Metre" hücresi — Excel ile aynı parçalar (`orderMetreParts`); yüzde soluk. */
+function MetreCell({ order }: { order: Order }) {
+  const p = orderMetreParts(order);
+  if (!p) return <span className="text-muted-foreground text-xs">—</span>;
+  return (
+    <span className="whitespace-nowrap tabular-nums text-xs">
+      {p.qty} <span className="text-muted-foreground">({p.pct})</span>
+    </span>
+  );
+}
+
 /**
  * Termin hücresi — DeadlineBadge'in soluna koşullu risk üçgeni. DeadlineBadge'e
  * dokunulmaz (WorkOrders ile paylaşılan saf tarih bileşeni); risk sinyali
@@ -191,25 +184,22 @@ function DeadlineCell({ order }: { order: Order }) {
  */
 export function buildOrderColumns(pricingEnabled: boolean, productionEnabled = true): ColumnDef<Order>[] {
   return [
-    ...(productionEnabled ? orderColumns : orderColumns.filter((c) => c.id !== "workOrder")),
+    // "Nerede?" de üretimle düşer: üretimsiz firmada her açık sipariş "İş emri açılmadı" derdi.
+    ...(productionEnabled
+      ? orderColumns
+      : orderColumns.filter((c) => c.id !== "workOrder" && c.id !== "nerede")),
     ...(pricingEnabled
       ? [
           {
             id: "totalAmount",
             header: "Tutar",
+            meta: { label: "Tutar", exportValue: (o: Order) => totalAmountText(o) ?? "" },
             cell: ({ row }) => {
-              const o = row.original;
-              if (!o.totalAmount) {
+              const text = totalAmountText(row.original);
+              if (!text) {
                 return <span className="text-muted-foreground text-xs">—</span>;
               }
-              return (
-                <span className="tabular-nums text-xs">
-                  {Number(o.totalAmount).toLocaleString("tr-TR", { useGrouping: false,
-                    minimumFractionDigits: 2,
-                  })}{" "}
-                  {o.currency}
-                </span>
-              );
+              return <span className="tabular-nums text-xs">{text}</span>;
             },
           } as ColumnDef<Order>,
         ]
@@ -240,78 +230,63 @@ export const orderColumns: ColumnDef<Order>[] = [
   {
     id: "items",
     header: "Kumaş",
-    meta: { label: "Kumaş" },
+    meta: { label: "Kumaş", exportValue: (o: Order) => lineLabelsText(o.lines, "item") },
     cell: ({ row }) => <LineLabelsCell lines={row.original.lines} kind="item" />,
   },
   {
     id: "colors",
     header: "Renk",
-    meta: { label: "Renk" },
+    meta: { label: "Renk", exportValue: (o: Order) => lineLabelsText(o.lines, "color") },
     cell: ({ row }) => <LineLabelsCell lines={row.original.lines} kind="color" />,
   },
   {
     accessorKey: "orderDate",
     header: () => <SortableHeader field="orderDate" label="Sipariş Tarihi" />,
-    meta: { label: "Sipariş Tarihi" },
+    meta: { label: "Sipariş Tarihi", exportValue: (o: Order) => dayText(o.orderDate) },
     cell: ({ row }) => safeFormat(row.original.orderDate, "dd.MM.yyyy"),
   },
   {
     accessorKey: "deadline",
     header: () => <SortableHeader field="deadline" label="Termin" />,
-    meta: { label: "Termin" },
+    meta: { label: "Termin", exportValue: (o: Order) => dayText(o.deadline) },
     cell: ({ row }) => <DeadlineCell order={row.original} />,
   },
   {
     id: "lines",
     header: () => <SortableHeader field="lineCount" label="Kalem" />,
-    meta: { label: "Kalem" },
+    meta: { label: "Kalem", exportValue: (o: Order) => o.lines?.length ?? 0 },
     cell: ({ row }) => <Badge variant="muted">{row.original.lines?.length ?? 0}</Badge>,
   },
   {
+    // TEK sevk sütunu (eski "Sevk" + durum rozeti birleşti): günlük dil, BRÜT sevk;
+    // ekran, Excel ve PDF aynı `orderSevkText`i yazar.
     id: "shipped",
-    header: () => <SortableHeader field="shippedQty" label="Sevk" />,
-    meta: { label: "Sevk" },
-    cell: ({ row }) => {
-      const o = row.original;
-      // Yalnız METRE satırları toplanır: kg/adet satırın karşılaması ölçülmez,
-      // paydaya girseydi sipariş asla %100 görünmezdi (ve kg + m toplanamaz).
-      const requested = (o.lines ?? [])
-        .filter((l) => isMeasuredUnit(l.unit))
-        .reduce((s, l) => s + Number(l.quantity ?? 0), 0);
-      if (requested === 0) {
-        return <span className="text-muted-foreground text-xs">—</span>;
-      }
-      const shipped = o.shippedQty ?? 0;
-      const pct = Math.min(100, Math.round((shipped / requested) * 100));
-      const fmt = (n: number) =>
-        n.toLocaleString("tr-TR", { useGrouping: false, maximumFractionDigits: 1 });
-      return (
-        <span className="tabular-nums text-xs">
-          {fmt(shipped)}/{fmt(requested)} m
-          <span className="text-muted-foreground ml-1">({pct}%)</span>
-        </span>
-      );
-    },
+    header: "Sevk durumu",
+    meta: { label: "Sevk durumu", exportValue: (o: Order) => orderSevkText(o) },
+    cell: ({ row }) => <SevkCell order={row.original} />,
+  },
+  {
+    // Gönderilen / istenen metre — gönderilmemiş siparişte de istenen metre görünür
+    // (1.3.10'da cümleye dönünce listeden düşmüştü). Sıralama sevk edilen metreye göre.
+    id: "metre",
+    header: () => <SortableHeader field="shippedQty" label="Metre" />,
+    meta: { label: "Metre", exportValue: (o: Order) => orderMetreText(o) },
+    cell: ({ row }) => <MetreCell order={row.original} />,
+  },
+  {
+    id: "nerede",
+    header: "Nerede?",
+    meta: { label: "Nerede?", exportValue: (o: Order) => neredeExportText(o) },
+    cell: ({ row }) => <NeredeCell order={row.original} />,
   },
   {
     id: "workOrder",
-    header: "İş Emri",
+    header: "Üretim",
     meta: {
-      label: "İş Emri",
+      label: "Üretim",
       exportValue: (o: Order) => rollupExportText(o),
+      exportExtra: [{ label: "İE sayısı", value: (o: Order) => deriveWoRollup(o.lines).activeCount }],
     },
     cell: ({ row }) => <WorkOrderRollupCell order={row.original} />,
-  },
-  {
-    accessorKey: "status",
-    header: () => <SortableHeader field="status" label="Durum" />,
-    meta: { label: "Durum" },
-    cell: ({ row }) => (
-      <StatusBadge
-        status={row.original.status}
-        labels={orderStatusLabels}
-        tones={orderStatusTones}
-      />
-    ),
   },
 ];

@@ -17,6 +17,233 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-07d",
+      "baslik": "Her girişte temiz sekmeler; kartelalık stok; listelerde son kullanılan süzgeçler hatırlanır",
+      "surumler": {
+        "panel": "1.3.15"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "Panelden çıkış yapınca ya da oturum düşüp yeniden giriş yapınca eski sekmeler açılmaz; program tek \"Anasayfa\" sekmesiyle başlar. Programı kapatıp yeniden açınca da sekmeler temizdir. Sayfayı yenilemek (F5) açık sekmeleri korur."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Kumaş Stoğu'nda sekmeler tek satırda kaldı; durum sekmeleri ile yer sekmeleri arasına ayraç geldi. \"Bitmiş Depo\" sekmesinde süzgeç satırının sağına \"Kartelalık\" kutusu eklendi: işaretlenince yalnız kartelalık işaretli toplar listelenir, üstteki toplam sayılar da aynı topları sayar. \"Fire dahil\" seçeneği \"+ Filtre\" menüsündedir."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "\"Kartela Takibi\" sayfasına \"Kartelalık Stok\" sekmesi eklendi: depoda duran, kartelalık işaretli bitmiş toplar listelenir; satırlar seçilip \"Sevke ekle\" ile doğrudan kartela sevkine alınır (\"Kartela işlemi yapabilir\" yetkisi gerekir). \"Yeni Sevk\" penceresindeki \"Listeden Seç\" önce kartelalık topları gösterir; gerekirse \"Tüm bitmiş\" seçilir."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Listelerin üstündeki süzgeçler tek satıra indi ve son kullandığınız süzgeçler kullanıcınıza kaydedilir: ekrandan çıkıp geri gelince ya da program yeniden açılınca liste aynı süzgeçlerle gelir. Arama yazısı kaydedilmez. \"Son 7 gün\" gibi göreli tarih seçimleri her açılışta bugüne göre yeniden hesaplanır. Sağdaki \"Temizle\" bütün süzgeçleri kaldırır; kayıt da boşalır. Bu ekranlarda geçerli: Siparişler, İş Emirleri, Sevkiyatlar, Kumaş Stoğu (her sekme ayrı), Kartela Takibi, Müşteriler, Cariler, Sevk Edilenler (Muhasebe), İadeler, Leventler, Dokuma İş Emirleri, Çuvallar ve Top Arşivi."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "İş Emirleri ve Sevkiyatlar kayıtlı süzgeç yokken son 30 günü gösterir. Barkod okutarak ya da başka ekrandan bağlantıyla açılan liste (örneğin bir partinin çuvalları) kayıtlı süzgeci uygulamaz; gelen seçimi gösterir ve kayıtlı süzgeci bozmaz. Çuvallar'da müşteri, şube ve parti seçimi kaydedilmez. Bu sürüm için sunucu güncellemesi gerekmez."
+        }
+      ]
+    },
+    {
+      "id": "2026-11-07c",
+      "baslik": "Stok kalemi Excel'inde depodaki tüm toplar",
+      "surumler": {
+        "panel": "1.3.14"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Siparişler ekranında \"Dışa aktar\" menüsündeki \"Excel (stok kalemi bazında)…\" penceresine yeni \"Depoda (tümü)\" sütunu eklendi: depoda duran bütün bitmiş toplar, çuvala girmiş ya da sevkiyata ayrılmış olanlar da dahil. Eski sütunun adı \"Depoda hazır (serbest)\" oldu; o sütun eskisi gibi yalnız çuvala ve sevkiyata girmemiş topları sayar. Yeni sütun yalnız top listesini görme yetkisi olan kullanıcılarda dolar."
+        }
+      ]
+    },
+    {
+      "id": "2026-11-07b",
+      "baslik": "Kartela sevki ve kabulü panelden; listelerde Dışa aktar menüsü",
+      "surumler": {
+        "panel": "1.3.13"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "\"Kartela Takibi\" sayfasında \"Yeni Sevk\" düğmesi var. Kartela firması seçilir, depodaki bitmiş toplar barkod okutularak ya da \"Listeden Seç\" ile eklenir, plaka, şoför ve not yazılır. \"Sevk Et\" deyince sevk kaydedilir ve çeki listesi açılır. Çuvala girmiş ya da sevkiyata okutulmuş toplar listede çıkmaz."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Yeni \"Bekleyen Kabul\" sekmesi kartela firmasından henüz dönmemiş sevkleri gösterir. \"Kabul Et\" ile her top için dönen kartela adedi girilir; adet girilen top tükenir, o kadar kartela doğar. İrsaliye numarası ve not da yazılabilir."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "\"Kabuller\" sekmesinde bir kabulün ayrıntısından \"Kabulü İptal Et\" seçilebilir. Önce geri alınacak kartelaların hepsi tek tek listelenir; iptal sebebi yazılınca kartelalar geri alınır ve tüketilen toplar yeniden \"Kartelada\" olur. Kabul belgesi silinmez. Kartelalardan biri sevkiyatta ya da çuvaldaysa iptal yapılmaz ve o kartelalar adıyla gösterilir."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "\"Sevkler\" sekmesinde henüz kabulü yapılmamış bir sevkin ayrıntısından \"Sevki İptal Et\" seçilebilir. İptal sebebi yazılır, toplar kartela firmasından depoya geri döner; sevk belgesi silinmez, iptal olarak kalır."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "Bu düğmeler yalnız \"Kartela işlemi yapabilir\" yetkisi olan kullanıcılara görünür; yalnız görme yetkisi olan kullanıcı sayfayı eskisi gibi okur."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "Listelerin üstündeki \"Sütunlar\" düğmesi artık yalnız hangi sütunların görüneceğini seçer. İndirme ayrı \"Dışa aktar\" düğmesine taşındı: açılan menüden Excel, PDF ya da CSV seçilir. Dosyaya eskisi gibi ekrandaki sütunlar ve süzgece uyan kayıtlar iner."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Siparişler ekranının üstündeki kalem bazında Excel düğmesi kalktı; yerine \"Dışa aktar\" menüsünde \"Excel (stok kalemi bazında)…\" var. Açılan pencerede ekrandaki süzgece uyan siparişler kumaş ve renge göre tek satırda toplanır: sipariş miktarı, sevk edilen, açık, üretimde, depoda hazır ve üretilmesi gereken metre. \"Renk\" ve \"En\" ayrımı açılıp kapatılabilir; birim her zaman ayrı tutulur, metre ile kg toplanmaz. \"Yalnız açığı olanlar\" seçilebilir ve dosyaya girecek sütunlar işaretlenir. \"Excel oluştur\" deyince yapılan seçim kullanıcıya kaydedilir, pencere bir sonraki açılışta aynı seçimle gelir."
+        }
+      ]
+    },
+    {
+      "id": "2026-11-07",
+      "baslik": "Stok raporunda kalem bazında liste",
+      "surumler": {
+        "panel": "1.3.12"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "\"Stok & Ölü Stok\" raporunda iki sekme var: \"Genel\" (bugünkü görünüm) ve \"Kalem bazında\". \"Kalem bazında\" sekmesi rafta duran malı iki tabloda gösterir: \"Ham\" tablosunda kumaş başına top sayısı ve metre, \"Bitmiş\" tablosunda kumaş, en, renk ve kat başına top sayısı ve metre. Dışarıdan alınan yarı mamul \"Ham\" tablosuna girmez; sevkiyata okutulmuş ya da çuvala girmiş toplar sayılmaz. Her tablonun altındaki toplam satırı \"Genel\" sekmesindeki \"Ham stok\" ve \"Bitmiş depo\" rakamlarıyla aynıdır."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Excel ve PDF o an açık sekmeyi indirir. \"Kalem bazında\" sekmesinden alınan Excel'de \"Ham\" ve \"Bitmiş\" iki ayrı sayfadır ve her sayfanın sonunda toplam satırı vardır."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "\"Kalem bazında\" sekmesi için sunucunun da güncellenmiş olması gerekir. Sunucu güncellenmeden açılırsa sekmede \"Bu rapor için sunucunun güncellenmesi gerekiyor.\" yazar; \"Genel\" sekmesi her zamanki gibi çalışır."
+        }
+      ]
+    },
+    {
+      "id": "2026-11-06",
+      "baslik": "Siparişlerde metre sütunu ve tek satır filtre; sekmeleri toplu kapatma",
+      "surumler": {
+        "panel": "1.3.11"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "duzeltme",
+          "metin": "Siparişler listesinde \"Sevk durumu\" sütununun yanına \"Metre\" sütunu geldi: gönderilen metre / istenen metre ve yüzdesi, örneğin 1.200 / 2.400 m (%50). Henüz hiç gönderilmemiş siparişte de istenen metre görünür. Yalnız metre kalemleri toplanır; yalnız kg ya da adet kalemi olan siparişte \"—\" yazar. Gönderilen metre iade düşülmeden yazılır. Başlığa tıklayınca liste gönderilen metreye göre sıralanır; Excel'e de aynı yazı çıkar."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "duzeltme",
+          "metin": "Sipariş yan panelindeki \"Sevk İlerlemesi\" listedeki \"Metre\" sütunuyla aynı sayıyı yazar. İptal edilen kalemin yalnız gönderilmiş kısmı hesaba girer; yan paneldeki toplam metre de binlik ayraçla yazılır."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Siparişler ekranındaki filtreler tek satıra indi, listeye daha çok yer kalır. \"Görünüm\" kutusu eski hızlı düğmeleri (Tümü, Bekleyenler, Fasonda, Sevke hazır, Kısmen gidenler, Gecikenler) tek açılır listede toplar; açınca her birinin yanında kaç sipariş olduğu yazar. \"Termin\" kutusuna tıklayınca açılan pencereden Bugün, Son 7 gün, Son 30 gün, Termini geçmiş ya da bir tarih aralığı seçilir; aynı pencerede termin yerine sipariş tarihi de seçilebilir. Şube, kumaş, renk, iş emri, fason firma, fasonda kaç gün ve \"İptaller dahil\" seçenekleri \"+ Filtre\" düğmesinden eklenir. Uygulanan her filtrenin kutusundaki ✕ yalnız o filtreyi kaldırır; sağdaki \"Temizle\" bütün filtreleri bir kerede kaldırır, arama yazısı yerinde kalır. Kayıtlı görünümler aynen çalışır. \"Kalem bazında Excel\" düğmesi sayfanın üstüne taşındı."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Sekmeleri toplu kapatma: sekmeye sağ tıklayınca \"Kapat\", \"Diğerlerini kapat\", \"Sağdakileri kapat\", \"Soldakileri kapat\" ve \"Tümünü kapat\" seçenekleri çıkar. Sekme şeridinin sağ ucundaki düğme ve Ctrl+Shift+W tüm sekmeleri kapatır. Birden çok sekme kapanınca çıkan bildirimdeki \"Geri al\" ile 6 saniye içinde hepsi eski sırasıyla geri açılır."
+        }
+      ]
+    },
+    {
+      "id": "2026-11-04c",
+      "baslik": "Sevk durumu günlük dille; iş emri şu an nerede süzgeci; başlık düzeni",
+      "surumler": {
+        "panel": "1.3.10"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "Siparişlerde \"Sevk durumu\" artık günlük dille yazılır: \"Henüz onaylanmadı\", \"Henüz gönderilmedi\", \"Bir kısmı gönderildi (1.200 / 2.400 m)\", \"Hepsi gönderildi\", \"Sipariş elle kapatıldı (… gönderildi)\", \"Sipariş iptal edildi\". Yan yana duran iki sevk sütunu tek sütunda birleşti; süzgeç, yan panel, Excel ve PDF aynı yazıyı kullanır."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "İş Emirleri ekranına iki süzgeç eklendi: \"Şu an hangi fasonda\" ve \"Şu an hangi aşamada\". Örneğin şu an NY Hisar boyahanesinde ya da şu an kurşunda topu olan iş emirlerini getirir. Plana değil, topun şu an bulunduğu yere bakar; her seçeneğin yanında, seçili diğer süzgeçlerle birlikte şu an oradaki iş emri sayısı yazar."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "duzeltme",
+          "metin": "Sipariş yan panelinde ve iş emri kapsama tablosunda metreler artık aynı yazılır; bir yerde 668, ötekinde 668,3 görünmez."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "duzeltme",
+          "metin": "İş emri detayında üstteki tuşlar ekrana sığmadığında artık alt satıra iner. İş emri numarası, durumu ve tipi tek satırda okunur; tuşlar başlığın üstüne binmez, yazılar kelime kelime alt alta kırılmaz. Tuşu çok olan diğer ekranların başlıkları da aynı şekilde düzeldi."
+        }
+      ]
+    },
+    {
+      "id": "2026-11-04b",
+      "baslik": "İş emrinden sipariş bağı koparma, Fasonda süzgeci; Siparişler nerede?",
+      "surumler": {
+        "panel": "1.3.9"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "İş Emirleri ekranına \"Fasonda\" süzgeci eklendi: seçince yalnız topu şu an boyahanede (fasonda) olan iş emirleri listelenir. Durum süzgeciyle birlikte kullanılabilir."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "İş emri detayına \"Sipariş Bağını Kopar\" tuşu eklendi: yanlış bağlanan sipariş kalemini iş emrinden ayırabilirsiniz. Kalan kalemlerin hepsi aynı renkse, iş emrinin rengini o renge çevirmeniz önerilir. Hedef kumaşı boş iş emrinde son bağ koparılamaz."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "Siparişler listesine \"Nerede?\" sütunu eklendi: her siparişin şu an ne durumda olduğunu tek cümleyle yazar (ör. \"İş emri açılmadı\", \"Tambur aşamasında · 4 top\", \"Fasonda – firma adı · 8 top · 3 gündür\", \"Sevke hazır · 6 top\", \"Hepsi gönderildi\"); termini geçen siparişte kırmızı \"Termini geçti\" yazısı çıkar. \"Sevk\" sütunu artık \"Henüz gönderilmedi\", \"Bir kısmı gönderildi (1.200 / 2.400 m)\" ya da \"Hepsi gönderildi\" yazar. Listenin üstündeki düğmelerle Bekleyenler, Fasonda, Sevke hazır, Kısmen gidenler ve Gecikenler tek tıkla süzülür; fason firmasını seçebilir, \"Fasonda X günden uzun\" kutusuna gün yazabilirsiniz. Siparişe tıklayınca yan panelde her iş emrinin hangi aşamada kaç top ve kaç metre olduğu ile son hareket saati görünür. Excel ve PDF ekrandaki yazının aynısını yazar; iş emri sayısı Excel'de ayrı \"İE sayısı\" sütunundadır. \"Durum\" sütununun adı \"Sevk durumu\", \"İş Emri\" sütununun adı \"Üretim\" oldu."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "Sevk irsaliyesinin Excel dosyasında tablo hücreleri çizgili gelir ve yazdırırken sayfa genişliğine sığar. İrsaliye Excel'inin altındaki brüt ve iade açıklamaları kaldırıldı (muhasebe fişinde duruyor); iptal edilmiş irsaliye uyarısı yerinde."
+        }
+      ]
+    },
+    {
+      "id": "2026-11-04",
+      "baslik": "Sipariş listesinin Excel dosyası ekrandakiyle aynı; kalem bazında Excel eklendi",
+      "surumler": {
+        "panel": "1.3.8"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "duzeltme",
+          "metin": "Siparişler ekranından indirilen Excel dosyasında Kumaş, Renk ve Sevk sütunları boş geliyordu; Kalem sütununda sayı yerine renk adları, tarihlerde saatli karışık bir yazı, Durum'da İngilizce kod, Tutar'da para birimsiz rakam çıkıyordu. Artık dosyada her sütun ekranda gördüğünüz yazıyla çıkar."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "duzeltme",
+          "metin": "İptal edilmiş kalemlerin kumaşı ve rengi sipariş listesinde artık görünmez; ekran ve Excel aynı bilgiyi gösterir."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Siparişler ekranına “Kalem bazında Excel” düğmesi eklendi: süzgece uyan tüm siparişlerin her kalemi ayrı bir satır olarak iner (sipariş no, müşteri, şube, kumaş, renk, özellikler, en, miktar, birim, fiyat, sevk edilen, kalan, termin, durum, iş emri, kalem notu). İptal edilmiş kalemler dosyaya girmez; fiyat sütunları yalnız listede tutarı görenlere çıkar."
+        }
+      ]
+    },
+    {
       "id": "2026-09-28c",
       "baslik": "Müşteri renk adı kumaşa göre girilebilir; irsaliyede aynı renkteki iki kumaş kendi adını basar; birleştirmeyi geri alma onarıldı",
       "surumler": {

@@ -21,12 +21,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PermissionGate } from "@/components/PermissionGate";
-import { StatusBadge, orderStatusTones } from "@/components/operations/StatusBadge";
 import { DeadlineBadge } from "@/components/operations/DeadlineBadge";
-import { orderStatusLabels } from "@/types/enums";
+import { SevkCell } from "./OrderNeredeCells";
 import { CoveragePanel } from "@/pages/Operations/WorkOrders/CoveragePanel";
 import { lineOpenMeasured } from "@/pages/Operations/WorkOrders/order-fulfillment";
 import { isMeasuredUnit, unitLabel } from "@/lib/item-unit";
+import { orderMetreParts, orderMetreProgress, orderQtyText } from "./order-cell-text";
 import { buildPicked, type PickedOrderLine } from "@/pages/Operations/WorkOrders/OrderPickerDialog";
 import { orderService } from "./service";
 import { returnsService } from "@/pages/Operations/Returns/service";
@@ -37,6 +37,7 @@ import { LinkedWorkOrdersCard } from "./LinkedWorkOrdersCard";
 import { RecordInfoButton } from "@/components/RecordInfoButton";
 import { OrderLineWoChips } from "./OrderLineWoChips";
 import { OrderShipmentsCard } from "./OrderShipmentsCard";
+import { OrderNeredeCard } from "./OrderNeredeCard";
 import type { Order, OrderLine } from "./types";
 import { useOrderLineCustomerNames } from "./useOrderLineCustomerNames";
 
@@ -103,7 +104,7 @@ export function OrderDetailSheet({
   const closeMut = useMutation({
     mutationFn: ({ id, r }: { id: string; r: string }) => orderService.manualClose(id, r),
     onSuccess: () => {
-      toast.success("Sipariş manuel olarak kapatıldı.");
+      toast.success("Sipariş elle kapatıldı.");
       fireConfetti();
       void qc.invalidateQueries({ queryKey: ["orders"] });
       setCloseOpen(false);
@@ -134,6 +135,8 @@ export function OrderDetailSheet({
   const totalQty = activeLines
     .filter((l) => isMeasuredUnit(l.unit))
     .reduce((acc, l) => acc + Number(l.quantity), 0);
+  const metreProgress = order ? orderMetreProgress(order) : null;
+  const metreParts = order ? orderMetreParts(order) : null;
   const isEditable = order && (order.status === "APPROVED" || order.status === "PARTIAL_SHIPPED");
   const isCancellable = order && order.status !== "COMPLETED" && order.status !== "CANCELLED";
   const canClose = order && (order.status === "PENDING" || order.status === "APPROVED" || order.status === "PARTIAL_SHIPPED");
@@ -178,11 +181,7 @@ export function OrderDetailSheet({
             <span className="font-mono">{order?.orderNumber}</span>
             {order && (
               <>
-                <StatusBadge
-                  status={order.status}
-                  labels={orderStatusLabels}
-                  tones={orderStatusTones}
-                />
+                <SevkCell order={order} />
                 {/* ⓘ — kim oluşturdu / en son kim değiştirdi (2026-08-17). */}
                 <RecordInfoButton
                   table="ORDER"
@@ -225,7 +224,7 @@ export function OrderDetailSheet({
                 <CardContent className="p-3">
                   <div className="text-xs text-muted-foreground">Toplam</div>
                   <div className="font-medium tabular-nums">
-                    {totalQty.toLocaleString("tr-TR", { useGrouping: false })} m
+                    {orderQtyText(totalQty, "MT")}
                   </div>
                   {unmeasuredLineCount > 0 && (
                     <div className="mt-1 text-[11px] text-amber-700">
@@ -236,22 +235,17 @@ export function OrderDetailSheet({
               </Card>
             </div>
 
-            {totalQty > 0 && (
+            {/* Listedeki "Metre" sütunuyla aynı kaynak (`orderMetreParts`). */}
+            {metreParts && metreProgress && (
               <Card>
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Sevk İlerlemesi</span>
                     <span className="font-medium tabular-nums">
-                      {order.shippedQty.toLocaleString("tr-TR", { useGrouping: false })} / {totalQty.toLocaleString("tr-TR", { useGrouping: false })} m
-                      <span className="ml-1 text-muted-foreground">
-                        (%{Math.round((order.shippedQty / totalQty) * 100)})
-                      </span>
+                      {metreParts.qty} <span className="text-muted-foreground">({metreParts.pct})</span>
                     </span>
                   </div>
-                  <AnimatedProgress
-                    value={(order.shippedQty / totalQty) * 100}
-                    className="mt-2 h-1.5"
-                  />
+                  <AnimatedProgress value={metreProgress.pct} className="mt-2 h-1.5" />
                 </CardContent>
               </Card>
             )}
@@ -289,7 +283,7 @@ export function OrderDetailSheet({
                     </span>
                     <span className="font-medium tabular-nums">
                       {returnsSummary.data.count} top ·{" "}
-                      {returnsSummary.data.totalQty.toLocaleString("tr-TR", { useGrouping: false })} m
+                      {orderQtyText(returnsSummary.data.totalQty, "MT")}
                     </span>
                   </div>
                 </CardContent>
@@ -298,6 +292,7 @@ export function OrderDetailSheet({
 
             {/* Bağlı iş emirleri — kaleme WO açıldıysa görünür; tıkta İE detayı
                 açılır (sheet kapanır). Bağ yoksa kart null döner. */}
+            <OrderNeredeCard orderId={order.id} status={order.status} open={open} />
             <LinkedWorkOrdersCard lines={order.lines} onNavigate={() => onOpenChange(false)} />
 
             {/* Sevkiyatlar drill-down — hangi sevkiyatlarla sevk edildi/bekliyor.
