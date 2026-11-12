@@ -7,6 +7,7 @@ import type { ShipmentListItem } from "@/pages/Operations/Shipments/types";
 import type { ReturnRow } from "@/pages/Operations/Returns/service";
 import type { CustomerOrderProfileRow } from "@/pages/Reports/Customer/service";
 import { SummaryTable, type Column } from "./SummarySection";
+import { SUMMARY_LIMIT } from "./customerSummaryService";
 
 const num = (n: number | string | null | undefined, d = 1) => formatNumber(n, d);
 const day = (iso: string | null | undefined) => safeFormat(iso, "dd.MM.yyyy");
@@ -26,7 +27,7 @@ const ORDER_COLS: Column<Order>[] = [
   {
     header: "Sevk",
     cell: (o) => (
-      <StatusBadge status={o.status} labels={{ [o.status]: orderSevkText(o) }} tones={{ [o.status]: orderSevkTone(o) }} />
+      <StatusBadge status={o.status} labels={{ [o.status]: orderSevkText(o) }} tones={{ [o.status]: orderSevkTone(o) }} className="px-1.5 py-0 text-[11px]" />
     ),
   },
 ];
@@ -49,7 +50,7 @@ const OPEN_COLS: Column<OpenLineRow>[] = [
 ];
 
 /** En çok bu kadar kalem satırı çizilir; fazlası "Tümünü gör"de. */
-export const OPEN_LINE_CAP = 15;
+export const OPEN_LINE_CAP = SUMMARY_LIMIT;
 
 export function OpenOrdersTable({ orders }: { orders: OpenOrder[] }) {
   const all = orders.flatMap((o) => o.lines.map((line) => ({ order: o.order, line })));
@@ -70,7 +71,7 @@ const SHIP_COLS: Column<ShipmentListItem>[] = [
   { header: "Şube", cell: (s) => <Clip text={s.branch?.name ?? ""} />, className: "w-full" },
   { header: "Top", cell: (s) => num(s._count.rolls, 0), align: "right" },
   { header: "Metre", cell: (s) => num(s.totalMeters), align: "right" },
-  { header: "Kg", cell: (s) => (s.kind === "DIRECT" ? "—" : num(s.totalKg)), align: "right" },
+  { header: "Kg", cell: (s) => (s.totalKg > 0 ? num(s.totalKg) : "—"), align: "right" },
   { header: "İade", cell: (s) => (s._count.returns > 0 ? `${s._count.returns} top` : "—"), align: "right" },
 ];
 
@@ -96,8 +97,6 @@ const PROFILE_COLS: Column<CustomerOrderProfileRow>[] = [
   { header: "En sık kumaş", cell: (p) => <Clip text={p.topItemName ?? ""} />, className: "w-full" },
   { header: "En sık renk", cell: (p) => <Clip text={p.topColorName ?? ""} w="max-w-[140px]" /> },
   { header: "En", cell: (p) => (p.topWidth == null ? "—" : num(p.topWidth, 0)), align: "right" },
-  { header: "Sipariş", cell: (p) => num(p.orderCount, 0), align: "right" },
-  { header: "Kalem", cell: (p) => num(p.lineCount, 0), align: "right" },
   { header: "Son sipariş", cell: (p) => day(p.lastOrderDate) },
 ];
 

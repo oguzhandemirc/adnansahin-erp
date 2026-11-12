@@ -37,7 +37,8 @@ export function CustomerSummaryStrip({ access, q }: Props) {
         key: "shipped",
         label: "Sevk (brüt)",
         value: `${formatNumber(ship.totalMeters, 1)} m`,
-        hint: `${formatNumber(ship.shipmentCount, 0)} sevk · ${formatNumber(ship.totalKg, 1)} kg`,
+        // Tartısız çuvalda kg toplamı 0'dır; "0 kg" yanıltır, yazılmaz.
+        hint: `${formatNumber(ship.shipmentCount, 0)} sevk${ship.totalKg > 0 ? ` · ${formatNumber(ship.totalKg, 1)} kg` : ""}`,
       });
     }
   }
