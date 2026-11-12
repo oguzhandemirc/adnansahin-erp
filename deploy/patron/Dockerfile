@@ -23,12 +23,15 @@ COPY sunucu/package.json sunucu/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY sunucu/ ./
 # generate: istemci + bu platformun şema motoru (çalışma anında ağ YOK — iç ağ internal).
+# typescript kilitte `devOptional` (prisma'nın isteğe bağlı eşi): --omit=dev onu BIRAKIR, --omit=optional düşürür
+# (yanında yalnız pg-cloudflare gider; Node'da yüklenmez). Prisma yapılandırmayı jiti ile okur, tsc istemez.
 RUN npx prisma generate \
  && npx prisma version \
  && npx tsc -p tsconfig.json \
  && npx tsc --ignoreConfig --outDir dist-cli --rootDir . --target es2022 --module commonjs --esModuleInterop \
       --strict --skipLibCheck --resolveJsonModule --types node scripts/tesis.ts scripts/db-rolleri.ts scripts/tesis-db.ts \
- && npm prune --omit=dev \
+ && npm prune --omit=dev --omit=optional \
+ && test ! -e node_modules/typescript && test ! -e node_modules/tsx && test ! -e node_modules/eslint \
  && test -f dist/server.js \
  && test -f dist-cli/scripts/tesis.js && test -f dist-cli/scripts/db-rolleri.js && test -f dist-cli/scripts/tesis-db.js \
  && ls node_modules/@prisma/engines | grep -q '^schema-engine-'
