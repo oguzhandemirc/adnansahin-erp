@@ -14,7 +14,7 @@ import { useSnapshot } from "../pano/useSnapshot";
 import { SectionHeader } from "../SectionHeader";
 import { useListCapability } from "../siparis/capabilities";
 import { makeStyles, useTokens } from "../theme-context";
-import { radius, space, TOUCH, typography } from "../tokens";
+import { space, TOUCH, typography } from "../tokens";
 import { kasaHareketiRow } from "./rows";
 
 const PROJECTION = "kasa-hareketi";
@@ -77,7 +77,7 @@ function CategoryFilter(p: { options: readonly CashCategoryOption[]; value: stri
 
 const useStyles = makeStyles((t) => ({
   filter: { marginBottom: space.m },
-  options: { marginTop: space.s, borderRadius: radius.cardInner, backgroundColor: t.surface, borderWidth: 1, borderColor: t.separator, overflow: "hidden" as const },
+  options: { marginTop: space.s, borderRadius: t.radius.cardInner, backgroundColor: t.surface, borderWidth: 1, borderColor: t.separator, overflow: "hidden" as const },
   option: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: space.l, gap: space.s },
   optionSep: { borderTopWidth: 1, borderTopColor: t.separator },
   optionText: { ...typography.body, color: t.text, flex: 1 },

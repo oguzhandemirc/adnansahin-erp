@@ -5,7 +5,7 @@ import type { AccountInviteResult } from "../api/wire";
 import { formatDateTime } from "../lib/format";
 import { Banner, Card } from "./kit";
 import { makeStyles, useTokens } from "./theme-context";
-import { radius, space, typography } from "./tokens";
+import { space, typography } from "./tokens";
 
 export function InviteShown({ r }: { r: AccountInviteResult }) {
   const t = useTokens();
@@ -34,7 +34,7 @@ export function InviteShown({ r }: { r: AccountInviteResult }) {
 
 const useStyles = makeStyles((t) => ({
   lead: { ...typography.body, color: t.text },
-  box: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, borderWidth: 1, borderRadius: radius.cardInner, padding: space.m, marginVertical: space.m },
+  box: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, borderWidth: 1, borderRadius: t.radius.cardInner, padding: space.m, marginVertical: space.m },
   code: { ...typography.headline, fontSize: 18, letterSpacing: 1, color: t.text, flex: 1 },
   hint: { ...typography.footnote, color: t.textMuted },
   until: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, marginTop: space.s },

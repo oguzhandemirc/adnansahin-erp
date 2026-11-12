@@ -57,7 +57,7 @@ describe("profil: görünüm", () => {
     expect(screen.getByTestId("sema").props.children).toBe("light");
     fireEvent.press(screen.getByTestId("tema-koyu"));
     expect(screen.getByTestId("sema").props.children).toBe("dark");
-    expect(store.set).toHaveBeenCalledWith("patron.tema", "koyu");
+    expect(store.set).toHaveBeenCalledWith("patron.gorunum", expect.stringContaining('"mode":"koyu"'));
     fireEvent.press(screen.getByTestId("tema-acik"));
     expect(screen.getByTestId("sema").props.children).toBe("light");
   });

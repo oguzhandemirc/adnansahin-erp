@@ -13,7 +13,7 @@ import { ListStates, SearchField } from "./siparis/parts";
 import { useRemoteList } from "./siparis/useRemoteList";
 import { makeStyles, useTokens } from "./theme-context";
 import { EMPTY_ICON, type IconName } from "./icons";
-import { FONT_SCALE, READABLE_MAX, TOUCH, radius, space, typography, type Domain } from "./tokens";
+import { FONT_SCALE, READABLE_MAX, TOUCH, space, typography, type Domain } from "./tokens";
 
 export interface Picked {
   readonly id: string;
@@ -150,7 +150,7 @@ const useStyles = makeStyles((t) => ({
     alignItems: "center" as const,
     gap: space.s,
     paddingHorizontal: space.m,
-    borderRadius: radius.control,
+    borderRadius: t.radius.control,
     borderWidth: 1,
     borderColor: t.separator,
     backgroundColor: t.surface,
@@ -165,7 +165,7 @@ const useStyles = makeStyles((t) => ({
   title: { ...typography.headline, color: t.text, flex: 1, textAlign: "center" as const },
   tools: { gap: space.s, paddingBottom: space.s },
   filter: { gap: space.xs },
-  options: { backgroundColor: t.surface, borderRadius: radius.cardInner, overflow: "hidden" as const, ...t.cardShadow },
+  options: { backgroundColor: t.surface, borderRadius: t.radius.cardInner, overflow: "hidden" as const, ...t.cardShadow },
   option: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, paddingHorizontal: space.l },
   optionSep: { borderTopWidth: 1, borderTopColor: t.separator },
   optionText: { ...typography.body, color: t.text, flex: 1 },

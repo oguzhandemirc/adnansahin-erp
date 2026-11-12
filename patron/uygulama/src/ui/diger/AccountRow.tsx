@@ -9,7 +9,7 @@ import type { IconName } from "../icons";
 import { ROLE_LABEL, RoleBadge, roleOf } from "../RoleBadge";
 import { StatusBadge } from "../StatusBadge";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, TOUCH, radius, space, typography } from "../tokens";
+import { FONT_SCALE, TOUCH, space, typography } from "../tokens";
 import { Avatar } from "./parts";
 
 export function lastSeen(a: Pick<Account, "sonGiris" | "durum" | "davetBitis">): string {
@@ -69,7 +69,7 @@ const useStyles = makeStyles((t) => ({
   badges: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, flexWrap: "wrap" as const, marginTop: space.xs },
   mail: { ...typography.subhead, color: t.textSecondary, marginTop: space.xs },
   seen: { ...typography.footnote, color: t.textMuted, marginTop: 1 },
-  capsule: { minHeight: TOUCH - 4, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingHorizontal: space.l, borderRadius: radius.chip, alignSelf: "flex-start" as const },
+  capsule: { minHeight: TOUCH - 4, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingHorizontal: space.l, borderRadius: t.radius.chip, alignSelf: "flex-start" as const },
   capsuleText: { ...typography.callout, fontWeight: "600" as const },
   off: { opacity: 0.45 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },

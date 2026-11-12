@@ -27,7 +27,7 @@ import { OrderRow, asObj, str } from "../../../src/ui/siparis/OrderRow";
 import { FactGroup, FactRow, ListStates, RolePill, StaleNote } from "../../../src/ui/siparis/parts";
 import { useRemoteList } from "../../../src/ui/siparis/useRemoteList";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
-import { FONT_SCALE, STRIPE, radius, space, tabularNums, typography } from "../../../src/ui/tokens";
+import { FONT_SCALE, space, tabularNums, typography } from "../../../src/ui/tokens";
 
 interface Amount { doviz: string; value: unknown }
 const amounts = (v: unknown, field: "bakiye" | "tutar"): Amount[] =>
@@ -43,7 +43,6 @@ function BalanceCard({ r }: { r: ProjectionRecord }) {
   const lock = cariLockView(k);
   return (
     <View style={s.card} testID={`cari-hesap-${r.id}`}>
-      <View style={[s.stripe, { backgroundColor: t.domain.finans.fg }]} />
       <View style={s.cardHead}>
         <IconChip domain="finans" icon="wallet-outline" />
         <Text style={s.cardTitle}>{cariKindLabel(k.tur)}</Text>
@@ -107,7 +106,6 @@ export default function CustomerDetail() {
       {r.data ? (
         <>
           <View style={s.card} testID="cari-kimlik">
-            <View style={[s.stripe, { backgroundColor: t.domain.cariler.fg }]} />
             <View style={s.cardHead}>
               <IconChip domain="cariler" icon="business-outline" size={44} />
               <View style={s.flex}>
@@ -165,8 +163,7 @@ export default function CustomerDetail() {
 }
 
 const useStyles = makeStyles((t) => ({
-  card: { backgroundColor: t.surface, borderRadius: radius.card, padding: space.l, paddingLeft: space.l + STRIPE, marginBottom: space.m, overflow: "hidden" as const, gap: space.s, ...t.cardShadow },
-  stripe: { position: "absolute" as const, left: 0, top: 0, bottom: 0, width: STRIPE },
+  card: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, paddingLeft: space.l, marginBottom: space.m, overflow: "hidden" as const, gap: space.s, ...t.cardShadow },
   cardHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
   cardTitle: { ...typography.headline, color: t.text, flex: 1 },
   flex: { flex: 1 },

@@ -14,7 +14,7 @@ import { Banner, Button, Card, Muted } from "./kit";
 import { ListGroup, ListRow, type ListRowProps } from "./ListRow";
 import { Empty, LoadingSkeleton, OfflineBand, ReadOnlyBand, SyncLateBand } from "./StateViews";
 import { makeStyles, useTokens } from "./theme-context";
-import { radius, space, tabularNums, typography, type Domain } from "./tokens";
+import { space, tabularNums, typography, type Domain } from "./tokens";
 import { UYGULAMA_ADI } from "../lib/kimlik";
 
 interface FieldRow {
@@ -148,11 +148,11 @@ const useFieldStyles = makeStyles((t) => ({
   sep: { borderTopWidth: 1, borderTopColor: t.separator },
   label: { ...typography.subhead, color: t.textSecondary, flexShrink: 1 },
   value: { ...typography.callout, ...tabularNums, color: t.text, flexShrink: 1, textAlign: "right" as const },
-  block: { backgroundColor: t.surfaceAlt, borderRadius: radius.cardInner, paddingHorizontal: space.m, paddingVertical: space.s, marginBottom: space.s },
+  block: { backgroundColor: t.surfaceAlt, borderRadius: t.radius.cardInner, paddingHorizontal: space.m, paddingVertical: space.s, marginBottom: space.s },
   blockTitle: { ...typography.headline, color: t.text, marginTop: space.xs },
   section: { ...typography.headline, color: t.text, marginBottom: space.s },
   stats: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.s },
-  stat: { flexGrow: 1, flexBasis: 140, backgroundColor: t.surfaceAlt, borderRadius: radius.cardInner, padding: space.m },
+  stat: { flexGrow: 1, flexBasis: 140, backgroundColor: t.surfaceAlt, borderRadius: t.radius.cardInner, padding: space.m },
   statLabel: { ...typography.caption, color: t.textSecondary },
   statValue: { ...typography.title2, ...tabularNums, color: t.text, marginTop: space.xs },
 }));

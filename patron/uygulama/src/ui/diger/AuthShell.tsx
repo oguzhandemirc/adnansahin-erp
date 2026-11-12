@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { UYGULAMA_ADI } from "../../lib/kimlik";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, radius, space, typography } from "../tokens";
+import { FONT_SCALE, space, typography } from "../tokens";
 
 export function AuthShell({ title, subtitle, step, children, footer }: {
   readonly title: string;
@@ -18,11 +18,11 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
   const t = useTokens();
   const s = useStyles();
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[s.flex, { backgroundColor: t.navy }]}>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[s.flex, { backgroundColor: t.color.primary }]}>
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         <View style={s.brand}>
           <View style={s.mark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <Ionicons name="stats-chart" size={34} color={t.gold} />
+            <Ionicons name="stats-chart" size={34} color={t.color.primarySoft} />
           </View>
           <Text style={s.brandName} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{UYGULAMA_ADI}</Text>
           <Text style={s.brandTag}>Fabrikanızın özeti, her an yanınızda</Text>
@@ -42,7 +42,7 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
         </View>
         {footer ? <View style={s.footer}>{footer}</View> : null}
         <View style={s.secure}>
-          <Ionicons name="lock-closed" size={13} color={t.onNavy.textMuted} />
+          <Ionicons name="lock-closed" size={13} color={t.color.onPrimary} />
           <Text style={s.secureText}>Parola + doğrulama kodu ile korunur</Text>
         </View>
       </ScrollView>
@@ -54,10 +54,10 @@ const useStyles = makeStyles((t) => ({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: "center" as const, padding: space.l, paddingVertical: space.xxl, width: "100%" as const, maxWidth: 480, alignSelf: "center" as const },
   brand: { alignItems: "center" as const, marginBottom: space.xl },
-  mark: { width: 72, height: 72, borderRadius: radius.card, backgroundColor: t.onNavy.surface, alignItems: "center" as const, justifyContent: "center" as const, marginBottom: space.l, borderWidth: 1, borderColor: t.onNavy.separator },
-  brandName: { ...typography.largeTitle, fontSize: 30, lineHeight: 36, color: t.onNavy.text, textAlign: "center" as const },
-  brandTag: { ...typography.subhead, color: t.onNavy.textSecondary, marginTop: space.xs, textAlign: "center" as const },
-  card: { borderRadius: radius.sheet, padding: space.xl, borderWidth: 1, borderColor: t.scheme === "dark" ? t.separator : t.surface, ...t.floatShadow },
+  mark: { width: 72, height: 72, borderRadius: t.radius.card, backgroundColor: t.color.primary2, alignItems: "center" as const, justifyContent: "center" as const, marginBottom: space.l, borderWidth: 1, borderColor: t.color.primary2 },
+  brandName: { ...typography.largeTitle, fontSize: 30, lineHeight: 36, color: t.color.onPrimary, textAlign: "center" as const },
+  brandTag: { ...typography.subhead, color: t.color.onPrimary, marginTop: space.xs, textAlign: "center" as const },
+  card: { borderRadius: t.radius.sheet, padding: space.xl, borderWidth: 1, borderColor: t.scheme === "dark" ? t.separator : t.surface, ...t.floatShadow },
   steps: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6, marginBottom: space.m },
   dot: { width: 8, height: 8, borderRadius: 4 },
   dotOn: { width: 22 },
@@ -67,5 +67,5 @@ const useStyles = makeStyles((t) => ({
   body: { marginTop: space.l },
   footer: { marginTop: space.l },
   secure: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "center" as const, gap: space.xs, marginTop: space.xl },
-  secureText: { ...typography.footnote, color: t.onNavy.textMuted },
+  secureText: { ...typography.footnote, color: t.color.onPrimary },
 }));

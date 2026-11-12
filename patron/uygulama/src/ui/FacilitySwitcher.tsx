@@ -9,7 +9,7 @@ import { IconChip } from "./IconChip";
 import { Banner, Button } from "./kit";
 import { StatusBadge } from "./StatusBadge";
 import { makeStyles, useTokens } from "./theme-context";
-import { READABLE_MAX, TOUCH, radius, space, typography, type StatusKind } from "./tokens";
+import { READABLE_MAX, TOUCH, space, typography, type StatusKind } from "./tokens";
 
 const PHASE_BADGE: Readonly<Record<string, { readonly label: string; readonly kind: StatusKind }>> = {
   SALT_OKUNUR: { label: "Salt okunur", kind: "uyari" },
@@ -89,7 +89,7 @@ const useStyles = makeStyles((t) => ({
   bar: { paddingTop: space.s, paddingBottom: space.xs },
   title: { ...typography.title2, color: t.text },
   note: { ...typography.subhead, color: t.textSecondary, marginBottom: space.m },
-  group: { backgroundColor: t.surface, borderRadius: radius.card, overflow: "hidden" as const, ...t.cardShadow },
+  group: { backgroundColor: t.surface, borderRadius: t.radius.card, overflow: "hidden" as const, ...t.cardShadow },
   row: { minHeight: TOUCH + 8, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.l, paddingVertical: space.s },
   sep: { borderTopWidth: 1, borderTopColor: t.separator },
   name: { ...typography.headline, fontWeight: "500" as const, color: t.text, flex: 1 },

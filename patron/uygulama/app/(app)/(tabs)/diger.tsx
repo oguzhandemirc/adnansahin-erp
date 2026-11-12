@@ -14,7 +14,7 @@ import { RoleBadge } from "../../../src/ui/RoleBadge";
 import { SectionHeader } from "../../../src/ui/SectionHeader";
 import { MORE_GROUPS } from "../../../src/ui/tabs";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
-import { radius, space, typography } from "../../../src/ui/tokens";
+import { space, typography } from "../../../src/ui/tokens";
 
 
 const INBOX_BADGE_LIMIT = 50;
@@ -81,7 +81,7 @@ const useStyles = makeStyles((t) => ({
     gap: space.m,
     padding: space.l,
     backgroundColor: t.surface,
-    borderRadius: radius.card,
+    borderRadius: t.radius.card,
     marginTop: space.s,
     ...t.cardShadow,
   },

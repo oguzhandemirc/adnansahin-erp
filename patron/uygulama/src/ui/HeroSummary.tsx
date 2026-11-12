@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { IconChip } from "./IconChip";
 import type { IconName } from "./icons";
 import { makeStyles, useTokens } from "./theme-context";
-import { FONT_SCALE, STRIPE, radius, space, tabularNums, typography, type Domain } from "./tokens";
+import { FONT_SCALE, space, tabularNums, typography, type Domain } from "./tokens";
 
 export interface HeroMini {
   readonly label: string;
@@ -27,7 +27,6 @@ export function HeroSummary(p: HeroSummaryProps) {
   const domain = p.domain ?? "genel";
   return (
     <View style={s.card} testID={p.testID} accessible accessibilityLabel={`${p.title}: ${p.value}${p.unit ? ` ${p.unit}` : ""}`}>
-      <View style={[s.stripe, { backgroundColor: t.domain[domain].fg }]} />
       <View style={s.head}>
         <IconChip domain={domain} icon={p.icon} />
         <Text style={s.title} maxFontSizeMultiplier={FONT_SCALE.title}>{p.title}</Text>
@@ -54,14 +53,13 @@ export function HeroSummary(p: HeroSummaryProps) {
 const useStyles = makeStyles((t) => ({
   card: {
     backgroundColor: t.surface,
-    borderRadius: radius.card,
+    borderRadius: t.radius.card,
     padding: space.ml,
-    paddingLeft: space.ml + STRIPE,
+    paddingLeft: space.ml,
     marginBottom: space.m,
     overflow: "hidden" as const,
     ...t.cardShadow,
   },
-  stripe: { position: "absolute" as const, left: 0, top: 0, bottom: 0, width: STRIPE },
   head: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
   title: { ...typography.headline, color: t.text },
   valueRow: { flexDirection: "row" as const, alignItems: "baseline" as const, gap: space.xs, marginTop: space.s },
@@ -69,7 +67,7 @@ const useStyles = makeStyles((t) => ({
   unit: { ...typography.title3, color: t.textSecondary },
   caption: { ...typography.footnote, color: t.textMuted, marginTop: space.xs },
   minis: { flexDirection: "row" as const, gap: space.s, marginTop: space.m },
-  mini: { flex: 1, backgroundColor: t.surfaceAlt, borderRadius: radius.cardInner, padding: space.s + 2 },
+  mini: { flex: 1, backgroundColor: t.surfaceAlt, borderRadius: t.radius.cardInner, padding: space.s + 2 },
   miniLabel: { ...typography.caption, color: t.textSecondary },
   miniValue: { ...typography.headline, ...tabularNums, color: t.text, marginTop: 2 },
 }));

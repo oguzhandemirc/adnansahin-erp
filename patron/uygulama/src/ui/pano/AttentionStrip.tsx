@@ -4,7 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, Text, View } from "react-native";
 import { haptic } from "../haptics";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, TOUCH, radius, space, typography, type StatusKind } from "../tokens";
+import { FONT_SCALE, TOUCH, space, typography, type StatusKind } from "../tokens";
 import type { AttentionItem } from "./read";
 
 export function AttentionStrip({ items, checked, onOpen }: {
@@ -62,9 +62,9 @@ function Pill({ tone, title, detail, onPress, testID }: { readonly tone: StatusK
   );
 }
 
-const useStyles = makeStyles(() => ({
+const useStyles = makeStyles((t) => ({
   wrap: { gap: space.s, marginBottom: space.m },
-  pill: { minHeight: TOUCH + 12, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, borderRadius: radius.card, paddingHorizontal: space.l, paddingVertical: space.m },
+  pill: { minHeight: TOUCH + 12, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, borderRadius: t.radius.card, paddingHorizontal: space.l, paddingVertical: space.m },
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   icon: { width: 36, height: 36, borderRadius: 18, alignItems: "center" as const, justifyContent: "center" as const },
   text: { flex: 1, gap: 2 },

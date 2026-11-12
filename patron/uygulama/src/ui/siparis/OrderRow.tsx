@@ -8,7 +8,7 @@ import { deadlineBadge, isOpenOrder, orderStatus } from "../../lib/labels/sipari
 import { IconChip } from "../IconChip";
 import { StatusBadge } from "../StatusBadge";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, radius, space, tabularNums, typography } from "../tokens";
+import { FONT_SCALE, space, tabularNums, typography } from "../tokens";
 
 export type Obj = Readonly<Record<string, unknown>>;
 
@@ -79,7 +79,7 @@ export function OrderRow({ r, onPress, showCustomer = true }: { r: ProjectionRec
 
 const useStyles = makeStyles((t) => ({
   row: { minHeight: 64, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.l, paddingVertical: space.m },
-  chip: { width: 36, height: 36, borderRadius: radius.cardInner, alignItems: "center" as const, justifyContent: "center" as const },
+  chip: { width: 36, height: 36, borderRadius: t.radius.cardInner, alignItems: "center" as const, justifyContent: "center" as const },
   text: { flex: 1, minWidth: 0, gap: 3 },
   line: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
   title: { ...typography.headline, color: t.text, flex: 1 },

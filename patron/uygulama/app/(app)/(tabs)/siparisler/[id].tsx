@@ -21,7 +21,7 @@ import { useListCapability } from "../../../../src/ui/siparis/capabilities";
 import { OrderLines } from "../../../../src/ui/siparis/OrderLines";
 import { FactGroup, FactRow, StaleNote } from "../../../../src/ui/siparis/parts";
 import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
-import { FONT_SCALE, STRIPE, TOUCH, radius, space, tabularNums, typography } from "../../../../src/ui/tokens";
+import { FONT_SCALE, TOUCH, space, tabularNums, typography } from "../../../../src/ui/tokens";
 
 const has = (v: unknown): boolean => (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && v.trim() !== "");
 
@@ -52,7 +52,6 @@ export default function OrderDetail() {
       {r.data ? (
         <>
           <View style={s.hero} testID="siparis-baslik">
-            <View style={[s.stripe, { backgroundColor: t.domain.siparisler.fg }]} />
             <View style={s.heroHead}>
               <IconChip domain="siparisler" size={44} />
               <View style={s.flex}>
@@ -119,8 +118,7 @@ export default function OrderDetail() {
 }
 
 const useStyles = makeStyles((t) => ({
-  hero: { backgroundColor: t.surface, borderRadius: radius.card, padding: space.l, paddingLeft: space.l + STRIPE, overflow: "hidden" as const, marginBottom: space.s, gap: space.m, ...t.cardShadow },
-  stripe: { position: "absolute" as const, left: 0, top: 0, bottom: 0, width: STRIPE },
+  hero: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, paddingLeft: space.l, overflow: "hidden" as const, marginBottom: space.s, gap: space.m, ...t.cardShadow },
   heroHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
   flex: { flex: 1 },
   customer: { ...typography.title2, color: t.text },

@@ -6,7 +6,7 @@ import type { RecordStatusEntry, RecordTone } from "../../lib/labels/uretim";
 import type { IconName } from "../icons";
 import { StatusBadge } from "../StatusBadge";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, radius, space, typography, type Tokens } from "../tokens";
+import { FONT_SCALE, space, typography, type Tokens } from "../tokens";
 
 type LocalTone = Exclude<RecordTone, "iyi" | "uyari" | "kritik" | "bilgi">;
 
@@ -32,13 +32,13 @@ export function RecordStatusBadge({ entry, testID }: { readonly entry: RecordSta
   );
 }
 
-const useStyles = makeStyles(() => ({
+const useStyles = makeStyles((t) => ({
   badge: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: space.xs,
     alignSelf: "flex-start" as const,
-    borderRadius: radius.chip,
+    borderRadius: t.radius.chip,
     paddingHorizontal: space.s,
     paddingVertical: 2,
   },

@@ -363,7 +363,7 @@ describe("§9 ekranda ham anahtar/kod/ISO yok", () => {
     expect(screen.queryByText("CONFIRMED")).toBeNull();
   });
   it("rapor hata kodu cümleye çevrilir; her fabrika kodu sözlükte", async () => {
-    const wire = readFileSync(join(__dirname, "../../../Teks-Erp/src/cloud-sync/wire/esitleme.ts"), "utf8");
+    const wire = readFileSync(join(__dirname, "../../sunucu/src/wire/esitleme.ts"), "utf8");
     const codes = /REPORT_ERROR_CODES = \[([^\]]+)\]/.exec(wire)![1]!.match(/"([A-Z_]+)"/g)!.map((x) => x.slice(1, -1));
     expect(codes.length).toBeGreaterThan(3);
     for (const c of codes) expect(labels.REPORT_ERROR[c]).toBeTruthy();

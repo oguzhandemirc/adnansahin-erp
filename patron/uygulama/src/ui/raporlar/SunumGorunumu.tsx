@@ -23,7 +23,7 @@ import type { IconName } from "../icons";
 import { Banner, Card } from "../kit";
 import { SectionHeader } from "../SectionHeader";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, radius, space, tabularNums, typography, type Domain, type StatusKind } from "../tokens";
+import { FONT_SCALE, space, tabularNums, typography, type Domain, type StatusKind } from "../tokens";
 
 /** Tabloda telefonda gösterilen satır tavanı (fazlası "N satırdan ilk M" notuyla). */
 export const TABLE_ROW_LIMIT = 8;
@@ -224,7 +224,7 @@ const useStyles = makeStyles((t) => ({
   unmeasuredSmall: { color: t.textSecondary },
   reason: { ...typography.footnote, color: t.textSecondary, marginTop: space.xs },
   period: { ...typography.footnote, color: t.textSecondary, marginTop: space.s },
-  cmp: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, alignSelf: "flex-start" as const, borderRadius: radius.cardInner, paddingHorizontal: space.s, paddingVertical: space.xs, marginTop: space.s, maxWidth: "100%" as const },
+  cmp: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, alignSelf: "flex-start" as const, borderRadius: t.radius.cardInner, paddingHorizontal: space.s, paddingVertical: space.xs, marginTop: space.s, maxWidth: "100%" as const },
   cmpText: { ...typography.subhead, ...tabularNums, fontWeight: "600" as const },
   cmpPeriod: { ...typography.footnote, flexShrink: 1 },
   side: { flexDirection: "row" as const, justifyContent: "space-between" as const, alignItems: "center" as const, gap: space.m, paddingVertical: space.s + 2 },

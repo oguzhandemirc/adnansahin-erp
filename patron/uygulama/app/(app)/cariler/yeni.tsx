@@ -12,7 +12,7 @@ import { IconChip } from "../../../src/ui/IconChip";
 import { Banner, Button, Field } from "../../../src/ui/kit";
 import { SectionHeader } from "../../../src/ui/SectionHeader";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
-import { STRIPE, TOUCH, radius, space, typography } from "../../../src/ui/tokens";
+import { TOUCH, space, typography } from "../../../src/ui/tokens";
 import { useWrite } from "../../../src/ui/useWrite";
 
 function RoleToggle(p: { label: string; on: boolean; onPress: () => void; testID: string }) {
@@ -57,7 +57,6 @@ export default function NewCustomer() {
         <Text style={s.introText}>Cari fabrikaya gelen kutusundan iletilir ve onay beklemeden doğrudan işlenir; kod ve mükerrer denetimi fabrikada yapılır, yalnız bir hata olursa bildirilir.</Text>
       </View>
       <View style={s.card}>
-        <View style={[s.stripe, { backgroundColor: t.domain.cariler.fg }]} />
         <Field label="Ad / unvan" value={f.ad} onChangeText={(v) => set({ ad: v })} testID="cari-ad" placeholder="Örn. Deniz Tekstil A.Ş." />
         <Text style={s.label}>Rol</Text>
         <View style={s.roles}>
@@ -67,7 +66,6 @@ export default function NewCustomer() {
       </View>
       <SectionHeader title="Ayrıntılar" />
       <View style={s.card}>
-        <View style={[s.stripe, { backgroundColor: t.domain.genel.fg }]} />
         <Field label="İl (isteğe bağlı)" value={f.il} onChangeText={(v) => set({ il: v })} />
         <Field label="Vergi no (isteğe bağlı)" value={f.vergiNo} onChangeText={(v) => set({ vergiNo: v.replace(/\D/g, "") })} keyboardType="number-pad" />
         <Field label="Telefon (isteğe bağlı)" value={f.telefon} onChangeText={(v) => set({ telefon: v })} keyboardType="phone-pad" />
@@ -82,10 +80,9 @@ export default function NewCustomer() {
 const useStyles = makeStyles((t) => ({
   intro: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, marginBottom: space.m },
   introText: { ...typography.subhead, color: t.textSecondary, flex: 1 },
-  card: { backgroundColor: t.surface, borderRadius: radius.card, padding: space.l, paddingLeft: space.l + STRIPE, marginBottom: space.m, overflow: "hidden" as const, ...t.cardShadow },
-  stripe: { position: "absolute" as const, left: 0, top: 0, bottom: 0, width: STRIPE },
+  card: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, paddingLeft: space.l, marginBottom: space.m, overflow: "hidden" as const, ...t.cardShadow },
   label: { ...typography.footnote, fontWeight: "600" as const, color: t.textSecondary, marginBottom: space.xs },
   roles: { flexDirection: "row" as const, gap: space.s, flexWrap: "wrap" as const },
-  toggle: { minHeight: TOUCH - 4, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingHorizontal: space.m, borderRadius: radius.chip, borderWidth: 1, borderColor: t.separator },
+  toggle: { minHeight: TOUCH - 4, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingHorizontal: space.m, borderRadius: t.radius.chip, borderWidth: 1, borderColor: t.separator },
   toggleText: { ...typography.callout, fontWeight: "600" as const },
 }));

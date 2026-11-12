@@ -14,7 +14,7 @@ import { Card } from "../kit";
 import { StatusBadge } from "../StatusBadge";
 import { ErrorState, LoadingSkeleton } from "../StateViews";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, TOUCH, radius, space, tabularNums, typography, type Domain, type StatusKind } from "../tokens";
+import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "../tokens";
 
 /** Rapor isteği durumu rozeti; HESAPLANIYOR'da yanında küçük dönen gösterge. Etiket ve ton sözlükten. */
 /** `compact`: liste satırında dönen gösterge yok (başlık sığsın; rozet durumu zaten söyler). */
@@ -148,7 +148,7 @@ const useStyles = makeStyles((t) => ({
     flexBasis: 150,
     minHeight: 132,
     backgroundColor: t.surface,
-    borderRadius: radius.card,
+    borderRadius: t.radius.card,
     padding: space.l,
     gap: space.s,
     ...t.cardShadow,
@@ -164,7 +164,7 @@ const useStyles = makeStyles((t) => ({
   readyHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginBottom: space.m },
   readyTitle: { ...typography.headline, color: t.text, flex: 1 },
   stats: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.s },
-  stat: { flexGrow: 1, flexBasis: 132, backgroundColor: t.surfaceAlt, borderRadius: radius.cardInner, padding: space.m },
+  stat: { flexGrow: 1, flexBasis: 132, backgroundColor: t.surfaceAlt, borderRadius: t.radius.cardInner, padding: space.m },
   statLabel: { ...typography.caption, color: t.textSecondary },
   statValue: { ...typography.title2, ...tabularNums, color: t.text, marginTop: space.xs },
   more: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, alignSelf: "flex-start" as const },

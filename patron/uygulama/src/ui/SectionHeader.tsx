@@ -4,7 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { IconChip } from "./IconChip";
 import type { IconName } from "./icons";
 import { makeStyles, useTokens } from "./theme-context";
-import { FONT_SCALE, TOUCH, radius, space, tabularNums, typography, type Domain } from "./tokens";
+import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain } from "./tokens";
 
 export interface SectionHeaderProps {
   readonly title: string;
@@ -42,7 +42,7 @@ export function SectionHeader({ title, count, icon, actionLabel = "Tümü", onAc
 const useStyles = makeStyles((t) => ({
   row: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginTop: space.l, marginBottom: space.s },
   title: { ...typography.title3, color: t.text },
-  count: { ...typography.footnote, ...tabularNums, fontWeight: "600" as const, color: t.textSecondary, backgroundColor: t.surfaceAlt, borderRadius: radius.chip, paddingHorizontal: space.s, paddingVertical: 1, overflow: "hidden" as const },
+  count: { ...typography.footnote, ...tabularNums, fontWeight: "600" as const, color: t.textSecondary, backgroundColor: t.surfaceAlt, borderRadius: t.radius.chip, paddingHorizontal: space.s, paddingVertical: 1, overflow: "hidden" as const },
   flex: { flex: 1 },
   action: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: 2, paddingLeft: space.s },
   actionText: { ...typography.subhead, color: t.tint },

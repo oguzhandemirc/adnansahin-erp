@@ -14,7 +14,7 @@ import { Picker, type Picked } from "../../../../src/ui/Picker";
 import { SectionHeader } from "../../../../src/ui/SectionHeader";
 import { SegmentedControl } from "../../../../src/ui/SegmentedControl";
 import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
-import { STRIPE, TOUCH, radius, space, typography } from "../../../../src/ui/tokens";
+import { TOUCH, space, typography } from "../../../../src/ui/tokens";
 import { useWrite } from "../../../../src/ui/useWrite";
 
 interface Line { urun: Picked | null; renk: Picked | null; miktar: string; birimFiyat: string }
@@ -66,14 +66,12 @@ export default function NewOrder() {
       </View>
 
       <View style={s.card}>
-        <View style={[s.stripe, { backgroundColor: t.domain.cariler.fg }]} />
         <Picker label="Cari" projection="cari-kart" value={cari} onChange={setCari} testID="cari-sec" />
         <Text style={s.label}>Para birimi</Text>
         <SegmentedControl items={CURRENCIES} value={doviz} onChange={setDoviz} testIDPrefix="doviz-" accessibilityLabel="Para birimi" />
       </View>
 
       <View style={s.card}>
-        <View style={[s.stripe, { backgroundColor: t.domain.sevkiyat.fg }]} />
         <Text style={s.label}>Termin (isteğe bağlı)</Text>
         <View style={s.quickRow}>
           {QUICK.map((q) => {
@@ -92,7 +90,6 @@ export default function NewOrder() {
       <SectionHeader title="Kalemler" count={lines.length} domain="siparisler" />
       {lines.map((l, i) => (
         <View key={i} style={s.card} testID={`kalem-${i}`}>
-          <View style={[s.stripe, { backgroundColor: t.domain.siparisler.fg }]} />
           <View style={s.lineHead}>
             <View style={s.lineNo}><Text style={s.lineNoText}>{i + 1}</Text></View>
             <Text style={s.lineTitle} numberOfLines={1}>{l.urun?.title ?? "Yeni kalem"}</Text>
@@ -126,11 +123,10 @@ export default function NewOrder() {
 const useStyles = makeStyles((t) => ({
   intro: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, marginBottom: space.m },
   introText: { ...typography.subhead, color: t.textSecondary, flex: 1 },
-  card: { backgroundColor: t.surface, borderRadius: radius.card, padding: space.l, paddingLeft: space.l + STRIPE, marginBottom: space.m, overflow: "hidden" as const, ...t.cardShadow },
-  stripe: { position: "absolute" as const, left: 0, top: 0, bottom: 0, width: STRIPE },
+  card: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, paddingLeft: space.l, marginBottom: space.m, overflow: "hidden" as const, ...t.cardShadow },
   label: { ...typography.footnote, fontWeight: "600" as const, color: t.textSecondary, marginBottom: space.xs },
   quickRow: { flexDirection: "row" as const, gap: space.s, marginBottom: space.m, flexWrap: "wrap" as const },
-  quick: { minHeight: 36, paddingHorizontal: space.m, borderRadius: radius.chip, borderWidth: 1, borderColor: t.separator, justifyContent: "center" as const },
+  quick: { minHeight: 36, paddingHorizontal: space.m, borderRadius: t.radius.chip, borderWidth: 1, borderColor: t.separator, justifyContent: "center" as const },
   quickText: { ...typography.subhead, fontWeight: "600" as const },
   lineHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginBottom: space.m },
   lineNo: { width: 26, height: 26, borderRadius: 13, backgroundColor: t.domain.siparisler.chip, alignItems: "center" as const, justifyContent: "center" as const },

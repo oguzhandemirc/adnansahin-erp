@@ -6,7 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } fr
 import { haptic } from "./haptics";
 import { durations, springs } from "./motion";
 import { makeStyles, useReducedMotion, useTokens } from "./theme-context";
-import { FONT_SCALE, TOUCH, radius, space, typography } from "./tokens";
+import { FONT_SCALE, TOUCH, space, typography } from "./tokens";
 
 export interface SegmentItem<K extends string> {
   readonly key: K;
@@ -84,7 +84,7 @@ const useStyles = makeStyles((t) => ({
   track: {
     flexDirection: "row" as const,
     backgroundColor: t.scheme === "dark" ? t.surfaceAlt : t.separator,
-    borderRadius: radius.control,
+    borderRadius: t.radius.control,
     padding: PAD,
     gap: 0,
   },
@@ -93,14 +93,14 @@ const useStyles = makeStyles((t) => ({
     top: PAD,
     bottom: PAD,
     left: PAD,
-    borderRadius: radius.control - PAD,
+    borderRadius: t.radius.control - PAD,
     backgroundColor: t.surface,
     ...t.cardShadow,
   },
   part: { minHeight: TOUCH - 8, alignItems: "center" as const, justifyContent: "center" as const, paddingHorizontal: space.s },
   // Eşit parçalı kipte yatay boşluk dar: 4 parçalı denetim 390 pt telefonda "Reddedilen" gibi etiketleri kırpmasın.
   flex: { flex: 1, paddingHorizontal: space.xs },
-  chip: { minWidth: 88, borderRadius: radius.control - PAD, paddingHorizontal: space.m },
+  chip: { minWidth: 88, borderRadius: t.radius.control - PAD, paddingHorizontal: space.m },
   text: { ...typography.subhead, color: t.textSecondary },
   textOn: { color: t.text, fontWeight: "600" as const },
 }));

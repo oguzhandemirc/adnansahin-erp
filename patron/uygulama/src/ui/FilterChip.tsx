@@ -3,7 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, Text } from "react-native";
 import { haptic } from "./haptics";
 import { makeStyles, useTokens } from "./theme-context";
-import { radius, space, typography } from "./tokens";
+import { space, typography } from "./tokens";
 
 export interface FilterChipProps {
   readonly label: string;
@@ -44,7 +44,7 @@ const useStyles = makeStyles((t) => ({
     alignItems: "center" as const,
     gap: space.xs,
     paddingHorizontal: space.m,
-    borderRadius: radius.chip,
+    borderRadius: t.radius.chip,
     borderWidth: 1,
     borderColor: t.separator,
     backgroundColor: t.surface,

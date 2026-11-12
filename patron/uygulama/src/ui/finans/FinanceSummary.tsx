@@ -10,7 +10,7 @@ import { Card } from "../kit";
 import { SectionHeader } from "../SectionHeader";
 import { Empty } from "../StateViews";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, radius, space, tabularNums, typography, type StatusKind } from "../tokens";
+import { FONT_SCALE, space, tabularNums, typography, type StatusKind } from "../tokens";
 import { EMPTY_ICON } from "../icons";
 
 type Obj = Readonly<Record<string, unknown>>;
@@ -147,10 +147,10 @@ const useStyles = makeStyles((t) => ({
   none: { ...typography.callout, color: t.textSecondary, marginTop: space.m },
   block: { marginTop: space.m },
   blockSep: { borderTopWidth: 1, borderTopColor: t.separator, paddingTop: space.m },
-  currency: { ...typography.caption, color: t.textSecondary, backgroundColor: t.surfaceAlt, borderRadius: radius.chip, paddingHorizontal: space.s, paddingVertical: 2, alignSelf: "flex-start" as const, overflow: "hidden" as const },
+  currency: { ...typography.caption, color: t.textSecondary, backgroundColor: t.surfaceAlt, borderRadius: t.radius.chip, paddingHorizontal: space.s, paddingVertical: 2, alignSelf: "flex-start" as const, overflow: "hidden" as const },
   big: { ...typography.display, color: t.text, marginTop: space.xs },
   minis: { flexDirection: "row" as const, gap: space.s, marginTop: space.m },
-  mini: { flex: 1, backgroundColor: t.surfaceAlt, borderRadius: radius.cardInner, padding: space.s + 2 },
+  mini: { flex: 1, backgroundColor: t.surfaceAlt, borderRadius: t.radius.cardInner, padding: space.s + 2 },
   miniLabel: { ...typography.caption, color: t.textSecondary },
   miniValue: { ...typography.headline, ...tabularNums, color: t.text, marginTop: 2 },
   barTitle: { ...typography.footnote, fontWeight: "600" as const, color: t.textSecondary, marginTop: space.l, marginBottom: space.s },

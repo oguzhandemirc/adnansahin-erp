@@ -4,7 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text, View } from "react-native";
 import { statusEntry } from "../lib/labels";
 import { makeStyles, useTokens } from "./theme-context";
-import { FONT_SCALE, radius, space, typography, type StatusKind } from "./tokens";
+import { FONT_SCALE, space, typography, type StatusKind } from "./tokens";
 
 export type StatusBadgeProps =
   | { readonly value: string; readonly kind?: undefined; readonly label?: undefined; readonly size?: "sm" | "md"; readonly testID?: string }
@@ -31,13 +31,13 @@ export function StatusBadge(p: StatusBadgeProps) {
   );
 }
 
-const useStyles = makeStyles(() => ({
+const useStyles = makeStyles((t) => ({
   badge: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: space.xs,
     alignSelf: "flex-start" as const,
-    borderRadius: radius.chip,
+    borderRadius: t.radius.chip,
     paddingHorizontal: space.s + 2,
     paddingVertical: 3,
   },

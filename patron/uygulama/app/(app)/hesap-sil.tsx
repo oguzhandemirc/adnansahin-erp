@@ -11,7 +11,7 @@ import { useSession } from "../../src/state/session";
 import { Screen } from "../../src/ui/Frame";
 import { Banner, Button, Card, ConfirmButton, Field } from "../../src/ui/kit";
 import { makeStyles, useTokens } from "../../src/ui/theme-context";
-import { radius, space, typography } from "../../src/ui/tokens";
+import { space, typography } from "../../src/ui/tokens";
 import { useWrite } from "../../src/ui/useWrite";
 
 export default function DeleteAccount() {
@@ -67,11 +67,11 @@ export default function DeleteAccount() {
 
 const useStyles = makeStyles((t) => ({
   head: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, marginBottom: space.m },
-  icon: { width: 44, height: 44, borderRadius: radius.cardInner, alignItems: "center" as const, justifyContent: "center" as const },
+  icon: { width: 44, height: 44, borderRadius: t.radius.cardInner, alignItems: "center" as const, justifyContent: "center" as const },
   title: { ...typography.title3, color: t.text, flex: 1 },
   list: { gap: space.s },
   item: { ...typography.callout, color: t.text },
-  hint: { flexDirection: "row" as const, gap: space.s, alignItems: "flex-start" as const, borderRadius: radius.cardInner, padding: space.m, marginTop: space.m },
+  hint: { flexDirection: "row" as const, gap: space.s, alignItems: "flex-start" as const, borderRadius: t.radius.cardInner, padding: space.m, marginTop: space.m },
   hintText: { ...typography.subhead, flex: 1 },
   gap: { height: space.s },
 }));

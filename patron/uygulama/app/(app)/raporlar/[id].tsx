@@ -20,7 +20,7 @@ import { usePendingPoll } from "../../../src/ui/raporlar/usePendingPoll";
 import { SectionHeader } from "../../../src/ui/SectionHeader";
 import { LoadingSkeleton } from "../../../src/ui/StateViews";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
-import { FONT_SCALE, radius, space, typography } from "../../../src/ui/tokens";
+import { FONT_SCALE, space, typography } from "../../../src/ui/tokens";
 
 export default function ReportDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -117,7 +117,7 @@ const useStyles = makeStyles((t) => ({
   meta: { marginTop: space.s, gap: 2 },
   metaText: { ...typography.footnote, color: t.textSecondary },
   computed: { marginBottom: space.s },
-  params: { marginTop: space.m, backgroundColor: t.surfaceAlt, borderRadius: radius.cardInner, paddingHorizontal: space.m, paddingVertical: space.xs },
-  pending: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, padding: space.m, borderRadius: radius.cardInner, marginBottom: space.m },
+  params: { marginTop: space.m, backgroundColor: t.surfaceAlt, borderRadius: t.radius.cardInner, paddingHorizontal: space.m, paddingVertical: space.xs },
+  pending: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, padding: space.m, borderRadius: t.radius.cardInner, marginBottom: space.m },
   pendingText: { ...typography.subhead, flex: 1 },
 }));

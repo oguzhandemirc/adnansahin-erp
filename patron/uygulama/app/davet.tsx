@@ -13,7 +13,7 @@ import { AuthShell } from "../src/ui/diger/AuthShell";
 import { Banner, Button, Field } from "../src/ui/kit";
 import { TotpQr } from "../src/ui/TotpQr";
 import { makeStyles, useTokens } from "../src/ui/theme-context";
-import { radius, space, typography } from "../src/ui/tokens";
+import { space, typography } from "../src/ui/tokens";
 import { UYGULAMA_ADI } from "../src/lib/kimlik";
 
 export default function Invite() {
@@ -123,8 +123,8 @@ const useStyles = makeStyles((t) => ({
   flex: { flex: 1, minWidth: 0 },
   lead: { ...typography.body, color: t.text, marginBottom: space.s },
   muted: { ...typography.subhead, color: t.textSecondary },
-  keyBox: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, borderWidth: 1, borderRadius: radius.cardInner, padding: space.m, marginVertical: space.m },
+  keyBox: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, borderWidth: 1, borderRadius: t.radius.cardInner, padding: space.m, marginVertical: space.m },
   key: { fontSize: 20, fontWeight: "700" as const, letterSpacing: 2, flex: 1 },
-  who: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, borderRadius: radius.cardInner, padding: space.m, marginBottom: space.l },
+  who: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, borderRadius: t.radius.cardInner, padding: space.m, marginBottom: space.l },
   whoName: { ...typography.headline, color: t.text },
 }));

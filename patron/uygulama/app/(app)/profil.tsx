@@ -16,7 +16,7 @@ import { Banner, Button, ConfirmButton, Field } from "../../src/ui/kit";
 import { ListGroup, ListRow } from "../../src/ui/ListRow";
 import { SegmentedControl } from "../../src/ui/SegmentedControl";
 import { makeStyles, THEME_PREF_LABEL, THEME_PREFS, useThemePref, useTokens } from "../../src/ui/theme-context";
-import { radius, READABLE_MAX, space, typography } from "../../src/ui/tokens";
+import { READABLE_MAX, space, typography } from "../../src/ui/tokens";
 import { useWrite } from "../../src/ui/useWrite";
 
 // Lacivert kart her temada koyudur: üstündeki metin `onNavy` token'larındandır.
@@ -74,34 +74,34 @@ export default function Profile() {
   const many = facilities.length > 1;
   return (
     <Screen module="profil">
-      <View style={[s.hero, { backgroundColor: t.navy, borderColor: t.scheme === "dark" ? t.onNavy.separator : t.navy }]} testID="profil-kart">
+      <View style={[s.hero, { backgroundColor: t.color.primary, borderColor: t.scheme === "dark" ? t.color.primary2 : t.color.primary }]} testID="profil-kart">
         <View style={s.heroTop}>
-          <View style={[s.avatar, { backgroundColor: role === "yonetici" ? t.gold : t.onNavy.chip }]}>
-            <Text style={[s.avatarText, { color: role === "yonetici" ? t.navy : t.onNavy.tint }]} maxFontSizeMultiplier={1}>{initials(hesap?.ad)}</Text>
+          <View style={[s.avatar, { backgroundColor: role === "yonetici" ? t.color.primarySoft : t.color.primary2 }]}>
+            <Text style={[s.avatarText, { color: role === "yonetici" ? t.color.primary : t.color.onPrimary }]} maxFontSizeMultiplier={1}>{initials(hesap?.ad)}</Text>
           </View>
           <View style={s.flex}>
-            <Text style={[s.heroName, { color: t.onNavy.text }]} numberOfLines={2}>{hesap?.ad ?? ""}</Text>
-            <Text style={[s.heroMail, { color: t.onNavy.textSecondary }]} numberOfLines={1}>{hesap?.eposta ?? ""}</Text>
+            <Text style={[s.heroName, { color: t.color.onPrimary }]} numberOfLines={2}>{hesap?.ad ?? ""}</Text>
+            <Text style={[s.heroMail, { color: t.color.onPrimary }]} numberOfLines={1}>{hesap?.eposta ?? ""}</Text>
           </View>
         </View>
         <View style={s.heroBadges}>
-          <View style={[s.rolePill, role === "yonetici" ? { backgroundColor: t.gold } : { backgroundColor: t.onNavy.chip }]} testID="profil-rol" accessible accessibilityLabel={`Rol: ${ROLE_LABEL[role]}`}>
-            <Ionicons name={role === "yonetici" ? "shield-checkmark" : "people"} size={14} color={role === "yonetici" ? t.navy : t.onNavy.tint} />
-            <Text style={[s.roleText, { color: role === "yonetici" ? t.navy : t.onNavy.tint }]}>{ROLE_LABEL[role]}</Text>
+          <View style={[s.rolePill, role === "yonetici" ? { backgroundColor: t.color.primarySoft } : { backgroundColor: t.color.primary2 }]} testID="profil-rol" accessible accessibilityLabel={`Rol: ${ROLE_LABEL[role]}`}>
+            <Ionicons name={role === "yonetici" ? "shield-checkmark" : "people"} size={14} color={role === "yonetici" ? t.color.primary : t.color.onPrimary} />
+            <Text style={[s.roleText, { color: role === "yonetici" ? t.color.primary : t.color.onPrimary }]}>{ROLE_LABEL[role]}</Text>
           </View>
         </View>
-        <View style={[s.heroSep, { backgroundColor: t.onNavy.separator }]} />
+        <View style={[s.heroSep, { backgroundColor: t.color.primary2 }]} />
         <View style={s.facRow}>
-          <Ionicons name="business-outline" size={18} color={t.onNavy.textSecondary} />
+          <Ionicons name="business-outline" size={18} color={t.color.onPrimary} />
           <View style={s.flex}>
-            <Text style={[s.facName, { color: t.onNavy.text }]} numberOfLines={1}>{facility?.tesis.ad ?? "—"}</Text>
-            {many ? <Text style={[s.facMeta, { color: t.onNavy.textMuted }]}>{`${facilities.length} fabrikaya üyesiniz`}</Text> : null}
+            <Text style={[s.facName, { color: t.color.onPrimary }]} numberOfLines={1}>{facility?.tesis.ad ?? "—"}</Text>
+            {many ? <Text style={[s.facMeta, { color: t.color.onPrimary }]}>{`${facilities.length} fabrikaya üyesiniz`}</Text> : null}
           </View>
           {many ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Fabrika değiştir" onPress={() => setSwitcher(true)} testID="fabrika-degistir"
-              style={({ pressed }) => [s.switch, { backgroundColor: t.onNavy.chip }, pressed && { opacity: 0.8 }]}>
-              <Ionicons name="swap-horizontal" size={16} color={t.onNavy.tint} />
-              <Text style={[s.switchText, { color: t.onNavy.tint }]}>Değiştir</Text>
+              style={({ pressed }) => [s.switch, { backgroundColor: t.color.primary2 }, pressed && { opacity: 0.8 }]}>
+              <Ionicons name="swap-horizontal" size={16} color={t.color.onPrimary} />
+              <Text style={[s.switchText, { color: t.color.onPrimary }]}>Değiştir</Text>
             </Pressable>
           ) : null}
         </View>
@@ -146,20 +146,20 @@ export default function Profile() {
 
 const useStyles = makeStyles((t) => ({
   flex: { flex: 1, minWidth: 0 },
-  hero: { borderRadius: radius.card, padding: space.ml, marginTop: space.s, borderWidth: 1, ...t.cardShadow },
+  hero: { borderRadius: t.radius.card, padding: space.ml, marginTop: space.s, borderWidth: 1, ...t.cardShadow },
   heroTop: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.l },
   avatar: { width: 64, height: 64, borderRadius: 32, alignItems: "center" as const, justifyContent: "center" as const },
   avatarText: { fontSize: 24, fontWeight: "700" as const },
   heroName: { ...typography.title2 },
   heroMail: { ...typography.subhead, marginTop: 2 },
   heroBadges: { flexDirection: "row" as const, marginTop: space.m, gap: space.s },
-  rolePill: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, borderRadius: radius.chip, paddingHorizontal: space.m, paddingVertical: 4 },
+  rolePill: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, borderRadius: t.radius.chip, paddingHorizontal: space.m, paddingVertical: 4 },
   roleText: { ...typography.footnote, fontWeight: "700" as const },
   heroSep: { height: 1, marginVertical: space.l, opacity: 0.8 },
   facRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
   facName: { ...typography.headline },
   facMeta: { ...typography.footnote, marginTop: 1 },
-  switch: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, borderRadius: radius.chip, paddingHorizontal: space.m, minHeight: 36 },
+  switch: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, borderRadius: t.radius.chip, paddingHorizontal: space.m, minHeight: 36 },
   switchText: { ...typography.subhead, fontWeight: "600" as const },
   pad: { padding: space.m },
   logout: { marginTop: space.l },

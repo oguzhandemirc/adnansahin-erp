@@ -9,7 +9,7 @@ import type { IconName } from "./icons";
 import { SegmentedControl } from "./SegmentedControl";
 import { StatusBadge } from "./StatusBadge";
 import { makeStyles, useTokens } from "./theme-context";
-import { FONT_SCALE, STRIPE, TOUCH, radius, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
+import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
 
 /** Opak içerik kartı; solda 4 px alan şeridi (alan verilmezse nötr). */
 export function Card({ children, onPress, testID, domain, style, accessibilityLabel }: {
@@ -22,11 +22,9 @@ export function Card({ children, onPress, testID, domain, style, accessibilityLa
 }) {
   const t = useTokens();
   const s = useStyles();
-  const stripe = <View style={[s.stripe, { backgroundColor: t.domain[domain ?? "genel"].fg }]} />;
   if (!onPress) {
     return (
       <View style={[s.card, style]} testID={testID} accessibilityLabel={accessibilityLabel}>
-        {stripe}
         {children}
       </View>
     );
@@ -39,7 +37,6 @@ export function Card({ children, onPress, testID, domain, style, accessibilityLa
       style={({ pressed }) => [s.card, style, pressed && s.pressed]}
       testID={testID}
     >
-      {stripe}
       {children}
     </Pressable>
   );
@@ -187,15 +184,14 @@ export function Row({ children }: { children: ReactNode }) {
 const useStyles = makeStyles((t) => ({
   card: {
     backgroundColor: t.surface,
-    borderRadius: radius.card,
+    borderRadius: t.radius.card,
     padding: space.l,
-    paddingLeft: space.l + STRIPE,
+    paddingLeft: space.l,
     marginBottom: space.m,
     minHeight: TOUCH,
     overflow: "hidden" as const,
     ...t.cardShadow,
   },
-  stripe: { position: "absolute" as const, left: 0, top: 0, bottom: 0, width: STRIPE },
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   title: { ...typography.title3, color: t.text, marginBottom: space.s },
   body: { ...typography.body, color: t.text },
@@ -203,7 +199,7 @@ const useStyles = makeStyles((t) => ({
   caption: { ...typography.caption, color: t.textSecondary },
   btn: {
     minHeight: TOUCH,
-    borderRadius: radius.button,
+    borderRadius: t.radius.button,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     paddingHorizontal: space.l,
@@ -220,7 +216,7 @@ const useStyles = makeStyles((t) => ({
     borderWidth: 1,
     borderColor: t.status.kritik.fill,
     backgroundColor: t.status.kritik.bg,
-    borderRadius: radius.cardInner,
+    borderRadius: t.radius.cardInner,
     padding: space.m,
     marginVertical: space.xs,
   },
@@ -232,7 +228,7 @@ const useStyles = makeStyles((t) => ({
     minHeight: 52,
     borderWidth: 1,
     borderColor: t.separator,
-    borderRadius: radius.control,
+    borderRadius: t.radius.control,
     paddingHorizontal: space.m,
     ...typography.body,
     backgroundColor: t.surface,
@@ -243,7 +239,7 @@ const useStyles = makeStyles((t) => ({
     alignItems: "flex-start" as const,
     gap: space.s,
     padding: space.m,
-    borderRadius: radius.cardInner,
+    borderRadius: t.radius.cardInner,
     marginBottom: space.m,
   },
   bannerText: { ...typography.subhead, flex: 1 },
@@ -251,7 +247,7 @@ const useStyles = makeStyles((t) => ({
     flexGrow: 1,
     flexBasis: 140,
     backgroundColor: t.surfaceAlt,
-    borderRadius: radius.cardInner,
+    borderRadius: t.radius.cardInner,
     padding: space.m,
   },
   statValue: { ...typography.title2, ...tabularNums, color: t.text, marginTop: space.xs },

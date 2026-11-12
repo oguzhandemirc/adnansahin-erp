@@ -9,8 +9,8 @@ export default function Index() {
   const t = useTokens();
   if (phase === "yukleniyor") {
     return (
-      <View style={{ flex: 1, backgroundColor: t.navy, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color={t.gold} size="large" accessibilityLabel="Yükleniyor" />
+      <View style={{ flex: 1, backgroundColor: t.color.primary, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={t.color.primarySoft} size="large" accessibilityLabel="Yükleniyor" />
       </View>
     );
   }

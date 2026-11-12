@@ -7,7 +7,7 @@ import type { IconName } from "../icons";
 import { ListGroup } from "../ListRow";
 import { SectionHeader } from "../SectionHeader";
 import { makeStyles, useTokens } from "../theme-context";
-import { TOUCH, radius, space, typography, type Domain } from "../tokens";
+import { TOUCH, space, typography, type Domain } from "../tokens";
 import { CheckRow } from "./parts";
 
 const GROUP_LOOK: Readonly<Record<PermissionGroup, { readonly domain: Domain; readonly icon: IconName }>> = {
@@ -74,7 +74,7 @@ export function PermissionChecklist(p: {
 
 const useStyles = makeStyles((t) => ({
   templates: { flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, gap: space.s, marginBottom: space.s },
-  chip: { minHeight: TOUCH - 8, paddingHorizontal: space.l, borderRadius: radius.chip, borderWidth: 1, justifyContent: "center" as const },
+  chip: { minHeight: TOUCH - 8, paddingHorizontal: space.l, borderRadius: t.radius.chip, borderWidth: 1, justifyContent: "center" as const },
   chipText: { ...typography.subhead, fontWeight: "600" as const },
   custom: { ...typography.footnote, color: t.textMuted },
 }));

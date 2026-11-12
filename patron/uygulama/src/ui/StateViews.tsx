@@ -8,7 +8,7 @@ import { DOMAIN_ICON, type IconName } from "./icons";
 import { Banner, Button } from "./kit";
 import { durations } from "./motion";
 import { makeStyles, useReducedMotion, useTokens } from "./theme-context";
-import { radius, space, typography, type Domain } from "./tokens";
+import { space, typography, type Domain } from "./tokens";
 
 export function Empty({ text, domain = "genel", icon, actionLabel, onAction, testID }: {
   readonly text: string;
@@ -73,9 +73,9 @@ export function SyncLateBand({ text, testID = "bant-gecikme" }: { readonly text:
 
 const useStyles = makeStyles((t) => ({
   empty: { alignItems: "center" as const, paddingVertical: space.xxl, paddingHorizontal: space.l, gap: space.m },
-  emptyIcon: { width: 64, height: 64, borderRadius: radius.card, alignItems: "center" as const, justifyContent: "center" as const },
+  emptyIcon: { width: 64, height: 64, borderRadius: t.radius.card, alignItems: "center" as const, justifyContent: "center" as const },
   emptyText: { ...typography.callout, color: t.textSecondary, textAlign: "center" as const },
   kpiGrid: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.m },
-  kpiBlock: { flexGrow: 1, flexBasis: 150, height: 112, borderRadius: radius.card, backgroundColor: t.surfaceAlt },
-  listBlock: { height: 56, borderRadius: radius.cardInner, backgroundColor: t.surfaceAlt, marginBottom: space.s },
+  kpiBlock: { flexGrow: 1, flexBasis: 150, height: 112, borderRadius: t.radius.card, backgroundColor: t.surfaceAlt },
+  listBlock: { height: 56, borderRadius: t.radius.cardInner, backgroundColor: t.surfaceAlt, marginBottom: space.s },
 }));

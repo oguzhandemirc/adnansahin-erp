@@ -1,75 +1,117 @@
-// Tema: sistem görünümünü izler; kullanıcı tercihi (Sistem · Açık · Koyu) düz depoda `patron.tema` anahtarında.
-// Sağlayıcı yoksa (testler, erken açılış) açık tema döner — bileşenler sağlayıcısız da çizilir.
+// Tema: görünüm tercihi (kip · tema rengi · zemin · köşe · simge kareleri) cihazda `patron.gorunum` (JSON); eski
+// `patron.tema` (yalnız kip) bir kez okunup göçer. Uygulanış anlıktır. Sağlayıcı yoksa (testler) varsayılan açık tema.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AccessibilityInfo, useColorScheme } from "react-native";
 import type { KeyValue } from "../state/store";
-import { light, schemes, type Scheme, type Tokens } from "./tokens";
+import { APPEARANCE_KEY, DEFAULT_APPEARANCE, LEGACY_THEME_KEY, MODE_LABEL, MODE_PREFS, resolveAppearance, resolveScheme, type Appearance, type ModePref } from "./appearance";
+import { buildTheme, light, type Theme } from "./tokens";
 
-export type ThemePref = "sistem" | "acik" | "koyu";
-export const THEME_PREFS: readonly ThemePref[] = ["sistem", "acik", "koyu"];
-export const THEME_PREF_LABEL: Readonly<Record<ThemePref, string>> = { sistem: "Sistem", acik: "Açık", koyu: "Koyu" };
-export const THEME_KEY = "patron.tema";
-
-interface ThemeValue {
-  readonly tokens: Tokens;
-  readonly pref: ThemePref;
-  readonly setPref: (p: ThemePref) => void;
-}
-
-const ThemeContext = createContext<ThemeValue>({ tokens: light, pref: "sistem", setPref: () => undefined });
+/** Eski adlar (Profil ekranı ve testler): kip tercihi. */
+export type ThemePref = ModePref;
+export const THEME_PREFS: readonly ThemePref[] = MODE_PREFS;
+export const THEME_PREF_LABEL = MODE_LABEL;
+export const THEME_KEY = LEGACY_THEME_KEY;
+export { resolveScheme };
 
 export function isThemePref(v: unknown): v is ThemePref {
   return typeof v === "string" && (THEME_PREFS as readonly string[]).includes(v);
 }
 
-export function resolveScheme(pref: ThemePref, system: string | null | undefined): Scheme {
-  if (pref === "acik") return "light";
-  if (pref === "koyu") return "dark";
-  return system === "dark" ? "dark" : "light";
+interface ThemeValue {
+  readonly tokens: Theme;
+  readonly appearance: Appearance;
+  /** Depodaki tercih okundu mu (açılış ekranı bunu bekler; renk sıçraması olmasın). */
+  readonly ready: boolean;
+  readonly setAppearance: (patch: Partial<Appearance>) => void;
+  readonly resetAppearance: () => void;
+}
+
+const ThemeContext = createContext<ThemeValue>({
+  tokens: light,
+  appearance: DEFAULT_APPEARANCE,
+  ready: true,
+  setAppearance: () => undefined,
+  resetAppearance: () => undefined,
+});
+
+/** Depodan görünüm: yeni anahtar varsa o; yoksa eski kip anahtarı `mode`a göçer (bir kez yazılır). */
+export async function loadAppearance(store: Pick<KeyValue, "get" | "set">): Promise<Appearance> {
+  const raw = await store.get(APPEARANCE_KEY).catch(() => null);
+  if (raw) return resolveAppearance(raw);
+  const legacy = await store.get(LEGACY_THEME_KEY).catch(() => null);
+  if (isThemePref(legacy)) {
+    const a = { ...DEFAULT_APPEARANCE, mode: legacy };
+    await store.set(APPEARANCE_KEY, JSON.stringify(a)).catch(() => undefined);
+    return a;
+  }
+  return DEFAULT_APPEARANCE;
 }
 
 export function ThemeProvider({ children, store }: { children: ReactNode; store?: Pick<KeyValue, "get" | "set"> }) {
   const system = useColorScheme();
-  const [pref, setPrefState] = useState<ThemePref>("sistem");
+  const [appearance, setState] = useState<Appearance>(DEFAULT_APPEARANCE);
+  const [ready, setReady] = useState(!store);
 
   useEffect(() => {
     if (!store) return;
     let live = true;
-    store
-      .get(THEME_KEY)
-      .then((v) => {
-        if (live && isThemePref(v)) setPrefState(v);
+    loadAppearance(store)
+      .then((a) => {
+        if (live) setState(a);
       })
-      .catch(() => undefined);
+      .finally(() => {
+        if (live) setReady(true);
+      });
     return () => {
       live = false;
     };
   }, [store]);
 
-  const setPref = useCallback(
-    (p: ThemePref) => {
-      setPrefState(p);
-      void store?.set(THEME_KEY, p).catch(() => undefined);
+  const persist = useCallback(
+    (a: Appearance) => {
+      void store?.set(APPEARANCE_KEY, JSON.stringify(a)).catch(() => undefined);
     },
     [store],
   );
 
-  const tokens = schemes[resolveScheme(pref, system)];
-  const value = useMemo(() => ({ tokens, pref, setPref }), [tokens, pref, setPref]);
+  const setAppearance = useCallback(
+    (patch: Partial<Appearance>) => {
+      setState((prev) => {
+        const next = resolveAppearance({ ...prev, ...patch });
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
+
+  const resetAppearance = useCallback(() => {
+    setState(DEFAULT_APPEARANCE);
+    persist(DEFAULT_APPEARANCE);
+  }, [persist]);
+
+  const tokens = buildTheme(resolveScheme(appearance.mode, system), appearance);
+  const value = useMemo(() => ({ tokens, appearance, ready, setAppearance, resetAppearance }), [tokens, appearance, ready, setAppearance, resetAppearance]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
-export function useTokens(): Tokens {
+export function useTokens(): Theme {
   return useContext(ThemeContext).tokens;
 }
 
-/** Profil ekranındaki "Sistem · Açık · Koyu" seçimi için. */
-export function useThemePref(): { pref: ThemePref; setPref: (p: ThemePref) => void } {
-  const { pref, setPref } = useContext(ThemeContext);
-  return { pref, setPref };
+/** Kişiselleştirme ekranı: görünüm + değiştirici. */
+export function useAppearance(): Pick<ThemeValue, "appearance" | "setAppearance" | "resetAppearance" | "ready"> {
+  const { appearance, setAppearance, resetAppearance, ready } = useContext(ThemeContext);
+  return { appearance, setAppearance, resetAppearance, ready };
 }
 
-/** Hareket azaltma açıksa yay yerine kısa solma kullanılır. */
+/** Eski arayüz: "Sistem · Açık · Koyu" seçimi. */
+export function useThemePref(): { pref: ThemePref; setPref: (p: ThemePref) => void } {
+  const { appearance, setAppearance } = useContext(ThemeContext);
+  return { pref: appearance.mode, setPref: (p) => setAppearance({ mode: p }) };
+}
+
+/** Hareket azaltma (erişilebilirlik) açık mı — animasyonlar kısalır/kapanır. */
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -89,8 +131,8 @@ export function useReducedMotion(): boolean {
 }
 
 /** Temaya bağlı stil fabrikası: her tema için bir kez kurulur (bileşen başına yeniden hesaplanmaz). */
-export function makeStyles<T>(build: (t: Tokens) => T): () => T {
-  const cache = new Map<Tokens, T>();
+export function makeStyles<T>(build: (t: Theme) => T): () => T {
+  const cache = new Map<Theme, T>();
   return function useStyles(): T {
     const t = useTokens();
     let s = cache.get(t);

@@ -9,7 +9,7 @@ import type { IconName } from "../icons";
 import { Button } from "../kit";
 import { Empty, ErrorState, LoadingSkeleton } from "../StateViews";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, TOUCH, radius, space, tabularNums, typography, type Domain, type StatusKind } from "../tokens";
+import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "../tokens";
 import type { RemoteList } from "./useRemoteList";
 
 export function SearchField(p: { value: string; onChangeText: (v: string) => void; placeholder: string; testID?: string; accessibilityLabel?: string }) {
@@ -157,7 +157,7 @@ export const useStyles = makeStyles((t) => ({
     alignItems: "center" as const,
     gap: space.s,
     paddingHorizontal: space.m,
-    borderRadius: radius.control,
+    borderRadius: t.radius.control,
     backgroundColor: t.scheme === "dark" ? t.surfaceAlt : t.surface,
     borderWidth: 1,
     borderColor: t.separator,
@@ -169,21 +169,21 @@ export const useStyles = makeStyles((t) => ({
     alignItems: "center" as const,
     gap: space.xs,
     paddingHorizontal: space.m + 2,
-    borderRadius: radius.chip,
+    borderRadius: t.radius.chip,
     backgroundColor: t.tint,
   },
   capsuleOff: { opacity: 0.4 },
-  quick: { minHeight: 36, justifyContent: "center" as const, paddingHorizontal: space.m, borderRadius: radius.chip, borderWidth: 1, borderColor: t.separator, backgroundColor: t.surface },
+  quick: { minHeight: 36, justifyContent: "center" as const, paddingHorizontal: space.m, borderRadius: t.radius.chip, borderWidth: 1, borderColor: t.separator, backgroundColor: t.surface },
   quickText: { ...typography.subhead, fontWeight: "600" as const },
   capsuleText: { ...typography.subhead, fontWeight: "600" as const, color: t.onTint },
   stale: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, marginBottom: space.s },
   staleText: { ...typography.footnote, color: t.textMuted },
-  group: { backgroundColor: t.surface, borderRadius: radius.card, overflow: "hidden" as const, marginBottom: space.m, ...t.cardShadow },
+  group: { backgroundColor: t.surface, borderRadius: t.radius.card, overflow: "hidden" as const, marginBottom: space.m, ...t.cardShadow },
   sep: { height: 1, backgroundColor: t.separator, marginLeft: space.l },
   fact: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.l, paddingVertical: space.s },
   factLabel: { ...typography.callout, color: t.textSecondary, flexShrink: 0 },
   factRight: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "flex-end" as const, gap: space.s },
   factValue: { ...typography.callout, ...tabularNums, fontWeight: "600" as const, color: t.text, textAlign: "right" as const, flexShrink: 1 },
-  pill: { borderRadius: radius.chip, paddingHorizontal: space.s, paddingVertical: 2, alignSelf: "flex-start" as const },
+  pill: { borderRadius: t.radius.chip, paddingHorizontal: space.s, paddingVertical: 2, alignSelf: "flex-start" as const },
   pillText: { ...typography.caption, fontWeight: "600" as const },
 }));

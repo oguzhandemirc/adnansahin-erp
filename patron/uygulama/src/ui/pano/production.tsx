@@ -6,7 +6,7 @@ import { lookup } from "../../lib/labels";
 import { STATION_TYPE, UNIT } from "../../lib/labels/uretim";
 import { BarRow } from "../charts";
 import { makeStyles, useTokens } from "../theme-context";
-import { radius, space, tabularNums, typography } from "../tokens";
+import { space, tabularNums, typography } from "../tokens";
 import { arr, num, qty, str } from "./read";
 
 /** Akış: Ham stok → Yarı mamul → … → Sevk; her durak top sayısıyla. */
@@ -66,12 +66,12 @@ export function StationBars({ data, testID = "istasyonlar" }: { readonly data: u
 const useStyles = makeStyles((t) => ({
   flow: { flexGrow: 1, gap: space.xs, paddingBottom: space.s, paddingRight: space.l },
   stopWrap: { flexGrow: 1, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
-  stop: { flexGrow: 1, minWidth: 92, backgroundColor: t.surface, borderRadius: radius.cardInner, paddingHorizontal: space.m, paddingVertical: space.s, borderTopWidth: 3, borderTopColor: t.station.ic.fg, ...t.cardShadow },
+  stop: { flexGrow: 1, minWidth: 92, backgroundColor: t.surface, borderRadius: t.radius.cardInner, paddingHorizontal: space.m, paddingVertical: space.s, borderTopWidth: 3, borderTopColor: t.station.ic.fg, ...t.cardShadow },
   stopLabel: { ...typography.caption, color: t.textSecondary },
   stopValueRow: { flexDirection: "row" as const, alignItems: "baseline" as const, gap: 3, marginTop: 2 },
   stopValue: { ...typography.title2, ...tabularNums, color: t.text },
   stopUnit: { ...typography.footnote, color: t.textSecondary },
-  card: { backgroundColor: t.surface, borderRadius: radius.card, padding: space.l, gap: space.xl, marginBottom: space.m, ...t.cardShadow },
+  card: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, gap: space.xl, marginBottom: space.m, ...t.cardShadow },
   station: { gap: 2 },
   // BarRow altındaki boşluğu geri al: dipnot kendi çubuğuna yapışsın, sonraki istasyonla karışmasın.
   stationFoot: { ...typography.footnote, ...tabularNums, color: t.textSecondary, marginTop: space.xs - space.m },

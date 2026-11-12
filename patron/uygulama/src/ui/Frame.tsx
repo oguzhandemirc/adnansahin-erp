@@ -17,7 +17,7 @@ import { LargeHeader, LargeTitle, useHeaderScroll } from "./LargeHeader";
 import { RoleBadge } from "./RoleBadge";
 import { RAIL_GROUPS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
-import { CONTENT_MAX, RAIL_WIDTH, TOUCH, WIDE_MIN, radius, space, typography } from "./tokens";
+import { CONTENT_MAX, RAIL_WIDTH, TOUCH, WIDE_MIN, space, typography } from "./tokens";
 import { UYGULAMA_ADI } from "../lib/kimlik";
 
 export function useWide(): boolean {
@@ -148,6 +148,6 @@ const useStyles = makeStyles((t) => ({
   rail: { width: RAIL_WIDTH, borderRightWidth: 1, borderColor: t.separator, backgroundColor: t.surface, paddingTop: space.l, paddingHorizontal: space.s },
   railHead: { paddingHorizontal: space.s, marginBottom: space.m, gap: space.xs },
   railSection: { ...typography.caption, color: t.textMuted, paddingHorizontal: space.s, marginTop: space.m, marginBottom: space.xs },
-  railItem: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.s, borderRadius: radius.control, marginBottom: 2 },
+  railItem: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.s, borderRadius: t.radius.control, marginBottom: 2 },
   railText: { ...typography.callout, color: t.text, flex: 1 },
 }));

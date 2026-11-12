@@ -7,7 +7,7 @@ import { IconChip } from "../IconChip";
 import type { IconName } from "../icons";
 import { roleOf } from "../RoleBadge";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, TOUCH, radius, space, tabularNums, typography, type Domain } from "../tokens";
+import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain } from "../tokens";
 
 export function initials(name: string | null | undefined): string {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
@@ -24,7 +24,7 @@ export function Avatar({ name, permissions, size = 44 }: { readonly name: string
   const role = roleOf(permissions);
   const c = t.role[role];
   // Koyu temada lacivert zemin yüzeyle birleşir; yönetici avatarı altın halkayla ayrılır.
-  const ring = role === "yonetici" && t.scheme === "dark" ? { borderWidth: 1.5, borderColor: t.gold } : null;
+  const ring = role === "yonetici" && t.scheme === "dark" ? { borderWidth: 1.5, borderColor: t.color.primarySoft } : null;
   return (
     <View style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }, ring]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <Text style={{ color: c.fg, fontSize: Math.round(size * 0.38), fontWeight: "700" }} maxFontSizeMultiplier={1}>{initials(name)}</Text>
@@ -134,7 +134,7 @@ export function CheckRow(p: {
 }
 
 const useStyles = makeStyles((t) => ({
-  pill: { minWidth: 24, height: 24, borderRadius: radius.chip, paddingHorizontal: space.s, alignItems: "center" as const, justifyContent: "center" as const },
+  pill: { minWidth: 24, height: 24, borderRadius: t.radius.chip, paddingHorizontal: space.s, alignItems: "center" as const, justifyContent: "center" as const },
   pillText: { ...typography.footnote, ...tabularNums, fontWeight: "700" as const },
   captionRow: { flexDirection: "row" as const, alignItems: "flex-end" as const, justifyContent: "space-between" as const, paddingHorizontal: space.l, marginTop: space.m, marginBottom: space.s },
   caption: { ...typography.footnote, fontWeight: "600" as const, color: t.textSecondary },

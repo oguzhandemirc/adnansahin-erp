@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptic } from "../haptics";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, TOUCH, radius, space, typography } from "../tokens";
+import { FONT_SCALE, TOUCH, space, typography } from "../tokens";
 
 export interface Choice<K extends string> {
   readonly key: K;
@@ -27,7 +27,7 @@ export function ChoiceSheet<K extends string>(p: {
   return (
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={p.onClose}>
       <View style={s.backdrop}>
-        <Pressable style={[s.scrim, { backgroundColor: t.navy, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Kapat" testID={`${p.testIDPrefix}kapat`} />
+        <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Kapat" testID={`${p.testIDPrefix}kapat`} />
         <View style={[s.sheet, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal>
           <View style={s.grabber} />
           <View style={s.head}>
@@ -69,8 +69,8 @@ const useStyles = makeStyles((t) => ({
   scrim: { position: "absolute" as const, top: 0, left: 0, right: 0, bottom: 0 },
   sheet: {
     backgroundColor: t.surface,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
+    borderTopLeftRadius: t.radius.sheet,
+    borderTopRightRadius: t.radius.sheet,
     paddingHorizontal: space.l,
     paddingTop: space.s,
     maxHeight: "80%" as const,
@@ -83,7 +83,7 @@ const useStyles = makeStyles((t) => ({
   head: { flexDirection: "row" as const, alignItems: "center" as const, minHeight: TOUCH },
   title: { ...typography.headline, color: t.text, flex: 1 },
   close: { width: 32, height: 32, borderRadius: 16, alignItems: "center" as const, justifyContent: "center" as const, backgroundColor: t.surfaceAlt },
-  list: { backgroundColor: t.surfaceAlt, borderRadius: radius.cardInner },
+  list: { backgroundColor: t.surfaceAlt, borderRadius: t.radius.cardInner },
   listInner: { paddingVertical: space.xs },
   row: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, paddingHorizontal: space.l, gap: space.m },
   rowSep: { borderTopWidth: 1, borderTopColor: t.separator },

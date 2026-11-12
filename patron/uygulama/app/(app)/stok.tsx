@@ -14,7 +14,7 @@ import { ConsignedSection } from "../../src/ui/fason/FasonCards";
 import { SectionHeader } from "../../src/ui/SectionHeader";
 import { StatusBadge } from "../../src/ui/StatusBadge";
 import { makeStyles } from "../../src/ui/theme-context";
-import { STRIPE, radius, space, typography } from "../../src/ui/tokens";
+import { space, typography } from "../../src/ui/tokens";
 
 const TOP_ITEMS = 8;
 
@@ -99,8 +99,8 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
 }
 
 const useStyles = makeStyles((t) => ({
-  card: { backgroundColor: t.surface, borderRadius: radius.card, padding: space.l, marginBottom: space.m, ...t.cardShadow },
-  dead: { backgroundColor: t.surface, borderRadius: radius.card, padding: space.l, borderLeftWidth: STRIPE, borderLeftColor: t.status.iyi.fill, marginBottom: space.m, ...t.cardShadow },
+  card: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, marginBottom: space.m, ...t.cardShadow },
+  dead: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, borderWidth: 1, borderColor: t.color.cardBorder, borderLeftColor: t.status.iyi.fill, marginBottom: space.m, ...t.cardShadow },
   deadOn: { borderLeftColor: t.status.uyari.fill },
   deadHead: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const },
   deadTitle: { ...typography.headline, color: t.text },

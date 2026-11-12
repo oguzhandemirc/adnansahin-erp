@@ -7,7 +7,7 @@ import { Pressable, Text, View } from "react-native";
 import { IconChip } from "./IconChip";
 import type { IconName } from "./icons";
 import { makeStyles, useTokens } from "./theme-context";
-import { FONT_SCALE, radius, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
+import { FONT_SCALE, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
 
 /** `ListRow` ikon çipi boyu (ayraç girintisinin varsayılanı). */
 export const LIST_ICON = 36;
@@ -95,7 +95,7 @@ export function ListGroup({ children, testID, iconSize = LIST_ICON }: { readonly
 }
 
 const useStyles = makeStyles((t) => ({
-  group: { backgroundColor: t.surface, borderRadius: radius.card, overflow: "hidden" as const, marginBottom: space.m, ...t.cardShadow },
+  group: { backgroundColor: t.surface, borderRadius: t.radius.card, overflow: "hidden" as const, marginBottom: space.m, ...t.cardShadow },
   sep: { height: 1, backgroundColor: t.separator },
   row: { minHeight: 56, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.l, paddingVertical: space.s },
   rowStacked: { minHeight: 64, paddingVertical: space.m },

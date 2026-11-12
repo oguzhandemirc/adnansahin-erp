@@ -22,7 +22,7 @@ import { SectionHeader } from "./SectionHeader";
 import { Empty } from "./StateViews";
 import { StatusBadge } from "./StatusBadge";
 import { makeStyles, useTokens } from "./theme-context";
-import { TOUCH, radius, space, typography } from "./tokens";
+import { TOUCH, space, typography } from "./tokens";
 import { useWrite } from "./useWrite";
 import { EMPTY_ICON } from "./icons";
 
@@ -200,12 +200,12 @@ export function NotificationHistory() {
 const useStyles = makeStyles((t) => ({
   flex: { flex: 1, minWidth: 0 },
   gap: { marginTop: space.s },
-  here: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, backgroundColor: t.surface, borderRadius: radius.card, padding: space.l, marginBottom: space.s, ...t.cardShadow },
+  here: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, marginBottom: space.s, ...t.cardShadow },
   hereHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, flexWrap: "wrap" as const },
   hereTitle: { ...typography.headline, color: t.text },
   hereHint: { ...typography.footnote, color: t.textSecondary, marginTop: 2 },
-  soon: { alignItems: "center" as const, gap: space.m, backgroundColor: t.surface, borderRadius: radius.card, paddingVertical: space.xl, paddingHorizontal: space.l, marginBottom: space.m, ...t.cardShadow },
-  soonIcon: { width: 52, height: 52, borderRadius: radius.cardInner + 4, alignItems: "center" as const, justifyContent: "center" as const },
+  soon: { alignItems: "center" as const, gap: space.m, backgroundColor: t.surface, borderRadius: t.radius.card, paddingVertical: space.xl, paddingHorizontal: space.l, marginBottom: space.m, ...t.cardShadow },
+  soonIcon: { width: 52, height: 52, borderRadius: t.radius.cardInner + 4, alignItems: "center" as const, justifyContent: "center" as const },
   soonText: { ...typography.callout, color: t.textSecondary, textAlign: "center" as const },
   ask: { padding: space.m, gap: space.s },
   askText: { ...typography.subhead, fontWeight: "600" as const },

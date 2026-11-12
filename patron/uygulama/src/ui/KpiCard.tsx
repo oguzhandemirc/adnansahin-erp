@@ -9,7 +9,7 @@ import type { IconName } from "./icons";
 import { IconChip } from "./IconChip";
 import { StatusBadge } from "./StatusBadge";
 import { makeStyles, useTokens } from "./theme-context";
-import { FONT_SCALE, STRIPE, TOUCH, radius, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
+import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
 
 export interface KpiTrend {
   /** Görünen metin, işaretli: "+%12 düne göre". */
@@ -71,7 +71,6 @@ export function KpiCard(p: KpiCardProps) {
   const s = useStyles();
   const body = (
     <>
-      <View style={[s.stripe, { backgroundColor: t.domain[p.domain].fg }]} />
       <View style={s.head}>
         <IconChip domain={p.domain} icon={p.icon} size={30} />
         <Text style={s.label} numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE.title}>{p.label}</Text>
@@ -130,14 +129,13 @@ const useStyles = makeStyles((t) => ({
     flexBasis: 150,
     minHeight: TOUCH * 2.5,
     backgroundColor: t.surface,
-    borderRadius: radius.card,
+    borderRadius: t.radius.card,
     padding: space.l,
-    paddingLeft: space.l + STRIPE,
+    paddingLeft: space.l,
     overflow: "hidden" as const,
     ...t.cardShadow,
   },
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  stripe: { position: "absolute" as const, left: 0, top: 0, bottom: 0, width: STRIPE },
   head: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
   label: { ...typography.footnote, fontWeight: "600" as const, color: t.textSecondary, flex: 1 },
   valueRow: { flexDirection: "row" as const, alignItems: "baseline" as const, gap: space.xs, marginTop: space.m },
