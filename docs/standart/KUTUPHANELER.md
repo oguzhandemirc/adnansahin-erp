@@ -99,10 +99,18 @@ Ayrıca kayıtta duran iki küçük borç: OFL-1.1 font lisans metninin dağıt�
 
 ## 9 · Kayıt defteri
 
-Yeni **paket** eklenmedi. Bir karar var ve sonucu da "paket YOK"tur:
+Yeni **npm paketi** eklenmedi (tek native Maven bağımlılığı aşağıda, 2026-11-12). Bir karar da "paket YOK"tur:
 **backend log kanalı** (2026-09-07) — `pino`/`winston` yerine **elle yazmak**
 seçildi ([KU-07]), çünkü taşımayı pm2 ve rotasyonu `pm2-logrotate` zaten
 yapıyordu; kalan tek eksik seviye + alan etiketiydi. Altı satırlık kayıt, ölçüm
 ve sonuç arşivde: `docs/history/CLAUDE-NOT-ARSIVI.md` (2026-09-07) ve
 `Teks-Erp/src/lib/logger.ts` başlığı. Yeni paket eklenince §3'teki blok buraya,
 §2'ye bir satır yazılır.
+
+### com.google.android.play:app-update@2.1.0 · mobil · 2026-11-12 (kullanıcı onayı)
+1. Problem      : Play dahili testten kurulan saha uygulaması yeni sürümü kendisi bildirsin (Play In-App Updates) · §2.3 "Play uygulama içi güncelleme"
+2. Alternatifler: `sp-react-native-in-app-updates` (+`react-native-device-info`, `semver`, `underscore`, eş `react-native-siren` → red); `expo-in-app-updates` 0.13 (Expo SDK 58 ister), 0.12 (indirme bitince sormadan `completeUpdate` → işin ortasında yeniden başlatma → red); elle: Google kitaplığı üstüne ince yerel Expo modülü (SEÇİLDİ, `mobil/modules/teks-erp-play-guncelleme`)
+3. Boyut/biçim  : native (Android AAR, ~100 KB); npm bağımlılığı yok, `package.json` değişmez
+4. Bakım        : Google Play Core app-update, sabit sürüm (2.1.0) — Play kuralı değişince elle yükseltilir
+5. Lisans       : Android SDK Lisansı (Play Core) — kapalı dağıtımda kullanım serbest; kullanıcı onayı 2026-11-12
+6. Dağıtım      : yerel modül + Maven bağımlılığı → APK/AAB ister (runtimeVersion 54.4), OTA yetmez; yeni izin yok

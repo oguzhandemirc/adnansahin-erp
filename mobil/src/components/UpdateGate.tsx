@@ -8,6 +8,11 @@
 //     açık kalır; yalnız açılışta sormak, günler boyunca güncelleme almayan
 //     cihazlar üretirdi.
 //
+//  3) Play dağıtımında (native sürüm Play'den) uygulama içi güncellemeyi
+//     gösterir: zorunluysa tam ekran Play akışı + kilit, değilse "Güncelle"
+//     kartı; yalnız operatör boştayken (`usePlayUpdate`). APK künyesi o
+//     ikilide hiç okunmaz. Hangi türün hangi ekranla gösterileceği BURADA seçilir.
+//
 //  2) İndirilmiş güncelleme varsa UYGULAR (kullanıcı kararı: "hemen yenilesin").
 //     Tek kapı: gönderilmemiş istasyon kaydı varken yenilemez — bkz.
 //     `guvenliYenile`. Tavan dolarsa yenileme atlanır, paket kaybolmaz.
@@ -37,6 +42,9 @@ import {
   politikaOku,
   type PolitikaDurumu,
 } from '../services/clientPolicy.service';
+import { usePlayUpdate } from '../hooks/usePlayUpdate';
+import PlayUpdateCard from './PlayUpdateCard';
+import { isPlayDistribution } from '../services/playUpdate';
 import { colors } from '../theme/tokens';
 
 /** Ön plana her dönüşte sormak gereksiz trafik — en az bu kadar ara olsun. */
@@ -51,6 +59,8 @@ export default function UpdateGate() {
   const [yenileniyor, setYenileniyor] = useState(false);
   const sonSorma = useRef(0);
   const yenilemeBasladi = useRef(false);
+  const play = usePlayUpdate(politikaDurum.sebep === 'apk');
+  const playMode = isPlayDistribution();
 
   /* --- (1) Ön plana dönüşte sor ------------------------------------ */
   const sor = useCallback(async () => {
@@ -78,7 +88,7 @@ export default function UpdateGate() {
     // Kilit KOŞULLU: "düzeltme kurulabilir mi" sorusunun cevabı sebebe göre
     // farklı yerde — paket ekseninde indirilmiş güncelleme, APK ekseninde
     // sunucudaki kurulum dosyası.
-    if (durum.sebep === 'apk') {
+    if (durum.sebep === 'apk' && !isPlayDistribution()) {
       const a = await apkDurumu();
       setApkHazir(a.yeniVarMi);
       setApkUrl(a.kunye?.indirmeUrl ?? null);
@@ -144,7 +154,8 @@ export default function UpdateGate() {
     );
   }
 
-  const duzeltmeHazir = politikaDurum.sebep === 'apk' ? apkHazir : isUpdatePending;
+  const duzeltmeHazir =
+    politikaDurum.sebep === 'apk' ? (playMode ? play.decision === 'hemen' : apkHazir) : isUpdatePending;
   const bekleyen = bekleyenYazimSayisi();
   const kilit = kilitlenmeliMi({ durum: politikaDurum, duzeltmeHazir, bekleyenYazim: bekleyen });
 
@@ -155,7 +166,9 @@ export default function UpdateGate() {
         <Text style={styles.baslik}>Güncelleme gerekli</Text>
         <Text style={styles.alt}>
           {politikaDurum.sebep === 'apk'
-            ? 'Sunucu daha yeni bir uygulama sürümü bekliyor. Kurulum dosyası hazır.'
+            ? playMode
+              ? 'Sunucu daha yeni bir uygulama sürümü bekliyor. Google Play’den güncelleyin.'
+              : 'Sunucu daha yeni bir uygulama sürümü bekliyor. Kurulum dosyası hazır.'
             : 'Sunucu daha yeni bir sürüm bekliyor. Güncelleme indirildi, uygulanmayı bekliyor.'}
         </Text>
         <Button
@@ -165,7 +178,9 @@ export default function UpdateGate() {
           buttonColor={colors.brand}
           style={styles.dugme}
           onPress={() => {
-            if (politikaDurum.sebep === 'apk') {
+            if (politikaDurum.sebep === 'apk' && playMode) {
+              play.update(true);
+            } else if (politikaDurum.sebep === 'apk') {
               if (!apkUrl) return;
               setKuruluyor(true);
               void apkIndirVeKur(apkUrl).finally(() => setKuruluyor(false));
@@ -174,7 +189,7 @@ export default function UpdateGate() {
             }
           }}
         >
-          {politikaDurum.sebep === 'apk' ? 'İndir ve kur' : 'Şimdi yenile'}
+          {politikaDurum.sebep === 'apk' ? (playMode ? 'Güncelle' : 'İndir ve kur') : 'Şimdi yenile'}
         </Button>
       </View>
     );
@@ -188,10 +203,24 @@ export default function UpdateGate() {
         <Text style={styles.seritMetin}>
           {bekleyen > 0
             ? `Sürümünüz eski · ${bekleyen} kayıt gönderilince güncellenecek`
-            : 'Sürümünüz eski · güncelleme indirilir indirilmez uygulanacak'}
+            : playMode && politikaDurum.sebep === 'apk'
+              ? 'Sürümünüz eski · ana menüye dönünce güncellenecek'
+              : 'Sürümünüz eski · güncelleme indirilir indirilmez uygulanacak'}
         </Text>
       </View>
     );
+  }
+
+  // PLAY — isteğe bağlı sürüm; yalnız boştayken, dokunmayı yalnız kartın kendisi alır.
+  if (play.decision === 'indiriliyor') {
+    return (
+      <View style={styles.serit} pointerEvents="none">
+        <Text style={styles.seritMetin}>Yeni sürüm indiriliyor…</Text>
+      </View>
+    );
+  }
+  if (play.decision === 'yeniden-baslat' || (play.decision === 'oner' && !play.dismissed)) {
+    return <PlayUpdateCard state={play} />;
   }
 
   return null;

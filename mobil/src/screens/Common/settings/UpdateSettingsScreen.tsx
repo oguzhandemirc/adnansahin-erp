@@ -38,6 +38,7 @@ import {
   type ApkDurum,
   type OtaKontrolSonuc,
 } from '../../../services/appUpdate.service';
+import { isPlayDistribution } from '../../../services/playUpdate';
 import { useBusyAction } from '../../../hooks/useBusyAction';
 import {
   SETTINGS_COLORS as COLORS,
@@ -258,7 +259,11 @@ export default function UpdateSettingsScreen() {
           </>
         ) : (
           <Text style={styles.durumIyi}>
-            {apk === null ? 'Kontrol ediliyor…' : 'Kurulum dosyası güncel.'}
+            {isPlayDistribution()
+              ? 'Uygulama sürümleri Google Play’den gelir; yeni sürüm olunca uygulama kendisi bildirir.'
+              : apk === null
+                ? 'Kontrol ediliyor…'
+                : 'Kurulum dosyası güncel.'}
           </Text>
         )}
       </View>

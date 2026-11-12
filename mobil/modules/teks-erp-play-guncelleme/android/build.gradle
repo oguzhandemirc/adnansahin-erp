@@ -1,0 +1,22 @@
+// Play uygulama içi güncelleme — ince yerel katman (docs/kurallar/surum-yayin.md § Play).
+// Depo içi yerel Expo modülü; tek yeni bağımlılık Google'ın Play app-update kitaplığı (onay 2026-11-12).
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.tekserp'
+version = '1.0.0'
+
+android {
+  namespace "com.tekserp.playguncelleme"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  implementation 'com.facebook.react:react-android'
+  implementation 'com.google.android.play:app-update:2.1.0'
+}

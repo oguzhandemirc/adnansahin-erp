@@ -24,6 +24,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 import { queryClient } from '../offline/queryClient';
+import { isPlayDistribution } from './playUpdate';
 
 /* ------------------------------------------------------------------ *
  * 1) UZAKTAN GÜNCELLEME
@@ -257,6 +258,8 @@ const KUNYE_TIMEOUT_MS = 15_000;
  */
 export async function apkDurumu(): Promise<ApkDurum> {
   const kurulu = kuruluVersionCode();
+  // Play dağıtımında native sürüm Play'den gelir; künye eski paketin kurulum dosyasını anlatır.
+  if (isPlayDistribution()) return { kunye: null, kurulu, yeniVarMi: false };
   const taban = otaKimlik().feedTabani;
   if (!taban) return { kunye: null, kurulu, yeniVarMi: false };
 
