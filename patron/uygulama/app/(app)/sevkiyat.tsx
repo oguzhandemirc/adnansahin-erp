@@ -14,7 +14,7 @@ import { EMPTY_ICON, MODULE_ICON } from "../../src/ui/icons";
 import { openRecord } from "../../src/ui/nav";
 import { AltSekmeler, ListeSatiri, StatCard } from "../../src/ui/ortak";
 import { obj, period, qty, str } from "../../src/ui/pano/read";
-import { RecordStatusBadge } from "../../src/ui/pano/RecordStatusBadge";
+import { KayitDurumRozeti } from "../../src/ui/pano/KayitDurumRozeti";
 import { RemoteList, useRecordPage } from "../../src/ui/pano/RemoteList";
 import { FactoryStamp, SnapshotGate } from "../../src/ui/pano/SnapshotGate";
 import { combine, useSnapshot } from "../../src/ui/pano/useSnapshot";
@@ -84,7 +84,7 @@ export default function Shipments() {
                 birincil={musteri ?? no}
                 ikincil={`${musteri ? `${no} · ` : ""}${tarih}${yurtdisi}`}
                 deger={metre}
-                rozet={gitti ? undefined : <RecordStatusBadge entry={st} testID={`durum-${r.id}`} />}
+                rozet={gitti ? undefined : <KayitDurumRozeti entry={st} testID={`durum-${r.id}`} />}
                 ayrac={i > 0}
                 ok={false}
                 onPress={() => openRecord(router, "sevkiyat", r.id)}

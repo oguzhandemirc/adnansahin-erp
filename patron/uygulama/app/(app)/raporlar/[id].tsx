@@ -15,7 +15,7 @@ import { Screen } from "../../../src/ui/Frame";
 import { IconTile } from "../../../src/ui/ortak";
 import { DOMAIN_TONE } from "../../../src/ui/tokens";
 import { Banner, ConfirmButton } from "../../../src/ui/kit";
-import { ParamRows, ReportStatusBadge } from "../../../src/ui/raporlar/parts";
+import { ParamRows, RaporDurumRozeti } from "../../../src/ui/raporlar/parts";
 import { SunumGorunumu } from "../../../src/ui/raporlar/SunumGorunumu";
 import { usePendingPoll } from "../../../src/ui/raporlar/usePendingPoll";
 import { BlokBasligi, Iskelet } from "../../../src/ui/ortak";
@@ -62,7 +62,7 @@ export default function ReportDetail() {
               <Text style={s.title} maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
             </View>
             <View style={s.badgeRow}>
-              <ReportStatusBadge status={d.durum} testID="rapor-durum" />
+              <RaporDurumRozeti status={d.durum} testID="rapor-durum" />
             </View>
             <View style={s.meta}>
               <Text style={s.metaText}>{`İstendi: ${formatDateTime(d.olusturulma)}`}</Text>

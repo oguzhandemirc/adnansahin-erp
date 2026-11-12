@@ -1,4 +1,4 @@
-// Liste satırı (şartname §3 ListRow): TEK satır 48 pt, tam genişlik (yan oluk 0, köşe 0). [simge xs] · birincil
+// Liste satırı (şartname §3 liste satırı): TEK satır 48 pt, tam genişlik (yan oluk 0, köşe 0). [simge xs] · birincil
 // `rowTitle` (isteğe bağlı sabit genişlik, ör. belge no) · ikincil muted esnek + "…" · değer 15/600 tabular · rozet ·
 // chevron. Ayraç 1 px `cardBorder`, metin başından. Basılabilirse tüm satır dokunma hedefidir.
 import Ionicons from "@expo/vector-icons/Ionicons";

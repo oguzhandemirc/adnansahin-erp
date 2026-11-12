@@ -20,7 +20,7 @@ import { openRecord } from "../../src/ui/nav";
 import { AltSekmeler, ListeSatiri, SectionCard, StatCard } from "../../src/ui/ortak";
 import { FlowStrip, StationBars } from "../../src/ui/pano/production";
 import { obj, period, pct, qty, str } from "../../src/ui/pano/read";
-import { RecordStatusBadge } from "../../src/ui/pano/RecordStatusBadge";
+import { KayitDurumRozeti } from "../../src/ui/pano/KayitDurumRozeti";
 import { MachineStopsCard } from "../../src/ui/pano/MachineStopsCard";
 import { SubcontractOpenSection } from "../../src/ui/fason/FasonCards";
 import { RemoteList, useRecordPage } from "../../src/ui/pano/RemoteList";
@@ -129,7 +129,7 @@ export default function Production() {
                         <Ionicons name={ready.kind === "iyi" ? "checkmark-circle" : "ellipse-outline"} size={16} color={hazirRenk} />
                       </View>
                     ) : null}
-                    <RecordStatusBadge entry={st} testID={`durum-${r.id}`} />
+                    <KayitDurumRozeti entry={st} testID={`durum-${r.id}`} />
                   </View>
                 }
                 ayrac={i > 0}

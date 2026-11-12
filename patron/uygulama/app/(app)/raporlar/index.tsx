@@ -15,7 +15,7 @@ import { Screen } from "../../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { EMPTY_ICON } from "../../../src/ui/icons";
 import { ActivityList, BosDurum, Iskelet, IconTile, ListeBlogu, ListeSatiri, MetricList, SectionCard, HataDurumu, type MetricItem } from "../../../src/ui/ortak";
-import { ReportStatusBadge, paramSummary } from "../../../src/ui/raporlar/parts";
+import { RaporDurumRozeti, paramSummary } from "../../../src/ui/raporlar/parts";
 import { usePendingPoll } from "../../../src/ui/raporlar/usePendingPoll";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
 import { DOMAIN_TONE, FONT_SCALE, space, typography } from "../../../src/ui/tokens";
@@ -144,7 +144,7 @@ export default function Reports() {
                     alt: `${paramSummary(r.parametreler)} · ${formatDateTime(r.olusturulma).replace(/^(\d{2}\.\d{2})\.\d{4} /, "$1 ")}`,
                     icon: d.icon,
                     ton: DOMAIN_TONE[d.domain],
-                    sag: <ReportStatusBadge status={r.durum} testID={`rapor-durum-${r.id}`} compact />,
+                    sag: <RaporDurumRozeti status={r.durum} testID={`rapor-durum-${r.id}`} compact />,
                     onPress: () => router.push({ pathname: "/raporlar/[id]", params: { id: r.id } } as never),
                   };
                 })}

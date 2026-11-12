@@ -8,7 +8,7 @@ import { recordStatus } from "../../src/lib/labels/uretim";
 import { QUOTE_EXPIRED, QUOTE_STATUS } from "../../src/lib/labels/teklif";
 import { Screen } from "../../src/ui/Frame";
 import { openRecord } from "../../src/ui/nav";
-import { RecordStatusBadge } from "../../src/ui/pano/RecordStatusBadge";
+import { KayitDurumRozeti } from "../../src/ui/pano/KayitDurumRozeti";
 import { SectionHeader } from "../../src/ui/SectionHeader";
 import { asObj } from "../../src/ui/siparis/OrderRow";
 import { useListCapability } from "../../src/ui/siparis/capabilities";
@@ -53,7 +53,7 @@ export default function Quotes() {
                 birincil={x.title}
                 deger={x.value}
                 ikincil={x.value ? `${st.label} · ${x.line}` : x.line}
-                rozet={x.value ? undefined : <RecordStatusBadge entry={st} testID={`durum-${r.id}`} />}
+                rozet={x.value ? undefined : <KayitDurumRozeti entry={st} testID={`durum-${r.id}`} />}
                 ton={DOMAIN_TONE.siparisler}
                 ayrac={i > 0}
                 onPress={() => openRecord(router, "teklif", r.id)}

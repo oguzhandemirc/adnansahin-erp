@@ -41,7 +41,7 @@ const RecordDetail = (require("../app/(app)/kayit/[projeksiyon]/[id]") as { defa
 const { ReceivableHero, ChequeDue } = require("../src/ui/finans/FinanceSummary") as typeof import("../src/ui/finans/FinanceSummary");
 const rows = require("../src/ui/finans/rows") as typeof import("../src/ui/finans/rows");
 const { ProjectionList } = require("../src/ui/data") as typeof import("../src/ui/data");
-const { ReportStatusBadge } = require("../src/ui/raporlar/parts") as typeof import("../src/ui/raporlar/parts");
+const { RaporDurumRozeti } = require("../src/ui/raporlar/parts") as typeof import("../src/ui/raporlar/parts");
 const { usePendingPoll, PENDING_POLL_MS } = require("../src/ui/raporlar/usePendingPoll") as typeof import("../src/ui/raporlar/usePendingPoll");
 const { asOfDayText, asOfIso, periodText } = require("../src/ui/raporlar/periods") as typeof import("../src/ui/raporlar/periods");
 const { invalidate } = require("../src/state/changes") as typeof import("../src/state/changes");
@@ -197,7 +197,7 @@ describe("§3 rapor durumu ve başlığı sözlükten", () => {
     }
   });
   it("rozet sözlük etiketini basar; hesaplanırken nabız", () => {
-    render(<ReportStatusBadge status="HESAPLANIYOR" testID="r" />);
+    render(<RaporDurumRozeti status="HESAPLANIYOR" testID="r" />);
     expect(screen.getByText("Hesaplanıyor")).toBeTruthy();
     expect(screen.getByLabelText("Hesaplanıyor")).toBeTruthy();
   });

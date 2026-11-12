@@ -13,7 +13,7 @@ const ROZET_SIMGE: Readonly<Record<StatusKind, IconName>> = { iyi: "checkmark-ci
 
 /** Rapor isteği durumu rozeti; HESAPLANIYOR'da yanında küçük dönen gösterge. Etiket ve ton sözlükten.
  *  `compact`: liste satırında dönen gösterge yok (başlık sığsın; rozet durumu zaten söyler). */
-export function ReportStatusBadge({ status, testID, compact }: { status: string; testID?: string; compact?: boolean }) {
+export function RaporDurumRozeti({ status, testID, compact }: { status: string; testID?: string; compact?: boolean }) {
   const t = useTokens();
   const e = (REPORT_STATUS as Readonly<Record<string, { label: string; tone: StatusKind } | undefined>>)[status];
   const label = e?.label ?? humanize(status);

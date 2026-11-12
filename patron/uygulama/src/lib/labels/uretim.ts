@@ -5,7 +5,7 @@ import type { StatusEntry, StatusTone } from "./ortak";
 
 /**
  * Kayıt durumu tonu: renk = anlam. iyi/uyari/kritik YALNIZ gerçekten o durumlar için; normal akış "etkin"
- * (marka), bekleyen "notr", kapanmış/iptal "sonuk" (iptal arıza değildir). Rozet çizimi `ui/pano/RecordStatusBadge`.
+ * (marka), bekleyen "notr", kapanmış/iptal "sonuk" (iptal arıza değildir). Rozet çizimi `ui/pano/KayitDurumRozeti`.
  */
 export type RecordTone = StatusTone | "etkin" | "notr" | "sonuk";
 

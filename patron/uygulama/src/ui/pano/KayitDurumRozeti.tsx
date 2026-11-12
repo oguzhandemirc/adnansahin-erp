@@ -15,7 +15,7 @@ const TON: Readonly<Record<RecordTone, { readonly ton: RozetTonu; readonly icon:
   sonuk: { ton: "soft", icon: "remove-circle-outline" },
 };
 
-export function RecordStatusBadge({ entry, testID }: { readonly entry: RecordStatusEntry; readonly testID?: string }) {
+export function KayitDurumRozeti({ entry, testID }: { readonly entry: RecordStatusEntry; readonly testID?: string }) {
   const c = TON[entry.tone];
   return <Rozet label={entry.label} tone={c.ton} icon={c.icon} testID={testID} accessibilityLabel={`Durum: ${entry.label}`} />;
 }
