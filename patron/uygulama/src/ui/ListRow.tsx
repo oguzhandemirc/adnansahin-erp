@@ -4,8 +4,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Children, Fragment, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
-import { IconChip } from "./IconChip";
-import type { IconName } from "./icons";
+import { IconTile } from "./ortak";
+import { DOMAIN_TONE } from "./tokens";
+import { DOMAIN_ICON, type IconName } from "./icons";
 import { makeStyles, useTokens } from "./theme-context";
 import { FONT_SCALE, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
 
@@ -40,7 +41,7 @@ export function ListRow(p: ListRowProps) {
   const value = p.value ? <Text style={[s.value, stacked && s.valueTop, p.valueTone ? { color: t.status[p.valueTone].fill } : null]} numberOfLines={1}>{p.value}</Text> : null;
   const content = (
     <>
-      {p.icon || p.domain ? <IconChip domain={p.domain ?? "genel"} icon={p.icon} size={LIST_ICON} /> : null}
+      {p.icon || p.domain ? <IconTile icon={p.icon ?? DOMAIN_ICON[p.domain ?? "genel"]} tone={DOMAIN_TONE[p.domain ?? "genel"]} size="md" /> : null}
       {stacked ? (
         <View style={[s.text, s.stack]}>
           <View style={s.top}>

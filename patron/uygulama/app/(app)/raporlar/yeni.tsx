@@ -10,7 +10,8 @@ import { buildReportParams, catalogEntries, extraParamNames, isPresentationKey, 
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { Screen } from "../../../src/ui/Frame";
-import { IconChip } from "../../../src/ui/IconChip";
+import { IconTile } from "../../../src/ui/ortak";
+import { DOMAIN_TONE } from "../../../src/ui/tokens";
 import { Banner, Button, Card, Field } from "../../../src/ui/kit";
 import { AS_OF_CHOICES, REPORT_PERIODS, asOfDayText, asOfIso, periodText, type AsOfChoice, type ReportPeriod } from "../../../src/ui/raporlar/periods";
 import { SectionHeader } from "../../../src/ui/SectionHeader";
@@ -78,7 +79,7 @@ export default function NewReport() {
     <Screen title="Rapor iste" module="raporlar" back>
       <Card domain={dom.domain}>
         <View style={s.head}>
-          <IconChip domain={dom.domain} icon={dom.icon} size={36} />
+          <IconTile icon={dom.icon} tone={DOMAIN_TONE[dom.domain]} size="md" />
           <Text style={s.title} maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
         </View>
         {typeof soru === "string" && soru !== "" ? <Text style={s.sub}>{soru}</Text> : null}

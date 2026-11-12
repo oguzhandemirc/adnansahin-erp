@@ -15,7 +15,8 @@ import { NATIVE_PUSH_SOON, pushAvailable } from "../push/support";
 import { useSession } from "../state/session";
 import { useRemote } from "../state/useRemote";
 import { GroupNote } from "./diger/parts";
-import { IconChip } from "./IconChip";
+import { IconTile } from "./ortak";
+import { DOMAIN_TONE } from "./tokens";
 import { Banner, Button } from "./kit";
 import { ListGroup, ListRow } from "./ListRow";
 import { SectionHeader } from "./SectionHeader";
@@ -113,7 +114,7 @@ export function NotificationDevices({ vapidKey, pushHere = pushAvailable(Platfor
       <SectionHeader title="Cihazlar" count={devices.data ? list.length : undefined} />
       {pushHere ? (
         <View style={s.here}>
-          <IconChip domain="gelenKutusu" icon="phone-portrait-outline" size={40} />
+          <IconTile icon="phone-portrait-outline" tone={DOMAIN_TONE.gelenKutusu} size="md" />
           <View style={s.flex}>
             <View style={s.hereHead}>
               <Text style={s.hereTitle}>Bu cihaz</Text>
@@ -178,7 +179,7 @@ export function NotificationHistory() {
             return (
               <Pressable key={n.id} disabled={!route} onPress={() => route && router.push(route as never)} accessibilityRole={route ? "link" : undefined}
                 style={({ pressed }) => [s.hist, pressed && route ? { backgroundColor: t.surfaceAlt } : null]}>
-                <IconChip domain={look.domain} icon={look.icon} size={36} />
+                <IconTile icon={look.icon} tone={DOMAIN_TONE[look.domain]} size="md" />
                 <View style={s.flex}>
                   <Text style={s.histTitle}>{n.baslik}</Text>
                   <Text style={s.histBody}>{n.metin}</Text>

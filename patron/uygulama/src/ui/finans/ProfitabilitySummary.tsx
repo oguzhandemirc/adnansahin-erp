@@ -7,7 +7,8 @@ import { profitView, type ProfitRowView } from "../../lib/profitability-summary"
 import { catalogEntries, requestable } from "../../lib/reports";
 import { useSession } from "../../state/session";
 import { useRemote } from "../../state/useRemote";
-import { IconChip } from "../IconChip";
+import { IconTile } from "../ortak";
+import { DOMAIN_TONE } from "../tokens";
 import { Card } from "../kit";
 import { ListRow } from "../ListRow";
 import { SnapshotGate } from "../pano/SnapshotGate";
@@ -53,7 +54,7 @@ function ProfitBody({ veri }: { veri: unknown }) {
     <View>
       <Card domain="finans" testID="karlilik-donem">
         <View style={s.head}>
-          <IconChip domain="finans" icon="trending-up-outline" />
+          <IconTile icon="trending-up-outline" tone={DOMAIN_TONE.finans} size="sm" />
           <Text style={s.headTitle} maxFontSizeMultiplier={FONT_SCALE.title}>{`${v.monthTitle} kalan (katkı)`}</Text>
         </View>
         <Text style={s.big} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={FONT_SCALE.title} testID="karlilik-katki">{v.contribution}</Text>

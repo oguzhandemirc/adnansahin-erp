@@ -3,7 +3,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ReactNode } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
-import { IconChip } from "../IconChip";
+import { IconTile } from "../ortak";
+import { DOMAIN_TONE } from "../tokens";
 import type { IconName } from "../icons";
 import { roleOf } from "../RoleBadge";
 import { makeStyles, useTokens } from "../theme-context";
@@ -77,7 +78,7 @@ export function ToggleRow(p: {
   const s = useStyles();
   return (
     <View style={s.toggle}>
-      {p.icon ? <View style={p.disabled ? s.dim : null}><IconChip domain={p.domain ?? "genel"} icon={p.icon} size={32} /></View> : null}
+      {p.icon ? <View style={p.disabled ? s.dim : null}><IconTile icon={p.icon} tone={DOMAIN_TONE[p.domain ?? "genel"]} size="sm" /></View> : null}
       <View style={s.flex}>
         <Text style={[s.toggleLabel, p.disabled && { color: t.textMuted }]}>{p.label}</Text>
         {p.hint ? <Text style={s.toggleHint}>{p.hint}</Text> : null}
@@ -122,7 +123,7 @@ export function CheckRow(p: {
       testID={p.testID}
       style={({ pressed }) => [s.check, pressed && { backgroundColor: t.surfaceAlt }]}
     >
-      {p.icon ? <IconChip domain={p.domain ?? "genel"} icon={p.icon} size={32} /> : null}
+      {p.icon ? <IconTile icon={p.icon} tone={DOMAIN_TONE[p.domain ?? "genel"]} size="sm" /> : null}
       <View style={s.flex}>
         <Text style={s.toggleLabel}>{p.title}</Text>
         {p.subtitle ? <Text style={s.toggleHint}>{p.subtitle}</Text> : null}

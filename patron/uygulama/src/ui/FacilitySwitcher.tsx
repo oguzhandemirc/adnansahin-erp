@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSession } from "../state/session";
-import { IconChip } from "./IconChip";
+import { IconTile } from "./ortak";
 import { Banner, Button } from "./kit";
 import { StatusBadge } from "./StatusBadge";
 import { makeStyles, useTokens } from "./theme-context";
@@ -48,7 +48,7 @@ export function FacilitySwitchModal({ visible, onClose }: { visible: boolean; on
                 <Pressable key={f.id} accessibilityRole="button" accessibilityState={{ selected: active, disabled: busy !== null }} disabled={busy !== null}
                   testID={`tesis-${f.id}`} onPress={() => (active ? onClose() : void choose(f.id))}
                   style={({ pressed }) => [s.row, i > 0 && s.sep, pressed && { backgroundColor: t.surfaceAlt }]}>
-                  <IconChip domain={active ? "gelenKutusu" : "genel"} icon="business-outline" size={36} />
+                  <IconTile icon="business-outline" tone={active ? "primary" : "sky"} size="md" />
                   <Text style={[s.name, active && { color: t.tint, fontWeight: "700" }]} numberOfLines={1}>{f.ad}</Text>
                   {badge ? <View testID={`tesis-rozet-${f.id}`}><StatusBadge kind={badge.kind} label={badge.label} size="sm" /></View> : null}
                   {busy === f.id ? (

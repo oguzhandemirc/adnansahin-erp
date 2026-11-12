@@ -5,7 +5,8 @@ import { Text, View } from "react-native";
 import { formatMoney } from "../../lib/format";
 import { AGING_BUCKET, AGING_BUCKETS, CHEQUE_DUE_BUCKET, CHEQUE_DUE_BUCKETS, CHEQUE_KIND } from "../../lib/labels/finans";
 import { AgingBar, type AgingSegment } from "../charts/AgingBar";
-import { IconChip } from "../IconChip";
+import { IconTile } from "../ortak";
+import { DOMAIN_TONE } from "../tokens";
 import { Card } from "../kit";
 import { SectionHeader } from "../SectionHeader";
 import { Empty } from "../StateViews";
@@ -90,7 +91,7 @@ export function ReceivableHero({ veri, caption }: { veri: unknown; caption?: str
   return (
     <Card domain="finans" testID="finans-alacak">
       <View style={s.head}>
-        <IconChip domain="finans" icon="trending-up-outline" />
+        <IconTile icon="trending-up-outline" tone={DOMAIN_TONE.finans} size="sm" />
         <Text style={s.headTitle} maxFontSizeMultiplier={FONT_SCALE.title}>Açık alacak</Text>
       </View>
       {caption ? <Text style={s.caption}>{caption}</Text> : null}
@@ -127,7 +128,7 @@ export function ChequeDue({ veri }: { veri: unknown }) {
           {groups.map((g, i) => (
             <View key={`${g.tur}-${g.doviz}`} style={[s.block, i > 0 && s.blockSep]}>
               <View style={s.groupHead}>
-                <IconChip domain="finans" icon={g.tur === "ISSUED" ? "arrow-up-circle-outline" : "arrow-down-circle-outline"} size={28} />
+                <IconTile icon={g.tur === "ISSUED" ? "arrow-up-circle-outline" : "arrow-down-circle-outline"} tone={DOMAIN_TONE.finans} size="sm" />
                 <Text style={s.groupTitle}>{`${CHEQUE_KIND[g.tur] ?? g.tur} çek/senet`}</Text>
                 <Text style={s.currency}>{g.doviz}</Text>
               </View>

@@ -2,7 +2,8 @@
 // ilk 15 kategori + "Diğer". Rakamlar fabrikanın; bu bileşen yalnız `lib/expense-summary` görünümünü çizer.
 import { Text, View } from "react-native";
 import { expenseView } from "../../lib/expense-summary";
-import { IconChip } from "../IconChip";
+import { IconTile } from "../ortak";
+import { DOMAIN_TONE } from "../tokens";
 import { Card } from "../kit";
 import { ListRow } from "../ListRow";
 import { SnapshotGate } from "../pano/SnapshotGate";
@@ -33,7 +34,7 @@ function ExpenseBody({ veri, onPickCategory }: { veri: unknown; onPickCategory?:
     <View>
       <Card domain="finans" testID="masraf-bu-ay">
         <View style={s.head}>
-          <IconChip domain="finans" icon="wallet-outline" />
+          <IconTile icon="wallet-outline" tone={DOMAIN_TONE.finans} size="sm" />
           <Text style={s.headTitle} maxFontSizeMultiplier={FONT_SCALE.title}>{`${v.monthTitle} harcanan`}</Text>
         </View>
         <Text style={s.big} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={FONT_SCALE.title} testID="masraf-toplam">{v.total}</Text>

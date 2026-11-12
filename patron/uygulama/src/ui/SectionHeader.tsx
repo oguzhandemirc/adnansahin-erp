@@ -1,7 +1,8 @@
 // Bölüm başlığı: isteğe bağlı alan ikon çipi · başlık (+ sayaç) ve sağda isteğe bağlı "Tümü ›" bağlantısı.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, Text, View } from "react-native";
-import { IconChip } from "./IconChip";
+import { IconTile } from "./ortak";
+import { DOMAIN_TONE } from "./tokens";
 import type { IconName } from "./icons";
 import { makeStyles, useTokens } from "./theme-context";
 import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain } from "./tokens";
@@ -23,7 +24,7 @@ export function SectionHeader({ title, count, icon, actionLabel = "Tümü", onAc
   const s = useStyles();
   return (
     <View style={s.row} testID={testID}>
-      {icon ? <IconChip domain={domain ?? "genel"} icon={icon} size={28} /> : null}
+      {icon ? <IconTile icon={icon} tone={DOMAIN_TONE[domain ?? "genel"]} size="sm" /> : null}
       <Text style={s.title} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>
         {title}
       </Text>

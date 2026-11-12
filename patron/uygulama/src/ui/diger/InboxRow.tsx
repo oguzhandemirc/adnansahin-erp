@@ -6,7 +6,8 @@ import type { InboxItem } from "../../api/wire";
 import { formatAgo } from "../../lib/format";
 import { statusEntry } from "../../lib/labels";
 import { inboxKind } from "../../lib/labels/diger";
-import { IconChip } from "../IconChip";
+import { IconTile } from "../ortak";
+import { DOMAIN_TONE } from "../tokens";
 import { StatusBadge } from "../StatusBadge";
 import { makeStyles, useTokens } from "../theme-context";
 import { space, typography } from "../tokens";
@@ -27,7 +28,7 @@ export function InboxRow({ m, onPress, showAuthor }: { readonly m: InboxItem; re
       accessibilityLabel={[kind.ad, summary, statusEntry(m.durum).label, age, late ? "24 saattir bekliyor" : null].filter(Boolean).join(", ")}
       style={({ pressed }) => [s.row, pressed && { backgroundColor: t.surfaceAlt }]}
     >
-      <IconChip domain={kind.domain} icon={kind.icon} size={40} />
+      <IconTile icon={kind.icon} tone={DOMAIN_TONE[kind.domain]} size="md" />
       <View style={s.text}>
         <View style={s.head}>
           <Text style={s.title} numberOfLines={1}>{kind.ad}</Text>

@@ -11,7 +11,8 @@ import { useRemote } from "../../../../src/state/useRemote";
 import { ErrorBox, Fields } from "../../../../src/ui/data";
 import { recordCurrency } from "../../../../src/ui/finans/rows";
 import { Screen } from "../../../../src/ui/Frame";
-import { IconChip } from "../../../../src/ui/IconChip";
+import { IconTile } from "../../../../src/ui/ortak";
+import { DOMAIN_TONE } from "../../../../src/ui/tokens";
 import type { IconName } from "../../../../src/ui/icons";
 import { Card } from "../../../../src/ui/kit";
 import { SectionHeader } from "../../../../src/ui/SectionHeader";
@@ -60,7 +61,7 @@ export default function RecordDetail() {
         <>
           <Card domain={kind.domain} testID="kayit-ozet">
             <View style={s.head}>
-              <IconChip domain={kind.domain} icon={kind.icon} size={36} />
+              <IconTile icon={kind.icon} tone={DOMAIN_TONE[kind.domain]} size="md" />
               <View style={{ flex: 1 }}>
                 <Text style={s.kind}>{kind.label}</Text>
                 <Text style={s.title} maxFontSizeMultiplier={FONT_SCALE.title} numberOfLines={2}>{title}</Text>

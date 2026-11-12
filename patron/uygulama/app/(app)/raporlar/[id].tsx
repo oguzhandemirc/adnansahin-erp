@@ -12,7 +12,8 @@ import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { ErrorBox, SnapshotView } from "../../../src/ui/data";
 import { Screen } from "../../../src/ui/Frame";
-import { IconChip } from "../../../src/ui/IconChip";
+import { IconTile } from "../../../src/ui/ortak";
+import { DOMAIN_TONE } from "../../../src/ui/tokens";
 import { Banner, Card, ConfirmButton } from "../../../src/ui/kit";
 import { ParamRows, ReportStatusBadge } from "../../../src/ui/raporlar/parts";
 import { SunumGorunumu } from "../../../src/ui/raporlar/SunumGorunumu";
@@ -58,7 +59,7 @@ export default function ReportDetail() {
         <>
           <Card domain={dom.domain} testID="rapor-ozet">
             <View style={s.head}>
-              <IconChip domain={dom.domain} icon={dom.icon} size={36} />
+              <IconTile icon={dom.icon} tone={DOMAIN_TONE[dom.domain]} size="md" />
               <Text style={s.title} maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
             </View>
             <View style={s.badgeRow}>

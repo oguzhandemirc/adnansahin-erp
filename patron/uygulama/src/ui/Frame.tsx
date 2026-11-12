@@ -10,7 +10,8 @@ import { MODULES, moduleNavTitle, moduleTitle, moduleVisible, type ModuleKey } f
 import { useSession } from "../state/session";
 import { StatusBands } from "./data";
 import { FacilitySwitchModal } from "./FacilitySwitcher";
-import { IconChip } from "./IconChip";
+import { IconTile } from "./ortak";
+import { DOMAIN_TONE } from "./tokens";
 import { MODULE_ICON } from "./icons";
 import { Banner } from "./kit";
 import { LargeHeader, LargeTitle, useHeaderScroll } from "./LargeHeader";
@@ -78,7 +79,7 @@ export function SideNav() {
                   onPress={() => router.navigate(m.route as never)}
                   style={({ pressed }) => [s.railItem, active && { backgroundColor: t.tintContainer }, pressed && !active && { backgroundColor: t.surfaceAlt }]}
                 >
-                  <IconChip domain={icon.domain} icon={icon.icon} size={28} />
+                  <IconTile icon={icon.icon} tone={DOMAIN_TONE[icon.domain]} size="sm" />
                   <Text style={[s.railText, active && { color: t.tint, fontWeight: "600" }]} numberOfLines={1}>{moduleNavTitle(m.key)}</Text>
                 </Pressable>
               );

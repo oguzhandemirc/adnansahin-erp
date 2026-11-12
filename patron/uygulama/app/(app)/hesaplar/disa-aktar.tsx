@@ -13,7 +13,8 @@ import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { GroupNote } from "../../../src/ui/diger/parts";
 import { Screen } from "../../../src/ui/Frame";
-import { IconChip } from "../../../src/ui/IconChip";
+import { IconTile } from "../../../src/ui/ortak";
+import { DOMAIN_TONE } from "../../../src/ui/tokens";
 import { Banner, Button } from "../../../src/ui/kit";
 import { ListGroup } from "../../../src/ui/ListRow";
 import { Empty, ErrorState, LoadingSkeleton } from "../../../src/ui/StateViews";
@@ -65,7 +66,7 @@ export default function ExportScreen() {
           {r.data.kumeler.map((d) => (
             <View key={d.ad} testID={`kume-${d.ad}`} style={s.row}>
               <View style={s.head}>
-                <IconChip domain="raporlar" icon="document-outline" size={36} />
+                <IconTile icon="document-outline" tone={DOMAIN_TONE.raporlar} size="md" />
                 <View style={s.text}>
                   <Text style={s.title}>{label(d)}</Text>
                   <Text style={s.count}>{`${formatNumber(d.adet, 0)} kayıt`}</Text>

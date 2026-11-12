@@ -14,7 +14,8 @@ import { inboxBody, inboxOverdue, inboxPending, inboxSummary } from "../../../sr
 import { GroupCaption, GroupNote } from "../../../src/ui/diger/parts";
 import { useSettlePoll } from "../../../src/ui/diger/useSettlePoll";
 import { Screen } from "../../../src/ui/Frame";
-import { IconChip } from "../../../src/ui/IconChip";
+import { IconTile } from "../../../src/ui/ortak";
+import { DOMAIN_TONE } from "../../../src/ui/tokens";
 import { Banner, Card, ConfirmButton } from "../../../src/ui/kit";
 import { ListGroup, ListRow } from "../../../src/ui/ListRow";
 import { StatusBadge } from "../../../src/ui/StatusBadge";
@@ -57,7 +58,7 @@ export default function InboxDetail() {
         <>
           <Card domain={kind.domain}>
             <View style={s.head}>
-              <IconChip domain={kind.domain} icon={kind.icon} size={48} />
+              <IconTile icon={kind.icon} tone={DOMAIN_TONE[kind.domain]} size="lg" />
               <View style={s.flex}>
                 <Text style={s.title} numberOfLines={2}>{inboxSummary(m)}</Text>
                 <Text style={s.sub} numberOfLines={1}>{m.hesapAdi}</Text>
