@@ -1,0 +1,108 @@
+// FABRİKA KANALI KAPISI — imzalı İSTEK (protokol LISANS-PROTOKOLU.md §4 sırası, amaç `esitle`):
+//   ① readRequestIdentity (imzasız) → kurulum dizini (açık anahtar + hak; satıcı cevabı henüz YAZILMAZ) ② verifyRequest (typ ·
+//   imza · kurulum · amaç · ±10 dk · HAM gövde özeti) ③ nonce ATOMİK (tesis kapsamında UNIQUE) ④ hak
+//   kapısı: yalnız URETIM sınıfı + `patron-bulut` modülü + bitmemiş abonelik + DEVREDİLMEMİŞ ⑤ tesisin
+//   hizmet aşaması ACIK (tesis kapatıldıysa kanal da kapalı — `service-lifecycle.ts`).
+// Kiracı İSTEKTEN değil kurulumdan çözülür (`tesisId` gövdeden ALINMAZ — sözleşme §9.2).
+// Satıcıdan YENİ gelen kurulum yalnız imza ve hak doğrulandıktan sonra yazılır (sıra imza → hak → DB; B5s).
+// Kayıtsız kurulum ile yabancı anahtar imzadan önce AYNI 401'i alır (var/yok kâhini yok; B5).
+import { CLOCK_SKEW_MS, UuidSchema, isCloudSenderClass, isoToMs, readRequestIdentity, verifyRequest, type RequestDoc } from "../lisans-protokol";
+import { CloudError, requestRejected } from "../lib/errors";
+import { isUniqueViolation } from "../lib/prisma-errors";
+import { withTesis } from "../lib/tenant";
+import type { CloudContext } from "./context";
+import { safeKeyId, type InstallationRecord } from "./installation-directory";
+import { CLOUD_MODULE_KEY, facilityServiceState } from "./service-lifecycle";
+import { securityEvent } from "../lib/security-events";
+
+export { CLOUD_MODULE_KEY };
+
+export interface FactoryCaller {
+  readonly installation: InstallationRecord;
+  readonly tesisId: string;
+  readonly request: RequestDoc;
+}
+
+/** Eşitleme hakkı (sözleşme §1.4 — bulut İKİNCİ kapıdır; fabrika zaten göndermez). */
+export function cloudEntitlementError(inst: InstallationRecord, nowMs: number): CloudError | null {
+  if (!isCloudSenderClass(inst.licenseClass)) {
+    return new CloudError(403, "SINIF_GONDEREMEZ", "Bu kurulumun lisans sınıfı patron bulutuna veri gönderemez (yalnız üretim, barındırılan ve demo)");
+  }
+  const until = inst.cloudUntil?.getTime() ?? 0;
+  if (!inst.modules.includes(CLOUD_MODULE_KEY) || until <= nowMs || inst.handedOver) {
+    return new CloudError(403, "PATRON_BULUT_KAPALI", "Patron bulutu hakkı yok ya da aboneliğin süresi doldu");
+  }
+  return null;
+}
+
+async function recordNonce(ctx: CloudContext, inst: InstallationRecord, request: RequestDoc, nowMs: number): Promise<void> {
+  const expiresMs = Math.max(isoToMs(request.zaman), nowMs) + CLOCK_SKEW_MS;
+  try {
+    await withTesis(ctx.sync, { tesisId: inst.tesisId }, (tx) =>
+      tx.requestNonce.create({
+        data: { tesisId: inst.tesisId, installationId: inst.installationId, nonce: request.nonce, expiresAt: new Date(expiresMs) },
+      }),
+    );
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new CloudError(409, "ISTEK_TEKRAR", "Bu istek daha önce işlendi (tekrar oynatma)");
+    throw err;
+  }
+}
+
+/** `path`: isteği alan uç (`SYNC_PATHS` sabiti) — imzalı `yol` taşıyan istek yalnız o uca geçer (amaç hep `esitle`). */
+/** Güvenlik olayı sayacı: kimlik/imza reddi (401) ve hak reddi (403) sınıf başına sayılır (B3). */
+export async function authenticateFactory(ctx: CloudContext, g: { header: unknown; rawBody: Buffer; nowMs: number; path: string }): Promise<FactoryCaller> {
+  try {
+    return await authenticate(ctx, g);
+  } catch (err) {
+    if (err instanceof CloudError && (err.status === 401 || err.status === 403)) securityEvent(err.status === 401 ? "IMZA_RED" : "HAK_RED", err.code);
+    throw err;
+  }
+}
+
+async function authenticate(ctx: CloudContext, g: { header: unknown; rawBody: Buffer; nowMs: number; path: string }): Promise<FactoryCaller> {
+  if (typeof g.header !== "string" || g.header.length === 0) {
+    throw new CloudError(401, "ISTEK_GECERSIZ", "İmzalı istek başlığı (X-TKL-Istek) yok");
+  }
+  const identity = readRequestIdentity(g.header);
+  if (!identity.ok) throw requestRejected(identity.code, identity.message, g.nowMs);
+  // Kimliksiz istek (protokolde yalnız etkinleştirme/taşıma) bulut kanalında meşru değil: `esitle` kimlik taşır.
+  const installationId = identity.value.installationId;
+  if (installationId === null || !UuidSchema.safeParse(installationId).success) {
+    throw new CloudError(401, "ISTEK_GECERSIZ", "İstekteki kurulum kimliği yok ya da biçimsiz");
+  }
+  const found = await ctx.directory.lookup(installationId, g.nowMs);
+  const candidate = found.record;
+  if (!candidate?.publicKeyX || safeKeyId(candidate.publicKeyX) !== identity.value.kid) {
+    console.warn(`[patron] imzalı istek reddi: kurulum ${installationId.slice(0, 8)}… ${candidate ? "anahtarı tutmuyor" : "bilinmiyor"}`);
+    throw new CloudError(401, "KURULUM_BILINMIYOR", "Bu kurulum bu anahtarla patron bulutunda kayıtlı değil");
+  }
+  const verified = verifyRequest(g.header, {
+    publicKeyX: candidate.publicKeyX,
+    body: g.rawBody,
+    nowMs: g.nowMs,
+    purposes: ["esitle"],
+    installationId,
+    path: g.path,
+  });
+  if (!verified.ok) throw requestRejected(verified.code, verified.message, g.nowMs);
+  let inst = candidate;
+  if (found.pending) {
+    // Önbellekte olmayan kurulum: pasif ya da hakkı yoksa yönlendirme bağı ve tesis DB isteği DOĞMAZ.
+    if (!found.cached) {
+      if (!candidate.active) throw new CloudError(403, "KURULUM_IPTAL", "Bu kurulumun kaydı pasif; patron bulutu kanalı kapalı");
+      const early = cloudEntitlementError(candidate, g.nowMs);
+      if (early) throw early;
+    }
+    const committed = await ctx.directory.commit(found.pending, g.nowMs);
+    if (!committed) throw new CloudError(401, "KURULUM_BILINMIYOR", "Bu kurulum bu anahtarla patron bulutunda kayıtlı değil");
+    inst = committed;
+  }
+  await recordNonce(ctx, inst, verified.value, g.nowMs);
+  if (!inst.active) throw new CloudError(403, "KURULUM_IPTAL", "Bu kurulumun kaydı pasif; patron bulutu kanalı kapalı");
+  const denied = cloudEntitlementError(inst, g.nowMs);
+  if (denied) throw denied;
+  const service = await facilityServiceState(ctx, inst.tesisId, g.nowMs);
+  if (service?.phase !== "ACIK") throw new CloudError(403, "PATRON_BULUT_KAPALI", "Tesisin patron bulutu hizmeti kapalı (tesis kapatıldı ya da hizmet sona erdi)");
+  return { installation: inst, tesisId: inst.tesisId, request: verified.value };
+}

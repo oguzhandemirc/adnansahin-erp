@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "TeksERP Yönetim",
+    "slug": "tekserp-patron",
+    "scheme": "tekserp-patron",
+    "version": "1.2.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.etkiliyazilim.tekserp.yonetim",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.etkiliyazilim.tekserp.yonetim",
+      "versionCode": 3,
+      "allowBackup": false,
+      "icon": "./assets/icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png",
+        "backgroundColor": "#161C2B"
+      },
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#161C2B"
+      },
+      "permissions": [],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.WAKE_LOCK",
+        "com.google.android.c2dm.permission.RECEIVE",
+        "com.google.android.gms.permission.AD_ID",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "lang": "tr"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      "./plugins/withPatronImza.js"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
