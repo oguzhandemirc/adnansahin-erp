@@ -22,7 +22,7 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         <View style={s.brand}>
           <View style={s.mark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <Ionicons name="stats-chart" size={34} color={t.color.primarySoft} />
+            <Ionicons name="stats-chart" size={34} color={t.color.onPrimary} />
           </View>
           <Text style={s.brandName} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{UYGULAMA_ADI}</Text>
           <Text style={s.brandTag}>Fabrikanızın özeti, her an yanınızda</Text>
