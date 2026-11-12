@@ -1,9 +1,8 @@
-// Kit v2: durum rozeti (4 ton + sözlük, bilinmeyen ham), segment seçimi, KPI erişilebilirlik etiketi, tema tercihi.
+// Kit v2: durum rozeti (4 ton + sözlük, bilinmeyen ham), segment seçimi, tema tercihi.
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
 import { INBOX_STATUSES, NOTIFICATION_STATUSES, REPORT_STATUSES, type AccountStatus } from "../src/api/wire";
 import { STATUS_DICT, statusEntry } from "../src/lib/labels";
-import { KpiCard, kpiAccessibilityLabel } from "../src/ui/KpiCard";
 import { ListRow } from "../src/ui/ListRow";
 import { Tabs } from "../src/ui/kit";
 import { SegmentedControl } from "../src/ui/SegmentedControl";
@@ -60,27 +59,7 @@ describe("SegmentedControl", () => {
   });
 });
 
-describe("KpiCard", () => {
-  it("ekran okuyucu tek etiket duyar: etiket, değer+birim, eğilim, durum", () => {
-    render(
-      <KpiCard label="Açık sipariş" value="12" unit="adet" domain="siparisler" trend={{ text: "+3 düne göre", direction: "up", tone: "uyari" }} status={{ kind: "kritik", label: "2 gecikmiş" }} spark={[1, 3, 2, 5]} testID="kpi" />,
-    );
-    expect(screen.getByLabelText("Açık sipariş: 12 adet, +3 düne göre, 2 gecikmiş")).toBeTruthy();
-    expect(kpiAccessibilityLabel({ label: "Stok", value: "4.200" })).toBe("Stok: 4.200");
-  });
-  it("dokunulabilir KPI düğme rolündedir", () => {
-    const fn = jest.fn();
-    render(<KpiCard label="Sevk" value="3" domain="sevkiyat" onPress={fn} testID="kpi-sevk" />);
-    fireEvent.press(screen.getByTestId("kpi-sevk"));
-    expect(fn).toHaveBeenCalled();
-  });
-});
-
-describe("KpiCard yan değerler + ListRow Posta düzeni", () => {
-  it("KPI etiketi açıklama ve yan değerleri de okur", () => {
-    render(<KpiCard label="Bugün sevk" value="1.200" unit="m" caption="4 top · brüt" lines={[{ label: "Bu ay", value: "23.120 m" }]} domain="sevkiyat" testID="kpi-yan" />);
-    expect(screen.getByTestId("kpi-yan").props.accessibilityLabel).toBe("Bugün sevk: 1.200 m, 4 top · brüt, Bu ay 23.120 m");
-  });
+describe("ListRow Posta düzeni", () => {
   it("ListRow `lines` alt satırları tam genişlikte basar; etiket başlık, değer, satırlar", () => {
     render(<ListRow title="İE-12" value="400 m" lines={["Boya · plan 30.10.2026", "200 / 400 m üretildi"]} domain="uretim" testID="satir" />);
     expect(screen.getByText("200 / 400 m üretildi")).toBeTruthy();

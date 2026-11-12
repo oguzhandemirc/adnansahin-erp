@@ -1,4 +1,4 @@
-// Ortak bileşenler (şartname §3) — ekranlar buradan alır. Eski karşılıklar (KpiCard, IconChip, ListRow, StatusBadge,
+// Ortak bileşenler (şartname §3) — ekranlar buradan alır. Eski karşılıklar (IconChip, ListRow, StatusBadge,
 // StateViews) bir sonraki dilimde bunlara yönlenecek; şimdilik yan yana durur.
 export { IconTile, ICON_TILE_SIZE, tilePair, type DurumTonu, type IconTileSize, type IconTileTone } from "./IconTile";
 export { Rozet, rozetRenk, type RozetTonu } from "./Rozet";
