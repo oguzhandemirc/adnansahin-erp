@@ -154,7 +154,9 @@ export function areaSummary(projection: string, data: unknown): string {
       return `${qty(d.acikKalem)} açık kalem · ${pct(d.karsilanmaYuzde)} karşılandı`;
     case "ozet.sevkiyat": {
       const m = period(d, "buAy");
-      return `${PERIOD_LABEL.buAy} ${qty(m.sevkMiktari)} ${UNIT.metre} · ${pct(m.zamanindaYuzde)} zamanında`;
+      // Termin türevi göndermeyen fabrikada "— zamanında" basılmaz: alan yoksa parça hiç çizilmez.
+      const onTime = num(m.zamanindaYuzde) === null ? "" : ` · ${pct(m.zamanindaYuzde)} zamanında`;
+      return `${PERIOD_LABEL.buAy} ${qty(m.sevkMiktari)} ${UNIT.metre}${onTime}`;
     }
     case "ozet.uretim":
       return `Bugün ${qty(d.bugunTamamlananToplam)} ${UNIT.top} tamamlandı`;

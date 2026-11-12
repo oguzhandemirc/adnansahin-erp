@@ -199,4 +199,11 @@ describe("okuyucular", () => {
     expect(text).toContain("açık kalem");
     expect(text).not.toMatch(/acikKalem|karsilanma/);
   });
+  it("termin türevi gelmeyen fabrikada zamanında/geciken satırı hiç çizilmez", () => {
+    const text = areaSummary("ozet.sevkiyat", { buAy: { sevkMiktari: 1200, sevkTopSayisi: 8 } });
+    expect(text).toBe("Bu ay 1.200 m");
+    expect(text).not.toMatch(/zamanında|—/);
+    expect(areaSummary("ozet.sevkiyat", { buAy: { sevkMiktari: 1200, zamanindaYuzde: 92.4 } })).toContain("%92,4 zamanında");
+    expect(attentionItems({ orders: { acikKalem: 4 } }).map((x) => x.key)).not.toContain("geciken");
+  });
 });
