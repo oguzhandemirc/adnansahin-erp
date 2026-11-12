@@ -7,7 +7,8 @@ import { ActivityIndicator, Pressable, Text, TextInput, View, type StyleProp, ty
 import { haptic } from "./haptics";
 import type { IconName } from "./icons";
 import { SegmentedControl } from "./SegmentedControl";
-import { StatusBadge } from "./StatusBadge";
+import { statusEntry } from "../lib/labels";
+import { Rozet, STATUS_ROZET_TONU } from "./ortak";
 import { makeStyles, useTokens } from "./theme-context";
 import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
 
@@ -147,9 +148,11 @@ export function Banner({ tone, text, testID, icon }: { tone: "warn" | "off" | "e
   );
 }
 
-/** Durum rozeti (geriye uyum adı; yeni kod `StatusBadge` kullanır). */
+/** Durum rozeti (geriye uyum adı; etiket ve ton sözlükten). */
 export function Badge({ status }: { status: string }) {
-  return <StatusBadge value={status} />;
+  const t = useTokens();
+  const e = statusEntry(status);
+  return <Rozet label={e.label} tone={STATUS_ROZET_TONU[e.tone]} icon={t.status[e.tone].icon} accessibilityLabel={`Durum: ${e.label}`} />;
 }
 
 export function Stat({ label, value }: { label: string; value: string }) {

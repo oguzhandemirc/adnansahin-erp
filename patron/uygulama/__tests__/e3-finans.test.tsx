@@ -151,17 +151,18 @@ describe("§2 her tutar para birimli (fabrikanın değeri; uygulama hesaplamaz)"
 
   it("liste satırları: tutar `.finans`ten, para birimi kaydın dövizinden; yön işareti yalnız gösterim", () => {
     const kasa = rows.kasaRow({ id: U(1), kayit: { ad: "K", doviz: "TRY" }, finans: { bakiye: "1000.00" }, surum: "1" });
-    expect(kasa.value).toBe("1.000 ₺");
+    expect(kasa.deger).toBe("1.000 ₺");
     const fat = rows.faturaRow({ id: U(2), kayit: { belgeNo: "F", doviz: "USD", tur: "SALES", vadesiGecti: true }, finans: { genelToplam: "12.5" }, surum: "1" });
-    expect(fat.value).toBe("12,5 $");
-    expect(fat.valueTone).toBe("kritik");
-    expect(fat.subtitle).toContain("Satış faturası");
+    // Kritik tutar danger rozetinde (değer metni korunur).
+    expect(fat.deger).toBeUndefined();
+    expect((fat.rozet as { props: { label: string; tone: string } }).props).toMatchObject({ label: "12,5 $", tone: "danger" });
+    expect(fat.ikincil).toContain("Satış faturası");
     const out = rows.tahsilatRow({ id: U(3), kayit: { belgeNo: "T", doviz: "EUR", yon: "OUT", yontem: "BANK_TRANSFER" }, finans: { tutar: "50" }, surum: "1" });
-    expect(out.value).toBe("− 50 €");
-    expect(out.subtitle).toContain("Havale/EFT");
+    expect(out.deger).toBe("− 50 €");
+    expect(out.ikincil).toContain("Havale/EFT");
     const cek = rows.cekRow({ id: U(4), kayit: { belgeNo: "C", doviz: "TRY", tur: "RECEIVED", belgeTuru: "CHEQUE", durum: "BOUNCED" }, finans: { tutar: "1" }, surum: "1" });
-    expect(cek.subtitle).toContain("Alınan çek");
-    expect(cek.subtitle).toContain("Karşılıksız");
+    expect(cek.ikincil).toContain("Alınan çek");
+    expect(cek.ikincil).toContain("Karşılıksız");
     // Döviz bilinmiyorsa simge uydurulmaz.
     expect(rows.financeAmount({ id: U(5), kayit: {}, finans: { tutar: "5" }, surum: "1" }, "tutar")).toBe("5");
   });

@@ -3,17 +3,16 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
 import { INBOX_STATUSES, NOTIFICATION_STATUSES, REPORT_STATUSES, type AccountStatus } from "../src/api/wire";
 import { STATUS_DICT, statusEntry } from "../src/lib/labels";
-import { ListRow } from "../src/ui/ListRow";
-import { Tabs } from "../src/ui/kit";
+import { Badge, Tabs } from "../src/ui/kit";
+import { ListeSatiri, Rozet, STATUS_ROZET_TONU } from "../src/ui/ortak";
 import { SegmentedControl } from "../src/ui/SegmentedControl";
-import { StatusBadge } from "../src/ui/StatusBadge";
 import { THEME_KEY, ThemeProvider, resolveScheme, useTokens } from "../src/ui/theme-context";
 import { dark, light } from "../src/ui/tokens";
 
-describe("StatusBadge + sözlük", () => {
+describe("Rozet + sözlük", () => {
   it("4 durum tonu: etiket ve erişilebilirlik metni", () => {
     for (const kind of ["iyi", "uyari", "kritik", "bilgi"] as const) {
-      render(<StatusBadge kind={kind} label={`L-${kind}`} testID={`r-${kind}`} />);
+      render(<Rozet tone={STATUS_ROZET_TONU[kind]} label={`L-${kind}`} accessibilityLabel={`Durum: L-${kind}`} testID={`r-${kind}`} />);
       expect(screen.getByText(`L-${kind}`)).toBeTruthy();
       expect(screen.getByLabelText(`Durum: L-${kind}`)).toBeTruthy();
     }
@@ -31,10 +30,10 @@ describe("StatusBadge + sözlük", () => {
     expect(statusEntry("BEKLIYOR").tone).toBe("uyari");
   });
   it("bilinmeyen değer ham döner (bilgi tonu)", () => {
-    render(<StatusBadge value="YENI_DURUM" />);
+    render(<Badge status="YENI_DURUM" />);
     expect(screen.getByText("YENI_DURUM")).toBeTruthy();
     expect(statusEntry("YENI_DURUM").tone).toBe("bilgi");
-    render(<StatusBadge value="REDDEDILDI" />);
+    render(<Badge status="REDDEDILDI" />);
     expect(screen.getByText("Reddedildi")).toBeTruthy();
   });
 });
@@ -59,11 +58,11 @@ describe("SegmentedControl", () => {
   });
 });
 
-describe("ListRow Posta düzeni", () => {
-  it("ListRow `lines` alt satırları tam genişlikte basar; etiket başlık, değer, satırlar", () => {
-    render(<ListRow title="İE-12" value="400 m" lines={["Boya · plan 30.10.2026", "200 / 400 m üretildi"]} domain="uretim" testID="satir" />);
-    expect(screen.getByText("200 / 400 m üretildi")).toBeTruthy();
-    expect(screen.getByTestId("satir").props.accessibilityLabel).toBe("İE-12, 400 m, Boya · plan 30.10.2026, 200 / 400 m üretildi");
+describe("ListeSatiri düzeni", () => {
+  it("birincil, ikincil (satırlar \" · \" ile birleşik) ve değer tek satırda; etiket üçünü okur", () => {
+    render(<ListeSatiri birincil="İE-12" deger="400 m" ikincil="Boya · plan 30.10.2026 · 200 / 400 m üretildi" ton="violet" testID="satir" />);
+    expect(screen.getByText("Boya · plan 30.10.2026 · 200 / 400 m üretildi")).toBeTruthy();
+    expect(screen.getByTestId("satir").props.accessibilityLabel).toBe("İE-12, Boya · plan 30.10.2026 · 200 / 400 m üretildi, 400 m");
   });
 });
 

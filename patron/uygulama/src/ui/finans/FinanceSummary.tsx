@@ -5,11 +5,10 @@ import { Text, View } from "react-native";
 import { formatMoney } from "../../lib/format";
 import { AGING_BUCKET, AGING_BUCKETS, CHEQUE_DUE_BUCKET, CHEQUE_DUE_BUCKETS, CHEQUE_KIND } from "../../lib/labels/finans";
 import { AgingBar, type AgingSegment } from "../charts/AgingBar";
-import { IconTile } from "../ortak";
+import { BosDurum, IconTile } from "../ortak";
 import { DOMAIN_TONE } from "../tokens";
 import { Card } from "../kit";
 import { SectionHeader } from "../SectionHeader";
-import { Empty } from "../StateViews";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, space, tabularNums, typography, type StatusKind } from "../tokens";
 import { EMPTY_ICON } from "../icons";
@@ -122,7 +121,7 @@ export function ChequeDue({ veri }: { veri: unknown }) {
     <View>
       <SectionHeader title="Çek ve senet vadeleri" domain="finans" />
       {groups.length === 0 ? (
-        <Empty text="Vadesi beklenen çek/senet yok" domain="finans" icon={EMPTY_ICON.vade} />
+        <BosDurum baslik="Vadesi beklenen çek/senet yok" icon={EMPTY_ICON.vade} />
       ) : (
         <Card domain="finans" testID="finans-cek-vade">
           {groups.map((g, i) => (

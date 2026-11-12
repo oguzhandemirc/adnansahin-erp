@@ -2,14 +2,12 @@
 // ilk 15 kategori + "Diğer". Rakamlar fabrikanın; bu bileşen yalnız `lib/expense-summary` görünümünü çizer.
 import { Text, View } from "react-native";
 import { expenseView } from "../../lib/expense-summary";
-import { IconTile } from "../ortak";
+import { BosDurum, IconTile, ListeBlogu, ListeSatiri } from "../ortak";
 import { DOMAIN_TONE } from "../tokens";
 import { Card } from "../kit";
-import { ListRow } from "../ListRow";
 import { SnapshotGate } from "../pano/SnapshotGate";
 import { useSnapshot } from "../pano/useSnapshot";
 import { SectionHeader } from "../SectionHeader";
-import { Empty } from "../StateViews";
 import { EMPTY_ICON } from "../icons";
 import { makeStyles } from "../theme-context";
 import { FONT_SCALE, space, typography } from "../tokens";
@@ -29,7 +27,7 @@ export function ExpenseSummary({ onPickCategory }: { readonly onPickCategory?: (
 function ExpenseBody({ veri, onPickCategory }: { veri: unknown; onPickCategory?: (categoryKey: string) => void }) {
   const s = useStyles();
   const v = expenseView(veri);
-  if (!v) return <Empty text={NOT_YET} domain="finans" icon={EMPTY_ICON.bekliyor} testID="masraf-ozeti-bos" />;
+  if (!v) return <BosDurum baslik={NOT_YET} icon={EMPTY_ICON.bekliyor} testID="masraf-ozeti-bos" />;
   return (
     <View>
       <Card domain="finans" testID="masraf-bu-ay">
@@ -43,13 +41,15 @@ function ExpenseBody({ veri, onPickCategory }: { veri: unknown; onPickCategory?:
       </Card>
       <SectionHeader title="Kategoriler" domain="finans" />
       {v.rows.length === 0 ? (
-        <Empty text="Son 12 ayda masraf yok" domain="finans" icon={EMPTY_ICON.bekliyor} testID="masraf-kategori-yok" />
+        <BosDurum baslik="Son 12 ayda masraf yok" icon={EMPTY_ICON.bekliyor} testID="masraf-kategori-yok" />
       ) : (
-        v.rows.map((r) => {
-          const key = r.categoryKey;
-          const onPress = onPickCategory && key !== null ? () => onPickCategory(key) : undefined;
-          return <ListRow key={r.key} title={r.title} value={r.value} lines={r.lines} domain="finans" icon="pricetag-outline" onPress={onPress} testID={`masraf-kategori-${r.key}`} />;
-        })
+        <ListeBlogu>
+          {v.rows.map((r, i) => {
+            const key = r.categoryKey;
+            const onPress = onPickCategory && key !== null ? () => onPickCategory(key) : undefined;
+            return <ListeSatiri key={r.key} birincil={r.title} ikincil={r.lines.join(" · ") || undefined} deger={r.value} icon="pricetag-outline" ton={DOMAIN_TONE.finans} ayrac={i > 0} onPress={onPress} testID={`masraf-kategori-${r.key}`} />;
+          })}
+        </ListeBlogu>
       )}
     </View>
   );

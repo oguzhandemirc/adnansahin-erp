@@ -5,9 +5,8 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSession } from "../state/session";
-import { IconTile } from "./ortak";
+import { IconTile, Rozet, STATUS_ROZET_TONU } from "./ortak";
 import { Banner, Button } from "./kit";
-import { StatusBadge } from "./StatusBadge";
 import { makeStyles, useTokens } from "./theme-context";
 import { READABLE_MAX, TOUCH, space, typography, type StatusKind } from "./tokens";
 
@@ -50,7 +49,7 @@ export function FacilitySwitchModal({ visible, onClose }: { visible: boolean; on
                   style={({ pressed }) => [s.row, i > 0 && s.sep, pressed && { backgroundColor: t.surfaceAlt }]}>
                   <IconTile icon="business-outline" tone={active ? "primary" : "sky"} size="md" />
                   <Text style={[s.name, active && { color: t.tint, fontWeight: "700" }]} numberOfLines={1}>{f.ad}</Text>
-                  {badge ? <View testID={`tesis-rozet-${f.id}`}><StatusBadge kind={badge.kind} label={badge.label} size="sm" /></View> : null}
+                  {badge ? <View testID={`tesis-rozet-${f.id}`}><Rozet tone={STATUS_ROZET_TONU[badge.kind]} label={badge.label} accessibilityLabel={`Durum: ${badge.label}`} /></View> : null}
                   {busy === f.id ? (
                     <ActivityIndicator color={t.tint} accessibilityLabel="Geçiliyor" />
                   ) : active ? (

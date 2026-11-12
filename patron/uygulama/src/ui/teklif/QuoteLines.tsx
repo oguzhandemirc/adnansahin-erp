@@ -3,7 +3,8 @@
 import type { ProjectionRecord } from "../../api/wire";
 import { formatMoney, formatNumber } from "../../lib/format";
 import { unitLabel } from "../../lib/labels/siparis";
-import { ListGroup, ListRow } from "../ListRow";
+import { ListeBlogu, ListeSatiri } from "../ortak";
+import { DOMAIN_TONE } from "../tokens";
 import { SectionHeader } from "../SectionHeader";
 import { asObj, str } from "../siparis/OrderRow";
 import { ListStates } from "../siparis/parts";
@@ -28,12 +29,12 @@ export function QuoteLines({ teklifId, currency }: { teklifId: string; currency:
     <>
       <SectionHeader title="Kalemler" domain="siparisler" />
       {list.items.length > 0 ? (
-        <ListGroup testID="teklif-kalemleri">
-          {list.items.map((r) => {
+        <ListeBlogu testID="teklif-kalemleri">
+          {list.items.map((r, i) => {
             const x = quoteLineText(r, currency);
-            return <ListRow key={r.id} title={x.title} subtitle={x.subtitle} value={x.value} domain="siparisler" icon="layers-outline" testID={`kalem-${r.id}`} />;
+            return <ListeSatiri key={r.id} birincil={x.title} ikincil={x.subtitle} deger={x.value} ton={DOMAIN_TONE.siparisler} icon="layers-outline" ayrac={i > 0} testID={`kalem-${r.id}`} />;
           })}
-        </ListGroup>
+        </ListeBlogu>
       ) : null}
       <ListStates list={list} empty="Bu teklifin kalemi yok" domain="siparisler" testID="teklif-kalem" />
     </>

@@ -7,15 +7,13 @@ import { profitView, type ProfitRowView } from "../../lib/profitability-summary"
 import { catalogEntries, requestable } from "../../lib/reports";
 import { useSession } from "../../state/session";
 import { useRemote } from "../../state/useRemote";
-import { IconTile } from "../ortak";
+import { BosDurum, IconTile, ListeBlogu, ListeSatiri, Rozet, STATUS_ROZET_TONU } from "../ortak";
 import { DOMAIN_TONE } from "../tokens";
 import { Card } from "../kit";
-import { ListRow } from "../ListRow";
 import { SnapshotGate } from "../pano/SnapshotGate";
 import { useSnapshot } from "../pano/useSnapshot";
 import { ReportTile } from "../raporlar/parts";
 import { SectionHeader } from "../SectionHeader";
-import { Empty } from "../StateViews";
 import { EMPTY_ICON } from "../icons";
 import { makeStyles } from "../theme-context";
 import { FONT_SCALE, space, typography } from "../tokens";
@@ -36,20 +34,30 @@ export function ProfitabilitySummary() {
 }
 
 function Rows({ items, prefix, empty }: { items: readonly ProfitRowView[]; prefix: string; empty: string }) {
-  if (items.length === 0) return <Empty text={empty} domain="finans" icon={EMPTY_ICON.bekliyor} testID={`karlilik-${prefix}-yok`} />;
+  if (items.length === 0) return <BosDurum baslik={empty} icon={EMPTY_ICON.bekliyor} testID={`karlilik-${prefix}-yok`} />;
   return (
-    <>
-      {items.map((r) => (
-        <ListRow key={r.key} title={r.title} value={r.value} valueTone={r.tone} lines={r.lines} domain="finans" icon="trending-up-outline" testID={`karlilik-${prefix}-${r.key}`} />
+    <ListeBlogu>
+      {items.map((r, i) => (
+        <ListeSatiri
+          key={r.key}
+          birincil={r.title}
+          ikincil={r.lines.join(" · ") || undefined}
+          deger={r.tone ? undefined : r.value}
+          rozet={r.tone ? <Rozet tone={STATUS_ROZET_TONU[r.tone]} label={r.value} /> : undefined}
+          icon="trending-up-outline"
+          ton={DOMAIN_TONE.finans}
+          ayrac={i > 0}
+          testID={`karlilik-${prefix}-${r.key}`}
+        />
       ))}
-    </>
+    </ListeBlogu>
   );
 }
 
 function ProfitBody({ veri }: { veri: unknown }) {
   const s = useStyles();
   const v = profitView(veri);
-  if (!v) return <Empty text={NOT_YET} domain="finans" icon={EMPTY_ICON.bekliyor} testID="karlilik-ozeti-bos" />;
+  if (!v) return <BosDurum baslik={NOT_YET} icon={EMPTY_ICON.bekliyor} testID="karlilik-ozeti-bos" />;
   return (
     <View>
       <Card domain="finans" testID="karlilik-donem">

@@ -7,7 +7,6 @@ import { ScrollView, View } from "react-native";
 import { recordStatus } from "../../src/lib/labels/uretim";
 import { QUOTE_EXPIRED, QUOTE_STATUS } from "../../src/lib/labels/teklif";
 import { Screen } from "../../src/ui/Frame";
-import { ListGroup, ListRow } from "../../src/ui/ListRow";
 import { openRecord } from "../../src/ui/nav";
 import { RecordStatusBadge } from "../../src/ui/pano/RecordStatusBadge";
 import { SectionHeader } from "../../src/ui/SectionHeader";
@@ -16,7 +15,8 @@ import { useListCapability } from "../../src/ui/siparis/capabilities";
 import { ListStates, QuickChip, SearchField, StaleNote } from "../../src/ui/siparis/parts";
 import { useRemoteList } from "../../src/ui/siparis/useRemoteList";
 import { useDebounced } from "../../src/ui/Picker";
-import { space } from "../../src/ui/tokens";
+import { ListeBlogu, ListeSatiri } from "../../src/ui/ortak";
+import { DOMAIN_TONE, space } from "../../src/ui/tokens";
 
 export default function Quotes() {
   const router = useRouter();
@@ -43,24 +43,25 @@ export default function Quotes() {
       ) : null}
       <SectionHeader title="Gönderilen teklifler" domain="siparisler" count={!list.loading && !list.hasMore ? list.items.length : undefined} />
       {list.items.length > 0 ? (
-        <ListGroup testID="teklif-listesi">
-          {list.items.map((r) => {
+        <ListeBlogu testID="teklif-listesi">
+          {list.items.map((r, i) => {
             const x = quoteRowText(r);
             const st = x.expired ? QUOTE_EXPIRED : recordStatus(QUOTE_STATUS, asObj(r.kayit).durum);
             return (
-              <ListRow
+              <ListeSatiri
                 key={r.id}
-                title={x.title}
-                value={x.value}
-                lines={[x.value ? `${st.label} · ${x.line}` : x.line]}
-                accessory={x.value ? undefined : <RecordStatusBadge entry={st} testID={`durum-${r.id}`} />}
-                domain="siparisler"
+                birincil={x.title}
+                deger={x.value}
+                ikincil={x.value ? `${st.label} · ${x.line}` : x.line}
+                rozet={x.value ? undefined : <RecordStatusBadge entry={st} testID={`durum-${r.id}`} />}
+                ton={DOMAIN_TONE.siparisler}
+                ayrac={i > 0}
                 onPress={() => openRecord(router, "teklif", r.id)}
                 testID={`kayit-${r.id}`}
               />
             );
           })}
-        </ListGroup>
+        </ListeBlogu>
       ) : null}
       <ListStates list={list} empty={filtered ? "Bu süzgeçte teklif yok" : "Henüz gönderilmiş teklif yok"} domain="siparisler" testID="teklifler" />
     </Screen>

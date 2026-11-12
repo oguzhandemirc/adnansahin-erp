@@ -11,8 +11,9 @@ import { formatValue, humanize, isHiddenKey, nestedEntries, recordSubtitle, reco
 import { useSession } from "../state/session";
 import { useRemote } from "../state/useRemote";
 import { Banner, Button, Card, Muted } from "./kit";
-import { ListGroup, ListRow, type ListRowProps } from "./ListRow";
-import { Empty, LoadingSkeleton, OfflineBand, ReadOnlyBand, SyncLateBand } from "./StateViews";
+import { OfflineBand, ReadOnlyBand, SyncLateBand } from "./Bantlar";
+import { DOMAIN_ICON } from "./icons";
+import { BosDurum, Iskelet, ListeBlogu, ListeSatiri, type ListeSatiriProps } from "./ortak";
 import { makeStyles, useTokens } from "./theme-context";
 import { space, tabularNums, typography, type Domain } from "./tokens";
 import { UYGULAMA_ADI } from "../lib/kimlik";
@@ -196,8 +197,8 @@ export interface ListFilter {
   readonly kategoriAnahtari?: string;
 }
 
-/** Satırı `ListRow` olarak çizen eşleme (dokunma ve testID listeden gelir). */
-export type ProjectionRowView = Omit<ListRowProps, "onPress" | "testID">;
+/** Satırı `ListeSatiri` olarak çizen eşleme (dokunma ve testID listeden gelir). */
+export type ProjectionRowView = Omit<ListeSatiriProps, "onPress" | "testID" | "ayrac">;
 
 export interface ProjectionListProps {
   readonly projection: string;
@@ -206,7 +207,7 @@ export interface ProjectionListProps {
   readonly empty?: string;
   /** Yalnız başlık + alt satır (seçici). */
   readonly compact?: boolean;
-  /** Verilirse her kayıt bu `ListRow` görünümüyle çizilir (compact/alan dökümü yerine). */
+  /** Verilirse her kayıt bu `ListeSatiri` görünümüyle çizilir (compact/alan dökümü yerine). */
   readonly row?: (r: ProjectionRecord) => ProjectionRowView;
   /** Boş durum ve kart şeridi rengi. */
   readonly domain?: Domain;
@@ -284,10 +285,10 @@ export function ProjectionList(p: ProjectionListProps) {
   const retry = search ? () => setSearchTick((x) => x + 1) : first.reload;
   const open = p.onOpen;
 
-  const rows = items.map((r) => {
+  const rows = items.map((r, i) => {
     const onPress = open ? () => open(r) : undefined;
-    if (p.row) return <ListRow key={r.id} {...p.row(r)} onPress={onPress} testID={`kayit-${r.id}`} />;
-    if (p.compact) return <ListRow key={r.id} title={recordTitle(r.kayit)} subtitle={recordSubtitle(r.kayit) || undefined} onPress={onPress} testID={`kayit-${r.id}`} />;
+    if (p.row) return <ListeSatiri key={r.id} {...p.row(r)} ayrac={i > 0} onPress={onPress} testID={`kayit-${r.id}`} />;
+    if (p.compact) return <ListeSatiri key={r.id} birincil={recordTitle(r.kayit)} ikincil={recordSubtitle(r.kayit) || undefined} ayrac={i > 0} onPress={onPress} testID={`kayit-${r.id}`} />;
     return (
       <Card key={r.id} domain={p.domain} onPress={onPress} testID={`kayit-${r.id}`}>
         <RecordHead title={recordTitle(r.kayit)} chevron={!!onPress} />
@@ -300,9 +301,9 @@ export function ProjectionList(p: ProjectionListProps) {
     <View>
       {error ? <ErrorBox text={error} onRetry={retry} /> : null}
       {items.length > 0 ? p.header : null}
-      {p.row || p.compact ? items.length > 0 ? <ListGroup iconSize={p.row ? undefined : 0}>{rows}</ListGroup> : null : rows}
-      {!loading && !error && items.length === 0 ? <Empty text={p.empty ?? "Kayıt yok"} domain={p.domain} /> : null}
-      {loading && items.length === 0 ? <LoadingSkeleton rows={3} /> : null}
+      {p.row || p.compact ? items.length > 0 ? <ListeBlogu>{rows}</ListeBlogu> : null : rows}
+      {!loading && !error && items.length === 0 ? <BosDurum baslik={p.empty ?? "Kayıt yok"} icon={p.domain ? DOMAIN_ICON[p.domain] : undefined} /> : null}
+      {loading && items.length === 0 ? <Iskelet bicim="liste" satir={3} /> : null}
       {extra?.error ? <ErrorBox text={extra.error} onRetry={() => void loadMore()} /> : null}
       {next && !loading ? (
         <Button label="Daha fazla" tone="plain" icon="chevron-down" busy={extra?.loading ?? false} onPress={() => void loadMore()} testID={`daha-fazla-${p.projection}`} />

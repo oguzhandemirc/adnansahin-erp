@@ -8,12 +8,12 @@ import { LIST_SEARCH, type ListSearchSpec } from "../api/wire";
 import { recordSubtitle, recordTitle } from "../lib/present";
 import { FilterChip } from "./FilterChip";
 import { haptic } from "./haptics";
-import { ListGroup, ListRow } from "./ListRow";
+import { ListeBlogu, ListeSatiri, type ListeSatiriProps } from "./ortak";
 import { ListStates, SearchField } from "./siparis/parts";
 import { useRemoteList } from "./siparis/useRemoteList";
 import { makeStyles, useTokens } from "./theme-context";
 import { EMPTY_ICON, type IconName } from "./icons";
-import { FONT_SCALE, READABLE_MAX, TOUCH, space, typography, type Domain } from "./tokens";
+import { FONT_SCALE, READABLE_MAX, TOUCH, space, typography, DOMAIN_TONE } from "./tokens";
 
 export interface Picked {
   readonly id: string;
@@ -23,11 +23,11 @@ export interface Picked {
 const ARAMA_BEKLEME_MS = 300;
 
 /** Seçici satırının alan ikonu (cari gül, ürün taş, renk paleti). */
-function rowIcon(projection: string): { domain: Domain; icon: IconName } {
-  if (projection === "cari-kart") return { domain: "cariler", icon: "person-outline" };
-  if (projection === "urun") return { domain: "stok", icon: "cube-outline" };
-  if (projection === "renk") return { domain: "uretim", icon: "color-palette-outline" };
-  return { domain: "genel", icon: "ellipse-outline" };
+function rowIcon(projection: string): Pick<ListeSatiriProps, "ton" | "icon"> {
+  if (projection === "cari-kart") return { ton: DOMAIN_TONE.cariler, icon: "person-outline" };
+  if (projection === "urun") return { ton: DOMAIN_TONE.stok, icon: "cube-outline" };
+  if (projection === "renk") return { ton: DOMAIN_TONE.uretim, icon: "color-palette-outline" };
+  return { ton: DOMAIN_TONE.genel, icon: "ellipse-outline" };
 }
 
 /** Yazım durunca terimi bırakır (her tuşta istek gitmesin). */
@@ -100,17 +100,17 @@ function Sheet(p: { label: string; projection: string; spec: ListSearchSpec | un
       </View>
       <ScrollView contentContainerStyle={[s.inner, s.listPad, { paddingBottom: insets.bottom + space.xl }]} keyboardShouldPersistTaps="handled">
         {list.items.length > 0 ? (
-          <ListGroup>
-            {list.items.map((r) => {
+          <ListeBlogu>
+            {list.items.map((r, i) => {
               const title = recordTitle(r.kayit);
               const on = r.id === p.value?.id;
               return (
-                <ListRow key={r.id} testID={`kayit-${r.id}`} title={title} subtitle={recordSubtitle(r.kayit) || undefined} {...rowIcon(p.projection)}
-                  accessory={on ? <Ionicons name="checkmark-circle" size={22} color={t.tint} /> : undefined}
+                <ListeSatiri key={r.id} testID={`kayit-${r.id}`} birincil={title} ikincil={recordSubtitle(r.kayit) || undefined} {...rowIcon(p.projection)} ayrac={i > 0}
+                  rozet={on ? <Ionicons name="checkmark-circle" size={22} color={t.tint} /> : undefined}
                   onPress={() => p.onPick({ id: r.id, title })} />
               );
             })}
-          </ListGroup>
+          </ListeBlogu>
         ) : null}
         <ListStates list={list} empty={ara ? "Eşleşen kayıt yok" : "Kayıt yok"} domain="genel" icon={ara ? EMPTY_ICON.arama : undefined} />
       </ScrollView>

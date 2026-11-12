@@ -1,4 +1,4 @@
-// Finans listesi satırları: kayıt → `ListRow` görünümü. Tutar `.finans` alt satırından, para birimi kaydın `doviz`inden;
+// Finans listesi satırları: kayıt → `ListeSatiri` görünümü. Tutar `.finans` alt satırından, para birimi kaydın `doviz`inden;
 // alt satır yanıtta yoksa hesap o alanı göremiyor demektir → değer yerine kilit (tutar hiç basılmaz). Aritmetik yok.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text, View } from "react-native";
@@ -20,7 +20,8 @@ import {
 import { recordTitle } from "../../lib/present";
 import type { ProjectionRowView } from "../data";
 import { useTokens } from "../theme-context";
-import { typography } from "../tokens";
+import { Rozet } from "../ortak";
+import { DOMAIN_TONE, typography } from "../tokens";
 
 type Obj = Readonly<Record<string, unknown>>;
 
@@ -52,10 +53,15 @@ export function LockedAmount({ testID }: { readonly testID?: string }) {
   );
 }
 
-function amountView(r: ProjectionRecord, field: string, sign?: string): Pick<ProjectionRowView, "value" | "accessory"> {
+function amountView(r: ProjectionRecord, field: string, sign?: string): Pick<ProjectionRowView, "deger" | "rozet"> {
   const a = financeAmount(r, field);
-  if (a === null) return { accessory: <LockedAmount testID={`kilit-${r.id}`} /> };
-  return { value: sign && a !== "—" ? `${sign} ${a}` : a };
+  if (a === null) return { rozet: <LockedAmount testID={`kilit-${r.id}`} /> };
+  return { deger: sign && a !== "—" ? `${sign} ${a}` : a };
+}
+
+/** Kritik tutar: değer sade metin yerine danger rozetinde (renk + metin). */
+function criticalAmount(v: Pick<ProjectionRowView, "deger" | "rozet">, on: boolean): Pick<ProjectionRowView, "deger" | "rozet"> {
+  return on && v.deger ? { rozet: <Rozet tone="danger" label={v.deger} /> } : v;
 }
 
 const join = (...parts: (string | undefined | false)[]) => parts.filter((x): x is string => typeof x === "string" && x !== "").join(" · ");
@@ -63,10 +69,10 @@ const join = (...parts: (string | undefined | false)[]) => parts.filter((x): x i
 export function kasaRow(r: ProjectionRecord): ProjectionRowView {
   const k = obj(r.kayit);
   return {
-    title: str(k.ad) ?? recordTitle(r.kayit),
-    subtitle: join(str(k.kod), "Kasa", k.aktif === false && "Pasif"),
+    birincil: str(k.ad) ?? recordTitle(r.kayit),
+    ikincil: join(str(k.kod), "Kasa", k.aktif === false && "Pasif"),
     icon: "cash-outline",
-    domain: "finans",
+    ton: DOMAIN_TONE.finans,
     ...amountView(r, "bakiye"),
   };
 }
@@ -74,10 +80,10 @@ export function kasaRow(r: ProjectionRecord): ProjectionRowView {
 export function bankaRow(r: ProjectionRecord): ProjectionRowView {
   const k = obj(r.kayit);
   return {
-    title: str(k.ad) ?? recordTitle(r.kayit),
-    subtitle: join(str(k.banka), str(k.kod), k.aktif === false && "Pasif"),
+    birincil: str(k.ad) ?? recordTitle(r.kayit),
+    ikincil: join(str(k.banka), str(k.kod), k.aktif === false && "Pasif"),
     icon: "business-outline",
-    domain: "finans",
+    ton: DOMAIN_TONE.finans,
     ...amountView(r, "bakiye"),
   };
 }
@@ -89,12 +95,11 @@ export function cekRow(r: ProjectionRecord): ProjectionRowView {
   const status = typeof k.durum === "string" ? CHEQUE_STATUS[k.durum] : undefined;
   const bounced = k.durum === "BOUNCED";
   return {
-    title: str(k.belgeNo) ?? recordTitle(r.kayit),
-    subtitle: join(kind && doc ? `${kind} ${doc}` : (kind ?? doc), status?.label ?? str(k.durum), str(k.vade) && `Vade ${formatDate(k.vade)}`),
+    birincil: str(k.belgeNo) ?? recordTitle(r.kayit),
+    ikincil: join(kind && doc ? `${kind} ${doc}` : (kind ?? doc), status?.label ?? str(k.durum), str(k.vade) && `Vade ${formatDate(k.vade)}`),
     icon: k.tur === "ISSUED" ? "arrow-up-circle-outline" : "arrow-down-circle-outline",
-    domain: "finans",
-    ...amountView(r, "tutar"),
-    valueTone: bounced ? "kritik" : undefined,
+    ton: DOMAIN_TONE.finans,
+    ...criticalAmount(amountView(r, "tutar"), bounced),
   };
 }
 
@@ -103,12 +108,11 @@ export function faturaRow(r: ProjectionRecord): ProjectionRowView {
   const overdue = k.vadesiGecti === true;
   const cancelled = k.durum === "CANCELLED";
   return {
-    title: str(k.belgeNo) ?? recordTitle(r.kayit),
-    subtitle: join(dict(INVOICE_TYPE, k.tur), str(k.tarih) && formatDate(k.tarih), cancelled && INVOICE_STATUS.CANCELLED!.label, overdue && "Gecikmiş"),
+    birincil: str(k.belgeNo) ?? recordTitle(r.kayit),
+    ikincil: join(dict(INVOICE_TYPE, k.tur), str(k.tarih) && formatDate(k.tarih), cancelled && INVOICE_STATUS.CANCELLED!.label, overdue && "Gecikmiş"),
     icon: "document-text-outline",
-    domain: "finans",
-    ...amountView(r, "genelToplam"),
-    valueTone: overdue && !cancelled ? "kritik" : undefined,
+    ton: DOMAIN_TONE.finans,
+    ...criticalAmount(amountView(r, "genelToplam"), overdue && !cancelled),
   };
 }
 
@@ -117,10 +121,10 @@ export function tahsilatRow(r: ProjectionRecord): ProjectionRowView {
   const dir = typeof k.yon === "string" ? PAYMENT_DIRECTION[k.yon] : undefined;
   const cancelled = k.durum === "CANCELLED";
   return {
-    title: str(k.belgeNo) ?? recordTitle(r.kayit),
-    subtitle: join(dir?.label ?? str(k.yon), dict(PAYMENT_METHOD, k.yontem), str(k.tarih) && formatDate(k.tarih), cancelled && PAYMENT_STATUS.CANCELLED!.label),
+    birincil: str(k.belgeNo) ?? recordTitle(r.kayit),
+    ikincil: join(dir?.label ?? str(k.yon), dict(PAYMENT_METHOD, k.yontem), str(k.tarih) && formatDate(k.tarih), cancelled && PAYMENT_STATUS.CANCELLED!.label),
     icon: k.yon === "OUT" ? "arrow-up-circle-outline" : "arrow-down-circle-outline",
-    domain: "finans",
+    ton: DOMAIN_TONE.finans,
     ...amountView(r, "tutar", dir?.sign),
   };
 }
@@ -131,10 +135,10 @@ export function kasaHareketiRow(r: ProjectionRecord): ProjectionRowView {
   const kind = dict(CASH_TXN_KIND, k.tur);
   const sign = typeof k.yon === "string" ? PAYMENT_DIRECTION[k.yon]?.sign : undefined;
   return {
-    title: str(k.kategori)?.trim() || kind || recordTitle(r.kayit),
-    subtitle: join(str(k.kategori) ? kind : undefined, str(k.belgeNo), str(k.tarih) && formatDate(k.tarih), k.durum === "CANCELLED" && PAYMENT_STATUS.CANCELLED!.label),
+    birincil: str(k.kategori)?.trim() || kind || recordTitle(r.kayit),
+    ikincil: join(str(k.kategori) ? kind : undefined, str(k.belgeNo), str(k.tarih) && formatDate(k.tarih), k.durum === "CANCELLED" && PAYMENT_STATUS.CANCELLED!.label),
     icon: k.yon === "OUT" ? "arrow-up-circle-outline" : "arrow-down-circle-outline",
-    domain: "finans",
+    ton: DOMAIN_TONE.finans,
     ...amountView(r, "tutar", sign),
   };
 }

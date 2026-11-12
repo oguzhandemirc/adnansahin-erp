@@ -63,7 +63,7 @@ export function GroupNote({ children, testID }: { readonly children: ReactNode; 
   return <Text style={s.note} testID={testID}>{children}</Text>;
 }
 
-/** İkonlu aç/kapa satırı (ListGroup içinde). `testID` anahtara verilir (testler `props.disabled` okur). */
+/** İkonlu aç/kapa satırı (ListeBlogu içinde). `testID` anahtara verilir (testler `props.disabled` okur). */
 export function ToggleRow(p: {
   readonly label: string;
   readonly hint?: string;

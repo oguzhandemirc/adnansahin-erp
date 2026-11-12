@@ -9,7 +9,7 @@ import { Screen } from "../../src/ui/Frame";
 import { RenkSecici } from "../../src/ui/gorunum/RenkSecici";
 import { haptic } from "../../src/ui/haptics";
 import { SegmentedControl } from "../../src/ui/SegmentedControl";
-import { StatusBadge } from "../../src/ui/StatusBadge";
+import { Rozet } from "../../src/ui/ortak";
 import { makeStyles, useAppearance, useTokens } from "../../src/ui/theme-context";
 import { TILE_TONES, TOUCH, space, tabularNums, typography } from "../../src/ui/tokens";
 
@@ -25,7 +25,7 @@ function Onizleme() {
           <Ionicons name="trending-up-outline" size={16} color={t.tile.violet.fg} />
         </View>
         <Text style={s.etiket} numberOfLines={1}>Bugünkü üretim</Text>
-        <StatusBadge kind="iyi" label="Yolunda" size="sm" />
+        <Rozet tone="success" label="Yolunda" accessibilityLabel="Durum: Yolunda" />
       </View>
       <Text style={s.deger}>12.480 m</Text>
       <View style={s.alt}>

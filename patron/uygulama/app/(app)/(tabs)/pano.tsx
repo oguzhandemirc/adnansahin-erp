@@ -15,8 +15,7 @@ import { FacilityName, Screen, useWide } from "../../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../src/ui/icons";
 import { Banner } from "../../../src/ui/kit";
-import { ListGroup, ListRow } from "../../../src/ui/ListRow";
-import { BosDurum } from "../../../src/ui/ortak";
+import { BosDurum, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
 import { DuzenCubugu, DuzenListesi, KutuEkleSayfasi } from "../../../src/ui/pano/Duzenleyici";
 import { useDuzen } from "../../../src/ui/pano/duzen";
 import { KUTU_CIZICI, type KutuBaglami } from "../../../src/ui/pano/KutuCizici";
@@ -28,7 +27,7 @@ import { SegmentedControl } from "../../../src/ui/SegmentedControl";
 import { useRemoteList } from "../../../src/ui/siparis/useRemoteList";
 import { SyncIndicator } from "../../../src/ui/SyncIndicator";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
-import { TOUCH, space, typography } from "../../../src/ui/tokens";
+import { DOMAIN_TONE, TOUCH, space, typography } from "../../../src/ui/tokens";
 
 /** Çalışan hesabındaki alan satırlarının kısa açıklaması. */
 const MODULE_HINT: Readonly<Partial<Record<ModuleKey, string>>> = {
@@ -155,19 +154,20 @@ function Reachable({ permissions, onOpen }: { readonly permissions: readonly str
     <View testID="gorebildigin-alanlar">
       <Text style={s.intro}>Fabrika özetini görme yetkin yok; aşağıdaki bölümlerle çalışabilirsin. Özet için tesis yöneticine başvur.</Text>
       <SectionHeader title="Görebildiğin alanlar" count={mods.length} />
-      <ListGroup>
-        {mods.map((m) => (
-          <ListRow
+      <ListeBlogu>
+        {mods.map((m, i) => (
+          <ListeSatiri
             key={m.key}
-            title={m.title}
-            subtitle={MODULE_HINT[m.key]}
-            domain={MODULE_ICON[m.key].domain}
+            birincil={m.title}
+            ikincil={MODULE_HINT[m.key]}
+            ton={DOMAIN_TONE[MODULE_ICON[m.key].domain]}
+            ayrac={i > 0}
             icon={MODULE_ICON[m.key].icon}
             onPress={() => onOpen(m.route)}
             testID={`kisayol-${m.key}`}
           />
         ))}
-      </ListGroup>
+      </ListeBlogu>
     </View>
   );
 }

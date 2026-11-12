@@ -77,8 +77,8 @@ describe("§2 izinli hesapta fabrikanın rakamları", () => {
     expect(screen.getByTestId("masraf-fark").props.children).toBe("Geçen aya göre 174,5 ₺ azaldı");
     expect(screen.getByText("Diğer (4 kategori)")).toBeTruthy();
     expect(screen.getAllByText(/^Kategori \d+$/)).toHaveLength(15);
-    expect(screen.getAllByText("Geçen aya göre 60 ₺ arttı")).toHaveLength(15);
-    expect(screen.getByText("Geçen aya göre değişmedi")).toBeTruthy();
+    expect(screen.getAllByText(/^Geçen aya göre 60 ₺ arttı/)).toHaveLength(15);
+    expect(screen.getByText(/^Geçen aya göre değişmedi/)).toBeTruthy();
   });
 });
 
