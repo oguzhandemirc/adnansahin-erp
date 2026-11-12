@@ -30,7 +30,7 @@ export default function HardwareScannerHost() {
       return;
     }
     // Bakım hattında expo-application yok (yeni paket yasak): paket adı derlemede gömülen yapılandırmadan.
-    startHardwareAdapter(adapter, native, { packageName: Constants.expoConfig?.android?.package ?? 'com.teks.erp.mobil' });
+    startHardwareAdapter(adapter, native, { packageName: Constants.expoConfig?.android?.package ?? 'com.etkiliyazilim.adnansahin.saha' });
     return () => stopHardwareAdapter();
   }, [adapter]);
 

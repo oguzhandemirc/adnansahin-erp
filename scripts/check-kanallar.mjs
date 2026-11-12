@@ -70,7 +70,7 @@ const DONMUS = {
     'panel.erpDisAdresi': 'https://adnansahin-erp.etkiliyazilim.com',
     // Electron/.env.production (a84fa180) VITE_API_BASE_URL — paketin arayüzüne gömülü (ölçüldü: 1.3.3 derlemesi).
     'panel.erpAdresi': 'http://192.168.1.250:4000',
-    'tablet.androidPaket': 'com.teks.erp.mobil',
+    'tablet.androidPaket': 'com.etkiliyazilim.adnansahin.saha', // kimlik göçü, kullanıcı kararı 2026-11-12 (eski: com.teks.erp.mobil — sahada elle kaldırılır)
     'tablet.erpAdresi': 'http://192.168.1.250:4000/api',
     'tablet.otaSertifika': 'keystore/ota-certs/certificate.pem',
   },
@@ -372,7 +372,7 @@ function sondalar(taban, tabanYollar) {
       });
     }],
     ['P3 uzak erişimsiz kanal (erpDisAdresi boş) YEŞİL', 'yesil', kayitta((o) => { tf(o).panel.erpDisAdresi = ''; })],
-    ['N1 iki kanal aynı androidPaket → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).tablet.androidPaket = 'com.teks.erp.mobil'; })],
+    ['N1 iki kanal aynı androidPaket → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).tablet.androidPaket = 'com.etkiliyazilim.adnansahin.saha'; })],
     ['N2 iki kanal aynı tablet erpAdresi → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).tablet.erpAdresi = 'http://192.168.1.250:4000/api'; })],
     ['N3 iki kanal aynı panel appId → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).panel.appId = 'com.etkiliyazilim.adnan-sahin-erp'; })],
     ['N4 önek-çakışan kod (adnansahin-test) → KIRMIZI', 'kirmizi', kayitta((o) => yeniKanal(o, 'adnansahin-test'))],

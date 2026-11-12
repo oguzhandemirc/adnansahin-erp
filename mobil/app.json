@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "TeksERP",
+    "name": "Adnan Şahin TeksERP Saha",
     "slug": "teks-erp-mobil",
     "version": "1.0.14",
     "orientation": "default",
@@ -20,7 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.teks.erp.mobil",
+      "package": "com.etkiliyazilim.adnansahin.saha",
       "versionCode": 58,
       "usesCleartextTraffic": true,
       "permissions": [
@@ -41,7 +41,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.teks.erp.mobil",
+      "bundleIdentifier": "com.etkiliyazilim.adnansahin.saha",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true

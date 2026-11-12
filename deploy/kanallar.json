@@ -34,8 +34,8 @@
         "erpAdresi": "http://192.168.1.250:4000"
       },
       "tablet": {
-        "androidPaket": "com.teks.erp.mobil",
-        "gorunenAd": "TeksERP",
+        "androidPaket": "com.etkiliyazilim.adnansahin.saha",
+        "gorunenAd": "Adnan Şahin TeksERP Saha",
         "erpAdresi": "http://192.168.1.250:4000/api",
         "runtimeVersion": "54.3",
         "otaSertifika": "keystore/ota-certs/certificate.pem"

@@ -968,7 +968,7 @@ function axmlYaz({ paket, meta = {} }) {
   return Buffer.concat([bas, govde]);
 }
 function apk(o, { feed = `${YAYIN_HOST}adnansahin/mobil/`, erp = FABRIKA_ERP, bundleYok = false, manifestUrlYok = false,
-  paket = 'com.teks.erp.mobil', manifestBozuk = false, sertifikaPem = null, appConfig = null } = {}) {
+  paket = 'com.etkiliyazilim.adnansahin.saha', manifestBozuk = false, sertifikaPem = null, appConfig = null } = {}) {
   sayac += 1;
   const y = path.join(o.d, `sahte-${sayac}.apk`);
   const meta = { 'expo.modules.updates.ENABLED': 'true' };
@@ -1022,7 +1022,7 @@ function apk(o, { feed = `${YAYIN_HOST}adnansahin/mobil/`, erp = FABRIKA_ERP, bu
 }
 {
   const o = ortam();
-  const r = mobilYayinla(o, ['--musteri=ikincifabrika', `--apk=${apk(o, { paket: 'com.teks.erp.mobil', feed: `${YAYIN_HOST}ikincifabrika/mobil/`, erp: TEST_ERP })}`, `--surum=${tabletSurum}`, '--vc=57'], mobilAgaci(o));
+  const r = mobilYayinla(o, ['--musteri=ikincifabrika', `--apk=${apk(o, { paket: 'com.etkiliyazilim.adnansahin.saha', feed: `${YAYIN_HOST}ikincifabrika/mobil/`, erp: TEST_ERP })}`, `--surum=${tabletSurum}`, '--vc=57'], mobilAgaci(o));
   ol('3n fabrika paket adlı APK (adres + bundle ikincifabrika) + --musteri=ikincifabrika → DUR (fabrika uygulamasının ÜSTÜNE yazardı)',
     r.kod !== 0 && /APK BAŞKA BİR UYGULAMANIN PAKETİ/.test(r.cikti) && /"adnansahin" kanalının/.test(r.cikti), r.cikti.slice(-500));
 }
@@ -1211,7 +1211,7 @@ const buildApk = (o, args, { ortamEk = {} } = {}) => {
   const r = buildApk(o, ['--musteri=adnansahin', `--verify-only=${y}`]);
   ol('6e yanlış paket adlı APK (ikincifabrika) + --musteri=adnansahin → DUR, APK kanonik adından taşınır',
     r.kod !== 0 && /APK "adnansahin" KANALININ KİMLİĞİNİ TAŞIMIYOR/.test(r.cikti) &&
-      /paket adı "com\.teks\.erp\.mobil\.ikincifabrika" ≠ "com\.teks\.erp\.mobil"/.test(r.cikti) &&
+      /paket adı "com\.teks\.erp\.mobil\.ikincifabrika" ≠ "com\.etkiliyazilim\.adnansahin\.saha"/.test(r.cikti) &&
       !fs.existsSync(y) && fs.existsSync(y.replace(/\.apk$/, '.DOGRULANMADI.apk')), r.cikti.slice(-700));
 }
 {

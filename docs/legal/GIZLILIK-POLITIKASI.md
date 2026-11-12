@@ -9,7 +9,7 @@
 > sitesi). Play Console → Store listing → Privacy policy alanına bu URL girilir.
 
 **Son güncelleme:** [DOLDUR — yayın tarihi]
-**Uygulama:** TeksERP Mobil (`com.teks.erp.mobil`)
+**Uygulama:** Adnan Şahin TeksERP Saha (`com.etkiliyazilim.adnansahin.saha`; 2026-11-12 öncesi `com.teks.erp.mobil`)
 **Veri sorumlusu:** [DOLDUR — şirket ünvanı, adres]
 **İletişim:** [DOLDUR — e-posta]
 
