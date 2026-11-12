@@ -4,9 +4,12 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text, View } from "react-native";
 import type { IconName } from "../icons";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, space, typography, type Pair, type Theme } from "../tokens";
+import { FONT_SCALE, space, typography, type Pair, type StatusKind, type Theme } from "../tokens";
 
 export type RozetTonu = "soft" | "primary" | "success" | "warning" | "danger" | "info";
+
+/** Durum türü (`StatusKind`) → rozet tonu; sözlük girdilerinin tek eşlemesi. */
+export const STATUS_ROZET_TONU: Readonly<Record<StatusKind, RozetTonu>> = { iyi: "success", uyari: "warning", kritik: "danger", bilgi: "info" };
 
 export function rozetRenk(t: Theme, ton: RozetTonu): Pair {
   switch (ton) {

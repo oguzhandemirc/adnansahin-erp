@@ -1,7 +1,6 @@
-// Ortak bileşenler (şartname §3) — ekranlar buradan alır. Eski karşılıklar (ListRow, StatusBadge,
-// StateViews) bir sonraki dilimde bunlara yönlenecek; şimdilik yan yana durur.
+// Ortak bileşenler (şartname §3) — ekranlar buradan alır.
 export { IconTile, ICON_TILE_SIZE, tilePair, type DurumTonu, type IconTileSize, type IconTileTone } from "./IconTile";
-export { Rozet, rozetRenk, type RozetTonu } from "./Rozet";
+export { Rozet, rozetRenk, STATUS_ROZET_TONU, type RozetTonu } from "./Rozet";
 export { StatCard, valueSize, type StatCardProps, type StatDeger, type StatDegisim } from "./StatCard";
 export { SectionCard } from "./SectionCard";
 export { MetricList, ActivityList, type MetricItem, type ActivityItem } from "./Listeler";

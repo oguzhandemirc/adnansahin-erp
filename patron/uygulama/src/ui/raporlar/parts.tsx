@@ -5,11 +5,10 @@ import { formatDate, formatDateTime, formatNumber } from "../../lib/format";
 import { REPORT_PARAM, REPORT_STATUS, reportDomain } from "../../lib/labels/finans";
 import { humanize, isHiddenKey } from "../../lib/present";
 import type { IconName } from "../icons";
-import { ListeBlogu, ListeSatiri, Rozet, type RozetTonu } from "../ortak";
+import { ListeBlogu, ListeSatiri, Rozet, STATUS_ROZET_TONU } from "../ortak";
 import { makeStyles, useTokens } from "../theme-context";
 import { DOMAIN_TONE, space, tabularNums, typography, type StatusKind } from "../tokens";
 
-const ROZET_TONU: Readonly<Record<StatusKind, RozetTonu>> = { iyi: "success", uyari: "warning", kritik: "danger", bilgi: "info" };
 const ROZET_SIMGE: Readonly<Record<StatusKind, IconName>> = { iyi: "checkmark-circle", uyari: "time-outline", kritik: "close-circle", bilgi: "information-circle" };
 
 /** Rapor isteği durumu rozeti; HESAPLANIYOR'da yanında küçük dönen gösterge. Etiket ve ton sözlükten.
@@ -21,7 +20,7 @@ export function ReportStatusBadge({ status, testID, compact }: { status: string;
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
       {status === "HESAPLANIYOR" && !compact ? <ActivityIndicator size="small" color={t.color.info.fg} accessibilityLabel="Hesaplanıyor" /> : null}
-      <Rozet label={label} tone={e ? ROZET_TONU[e.tone] : "soft"} icon={e ? ROZET_SIMGE[e.tone] : undefined} accessibilityLabel={`Durum: ${label}`} testID={testID} />
+      <Rozet label={label} tone={e ? STATUS_ROZET_TONU[e.tone] : "soft"} icon={e ? ROZET_SIMGE[e.tone] : undefined} accessibilityLabel={`Durum: ${label}`} testID={testID} />
     </View>
   );
 }
