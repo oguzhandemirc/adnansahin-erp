@@ -1,59 +1,80 @@
-// Raporlar: istenebilir rapor kartları (fabrikanın `rapor-katalogu`ndan, izinliler) → isteklerim (durum rozetli) →
-// hazır görünümler (fabrikanın hesapladığı anlıklar). Bekleyen istek varken ekran kısa yoklama yapar.
+// Raporlar merkezi (şartname §4.9): kategori kartları (rapor ailesi; yalnız izinli raporlar sayılır — finans izni
+// yoksa Finans kartı hiç çizilmez) → seçili kategorinin rapor listesi → isteklerim (durum rozetli) → hazır görünümler
+// (fabrikanın hesapladığı anlıklar; dokununca ilgili ekran). Bekleyen istek varken ekran kısa yoklama yapar.
 import { useRouter } from "expo-router";
-import { View } from "react-native";
+import { useState } from "react";
+import { Text, View } from "react-native";
 import { can } from "../../../src/lib/access";
 import { formatDateTime, formatNumber } from "../../../src/lib/format";
-import { reportDomain, reportPending, reportTitle } from "../../../src/lib/labels/finans";
-import { catalogEntries, requestable } from "../../../src/lib/reports";
+import { REPORT_FAMILY_LABEL, reportDomain, reportFamily, reportPending, reportTitle } from "../../../src/lib/labels/finans";
+import { catalogEntries, requestable, type CatalogEntry } from "../../../src/lib/reports";
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { useOpenRefresh } from "../../../src/state/useOpenRefresh";
 import { Screen } from "../../../src/ui/Frame";
-import { ListGroup, ListRow } from "../../../src/ui/ListRow";
-import { ReadyView, ReportStatusBadge, ReportTile, paramSummary, type ReadyStat } from "../../../src/ui/raporlar/parts";
-import { usePendingPoll } from "../../../src/ui/raporlar/usePendingPoll";
-import { SectionHeader } from "../../../src/ui/SectionHeader";
-import { Empty, ErrorState, LoadingSkeleton } from "../../../src/ui/StateViews";
-import { space } from "../../../src/ui/tokens";
+import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { EMPTY_ICON } from "../../../src/ui/icons";
+import { ActivityList, BosDurum, Iskelet, IconTile, ListeBlogu, ListeSatiri, MetricList, SectionCard, HataDurumu, type MetricItem } from "../../../src/ui/ortak";
+import { ReportStatusBadge, paramSummary } from "../../../src/ui/raporlar/parts";
+import { usePendingPoll } from "../../../src/ui/raporlar/usePendingPoll";
+import { makeStyles, useTokens } from "../../../src/ui/theme-context";
+import { DOMAIN_TONE, FONT_SCALE, space, typography } from "../../../src/ui/tokens";
 
 type Obj = Readonly<Record<string, unknown>>;
 const obj = (v: unknown): Obj => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Obj) : {});
-const num = (v: unknown, digits = 0) => formatNumber(v, digits);
 const pct = (v: unknown) => (formatNumber(v, 1) === "—" ? "—" : `%${formatNumber(v, 1)}`);
-const positive = (v: unknown) => typeof v === "number" && v > 0;
 
-/** Açık sipariş karşılama: karşılanma yüzdesi, açık kalem, geciken kalem (fabrikanın sayıları). */
-function coverageStats(veri: unknown): ReadyStat[] {
-  const o = obj(obj(veri).ozet);
-  return [
-    { label: "Karşılanma", value: pct(o.karsilanmaYuzde) },
-    { label: "Açık kalem", value: `${num(o.acikKalem)} kalem` },
-    { label: "Geciken kalem", value: `${num(o.gecikenKalem)} kalem`, tone: positive(o.gecikenKalem) ? "kritik" : undefined },
-  ];
+interface Kategori {
+  readonly aile: string;
+  readonly ad: string;
+  readonly raporlar: readonly CatalogEntry[];
 }
 
-/** Stok karnesi: bitmiş, ham ve ölü stok miktarı (birim anlıkta yok → uydurulmaz). */
-function stockStats(veri: unknown): ReadyStat[] {
-  const o = obj(obj(veri).ozet);
-  return [
-    { label: "Bitmiş miktar", value: num(o.bitmisMiktar, 1) },
-    { label: "Ham miktar", value: num(o.hamMiktar, 1) },
-    { label: `Ölü stok (${num(o.oluStokGun)}+ gün)`, value: num(o.oluMiktar, 1), tone: positive(o.oluMiktar) ? "uyari" : undefined },
-  ];
+/** İzinli raporları aileye göre gruplar; sıra katalogdaki ilk görünüşe göre. */
+function kategoriler(entries: readonly CatalogEntry[]): Kategori[] {
+  const m = new Map<string, CatalogEntry[]>();
+  for (const e of entries) {
+    const a = reportFamily(e.anahtar);
+    const key = REPORT_FAMILY_LABEL[a] ? a : "diger";
+    m.set(key, [...(m.get(key) ?? []), e]);
+  }
+  return [...m.entries()].map(([aile, raporlar]) => ({ aile, ad: REPORT_FAMILY_LABEL[aile] ?? "Diğer", raporlar }));
+}
+
+function KategoriKarti({ k, secili, onPress }: { readonly k: Kategori; readonly secili: boolean; readonly onPress: () => void }) {
+  const t = useTokens();
+  const s = useStyles();
+  const d = reportDomain(`${k.aile}/`);
+  return (
+    <Basilabilir
+      onPress={onPress}
+      style={[s.kart, secili && { borderColor: t.color.primary, backgroundColor: t.color.primarySoft }]}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: secili }}
+      accessibilityLabel={`${k.ad}, ${k.raporlar.length} rapor`}
+      dokunsal="selection"
+      testID={`kategori-${k.aile}`}
+    >
+      <IconTile icon={d.icon} tone={DOMAIN_TONE[d.domain]} size="md" />
+      <Text style={s.kartAd} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{k.ad}</Text>
+      <Text style={s.kartSayi} maxFontSizeMultiplier={FONT_SCALE.title}>{`${k.raporlar.length} rapor`}</Text>
+    </Basilabilir>
+  );
 }
 
 export default function Reports() {
   const { api, permissions } = useSession();
   const router = useRouter();
+  const s = useStyles();
   const catalog = useRemote("anlik:rapor-katalogu", () => api.snapshot("rapor-katalogu"));
   const mine = useRemote("raporlar:benim", () => api.reportList({ limit: 50 }), { tags: ["rapor"] });
   const coverage = useRemote(can(permissions, "bulut:siparis:oku") ? "anlik:acik-siparis-karsilama" : null, () => api.snapshot("acik-siparis-karsilama"));
   const stock = useRemote(can(permissions, "bulut:stok:oku") ? "anlik:stok-karnesi" : null, () => api.snapshot("stok-karnesi"));
   useOpenRefresh();
   const all = catalogEntries(catalog.data?.veri);
-  const entries = all.filter((e) => requestable(e.anahtar, permissions));
+  const kats = kategoriler(all.filter((e) => requestable(e.anahtar, permissions)));
+  const [secim, setSecim] = useState<string | null>(null);
+  const secili = kats.find((k) => k.aile === secim) ?? kats[0];
   const requests = mine.data?.kayitlar ?? [];
   usePendingPoll(requests.some((r) => reportPending(r.durum)), mine.reload);
   const refresh = () => {
@@ -62,56 +83,105 @@ export default function Reports() {
     if (coverage.data || coverage.error) coverage.reload();
     if (stock.data || stock.error) stock.reload();
   };
-  // Katalog girdisi fabrikanın "soru"sunu da taşır (tel şeması); yoksa kart yalnız başlıkla çizilir.
-  const soru = (e: object): string | undefined => {
-    const v = (e as Obj).soru;
-    return typeof v === "string" && v !== "" ? v : undefined;
-  };
+  const hazir: MetricItem[] = [
+    ...(coverage.data ? [{ key: "karsilama", etiket: "Açık sipariş karşılama", deger: pct(obj(obj(coverage.data.veri).ozet).karsilanmaYuzde), icon: "receipt-outline" as const, ton: "blue" as const, onPress: () => router.push("/siparisler" as never) }] : []),
+    ...(stock.data ? [{ key: "stok", etiket: "Stok karnesi · bitmiş", deger: `${formatNumber(obj(obj(stock.data.veri).ozet).bitmisMiktar, 0)} m`, icon: "cube-outline" as const, ton: "teal" as const, onPress: () => router.push("/stok" as never) }] : []),
+  ];
 
   return (
     <Screen module="raporlar" onRefresh={refresh} refreshing={mine.refreshing || catalog.refreshing}>
-      <SectionHeader title="Rapor iste" domain="raporlar" />
-      {catalog.loading && !catalog.data ? <LoadingSkeleton variant="kpi" rows={4} /> : null}
-      {catalog.error && !catalog.data ? <Empty text="Fabrikadan rapor kataloğu henüz gelmedi" domain="raporlar" icon={EMPTY_ICON.bekliyor} actionLabel="Tekrar dene" onAction={catalog.reload} /> : null}
-      {catalog.data && entries.length === 0 ? <Empty text="İsteyebileceğiniz rapor yok" domain="raporlar" icon={EMPTY_ICON.yetki} /> : null}
-      {entries.length > 0 ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.m }}>
-          {entries.map((e) => (
-            <ReportTile key={e.anahtar} anahtar={e.anahtar} baslik={e.baslik} soru={soru(e)} onPress={() => router.push({ pathname: "/raporlar/yeni", params: { anahtar: e.anahtar } } as never)} />
-          ))}
-        </View>
+      <KademeliGiris sira={0}>
+        {catalog.loading && !catalog.data ? <Iskelet bicim="kpi" satir={4} /> : null}
+        {catalog.error && !catalog.data ? <BosDurum baslik="Fabrikadan rapor kataloğu henüz gelmedi" icon={EMPTY_ICON.bekliyor} eylem="Tekrar dene" onEylem={catalog.reload} /> : null}
+        {catalog.data && kats.length === 0 ? <BosDurum baslik="İsteyebileceğiniz rapor yok" icon={EMPTY_ICON.yetki} /> : null}
+        {kats.length > 0 ? (
+          <View style={s.izgara} accessibilityRole="tablist" testID="rapor-kategorileri">
+            {kats.map((k) => (
+              <View key={k.aile} style={s.hucre}>
+                <KategoriKarti k={k} secili={k.aile === secili?.aile} onPress={() => setSecim(k.aile)} />
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </KademeliGiris>
+
+      {secili ? (
+        <KademeliGiris sira={1}>
+          <ListeBlogu baslik={secili.ad} sayi={secili.raporlar.length} testID="rapor-listesi">
+            {secili.raporlar.map((e, i) => {
+              const d = reportDomain(e.anahtar);
+              return (
+                <ListeSatiri
+                  key={e.anahtar}
+                  birincil={e.baslik}
+                  icon={d.icon}
+                  ton={DOMAIN_TONE[d.domain]}
+                  ayrac={i > 0}
+                  onPress={() => router.push({ pathname: "/raporlar/yeni", params: { anahtar: e.anahtar } } as never)}
+                  accessibilityLabel={`${e.baslik} raporu iste`}
+                  testID={`katalog-${e.anahtar}`}
+                />
+              );
+            })}
+          </ListeBlogu>
+        </KademeliGiris>
       ) : null}
 
-      <SectionHeader title="İsteklerim" count={mine.data ? requests.length : undefined} />
-      {mine.loading && !mine.data ? <LoadingSkeleton rows={3} /> : null}
-      {mine.error && !mine.data ? <ErrorState text={mine.error} onRetry={mine.reload} /> : null}
-      {mine.data && requests.length === 0 ? <Empty text="Henüz rapor istemediniz" domain="raporlar" /> : null}
-      {requests.length > 0 ? (
-        <ListGroup testID="isteklerim">
-          {requests.map((r) => {
-            const d = reportDomain(r.raporAnahtari);
-            return (
-              <ListRow
-                key={r.id}
-                testID={`rapor-${r.id}`}
-                title={reportTitle(r.raporAnahtari, all)}
-                subtitle={`${paramSummary(r.parametreler)} · ${formatDateTime(r.olusturulma).replace(/^(\d{2}\.\d{2})\.\d{4} /, "$1 ")}`}
-                icon={d.icon}
-                domain={d.domain}
-                accessory={<ReportStatusBadge status={r.durum} testID={`rapor-durum-${r.id}`} compact />}
-                onPress={() => router.push({ pathname: "/raporlar/[id]", params: { id: r.id } } as never)}
+      <KademeliGiris sira={2}>
+        <View style={s.blok}>
+          <SectionCard baslik={mine.data ? `İsteklerim (${requests.length})` : "İsteklerim"} testID="isteklerim-kart">
+            {mine.loading && !mine.data ? <Iskelet bicim="liste" satir={2} /> : null}
+            {mine.error && !mine.data ? <HataDurumu mesaj={mine.error} onTekrar={mine.reload} /> : null}
+            {mine.data ? (
+              <ActivityList
+                testID="isteklerim"
+                bos="Henüz rapor istemediniz"
+                items={requests.map((r) => {
+                  const d = reportDomain(r.raporAnahtari);
+                  return {
+                    key: r.id,
+                    baslik: reportTitle(r.raporAnahtari, all),
+                    alt: `${paramSummary(r.parametreler)} · ${formatDateTime(r.olusturulma).replace(/^(\d{2}\.\d{2})\.\d{4} /, "$1 ")}`,
+                    icon: d.icon,
+                    ton: DOMAIN_TONE[d.domain],
+                    sag: <ReportStatusBadge status={r.durum} testID={`rapor-durum-${r.id}`} compact />,
+                    onPress: () => router.push({ pathname: "/raporlar/[id]", params: { id: r.id } } as never),
+                  };
+                })}
               />
-            );
-          })}
-        </ListGroup>
-      ) : null}
+            ) : null}
+          </SectionCard>
+        </View>
+      </KademeliGiris>
 
-      {coverage.data || coverage.loading || coverage.error || stock.data || stock.loading || stock.error ? <SectionHeader title="Hazır görünümler" /> : null}
-      {can(permissions, "bulut:siparis:oku") ? (
-        <ReadyView projection="acik-siparis-karsilama" title="Açık sipariş karşılama" domain="siparisler" icon="receipt-outline" remote={coverage} stats={coverageStats} />
+      {hazir.length > 0 ? (
+        <KademeliGiris sira={3}>
+          <View style={s.blok}>
+            <SectionCard baslik="Hazır görünümler" testID="hazir-gorunumler">
+              <MetricList items={hazir} testID="hazir" />
+            </SectionCard>
+          </View>
+        </KademeliGiris>
       ) : null}
-      {can(permissions, "bulut:stok:oku") ? <ReadyView projection="stok-karnesi" title="Stok karnesi" domain="stok" icon="cube-outline" remote={stock} stats={stockStats} /> : null}
     </Screen>
   );
 }
 
+const useStyles = makeStyles((t) => ({
+  izgara: { flexDirection: "row" as const, flexWrap: "wrap" as const, marginHorizontal: -space.s / 2, marginTop: space.s, marginBottom: space.s },
+  hucre: { width: "50%" as const, padding: space.s / 2 },
+  kart: {
+    alignItems: "center" as const,
+    gap: space.xs,
+    paddingVertical: space.m,
+    paddingHorizontal: space.m,
+    backgroundColor: t.color.card,
+    borderRadius: t.radius.card,
+    borderWidth: 1,
+    borderColor: t.color.cardBorder,
+    ...t.shadow.card,
+  },
+  kartAd: { ...typography.headline, color: t.color.text, marginTop: space.xs },
+  kartSayi: { ...typography.footnote, color: t.color.textMuted },
+  blok: { marginTop: space.m },
+}));

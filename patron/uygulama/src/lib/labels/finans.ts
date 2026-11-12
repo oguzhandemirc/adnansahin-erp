@@ -219,6 +219,24 @@ export const REPORT_FAMILY: Readonly<Record<string, { readonly domain: Domain; r
   production: { domain: "uretim", icon: "construct-outline" },
 };
 
+/** Rapor ailesi → kategori adı (Raporlar merkezi kartları); bilinmeyen aile "Diğer" kartına düşer (ham kod görünmez). */
+export const REPORT_FAMILY_LABEL: Readonly<Record<string, string>> = {
+  sales: "Satış ve sevk",
+  customer: "Müşteri",
+  quality: "Kalite",
+  subcontract: "Fason",
+  inventory: "Stok",
+  finance: "Finans",
+  dokuma: "Dokuma",
+  production: "Üretim",
+  maliyet: "Maliyet",
+};
+
+/** Raporun ailesi: anahtarın ilk parçası (katalogdaki `aile` ile aynı). */
+export function reportFamily(key: string): string {
+  return key.split("/")[0] ?? "";
+}
+
 /** Anahtara özel alan (aile içinde ayrışanlar): sevk karnesi sevkiyat renginde. */
 const REPORT_KEY_DOMAIN: Readonly<Record<string, Domain>> = { "sales/shipment-scorecard": "sevkiyat", "sales/sevkiyat": "sevkiyat", "sales/termin": "sevkiyat" };
 

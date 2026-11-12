@@ -1,54 +1,47 @@
-// Rapor ekranı parçaları: katalog kartı (alan renkli ikon çipi), durum rozeti (+ hesaplanırken nabız), parametre
-// satırları ve hazır görünüm kartı. Başlık/durum sözlükten (`labels/finans`); sayılar fabrikanın, uygulama hesaplamaz.
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+// Rapor ekranı parçaları: katalog satırı (simge karesi), durum rozeti (+ hesaplanırken nabız), parametre
+// satırları. Başlık/durum sözlükten (`labels/finans`); sayılar fabrikanın, uygulama hesaplamaz.
+import { ActivityIndicator, Text, View } from "react-native";
 import { formatDate, formatDateTime, formatNumber } from "../../lib/format";
 import { REPORT_PARAM, REPORT_STATUS, reportDomain } from "../../lib/labels/finans";
 import { humanize, isHiddenKey } from "../../lib/present";
-import type { Remote } from "../../state/useRemote";
-import { SnapshotView } from "../data";
-import { IconChip } from "../IconChip";
 import type { IconName } from "../icons";
-import { Card } from "../kit";
-import { StatusBadge } from "../StatusBadge";
-import { ErrorState, LoadingSkeleton } from "../StateViews";
+import { ListeBlogu, ListeSatiri, Rozet, type RozetTonu } from "../ortak";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "../tokens";
+import { DOMAIN_TONE, space, tabularNums, typography, type StatusKind } from "../tokens";
 
-/** Rapor isteği durumu rozeti; HESAPLANIYOR'da yanında küçük dönen gösterge. Etiket ve ton sözlükten. */
-/** `compact`: liste satırında dönen gösterge yok (başlık sığsın; rozet durumu zaten söyler). */
+const ROZET_TONU: Readonly<Record<StatusKind, RozetTonu>> = { iyi: "success", uyari: "warning", kritik: "danger", bilgi: "info" };
+const ROZET_SIMGE: Readonly<Record<StatusKind, IconName>> = { iyi: "checkmark-circle", uyari: "time-outline", kritik: "close-circle", bilgi: "information-circle" };
+
+/** Rapor isteği durumu rozeti; HESAPLANIYOR'da yanında küçük dönen gösterge. Etiket ve ton sözlükten.
+ *  `compact`: liste satırında dönen gösterge yok (başlık sığsın; rozet durumu zaten söyler). */
 export function ReportStatusBadge({ status, testID, compact }: { status: string; testID?: string; compact?: boolean }) {
   const t = useTokens();
   const e = (REPORT_STATUS as Readonly<Record<string, { label: string; tone: StatusKind } | undefined>>)[status];
+  const label = e?.label ?? humanize(status);
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
-      {status === "HESAPLANIYOR" && !compact ? <ActivityIndicator size="small" color={t.status.bilgi.fill} accessibilityLabel="Hesaplanıyor" /> : null}
-      {e ? <StatusBadge kind={e.tone} label={e.label} size="sm" testID={testID} /> : <StatusBadge value={status} size="sm" testID={testID} />}
+      {status === "HESAPLANIYOR" && !compact ? <ActivityIndicator size="small" color={t.color.info.fg} accessibilityLabel="Hesaplanıyor" /> : null}
+      <Rozet label={label} tone={e ? ROZET_TONU[e.tone] : "soft"} icon={e ? ROZET_SIMGE[e.tone] : undefined} accessibilityLabel={`Durum: ${label}`} testID={testID} />
     </View>
   );
 }
 
-/** Katalog kartı: alan renkli ikon çipi + başlık + fabrikanın "soru"su. */
+/** Rapor satırı (tek başına, tam genişlik blok): simge karesi + başlık + fabrikanın "soru"su; dokununca istek ekranı. */
 export function ReportTile({ anahtar, baslik, soru, onPress }: { anahtar: string; baslik: string; soru?: string; onPress: () => void }) {
-  const t = useTokens();
-  const s = useStyles();
   const d = reportDomain(anahtar);
   return (
-    <Pressable
-      onPress={onPress}
-      testID={`katalog-${anahtar}`}
-      accessibilityRole="button"
-      accessibilityLabel={`${baslik} raporu iste`}
-      style={({ pressed }) => [s.tile, pressed && s.pressed]}
-    >
-      <View style={s.tileHead}>
-        <IconChip domain={d.domain} icon={d.icon} size={36} />
-        <Ionicons name="add-circle-outline" size={20} color={t.tint} />
-      </View>
-      <Text style={s.tileTitle} numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE.title}>{baslik}</Text>
-      {soru ? <Text style={s.tileSub} numberOfLines={3}>{soru}</Text> : null}
-    </Pressable>
+    <ListeBlogu>
+      <ListeSatiri
+        birincil={baslik}
+        ikincil={soru}
+        icon={d.icon}
+        ton={DOMAIN_TONE[d.domain]}
+        ayrac={false}
+        onPress={onPress}
+        accessibilityLabel={`${baslik} raporu iste`}
+        testID={`katalog-${anahtar}`}
+      />
+    </ListeBlogu>
   );
 }
 
@@ -94,79 +87,9 @@ export function ParamRows({ params }: { params: unknown }) {
   );
 }
 
-export interface ReadyStat {
-  readonly label: string;
-  readonly value: string;
-  readonly tone?: StatusKind;
-}
-
-/** Hazır görünüm (fabrikanın hesapladığı anlık): başlık + 3 öne çıkan sayı; "Ayrıntı" tüm dökümü açar. */
-export function ReadyView<T extends { veri: unknown }>(p: {
-  projection: string;
-  title: string;
-  domain: Domain;
-  icon: IconName;
-  remote: Remote<T>;
-  stats: (veri: unknown) => readonly ReadyStat[];
-}) {
-  const t = useTokens();
-  const s = useStyles();
-  const [open, setOpen] = useState(false);
-  const r = p.remote;
-  return (
-    <Card domain={p.domain} testID={`anlik-${p.projection}`}>
-      <View style={s.readyHead}>
-        <IconChip domain={p.domain} icon={p.icon} />
-        <Text style={s.readyTitle} maxFontSizeMultiplier={FONT_SCALE.title}>{p.title}</Text>
-      </View>
-      {r.loading && !r.data ? <LoadingSkeleton variant="kpi" rows={3} /> : null}
-      {r.error && !r.data ? <ErrorState text={r.error} onRetry={r.reload} /> : null}
-      {r.data ? (
-        <View>
-          <View style={s.stats}>
-            {p.stats(r.data.veri).map((x) => (
-              <View key={x.label} style={[s.stat, x.tone ? { backgroundColor: t.status[x.tone].bg } : null]} accessible accessibilityLabel={`${x.label}: ${x.value}`}>
-                <Text style={[s.statLabel, x.tone ? { color: t.status[x.tone].text } : null]} numberOfLines={2}>{x.label}</Text>
-                <Text style={[s.statValue, x.tone ? { color: t.status[x.tone].text } : null]} numberOfLines={2} adjustsFontSizeToFit>{x.value}</Text>
-              </View>
-            ))}
-          </View>
-          <Pressable onPress={() => setOpen((o) => !o)} style={s.more} accessibilityRole="button" testID={`anlik-${p.projection}-ayrinti`}>
-            <Text style={s.moreText}>{open ? "Ayrıntıyı gizle" : "Ayrıntı"}</Text>
-            <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={t.tint} />
-          </Pressable>
-          {open ? <SnapshotView value={r.data.veri} /> : null}
-        </View>
-      ) : null}
-    </Card>
-  );
-}
-
 const useStyles = makeStyles((t) => ({
-  tile: {
-    flexGrow: 1,
-    flexBasis: 150,
-    minHeight: 132,
-    backgroundColor: t.surface,
-    borderRadius: t.radius.card,
-    padding: space.l,
-    gap: space.s,
-    ...t.cardShadow,
-  },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  tileHead: { flexDirection: "row" as const, justifyContent: "space-between" as const, alignItems: "flex-start" as const },
-  tileTitle: { ...typography.headline, color: t.text },
-  tileSub: { ...typography.footnote, color: t.textSecondary },
   row: { flexDirection: "row" as const, justifyContent: "space-between" as const, gap: space.m, paddingVertical: space.s + 2 },
   sep: { borderTopWidth: 1, borderTopColor: t.separator },
   rowLabel: { ...typography.subhead, color: t.textSecondary },
   rowValue: { ...typography.callout, ...tabularNums, color: t.text, flexShrink: 1, textAlign: "right" as const },
-  readyHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginBottom: space.m },
-  readyTitle: { ...typography.headline, color: t.text, flex: 1 },
-  stats: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.s },
-  stat: { flexGrow: 1, flexBasis: 132, backgroundColor: t.surfaceAlt, borderRadius: t.radius.cardInner, padding: space.m },
-  statLabel: { ...typography.caption, color: t.textSecondary },
-  statValue: { ...typography.title2, ...tabularNums, color: t.text, marginTop: space.xs },
-  more: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, alignSelf: "flex-start" as const },
-  moreText: { ...typography.subhead, color: t.tint },
 }));

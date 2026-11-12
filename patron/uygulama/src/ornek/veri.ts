@@ -105,6 +105,27 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
         { anahtar: "u4", etiket: "Taslak Kadife 140 cm", adet: 41, miktar: 9900, enEskiGun: 7, siparissizMiktar: 0 },
       ],
     },
+    "acik-siparis-karsilama": { ozet: { karsilanmaYuzde: 61.5, acikKalem: 24, gecikenKalem: 0 } },
+    // Finans aileleri de katalogda; örnek hesapta finans izni yok → listelenmez (izinle süzülür).
+    "rapor-katalogu": {
+      raporlar: [
+        ["sales/siparis-talep", "Sipariş talebi"], ["sales/sevkiyat", "Sevkiyat"], ["sales/acik-siparisler", "Açık siparişler"],
+        ["customer/scorecard", "Müşteri karnesi"], ["quality/kalite", "Kalite"], ["quality/kayip", "Kayıp ve fire"],
+        ["production/makine-duruslari", "Makine duruşları"], ["subcontract/fasoncular", "Fasoncular"],
+        ["inventory/depo", "Depo"], ["inventory/scorecard", "Stok karnesi"], ["finance/alacaklar", "Alacaklar"], ["finance/aging", "Alacak yaşlandırma"],
+      ].map(([anahtar, baslik]) => ({ anahtar, baslik, aile: anahtar!.split("/")[0], parametreler: ["dateFrom", "dateTo"] })),
+    },
+  };
+}
+
+/** Rapor isteklerim (örnek): biri hazır, biri hesaplanıyor. */
+export function ORNEK_RAPORLAR() {
+  return {
+    kayitlar: [
+      { id: "r1", raporAnahtari: "sales/sevkiyat", aile: "sales", parametreler: { dateFrom: sonra(-30), dateTo: sonra(0) }, durum: "HAZIR", hataKodu: null, olusturulma: once(0, 2), tamamlanma: once(0, 2) },
+      { id: "r2", raporAnahtari: "quality/kayip", aile: "quality", parametreler: { dateFrom: sonra(-7), dateTo: sonra(0) }, durum: "HESAPLANIYOR", hataKodu: null, olusturulma: once(0, 0), tamamlanma: null },
+    ],
+    sonraki: null,
   };
 }
 
