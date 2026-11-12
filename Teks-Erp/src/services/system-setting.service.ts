@@ -1930,6 +1930,14 @@ export class SystemSettingService {
     // tek write chokepoint burada invalidate eder (toggle anında taze görünür).
     invalidateFeatureFlagsCache();
 
+    // Patron bulutu kapatma düğmesi ↔ tetikleyiciler/iş uzlaştırması: yalnız `patronCloud.*`
+    // anahtarında, beklenmeden; tembel import yükleme döngüsünü önler, hata isteğe sızmaz.
+    if (key.startsWith("patronCloud.")) {
+      void import("../jobs/patron-cloud.jobs")
+        .then((m) => m.notifyPatronCloudSettingWritten(key))
+        .catch(() => undefined);
+    }
+
     return { success: true, data: updated, message: "Ayar güncellendi" };
   }
 

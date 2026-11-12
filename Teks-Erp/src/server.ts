@@ -17,6 +17,7 @@ import { startDefaultWarehouseReconciler } from './jobs/default-warehouse.job';
 import { startExchangeRateScheduler } from './jobs/exchange-rate.job';
 import { startShiftCalendarScheduler } from './jobs/shift-calendar.job';
 import { startShiftCloseScheduler } from './jobs/machine-shift-close.job';
+import { startPatronCloudJobs, stopPatronCloudJobs } from './jobs/patron-cloud.jobs';
 import { AuditService } from './services/audit.service';
 import { flushLatencyNow } from './services/latency-persist.service';
 import { assertBaseServiceGuards } from './services/base.service';
@@ -216,6 +217,9 @@ const server = app.listen(Number(PORT), HOST, () => {
     startShiftCalendarScheduler();
     // Kapanan vardiya × tezgah karnesi (M2) — aynı bayrak, aynı sıfır fark.
     startShiftCloseScheduler();
+    // Patron bulutu: ön koşul (adres ∧ anahtar ∧ kimlik ∧ ayar) AÇIKSA tetikleyiciler açılır ve
+    // eşitleme işi kurulur; kapalıysa zamanlayıcı kurulmaz (açık kalmış tetikleyici kapatılır).
+    startPatronCloudJobs();
 
     void AuditService.logEvent({
         category: "SYSTEM",
@@ -259,6 +263,7 @@ let shuttingDown = false;
 function gracefulShutdown(signal: string, exitCode = 0): void {
     if (shuttingDown) return;
     shuttingDown = true;
+    stopPatronCloudJobs();
     satir("");
     bilgi("shutdown", `${signal} alındı — sunucu kapatılıyor (uçuştaki istekler bitiriliyor)...`);
     // ⚠️ TEŞHİS (2026-09-10): zorla-çıkış eskiden TEK cümle basıyordu ve sebep
