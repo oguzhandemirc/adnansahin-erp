@@ -11,7 +11,9 @@
 `kur.ps1` adım [3/9] `premigrate_` yedeğini alır; dosyanın oluştuğunu ve boyutunun sıfır olmadığını gör. Geri dönüşün tek yolu bu yedektir.
 
 ## 2. Backend'i durdur → migration → başlat
-`kur.ps1` sırayla: [4/9] pm2 durdurur → [7/9] `migrate deploy` → [8/9] pm2 başlatır → [9/9] sağlık kontrolü. Adımlardan biri kırmızıysa durulur, sonraki adıma elle geçilmez.
+Komut (yönetici PowerShell; çıplak `C:\TeksERP\kur.ps1` yürütme ilkesine takılır): `powershell -NoProfile -ExecutionPolicy Bypass -File C:\TeksERP\kur.ps1 -Paket <zip>`.
+
+`kur.ps1` sırayla: [4/9] pm2 durdurur → [5/9] eski kodu `app.eski-*` adıyla kenara alır, yenisini yerleştirir → [6/9] bağımlılıklar pakette yoksa `npm ci --omit=dev` (internet ister) → [7/9] `migrate deploy` → [8/9] pm2 başlatır → [9/9] sağlık kontrolü. Adımlardan biri kırmızıysa durulur, sonraki adıma elle geçilmez.
 
 Backend durmuşken uygulanır: migration `rolls`/`roll_movements` dahil 32 tabloya kısa ShareLock alır; açık yazma tx'i onu bekletir. Başladıktan sonra eşitleme KAPALI kalır; açma ayrı bir bakım işidir (`patron-bulutu.md` § Açma reçetesi).
 
@@ -35,7 +37,7 @@ SELECT migration_name, finished_at FROM _prisma_migrations
 Ardından panelde top listesi açılır, tabletten bir okutma yapılır (normal çalışma).
 
 ## 4. Geri dönüş
-- Uygulama sorunu: eski backend paketi bu şemayla çalışır (ölçüldü: okuma sonuçları birebir, tetikleyiciler kapalıyken sıfır çağrı) — yalnız paketi geri koy, şemaya dokunma.
+- Uygulama sorunu: eski backend paketi bu şemayla çalışır (ölçüldü: okuma sonuçları birebir, tetikleyiciler kapalıyken sıfır çağrı) — yalnız paketi geri koy, şemaya dokunma: `powershell -NoProfile -ExecutionPolicy Bypass -File C:\TeksERP\kur.ps1 -GeriAl`. Sonundaki "DB migration'lari GERI ALINMADI" uyarısı BEKLENİR (iki tablo boş durur); eski paketle `migrate status` "Database schema is up to date!" der (D8 provası 2026-11-12).
 - Şema sorunu: migration geri alınmaz; backend durdurulur, 1. adımdaki yedekten geri yüklenir (`docs/kurallar/surum-yayin.md` § Migration).
 
 ## 5. Eşitlemeyi açma (ayrı bakım işi, kullanıcıya gösterilerek)
@@ -68,4 +70,5 @@ Bilinenler: telefondan gelen birim fiyat yok sayılır (fiyatı panelden girin).
 ## Ölçülen süreler (yerel prova, ~23,5 bin top)
 - Migration SQL'i < 1 sn (89–169 ms + 9–17 ms; süreç dahil 1,0–1,8 sn); en uzun tablo kilidi ≈ 91 ms (yüklü makinede 129 ms).
 - Asıl süre yedek + backend'i durdurup başlatmaktır.
+- D8 provası (2026-11-11 yedeğinin kopyası, macOS, yüklü makine): `pg_dump -Fc` 4,5 sn / 29,9 MB · `migrate deploy` 2,5 sn (SQL 219 + 31 ms) · backend açılışı 1,1–1,6 sn; açılışta yazılan tek satır `STARTUP` audit kaydı (eski sürümle aynı). Fabrika sunucusundaki süre ayrıca `npm ci`ye ve pm2'ye bağlıdır. Eski ↔ yeni karşılaştırma betiği: `Teks-Erp/scripts/prova_eski_yeni_karsilastirma.mjs`.
 - Kapalıyken yazma maliyeti: tetikleyici 0; fark yalnız yeni filigran indeksi bakımı (5000 topluk toplu güncelleme 398 → 414 ms).
