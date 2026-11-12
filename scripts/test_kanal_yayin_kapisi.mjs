@@ -54,7 +54,7 @@ import {
 } from './lib/kanallar.mjs';
 import { bundleAdresOlcumu } from '../mobil/scripts/lib/adres.mjs';
 import { zipGirdisiOku } from '../mobil/scripts/lib/zip.mjs';
-import { apkKimligi, axmlOgeleri } from '../mobil/scripts/lib/apk-kimlik.mjs';
+import { apkKimligi, axmlOgeleri, otaIzleri } from '../mobil/scripts/lib/apk-kimlik.mjs';
 
 const KOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ESKI = (process.argv.find((a) => a.startsWith('--eski=')) ?? '').slice('--eski='.length) || null;
@@ -956,6 +956,10 @@ console.log('\n§5 — ortak yüklemler');
   ol('5e ikili manifest okuyucu: paket adı öznitelikten, expo-updates meta verisinin TAMAMI raporlanır (sıradan meta değil), app.config okunur',
     k.paket === 'com.teks.erp.mobil.ikincifabrika' && k.otaMeta.length === 3 && k.otaMeta.every((a) => a.startsWith('expo.modules.updates.')) &&
       k.appConfig?.name === 'TeksERP Ikinci' && temiz.otaMeta.length === 0, JSON.stringify({ k, temiz }));
+  const U = 'expo.modules.updates.';
+  ol('5e2 prebuild\'in zararsız varsayılanları (ENABLED=false · CHECK_ON_LAUNCH · LAUNCH_WAIT_MS) OTA izi SAYILMAZ; ENABLED=true sayılır',
+    otaIzleri({ [`${U}ENABLED`]: 'false', [`${U}EXPO_UPDATES_CHECK_ON_LAUNCH`]: 'ALWAYS', [`${U}EXPO_UPDATES_LAUNCH_WAIT_MS`]: '0' }).length === 0 &&
+      otaIzleri({ [`${U}ENABLED`]: 'true' }).join() === `${U}ENABLED` && otaIzleri({ [`${U}EXPO_RUNTIME_VERSION`]: '54.4' }).length === 1);
   let bozukHata = null;
   try { axmlOgeleri(Buffer.from('<manifest/>')); } catch (e) { bozukHata = e.message; }
   ol('5f ikili olmayan manifest → ÖLÇÜLEMEDİ (metin olarak "okunmuş" sayılmaz)', /AXML/.test(bozukHata ?? ''), String(bozukHata));

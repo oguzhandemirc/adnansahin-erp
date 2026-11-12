@@ -96,8 +96,19 @@ export function axmlOgeleri(b) {
 const UPD = 'expo.modules.updates.';
 
 /**
+ * Etkin OTA izi taşıyan `expo.modules.updates.*` meta-data adları. Expo prebuild expo-updates
+ * kurulu olmasa da `ENABLED=false` + iki zararsız varsayılan yazar; bunlar iz sayılmaz.
+ * @param {Record<string, string|null>} meta ad → değer
+ */
+export function otaIzleri(meta) {
+  return Object.entries(meta)
+    .filter(([ad, deger]) => ad.startsWith(UPD) && (ad === `${UPD}ENABLED` ? deger !== 'false' : !/(CHECK_ON_LAUNCH|LAUNCH_WAIT_MS)$/.test(ad)))
+    .map(([ad]) => ad);
+}
+
+/**
  * APK dosyasının kimliği.
- * `otaMeta`: pakette kalan `expo.modules.updates.*` meta-data adları (tablette boş olmalı).
+ * `otaMeta`: pakette etkin OTA izi taşıyan meta-data adları (`otaIzleri`; tablette boş olmalı).
  * @returns {{ paket: string, otaMeta: string[], appConfig: object|null }}
  */
 export function apkKimligi(apkYolu) {
@@ -127,7 +138,7 @@ export function apkKimligi(apkYolu) {
   }
   return {
     paket: kok.oznitelik.package,
-    otaMeta: Object.keys(meta).filter((ad) => ad.startsWith(UPD)),
+    otaMeta: otaIzleri(meta),
     appConfig,
   };
 }

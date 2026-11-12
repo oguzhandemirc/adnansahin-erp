@@ -79,7 +79,7 @@ import {
   bundleAdresOlcumu,
 } from './lib/adres.mjs';
 import { zipGirdisiOku } from './lib/zip.mjs';
-import { ApkOlculemedi, apkKimligi, axmlOgeleri } from './lib/apk-kimlik.mjs';
+import { ApkOlculemedi, apkKimligi, axmlOgeleri, otaIzleri } from './lib/apk-kimlik.mjs';
 import { KANAL_ORTAM, tabletYapilandirmaFarki } from './lib/kanal.cjs';
 import { KAYIT_REL, Olculemedi, erpAdresiEsit, kanalCoz } from '../../scripts/lib/kanallar.mjs';
 
@@ -698,18 +698,23 @@ function prebuildKimlikKapisi(kod, kanal) {
   };
   const paket = dosyadan('app/build.gradle', /applicationId\s+['"]([^'"]+)['"]/);
   const uygulamaAdi = dosyadan('app/src/main/res/values/strings.xml', /<string name="app_name"[^>]*>([^<]*)<\/string>/);
-  const otaIzi = /expo\.modules\.updates\./.test(manifest);
+  const meta = {};
+  for (const m of manifest.matchAll(/<meta-data\b[^>]*>/g)) {
+    const ad = /android:name="([^"]*)"/.exec(m[0])?.[1];
+    if (ad) meta[ad] = /android:value="([^"]*)"/.exec(m[0])?.[1] ?? null;
+  }
+  const otaIzi = otaIzleri(meta);
 
   baslik('PREBUILD KİMLİĞİ');
   bilgi(`Beklenen kanal          : ${kod} (komut argümanından)`);
   bilgi(`Prebuild paket adı      : ${paket ?? '(yok)'}`);
   bilgi(`Prebuild görünen ad     : ${uygulamaAdi ?? '(yok)'}`);
-  bilgi(`OTA meta verisi         : ${otaIzi ? 'VAR' : 'yok'}`);
+  bilgi(`OTA meta verisi         : ${otaIzi.length ? otaIzi.join(', ') : 'yok'}`);
 
   const sorunlar = [];
   if (paket !== kanal.tablet.androidPaket) sorunlar.push(`applicationId "${paket ?? 'yok'}" ≠ "${kanal.tablet.androidPaket}"`);
   if (uygulamaAdi !== kanal.tablet.gorunenAd) sorunlar.push(`app_name "${uygulamaAdi ?? 'yok'}" ≠ "${kanal.tablet.gorunenAd}"`);
-  if (otaIzi) sorunlar.push('AndroidManifest expo.modules.updates.* meta verisi taşıyor — tablet yalnız Google Play\'den güncellenir');
+  if (otaIzi.length) sorunlar.push(`AndroidManifest etkin OTA meta verisi taşıyor (${otaIzi.join(', ')}) — tablet yalnız Google Play'den güncellenir`);
 
   if (sorunlar.length) {
     dur(
