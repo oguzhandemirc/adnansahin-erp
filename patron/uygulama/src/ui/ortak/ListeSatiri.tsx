@@ -60,10 +60,11 @@ const useStyles = makeStyles((t) => ({
   kap: { backgroundColor: t.color.card },
   metin: { flex: 1, minWidth: 0, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, minHeight: ROW, paddingRight: GUTTER },
   ayrac: { borderTopWidth: 1, borderTopColor: t.color.cardBorder },
-  birincil: { ...typography.rowTitle, color: t.color.text, flexShrink: 0, maxWidth: "60%" as const },
+  // Değer ve rozet asla kırpılmaz (flexShrink 0); sıkışınca önce ikincil, sonra birincil "…" ile kısalır.
+  birincil: { ...typography.rowTitle, color: t.color.text, flexShrink: 1, maxWidth: "60%" as const },
   ikincil: { ...typography.label, color: t.color.textMuted, flex: 1, minWidth: 0 },
   esnek: { flex: 1 },
   // Rozet kendi içinde `alignSelf: flex-start`; satırda dikey ortalansın diye sarılır.
   rozet: { justifyContent: "center" as const, flexShrink: 0 },
-  deger: { fontSize: 15, lineHeight: 20, fontWeight: "600" as const, ...tabularNums, color: t.color.text },
+  deger: { fontSize: 15, lineHeight: 20, fontWeight: "600" as const, ...tabularNums, color: t.color.text, flexShrink: 0 },
 }));

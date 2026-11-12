@@ -12,9 +12,6 @@ export const asObj = (v: unknown): Obj => (typeof v === "object" && v !== null &
 export const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
 export const present = (v: unknown): boolean => (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && v.trim() !== "");
 
-/** Sipariş no sütunu (şartname §4.2: no önde, müşteri esner); "SIP-2026-0451" 15/600'da sığar. */
-const NO_GENISLIK = 120;
-
 /** Fabrika durum tonu → rozet tonu (tek yer). */
 export const ROZET_TONU: Readonly<Record<StatusKind, RozetTonu>> = { iyi: "success", uyari: "warning", kritik: "danger", bilgi: "info" };
 
@@ -36,9 +33,9 @@ export function OrderRow({ r, onPress, showCustomer = true, ayrac }: { r: Projec
   const x = orderRowText(r, showCustomer);
   return (
     <ListeSatiri
-      birincil={showCustomer ? x.no : x.title}
-      birincilGenislik={showCustomer ? NO_GENISLIK : undefined}
-      ikincil={showCustomer ? x.title : undefined}
+      // 390 pt'de müşteri adı öne (en çok %60), sipariş no ikincil küçük metne iner: ad ~70 pt'ye kısalmaz.
+      birincil={x.title}
+      ikincil={showCustomer ? x.no : undefined}
       deger={x.open ?? undefined}
       rozet={<Rozet label={x.short} tone={ROZET_TONU[x.status.tone]} />}
       ayrac={ayrac}
