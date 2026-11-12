@@ -32,6 +32,8 @@ export interface CloudSyncStatus {
   readonly lastReconcileYmd: string | null;
   readonly consecutiveFailures: number;
   readonly nextDueAt: number | null;
+  /** Son başarılı anlık hesabının zamanı (hiç yapılmadıysa null). */
+  readonly lastSnapshotAt: number | null;
 }
 
 let started = false;
@@ -45,9 +47,11 @@ let failures = 0;
 let lastReconcileAttemptAt = 0;
 let forceReconcileOnce = false;
 let lastPruneYmd: string | null = null;
+/** Son başarılı anlık hesabı (bellekte; yeniden başlatmada ilk tur hepsini hesaplar). */
+let lastSnapshotAt = 0;
 /** Aynı hata metni art arda yazılmaz (geri çekilmede her tık aynı satırı basmasın). */
 let lastWarn: string | null = null;
-let status: Omit<CloudSyncStatus, "running" | "consecutiveFailures" | "nextDueAt"> = {
+let status: Omit<CloudSyncStatus, "running" | "consecutiveFailures" | "nextDueAt" | "lastSnapshotAt"> = {
   eligible: false,
   blockReason: null,
   lastRoundAt: null,
@@ -56,7 +60,7 @@ let status: Omit<CloudSyncStatus, "running" | "consecutiveFailures" | "nextDueAt
 };
 
 export function getCloudSyncStatus(): CloudSyncStatus {
-  return { ...status, running: started, consecutiveFailures: failures, nextDueAt: started ? nextDueAt : null };
+  return { ...status, running: started, consecutiveFailures: failures, nextDueAt: started ? nextDueAt : null, lastSnapshotAt: lastSnapshotAt || null };
 }
 
 export function isCloudSyncRunning(): boolean {
@@ -113,8 +117,14 @@ async function tickBody(nowMs: number): Promise<void> {
   await dailyPrune(nowMs);
   const deps: RoundDeps = { transport, nowMs: () => nowMs, eligibility: async () => elig, onPacket };
   if (nowMs >= nextDueAt) {
-    const o = await runSyncRound({ kind: "ARTIMLI" }, deps);
+    // Anlıklar aralık başına EN ÇOK bir kez hesaplanır (devam turları — `more` — yeniden hesaplamaz).
+    const snapshots = nowMs - lastSnapshotAt >= intervalMs;
+    const o = await runSyncRound({ kind: "ARTIMLI", snapshots }, deps);
     remember(o, nowMs);
+    if (snapshots && o.status !== "HATA") lastSnapshotAt = nowMs;
+    if (o.snapshotRun && o.snapshotRun.errors.length > 0) {
+      warnOnce(`anlık kurulamadı: ${o.snapshotRun.errors.map((e) => `${e.name} (${e.message})`).join(", ").slice(0, 300)}`);
+    }
     settle(o.status !== "HATA", nowMs, intervalMs, o.more);
     if (o.status === "HATA") return;
   }
@@ -198,6 +208,7 @@ export function __configureCloudSyncForTests(p: {
     failures = 0;
     nextDueAt = 0;
     lastPruneYmd = null;
+    lastSnapshotAt = 0;
     lastReconcileAttemptAt = 0;
     lastWarn = null;
   }

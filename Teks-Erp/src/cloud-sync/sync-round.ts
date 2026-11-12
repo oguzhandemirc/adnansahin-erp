@@ -1,6 +1,7 @@
 // EŞİTLEME TURU (§2 akış ①…⑨): ön koşul → güvenli ufuk → kirli kökler → satır kurulumu →
 // paket(ler) → imzalı POST → onaylanan filigranların TEK tx'te ilerletilmesi. Kaynak: ana ürün
-// 19aa48a9 aynı dosya; Adnan farkı: anlık kayıt yok (D3b), modül bayrağı yalnız üretim, ön koşul D1'in async
+// 19aa48a9 aynı dosya; Adnan farkı: anlıklar yalnız iş istediğinde (`snapshots`) ve hatası turu durdurmaz,
+// modül bayrağı yalnız üretim, ön koşul D1'in async
 // `cloudEligibility`si, sürüm `lib/app-version`.
 // Bir tur bitmeden ikincisi başlamaz (çağıran iş `running` korumasıyla). Filigran YALNIZ
 // bulutun `kabul` listesiyle ilerler; onaysız paket sonraki turda aynı konumdan yeniden kurulur.
@@ -16,6 +17,7 @@ import { buildRecords } from "./record-builder";
 import { membershipDigest, parentLinkOf } from "./reconcile";
 import { chainOf, entryOf, needsFull, packDrafts, planFull, retentionOf, toUnits, withCompletion, type PacketDraft, type Unit } from "./packing";
 import { RECORD_PROJECTIONS, type ModuleKey } from "./projections";
+import { buildSnapshots, type SnapshotBuild } from "./snapshots";
 import { FULL_RESEND_MARKER, formatRoundCounter, loadWatermarks, saveWatermarks, wmKey, type StoredWatermark, type WatermarkWrite } from "./watermarks";
 import {
   ENVELOPE_VERSION,
@@ -35,6 +37,8 @@ import {
 
 export interface RoundOptions {
   readonly kind: Extract<SyncRoundKind, "ARTIMLI" | "UZLASTIRMA">;
+  /** ANLIK projeksiyonlar bu turda hesaplansın mı (yalnız ARTIMLI; sıklığa iş karar verir). */
+  readonly snapshots?: boolean;
 }
 
 export interface RoundDeps {
@@ -61,6 +65,8 @@ export interface RoundOutcome {
   readonly contractWarning: string | null;
   /** Bu uzlaştırmada iki uçta aynı kümeyle sayılamayan projeksiyonlar (ÖLÇÜLEMEDİ — TAM istenmez). */
   readonly reconcileSkipped: string[];
+  /** Anlık hesabı yapıldıysa: süreler, kurulamayanlar, içerik değiştiği için gönderilenler. */
+  readonly snapshotRun: (Pick<SnapshotBuild, "timings" | "errors"> & { readonly sent: string[] }) | null;
 }
 
 interface ModuleFlags {
@@ -235,7 +241,7 @@ async function sendDrafts(queue: PacketDraft[], st: SendState): Promise<{ status
 export async function runSyncRound(opts: RoundOptions, deps: RoundDeps): Promise<RoundOutcome> {
   const now = deps.nowMs ?? Date.now;
   const elig = await (deps.eligibility ?? (() => cloudEligibility()))();
-  const empty = { packets: 0, accepted: [], rejected: [], unaccepted: [], fullRequested: [], more: false, contractWarning: null, reconcileSkipped: [] };
+  const empty = { packets: 0, accepted: [], rejected: [], unaccepted: [], fullRequested: [], more: false, contractWarning: null, reconcileSkipped: [], snapshotRun: null };
   if (!elig.ok) return { ...empty, status: "GONDERILMEDI", reason: elig.reason, horizon: null };
 
   const ctx = cloudContext(elig, deps.transport);
@@ -257,10 +263,13 @@ export async function runSyncRound(opts: RoundOptions, deps: RoundDeps): Promise
     failed: new Set(),
     outcome: { packets: 0, accepted: [], rejected: [], fullRequested: [], contractWarning: null },
   };
-  // ANLIK projeksiyonlar D3b'de: bu dilimde paket yalnız kayıt ve uzlaştırma taşır.
-  const sent = await sendDrafts(packDrafts(plan.units, [], reconcile.entries), st);
+  // İçerik özeti son ONAYLANANLA aynı olan anlık gönderilmez.
+  const build = opts.kind === "ARTIMLI" && opts.snapshots ? await buildSnapshots({ now: new Date(now()), productionOn: flags.production }) : null;
+  const snapshots = build ? build.snapshots.filter((s) => stored.get(wmKey.snapshot(s.projection))?.digest !== s.digest) : [];
+  const snapshotRun = build ? { timings: build.timings, errors: build.errors, sent: snapshots.map((s) => s.projection) } : null;
+  const sent = await sendDrafts(packDrafts(plan.units, snapshots, reconcile.entries), st);
   const status = sent.status === "TAMAM" && (st.failed.size > 0 || st.outcome.rejected.length > 0) ? "KISMI" : sent.status;
   const rejectedRoots = new Set(st.outcome.rejected.map((r) => r.projection.split(".")[0]!));
   const unaccepted = [...st.failed].filter((n) => !rejectedRoots.has(n));
-  return { ...st.outcome, unaccepted, more: plan.more, status, reason: sent.reason, horizon: horizon.toISOString(), reconcileSkipped: reconcile.skipped };
+  return { ...st.outcome, unaccepted, more: plan.more, status, reason: sent.reason, horizon: horizon.toISOString(), reconcileSkipped: reconcile.skipped, snapshotRun };
 }
