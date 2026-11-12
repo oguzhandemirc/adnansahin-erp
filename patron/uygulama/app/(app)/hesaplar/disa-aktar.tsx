@@ -20,6 +20,7 @@ import { Empty, ErrorState, LoadingSkeleton } from "../../../src/ui/StateViews";
 import { makeStyles } from "../../../src/ui/theme-context";
 import { space, tabularNums, typography } from "../../../src/ui/tokens";
 import { EMPTY_ICON } from "../../../src/ui/icons";
+import { UYGULAMA_ADI } from "../../../src/lib/kimlik";
 
 const browser: BrowserLike | undefined = typeof window === "undefined" ? undefined : (window as unknown as BrowserLike);
 
@@ -53,7 +54,7 @@ export default function ExportScreen() {
       {hizmet?.asama === "SALT_OKUNUR" && hizmet.saltOkunurBitis ? (
         <Banner tone="warn" testID="disa-aktar-sure" text={`Hizmet sona erdi; dökümü ${formatDateTime(hizmet.saltOkunurBitis)} tarihine kadar alabilirsiniz. Sonra veriler imha edilir.`} />
       ) : null}
-      {!web ? <Banner tone="off" testID="disa-aktar-web" text="Dosya yalnız web sürümünden indirilir: aynı hesapla tarayıcıdan TeksERP Yönetim'e girip Hesaplar › Dışa aktar'ı açın." /> : null}
+      {!web ? <Banner tone="off" testID="disa-aktar-web" text={`Dosya yalnız web sürümünden indirilir: aynı hesapla tarayıcıdan ${UYGULAMA_ADI} uygulamasına girip Hesaplar › Dışa aktar'ı açın.`} /> : null}
       <GroupNote>Tesisin bulut verisinin dökümü; her küme ayrı dosya. Liste hesabınızın okuyabildiği verilerle sınırlıdır.</GroupNote>
       {error ? <Banner tone="error" text={error} /> : null}
       {r.loading && !r.data ? <LoadingSkeleton rows={4} /> : null}

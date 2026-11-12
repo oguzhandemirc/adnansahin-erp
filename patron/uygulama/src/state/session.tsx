@@ -14,6 +14,7 @@ import { createFeedFetcher, useChangeFeed, type FeedMode } from "./changes";
 import { useForeground } from "./useForeground";
 import { legacyPlainStore, plainStore, secretStore } from "./store";
 import { applyServerFactoryTimezone } from "../lib/factory-time";
+import { UYGULAMA_ADI } from "../lib/kimlik";
 
 const TOKEN_KEY = "patron.belirtec";
 const SCOPE_KEY = "patron.kapsam";
@@ -267,7 +268,7 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
     cache,
     facility,
     facilityId,
-    facilities: choices.length > 0 ? choices : facility ? [{ id: facility.tesis.id, ad: facility.tesis.ad ?? "TeksERP Yönetim", hizmet: facility.hizmet?.asama ?? "ACIK" }] : [],
+    facilities: choices.length > 0 ? choices : facility ? [{ id: facility.tesis.id, ad: facility.tesis.ad ?? UYGULAMA_ADI, hizmet: facility.hizmet?.asama ?? "ACIK" }] : [],
     switchError,
     permissions: facility?.hesap.izinler ?? [],
     offline,

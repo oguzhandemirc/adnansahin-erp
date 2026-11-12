@@ -62,7 +62,7 @@ export default function NewOrder() {
     <Screen title="Yeni sipariş" module="siparisler" back>
       <View style={s.intro}>
         <IconChip domain="gelenKutusu" icon="paper-plane-outline" size={32} />
-        <Text style={s.introText}>Sipariş fabrikaya gelen kutusundan iletilir; fabrika işleyince durumunu oradan izlersiniz.</Text>
+        <Text style={s.introText}>Sipariş fabrikaya gelen kutusundan iletilir ve onay beklemeden doğrudan işlenir; yalnız bir hata olursa bildirilir.</Text>
       </View>
 
       <View style={s.card}>

@@ -54,7 +54,7 @@ export default function NewCustomer() {
     <Screen title="Yeni cari" module="cariler" back>
       <View style={s.intro}>
         <IconChip domain="gelenKutusu" icon="paper-plane-outline" size={32} />
-        <Text style={s.introText}>Cari fabrikaya gelen kutusundan iletilir; kod ve mükerrer denetimi fabrikada yapılır.</Text>
+        <Text style={s.introText}>Cari fabrikaya gelen kutusundan iletilir ve onay beklemeden doğrudan işlenir; kod ve mükerrer denetimi fabrikada yapılır, yalnız bir hata olursa bildirilir.</Text>
       </View>
       <View style={s.card}>
         <View style={[s.stripe, { backgroundColor: t.domain.cariler.fg }]} />

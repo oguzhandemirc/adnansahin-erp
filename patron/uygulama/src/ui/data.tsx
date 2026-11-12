@@ -15,6 +15,7 @@ import { ListGroup, ListRow, type ListRowProps } from "./ListRow";
 import { Empty, LoadingSkeleton, OfflineBand, ReadOnlyBand, SyncLateBand } from "./StateViews";
 import { makeStyles, useTokens } from "./theme-context";
 import { radius, space, tabularNums, typography, type Domain } from "./tokens";
+import { UYGULAMA_ADI } from "../lib/kimlik";
 
 interface FieldRow {
   readonly key: string;
@@ -168,7 +169,7 @@ export function StatusBands() {
       {offline ? <OfflineBand text={`Çevrimdışı — son veri ${offlineSince ? formatAgo(offlineSince) : "bilinmiyor"}. Değişiklik yapılamaz.`} /> : null}
       {readOnly ? (
         <ReadOnlyBand
-          text={`TeksERP Yönetim hizmeti ${formatDateTime(service?.bitis)} tarihinde sona erdi — veriler ${formatDateTime(service?.saltOkunurBitis)} tarihine kadar yalnız görüntülenir ve dışa aktarılabilir (Hesaplar › Dışa aktar); yeni kayıt girilemez.`}
+          text={`${UYGULAMA_ADI} hizmeti ${formatDateTime(service?.bitis)} tarihinde sona erdi — veriler ${formatDateTime(service?.saltOkunurBitis)} tarihine kadar yalnız görüntülenir ve dışa aktarılabilir (Hesaplar › Dışa aktar); yeni kayıt girilemez.`}
         />
       ) : null}
       {facility && !readOnly && syncIsLate(last) ? (

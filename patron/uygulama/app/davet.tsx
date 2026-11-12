@@ -14,6 +14,7 @@ import { Banner, Button, Field } from "../src/ui/kit";
 import { TotpQr } from "../src/ui/TotpQr";
 import { makeStyles, useTokens } from "../src/ui/theme-context";
 import { radius, space, typography } from "../src/ui/tokens";
+import { UYGULAMA_ADI } from "../src/lib/kimlik";
 
 export default function Invite() {
   const { api } = useSession();
@@ -104,7 +105,7 @@ export default function Invite() {
           <Field label="Parola (tekrar)" value={pw2} onChangeText={setPw2} secureTextEntry autoComplete="new-password"
             error={pw2 !== "" && pw !== pw2 ? "Parolalar aynı değil" : undefined} />
           <Button label="Devam" icon="arrow-forward" busy={busy} disabled={pw === "" || pw !== pw2} onPress={() => void run(async () => setSecret(await api.inviteAccept(code.trim(), pw)))} />
-          <Button label="Zaten TeksERP Yönetim hesabım var — bağla" tone="plain" testID="davet-bagla"
+          <Button label={`Zaten ${UYGULAMA_ADI} hesabım var — bağla`} tone="plain" testID="davet-bagla"
             onPress={() => { setLinkMode(true); setLinkEmail(info.eposta); setError(null); }} />
         </View>
       ) : (

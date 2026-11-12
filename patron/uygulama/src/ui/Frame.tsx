@@ -18,6 +18,7 @@ import { RoleBadge } from "./RoleBadge";
 import { RAIL_GROUPS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
 import { CONTENT_MAX, RAIL_WIDTH, TOUCH, WIDE_MIN, radius, space, typography } from "./tokens";
+import { UYGULAMA_ADI } from "../lib/kimlik";
 
 export function useWide(): boolean {
   return useWindowDimensions().width >= WIDE_MIN;
@@ -29,7 +30,7 @@ export function FacilityName() {
   const s = useStyles();
   const [open, setOpen] = useState(false);
   // Firma adı KODDA yok: hesabın tesisinden gelir; yoksa nötr ad.
-  const name = <Text style={s.facility} numberOfLines={1}>{facility?.tesis.ad ?? "TeksERP Yönetim"}</Text>;
+  const name = <Text style={s.facility} numberOfLines={1}>{facility?.tesis.ad ?? UYGULAMA_ADI}</Text>;
   if (facilities.length < 2) return name;
   return (
     <>

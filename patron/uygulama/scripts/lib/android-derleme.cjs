@@ -5,11 +5,12 @@
 const os = require("node:os");
 const path = require("node:path");
 
-// Birincil ad yonetim (2026-10-16); patron.etkiliyazilim.com kalıcı takma addır (kurulu fabrikalar), uygulama onu taşımaz.
-const PATRON_API = "https://yonetim.etkiliyazilim.com";
+// Bulut adresi, görünen ad ve çıktı öneki TEK kaynaktan: `kimlik.json` (app.config.js ve uygulama da onu okur).
+const KIMLIK = require("../../kimlik.json");
+const PATRON_API = KIMLIK.sunucu;
 /** Mağaza paketinin görünen adı ve dosya adı öneki (app.json `expo.name` ile aynı olmalı; build-aab ölçer). */
-const GORUNEN_AD = "TeksERP Yönetim";
-const CIKTI_ONEKI = "tekserp-yonetim";
+const GORUNEN_AD = KIMLIK.gorunenAd;
+const CIKTI_ONEKI = KIMLIK.ciktiOneki;
 const KOK_DIZIN = path.join(os.homedir(), ".tekserp", "patron-android");
 const IMZA = Object.freeze({
   dizin: path.join(KOK_DIZIN, "yukleme"),

@@ -1,8 +1,9 @@
-// Giriş/davet kabuğu: her temada lacivert zemin + nötr marka ("TeksERP Yönetim"; firma adı/logo KODDA yok) + opak
+// Giriş/davet kabuğu: her temada lacivert zemin + uygulama adı (`kimlik.json`) + opak
 // form kartı. Lacivert zemindeki metin `onNavy` token'larındandır (zemin her temada koyu).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { UYGULAMA_ADI } from "../../lib/kimlik";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, radius, space, typography } from "../tokens";
 
@@ -23,7 +24,7 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
           <View style={s.mark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <Ionicons name="stats-chart" size={34} color={t.gold} />
           </View>
-          <Text style={s.brandName} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>TeksERP Yönetim</Text>
+          <Text style={s.brandName} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{UYGULAMA_ADI}</Text>
           <Text style={s.brandTag}>Fabrikanızın özeti, her an yanınızda</Text>
         </View>
         <View style={[s.card, { backgroundColor: t.surface }]}>
