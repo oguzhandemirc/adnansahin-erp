@@ -4,7 +4,7 @@ Bu dosya "yeni bir tablo/kolon/migration nasıl yazılır" sorusunun cevabıdır
 
 Kural biçimi ve zorlama etiketleri: [`README.md`](README.md). Katman-üstü ilkeler: [`ILKELER.md`](ILKELER.md). Kadans: [`TEST-VE-DERLEME.md`](TEST-VE-DERLEME.md).
 
-**Burada tekrarlanmayan, işaret edilen yerler:** `Teks-Erp/CLAUDE.md` § "Veritabanı kuralları" (14 DB kuralı) · `docs/KOD-KURALLARI.md` (partial index drift · `notIn: []` · `now() AT TIME ZONE 'UTC'` · `applied_steps_count` · `EXPRESSION_UNIQUES` girdisi · cursor sözleşmesi) · `docs/RECETELER.md` (§ enum'a yeni değer, § yeni migration) · `docs/kurallar/deploy-kurulum.md` · kök `CLAUDE.md` § Veri ve defter.
+**Burada tekrarlanmayan, işaret edilen yerler:** `Teks-Erp/CLAUDE.md` § "Veritabanı kuralları" · `docs/KOD-KURALLARI.md` (partial index drift · `notIn: []` · `now() AT TIME ZONE 'UTC'` · `applied_steps_count` · `EXPRESSION_UNIQUES` girdisi · cursor sözleşmesi) · `docs/RECETELER.md` (§ enum'a yeni değer, § yeni migration) · `docs/kurallar/surum-yayin.md` · kök `CLAUDE.md` § Veri ve defter.
 
 Ham ölçümler: [`kesif/sema-migration.json`](../history/standart-2026-09-05/kesif/sema-migration.json) · [`olcum/faz0-acik-olcumler.json`](../history/standart-2026-09-05/olcum/faz0-acik-olcumler.json).
 
@@ -58,7 +58,7 @@ Referans model `prisma/schema.prisma:4580` (SackTag, 2026-09-04) — katalog sı
 | **PİVOT / bağ** | yalnız `createdAt` | en fazla `createdById` | `@@id([a,b])` ya da `@@unique([a,b])` | `SackTagAssignment` `:4616`, `PermissionTemplateItem` `:775` |
 
 - **[DB-07]** Katalog modeli dört alanı BİRLİKTE taşır — değişmez `code` (`@unique` ya da `@@unique([kind, code])`) · `name` · `sortOrder Int @default(0)` · `isActive Boolean @default(true)`; katalogdan çıkarma silme değil `isActive:false`'tur · zorlama: insan:alan kümesi model sınıfına göre değişir, jenerik AST kuralı yanlış pozitif üretir · kanıt: `schema.prisma:4580-4612`, `:3339` (`@@unique([kind, code])`); 31 model `isActive` · devralınan: yok
-- **[DB-08]** `code` bir kez yazılır ve BİR DAHA DEĞİŞMEZ; adı düzelten operatör geçmiş kırılımını ikiye bölmesin · zorlama: insan:kolon teknik olarak güncellenebilir, yasak servis katmanındadır · kanıt: `schema.prisma:4582-4585` gerekçe yorumu; alan kuralı `docs/kurallar/sebep-katalogu.md` · devralınan: yok
+- **[DB-08]** `code` bir kez yazılır ve BİR DAHA DEĞİŞMEZ; adı düzelten operatör geçmiş kırılımını ikiye bölmesin · zorlama: insan:kolon teknik olarak güncellenebilir, yasak servis katmanındadır · kanıt: `schema.prisma:4582-4585` gerekçe yorumu; alan kuralı `docs/kurallar/defter.md` · devralınan: yok
 - **[DB-09]** Append-only defter satırı GÜNCELLENMEZ ve SİLİNMEZ — bu yüzden `updatedAt` almaz ve kronolojisi `createdAt`'tir; bu niyet model başlığında `///` ile YAZILI olur · zorlama: insan:append-only niyeti şema alanlarından okunmaz, başlıktan okunur · kanıt: `schema.prisma:3247` ("Append-only: satır SİLİNMEZ, GÜNCELLENMEZ (bu yüzden `updatedAt` yok)") · devralınan: yok
 - **[DB-10]** Pivot tabloda bağın tekilliği şemada durur (`@@id([a,b])` ya da `@@unique([a,b])`); pivot künye taşıyacaksa yalnız `createdById` taşır · zorlama: insan:pivotun künye taşıyıp taşımayacağı domain kararıdır · kanıt: 6 composite PK; `schema.prisma:4616` (`@@unique([sackId, tagId])` + `createdById`) · devralınan: yok
 
@@ -108,7 +108,7 @@ Varsayılan silme SOFT'tur (kök `CLAUDE.md` § Veri ve defter). Bugün geçerli
 
 ## 10 · Sorgu, Decimal, zaman
 
-14 numaralı DB kural listesi `Teks-Erp/CLAUDE.md` § "Veritabanı kuralları"dadır (cursor pagination · `select` ≠ `include` · `$queryRaw` · `createMany` · kısa tx · snapshot JSON). Burada yalnız **yeni kodda zorunlu** iki tanesi kural satırı olarak durur:
+DB kural listesi `Teks-Erp/CLAUDE.md` § "Veritabanı kuralları"dadır (cursor pagination · `select` ≠ `include` · `$queryRaw` · `createMany` · kısa tx · snapshot JSON). Burada yalnız **yeni kodda zorunlu** iki tanesi kural satırı olarak durur:
 
 - **[DB-33]** Para/metraj kolonu `Decimal` + `@db.Decimal(p,s)`'tir ve ölçek kataloğuna uyar — metraj `(12,3)` · tutar `(14,2)` · kur `(18,6)`; okuma/yazma yolu `Prisma.Decimal` ya da DB-side `increment`/`decrement` kullanır, JS float kullanmaz · zorlama: insan:`Number(qty|amount|total)` çağrılarının çoğu sunum/serileştirmedir (95 vuruş ölçüldü, tek tek doğrulanmadı) — AST ayıramaz · kanıt: 97 Decimal kolon; `Prisma.Decimal` 662 kullanım, increment/decrement 34 · devralınan: yok
 - **[DB-34]** `Json` kolon yalnız snapshot/config/audit yükü içindir; Prisma JSON filtresiyle sorgulanmaz ve liste sorgusunda `omit` ile düşürülür · zorlama: insan:eksik `omit` yalnız yanıt boyutunda görünür, kapı kurulmadı · kanıt: 25 Json kolon, Prisma JSON filtresi 0; emsal `traveler-card.service.ts:751` (`omit: { snapshot: true }`) · devralınan: 1 sorgu index'siz (`system_logs.newData`, §12)

@@ -4,7 +4,7 @@ Bu dosya backend'de **nasıl yazılır** sorusunu cevaplar: hangi katman neyi i�
 
 Katman-üstü ilkeler [`ILKELER.md`](ILKELER.md) (`[IL-xx]` ile atıf yapılır), kural biçimi ve "yeni kodda zorunlu / devralınan baseline" ayrımı [`README.md`](README.md), kadans [`TEST-VE-DERLEME.md`](TEST-VE-DERLEME.md). Olaydan doğan yasaklar `docs/KOD-KURALLARI.md`'de, çekirdek değişmezler (atomik claim · audit tx dışında · advisory kilit ilk ifade · `details.code` · fail-closed kapılar) kök `CLAUDE.md`'de — **burada tekrarlanmaz, işaret edilir**.
 
-⚠️ `Teks-Erp/CLAUDE.md` § Katmanlar'daki "controller'sız route bilinçli istisnadır" cümlesi 2026-09-05 ölçümüyle çürüdü (80 route dosyasının 45'i controller'sız). Kanonik cümle **[BE-02]**'dir.
+⚠️ Eski `Teks-Erp/CLAUDE.md` Katmanlar bölümündeki "controller'sız route bilinçli istisnadır" cümlesi 2026-09-05 ölçümüyle çürüdü (80 route dosyasının 45'i controller'sız). Kanonik cümle **[BE-02]**'dir.
 
 ---
 
@@ -87,7 +87,7 @@ Dosya banner'ı ([IL-25]) ve yorum politikası ([IL-24]) burada da geçerlidir; 
 
 - **[BE-24]** Okuma projeksiyonu modül düzeyinde `const X_SELECT = { … } satisfies Prisma.XSelect` sabitidir · zorlama: tsc (`satisfies` yanlış alanı derlemede düşürür) · kanıt: `sack-tag.service.ts:39-47`; ölçüm — 34 `*_SELECT` sabiti, 18 `satisfies Prisma.*` · devralınan: 117 projeksiyonsuz okuma (1.549 çağrının %7'si)
 - **[BE-25]** Servis metodunun dönüş tipi **adlandırılmış DTO**'dur; `Promise<ApiResponse<unknown>>` / `<any>` yeni kodda yazılmaz · zorlama: insan:`Promise<ApiResponse<unknown>>` DERLENİR — tsc'nin diyecek bir şeyi yok; "adlandırılmış DTO mu, tembellik mi" ancak dönen nesneyi okuyarak bilinir ve `unknown` jeneriğini AST'den yasaklamak devralınan 199 imzayı bir gecede kırmızıya çevirirdi · kanıt: ölçüm 2026-09-05 — `grep -rn --include='*.ts' 'ApiResponse<unknown>' src` **199** (bunun 192'si `Promise<ApiResponse<unknown>>`), `ApiResponse<Record<string, unknown>>` 13, `ApiResponse<any>` 0 · devralınan: 199 imza (ÖLÇÜM; `Teks-Erp/lint-baseline.json` bu kural için tavan TAŞIMAZ — tavanı olan üç kural `max-lines`/`max-lines-per-function`/`max-params`)
-- **[BE-26]** Okuma `select` ile yazılır; `include` yeni okumada kullanılmaz — yasak `Teks-Erp/CLAUDE.md` § DB kuralı 7'de · zorlama: insan:ilişki ağacını tümden isteyen meşru okuma ile tembellik AST'de aynı · kanıt: ölçüm — `select` 2.601 satır ↔ `include` 269 satır · devralınan: 269 satır (yığın: `subcontractor` 60 · `workorder` 50)
+- **[BE-26]** Okuma `select` ile yazılır; `include` yeni okumada kullanılmaz — yasak `Teks-Erp/CLAUDE.md` § Veritabanı kuralları'nda · zorlama: insan:ilişki ağacını tümden isteyen meşru okuma ile tembellik AST'de aynı · kanıt: ölçüm — `select` 2.601 satır ↔ `include` 269 satır · devralınan: 269 satır (yığın: `subcontractor` 60 · `workorder` 50)
 - **[BE-27]** Servis dosyasında `any` ve `@ts-ignore` yazılmaz · zorlama: eslint:`@typescript-eslint/no-explicit-any` · kanıt: ölçüm — 269 dosyada gerçek `any` 1, `@ts-ignore` 0 · devralınan: yok
 
 ## 7 · Adlandırma

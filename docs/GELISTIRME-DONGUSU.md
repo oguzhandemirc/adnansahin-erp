@@ -1,30 +1,19 @@
 # Geliştirme döngüsü — yerel çalışma
 
-> Koddan çıkarıldı (anlama turu 2026-09-05). ⚠️ olanlar o güne dek belgesizdi. Sunucu süreci kuralı: `pkill -f "tsx src/server.ts"` YASAK — kendi başlattığın süreci PID ile durdur ya da ayrı port kullan (MODUL-BAYRAK-TASARIM §12-12).
+> Koddan çıkarıldı (anlama turu 2026-09-05; Adnan Şahin klonu için DB bölümü 2026-11-12'de yeniden yazıldı). Sunucu süreci kuralı: `pkill -f "tsx src/server.ts"` YASAK — kendi başlattığın süreci PID ile durdur ya da ayrı port kullan.
 
 ## Adımlar
 
 1. Node >= 22 kullan (backend engines şartı). <sub>(Teks-Erp/package.json:4-6 "engines": { "node": ">=22" }; .github/workflows/ci.yml:86 node-version: 22)</sub> — atlanırsa: Eski Node'da tsx/Prisma 7 çalışmaz; hata mesajı sürüm sebebini söylemez.
-2. Dev veritabanı Docker konteyneri `tekserp-local-db` ayakta olmalı (55433->5432). <sub>(docker ps: 'tekserp-local-db  0.0.0.0:55433->5432/tcp  Up 2 days'; Teks-Erp/CLAUDE.md:138 aynı konteyneri adlandırır)</sub> — atlanırsa: Tüm bekçiler ECONNREFUSED'a düşer; run-all-tests bunu 'altyapı hatası' sayıp 1 kez yeniden dener (run-all-tests.ts:180-187), sonra kırmızı.
-3. `Teks-Erp/.env` var olmalı ve DATABASE_URL yerel geliştirme DB'sini göstermeli (PORT=4000).
-   ⚠️ **2026-09-11'den beri dev hedefi fabrikanın dev kopyası** — fabrikanın
-   `20260911_030001` yedeğinin restore'u (5.784 top, 116 sevkiyat, GERÇEK VERİ).
-   Eski `tekserp_demo` duruyor ama artık kullanılmıyor. DB adı PROFİL değeridir,
-   koda sabitlenmez.
-   ⚠️⚠️ **YIKICI BETİK UYARISI:** `scripts/db-guard.ts` izin listesi SON EKE
-   bakar (`_dev`/`_test`/`_local`/`_demo`), yani `reset-operational.ts` bu
-   hedefte KOŞAR. `clean_test_residue.ts` 2026-09-12'den beri AYRICA fixture
-   kapısından geçer (ad `_test` + hacim eşiği) ve bu hedefte `--apply`
-   verilmeden de DURUR. Artık gerçek fabrika verisi
-   olduğu için ikisi de ELLE ONAY olmadan çalıştırılmaz. (2026-09-11'de
-   `clean_test_residue --apply` demo DB'de 468 fason sevkinin kalemlerini
-   silmişti — betik başlığı silip başlığı bırakıyor.)
-   ⚠️ **BEKÇİ PAKETİ bu hedefte anlamsızdır:** fabrika verisinde `PATOS`/`MAVI`/
-   `MUS-001` fixture'ları YOK → ~70 bekçi "Seed fixture eksik" ile çöker ve tam
-   da akış bekçileri (manuel taşıma, fason iptal/geri alma, bölme) hiç koşmaz;
-   yeşil sayı yanıltır. Paket fixture'lı AYRI bir DB'de koşulur: `CREATE DATABASE
-   <ad>_test` → `DATABASE_URL=… npx prisma migrate deploy` → `npm run seed` +
-   `npm run seed:fixtures` → `DATABASE_URL=… npm test` (arşiv 2026-09-11 B-4b). <sub>(Teks-Erp/.env:4-8 (PORT=4000, DATABASE_URL=...@localhost:55433/tekserp_demo, JWT_SECRET, BACKUP_DIR))</sub> — atlanırsa: src/lib/prisma.ts:19 'DATABASE_URL is not set' ile ÇÖKER (gürültülü); ama .env yanlış DB gösterirse bekçiler o DB'ye 1.539 deleteMany gönderir.
+2. **Bu klonda `.env` ve test veritabanı YOK.** Ana ürün reposunun (`Teks-Erp` ayrı klonu) dev DB'si Adnan Şahin fabrikasının GERÇEK VERİSİDİR — ona bağlanılmaz, bekçi/script koşulmaz, `.env`i buraya kopyalanmaz. Bekçi koşacak oturum kendi `tekserp_<oturum>_test` veritabanını açar. — atlanırsa: bekçiler hedef DB'ye binlerce `deleteMany` gönderir.
+3. **Test DB kurma betiği yok, elle kurulur** (repoda fixture'lı test DB'si kuran betik ölçülmedi; `Teks-Erp/scripts/e2e-ortam.ts` farklı bir iştir — fabrika dump'ının kopyasını ister, bu klonda dump yok). Adımlar, `Teks-Erp/` içinden:
+   1. Yerel PostgreSQL'de boş DB: `createdb tekserp_<oturum>_test` (ad `_test` ile bitmek ZORUNDA — `npm test`in fixture adı kapısı aksi hâlde durur).
+   2. `Teks-Erp/.env` (gitignore'lu; şablon `Teks-Erp/.env.example`): `DATABASE_URL="postgresql://<kullanıcı>@localhost:<port>/tekserp_<oturum>_test?schema=public"`, `JWT_SECRET=<rastgele>`, `PORT=4000`. Sır repoya girmez.
+   3. `npm install` → `npm run prisma:generate` → `npm run prisma:migrate` (= `prisma migrate deploy`).
+   4. `npm run seed` (temiz kurulum: yalnız `admin`/`123123`) → `npm run seed:fixtures` (PATOS/MAVI/MUS-001 iş fixture'ları; bekçiler bunlara dayanır).
+   5. Doğrula: `npx tsx scripts/run-all-tests.ts <ad-parçası>` (koşucunun DB kapıları hedefi denetler).
+   CI aynı sırayı `.github/workflows/ci.yml` backend işinde koşar (DB `teks_ci`). — atlanırsa: `src/lib/prisma.ts` 'DATABASE_URL is not set' ile ÇÖKER; fixture atlanırsa ~70 bekçi "Seed fixture eksik" ile düşer.
+   ⚠️ **YIKICI BETİK UYARISI:** `scripts/db-guard.ts` izin listesi SON EKE bakar (`_dev`/`_test`/`_local`/`_demo`); `reset-operational.ts` ve `clean_test_residue.ts --apply` yalnız kendi `_test` DB'nde ve elle onayla koşulur.
 4. Komutlar `Teks-Erp/` dizini İÇİNDEN koşulur — dotenv CWD'ye bakar. <sub>(Teks-Erp/src/lib/prisma.ts:14 dotenv.config(); Teks-Erp/prisma.config.ts:14 loadEnv({ path: path.join(__dirname, ".env"))</sub> — atlanırsa: Kökten koşulan prisma komutu 'The datasource.url property is required in your Prisma config file' verir; mesaj config'i suçlar, gerçek sebep .env bulunamamasıdı
 5. Şema/pull sonrası: npm install → npm run prisma:generate → npm run prisma:migrate (migrate deploy). <sub>(Teks-Erp/package.json:19-20 (prisma:generate = prisma generate, prisma:migrate = prisma migrate deploy); Teks-Erp/CLAUDE)</sub> — atlanırsa: generate atlanırsa TS 'Property X does not exist'; migrate atlanırsa runtime P2022 ve audit best-effort olduğu için log SESSİZCE kaybolur, sunucu ayakta kalır (
 5b. Aynı sıra **REBASE SONRASI DA** geçerlidir: dalını şema taşıyan bir trenin üstüne rebase eden herkesin test DB'si bir adım geride kalır ve kırmızı **kod kusuru gibi görünür**. İki bağımsız vaka, aynı gün (2026-09-13): rebase sonrası `test_consistency` §1/§2 `SORGU HATASI` verdi (üç migration uygulanmamıştı; `npm run prisma:migrate` → 29/4 geri 31/2 oldu) · başka bir oturumun test DB'si iki migration geride olduğu için `P2022 revokedAt does not exist` verdi ve **bekçi kusuru sanıldı**. Temiz rebase ≠ çalışan rebase. <sub>(ölçüldü 2026-09-13, iki oturum iki ayrı test DB'si; `20260913020000_order_line_unit` · `20260913140000_customer_default_destination` · `20260913160000_plan_deviation_revoke`)</sub> — atlanırsa: ORTAM kırmızısı KOD kırmızısı sanılır ve sebep yanlış yerde aranır.
@@ -60,7 +49,7 @@
 
 ## ⚠️ Belgesizdi
 
-- Dev DB'nin nasıl ayağa kalktığı hiçbir yerde YAZILI DEĞİL: `tekserp-local-db` konteynerini kuran/başlatan komut yok; ad yalnız bayatlık şerhi içinde geçiyor (Teks-Erp/CLAUDE.md:138). Yeni makinede döngü ilk adımda durur.
+- Yerel PostgreSQL'i kuran/başlatan komut repoda yok (`Teks-Erp/docker-compose.yml` üretim kurgusudur, portu dışarı açmaz); test DB'si yukarıdaki 3. adımla elle kurulur.
 - Yerel ilk kurulumda `npm run seed:fixtures` ZORUNLU olduğu hiçbir kurulum talimatında yok — README.md:35 yalnız `npm run seed` der; zorunluluk yalnız CI yorumunda (.github/workflows/ci.yml:97-103) ve CLAUDE.md:393'te 'CI seed'i' parantezi olarak geçer.
 - README.md:35 hızlı başlangıcı `npx prisma migrate dev` önerir; Teks-Erp/CLAUDE.md:112/257 aynı komutu iki DEFERRABLE FK'yı düşürdüğü için REDDEDER. İki doküman ters şey söylüyor, uzlaştıran cümle yok.
 - Sunucuyu YENİDEN BAŞLATMANIN doğru yolu (kendi PID'ini sakla, `lsof -iTCP:4000`, ayrı port) yalnız tasarım dokümanı §12-12 ve gece raporlarında; hiçbir CLAUDE.md'de ya da geliştirme bölümünde yok.
@@ -68,7 +57,7 @@
 - (kapandı 2026-09-26) HTTP ayaklı bekçiler (`httpBekciKapisi`) sunucu ister ve sunucu yoksa bölümlerini BEYANLA atlar; tek komut kendi sunucusunu boş portta açıp kapatır: `cd Teks-Erp && DATABASE_URL='…/<ad>_test' node ../scripts/agir-is.mjs -- npx tsx scripts/bekci-http.ts [--tam]` (`Teks-Erp/docs/BEKCI-HARITASI.md` § Nasıl koşulur).
 - `BEKCI_PROD_ONAY=1`, `BEKCI_HEDEF_ONAY=1` ve `ALLOW_NONLOCAL_TEST_DB=1` kaçış anahtarları yalnız kodda + arşiv/audit anlatısında; hiçbir geliştirme talimatında yok (`SKIP_TYPECHECK` sadece CLAUDE.md:88'de var).
 - Tek-dosya bekçi koşumunun (`npx tsx scripts/test_X.ts`) productionDbGate'ten GEÇMEDİĞİ uyarısı yalnız audit haritasında (K11:27); CLAUDE.md:356 bu yolu uyarısız önerir.
-- `Teks-Erp/.env.example:31` ve `example-env.txt:2` hâlâ `adnansahin_db@localhost:5432` gösteriyor — gerçek dev hedefi `tekserp_demo@localhost:55433` (.env:5). Şablonu kopyalayan yeni geliştirici var olmayan DB'ye bağlanır.
+- `Teks-Erp/.env.example` ve `example-env.txt` `adnansahin_db@localhost:5432` gösteriyor; bu ad hedef-DB kapısının YAZILMASI YASAK listesindedir — şablonu kopyalarken DB adını `tekserp_<oturum>_test` yap.
 - mobil/CLAUDE.md:253-255 sabit `API_URL` örneği veriyor; gerçek çözüm zinciri (devHost → EXPO_PUBLIC_API_URL → localhost) src/constants/api.ts:15-20'de ve dokümanda hiç yok.
 - mobil `npm run dev`in `adb reverse tcp:8081 tcp:8081` koştuğu mobil/CLAUDE.md komut listesinde yok (yalnız `npx expo start` var).
 - Electron'da yerel `.env` bulunmadığı ve dev'in apiClient.ts:41 fallback'iyle localhost:4000'e gittiği yazılı değil; Electron/CLAUDE.md:27 bir `.env` varmış gibi anlatır.

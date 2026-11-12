@@ -2,7 +2,7 @@
 
 > **Tarih:** 2026-07-08 · **Kapsam:** `Teks-Erp/` backend — PostgreSQL (dev 18 / saha 16.9, `docs/ops/DEPLOY-RUNBOOK.md`) + Prisma 7 + Express 5
 >
-> ⚠️ **TARİHSEL ÖLÇÜM (2026-09-05 gözden geçirmesi):** bu rapor 2026-07-08 fotoğrafıdır; sayıları ve "açık" işaretleri bayattır. Kalıcı kuralları `Teks-Erp/CLAUDE.md` § Veritabanı kuralları ile `docs/kurallar/deploy-kurulum.md`'de yaşıyor.
+> ⚠️ **TARİHSEL ÖLÇÜM (2026-09-05 gözden geçirmesi):** bu rapor 2026-07-08 fotoğrafıdır; sayıları ve "açık" işaretleri bayattır. Kalıcı kuralları `Teks-Erp/CLAUDE.md` § Veritabanı kuralları ile `docs/history/kurallar-2026-09/deploy-kurulum.md`'de yaşıyor.
 > **Yöntem:** 8 boyutlu çok-ajanlı tarama + kuşkucu çapraz doğrulama + elle teyit
 > **Genel sonuç:** Mimari olgun ve disiplinli. **Kritik bulgu yok.** 5 yüksek, 22 orta, 22 düşük, 11 bilgi düzeyinde bulgu. En acil iki başlık: **(1)** yedeklerin makine dışına çıkmaması (felaket kurtarma), **(2)** üretimin C locale'inde Türkçe aramanın sessizce eksik sonuç dönmesi.
 

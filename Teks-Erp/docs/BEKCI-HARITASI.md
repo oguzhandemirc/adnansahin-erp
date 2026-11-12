@@ -2250,7 +2250,7 @@ Kalan atlamalar üç biçimde ve strict hiçbirini görmez:
 | `Teks-Erp/scripts/test_semi_finished_surfaces.ts` | Yarı mamul ayrımının GÖSTERİMDE olup ARZDA olmadığını kilitler: Ürün Dengesi ayrı kova + `malzemeAcigi` ikisini birden düşer, sipariş karşılamada `fre | ✓ | ✓ |  |
 ## dokuma
 
-> Alan 2026-09-13'te doğdu (şema parça parça iniyor: P1 `WeavingOrder` · P2 `MachineRun`). Kural dosyası `docs/kurallar/dokuma.md`.
+> Alan 2026-09-13'te doğdu (şema parça parça iniyor: P1 `WeavingOrder` · P2 `MachineRun`). Kural dosyası `docs/history/kurallar-2026-09/dokuma.md`.
 
 | Dosya | Ne ölçüyor | DB | Negatif sonda | |
 |---|---|---|---|---|

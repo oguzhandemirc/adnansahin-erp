@@ -1,16 +1,15 @@
 name: CI
 
-# TeksERP monorepo — 3 alt proje (Teks-Erp backend, Electron panel, mobil).
+# Adnan Şahin ERP monorepo — 3 alt proje (Teks-Erp backend, Electron panel, mobil).
 # Her push + PR'da tip kontrolü + test takımları koşar. Backend testleri yerel
 # PostgreSQL gerektirir (service container + migrate deploy + seed); Electron
 # (Vitest/jsdom) ve mobil (jest-expo) DB'siz çalışır.
 
 on:
   push:
-    # Müşteri dalı YOK: fabrika paketi ve demo derlemesi `main`den üretilir, müşteri
-    # farkı yalnız bayrak profilinde yaşar (kök CLAUDE.md § Dallanma). `adnansahin`
-    # 2026-09-02'de emekli oldu — tetikleyicide bırakmak "o dalda da koşuyor"
-    # yanılsaması üretir ve emekli dalı yaşıyor gösterirdi.
+    # Tek ana dal `main` (iş `feature/*` → `main`); fabrika paketi `main`den üretilir.
+    # `adnan-yedek` dokunulmaz yedek daldır — CI orada koşmaz (kök CLAUDE.md § Dokunulmazlar).
+    # Bu repo yalnız Adnan Şahin fabrikasına aittir; başka müşteri dalı yoktur.
     branches: [main]
   pull_request:
     branches: [main]

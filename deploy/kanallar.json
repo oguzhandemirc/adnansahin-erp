@@ -7,15 +7,13 @@
     "Üretim kanalının kimliği DONMUŞTUR: değişimi sahadaki kurulumlar için bir GÖÇTÜR (yeni uygulama · kayıp userData · kopan güncelleme kanalı).",
     "Commit edilen işaretçiler (Electron/shared/musteri.json · mobil/musteri.json · Electron/package.json · mobil/app.json) 'varsayilan' kanalı gösterir.",
     "Panel kimliği ağaca YAZILMAZ: electron-paketle.sh <kod> onu derleme ANINDA enjekte eder (electron-builder -c.* + Vite sanal modülü, Electron/build-channel.ts); panel.erpAdresi = keşif sonuç vermezse panelin bağlandığı varsayılan sunucu.",
-    "terfiKaynagi (yalnız üretim kanalında): bu kanala yalnız o hazırlık kanalında yayınlanmış ve kullanıcının terfi etiketiyle onayladığı commit çıkar (K5, scripts/lib/terfi.mjs); null = terfi yok. Hazırlık kanalının aynası onu terfiKaynagi olarak göstermek ZORUNDADIR.",
     "runtimeVersion kanal kimliği DEĞİLDİR (JS↔native uyum kimliği): çakışma denetimine girmez, mobil/app.json ile eşit olmak zorundadır.",
-    "Bekçi: node scripts/check-kanallar.mjs (+ --sonda) · yayın kapıları: node scripts/test_kanal_yayin_kapisi.mjs. Kural: docs/kurallar/surum-yayin.md; karar: docs/history/CLAUDE-NOT-ARSIVI.md 2026-09-27 testfabrika D1."
+    "Bekçi: node scripts/check-kanallar.mjs (+ --sonda) · yayın kapıları: node scripts/test_kanal_yayin_kapisi.mjs. Kural: docs/kurallar/surum-yayin.md."
   ],
   "varsayilan": "adnansahin",
   "kanallar": {
     "adnansahin": {
       "tur": "uretim",
-      "terfiKaynagi": "testfabrika",
       "ad": "Adnan Şahin Tekstil",
       "gorunurEtiket": null,
       "yayin": {
@@ -41,36 +39,6 @@
         "erpAdresi": "http://192.168.1.250:4000/api",
         "runtimeVersion": "54.3",
         "otaSertifika": "keystore/ota-certs/certificate.pem"
-      }
-    },
-    "testfabrika": {
-      "tur": "hazirlik",
-      "ayna": "adnansahin",
-      "ad": "Test Fabrika (Adnan Şahin aynası)",
-      "gorunurEtiket": "TEST FABRİKA",
-      "yayin": {
-        "panelFeed": "https://guncelleme.etkiliyazilim.com/testfabrika/electron/",
-        "panelManifest": "https://guncelleme.etkiliyazilim.com/testfabrika/electron/latest.yml",
-        "mobilFeed": "https://guncelleme.etkiliyazilim.com/testfabrika/mobil/",
-        "otaManifest": "https://guncelleme.etkiliyazilim.com/testfabrika/mobil/ota/54.3/manifest",
-        "apkKunye": "https://guncelleme.etkiliyazilim.com/testfabrika/mobil/apk/surum.json",
-        "vdsPanel": "/opt/stack/apps/tekserp-guncelleme/html/testfabrika/electron",
-        "vdsMobil": "/opt/stack/apps/tekserp-guncelleme/html/testfabrika/mobil",
-        "panelDefter": "/opt/stack/apps/tekserp-guncelleme/defter/testfabrika-YAYIN-DEFTERI.tsv"
-      },
-      "panel": {
-        "appId": "com.etkiliyazilim.teks-erp.testfabrika",
-        "urunAdi": "TeksERP Test Fabrika",
-        "paketAdi": "teks-erp-testfabrika",
-        "erpDisAdresi": "http://100.70.47.46:4000",
-        "erpAdresi": "http://100.70.47.46:4000"
-      },
-      "tablet": {
-        "androidPaket": "com.teks.erp.mobil.testfabrika",
-        "gorunenAd": "TeksERP Test",
-        "erpAdresi": "http://100.70.47.46:4000/api",
-        "runtimeVersion": "54.3",
-        "otaSertifika": "keystore/ota-certs-testfabrika/certificate.pem"
       }
     }
   }

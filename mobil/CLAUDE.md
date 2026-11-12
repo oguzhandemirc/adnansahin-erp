@@ -1,54 +1,54 @@
-# TeksERP Mobil (`mobil/`)
+# Adnan Şahin ERP — Tablet
 
-React Native + Expo 54, Android tablet (yatay) + telefon (dikey), yön kilidi yok. Backend `Teks-Erp/` (port 4000). Domain kuralları kök `CLAUDE.md`; alan kuralları `docs/kurallar/<alan>.md`; teknik desenler `docs/KOD-KURALLARI.md`. Bu dosya yalnız tablet-geneli düzeni taşır (yeniden yazım 2026-09-05; önceki sürüm git `6695afc2`).
+React Native + Expo 54 saha uygulaması: Android tablet (yatay) ve telefon (dikey), yön kilidi yok; backend'e (`Teks-Erp/`, port 4000) HTTP ile bağlanır. Çekirdek değişmezler kök `CLAUDE.md`de.
 
 ## Komutlar
 
 ```bash
-npx expo start · npx expo start --android · npx expo run:android   # native build (BT/BLE Expo Go'da çalışmaz)
-npx tsc --noEmit · npm test (jest --runInBand, 85 dosya / 854 vaka / ~17 sn — commit kapısında)
-npm run yayinla:check -- --musteri=<kod>        # OTA mı APK mı? (native parmak izi)
-npm run yayinla -- --musteri=<kod>              # OTA (JS-only, ~%90); ERP adresi + kimlik + imza anahtarı kanaldan
-TEKSERP_KANAL=<kod> npx expo prebuild --platform android --clean --no-install   # kanal değişince android/ yeniden
-npm run build:apk -- --musteri=<kod>            # native değişti → APK; ./gradlew ELLE ÇAĞIRMA
-node ../deploy/mobil-yayinla.mjs --musteri=<kod> --paket=ota-cikti/<kod>/<rv>/<damga>   # yükleme (manifest EN SON)
+npx expo start                     # geliştirme; BT/BLE için native derleme: npm run android
+npm run typecheck                  # tsc --noEmit
+npm run lint
+npm test                           # jest --runInBand (commit kapısında koşar)
+npm run yayinla:check -- --musteri=adnansahin   # OTA mı APK mı? (native parmak izi)
+npm run yayinla -- --musteri=adnansahin         # OTA paketi üretir (ota-cikti/adnansahin/<rv>/<damga>)
+npm run build:apk -- --musteri=adnansahin       # native değişti → APK; ./gradlew ELLE ÇAĞRILMAZ
+node ../deploy/mobil-yayinla.mjs --musteri=adnansahin --paket=<ota-cikti/...>   # sahaya çıkış, manifest en son
 ```
 
-- **Sahaya çıkış:** kanalı değişikliğin cinsi belirler; `--musteri` HER komutta zorunlu (kapı beklenen değeri argümandan alır — `musteri.json` yalnız dinlenme işaretçisidir); kanal kimliği (paket adı · görünen ad · güncelleme adresi · OTA sertifikası · görünür etiket) derleme anında `TEKSERP_KANAL` ile `app.config.js`ten gelir, `app.json` kanal için YAZILMAZ; ERP adresi kanalın kaydından (`deploy/kanallar.json`), açık verilen adres kanalınkiyle eşit olmalı, koda gömülü varsayılan YOK; her kanalın OTA anahtarı ayrı (`keystore/ota-keys[-<kod>]/`); `runtimeVersion` native kimliğidir (artmazsa yeni JS eski native'i çağırır, tüm tabletler çöker); OTA turunda `versionCode`a dokunulmaz; `keystore/` git dışı, kaybı = her tablette sil+kur; `usesCleartextTraffic` `expo-build-properties` altında. Reçete ve tuzaklar: `docs/kurallar/surum-yayin.md`, `docs/ops/MOBIL-UZAKTAN-GUNCELLEME.md`.
-- **API adresi:** `EXPO_PUBLIC_API_URL` → `src/constants/api.ts` (dev-host'tan türetir) → axios `baseURL`; derleme anında gömülür. JWT `expo-secure-store`; her istek `Authorization: Bearer`; cache `@tanstack/react-query` (+ persist: offline mutasyon kuyruğu). Sunucu politikası `GET /api/client-policy/mobil` fail-open, iki eksen (`minVersion` + `minPaketTarihi`).
+Ağır koşum `node ../scripts/agir-is.mjs -- <komut>` ile. Sürüm notu (`surum-notlari.json`) yazılmadan yayın yapılmaz.
 
-## Klasör yapısı
+## Mimari sınırlar
 
-`src/screens/` (modüle göre; `Modules/<Ekran>/`, `Common/settings/`) · `components/` · `navigation/` (`pairingGate.ts`) · `services/` (api, hal/, scanFeedback, printHtml, btPrinter) · `store/` (zustand: auth, lock, deviceSettings, tabs) · `hooks/` · `offline/` (mutations kuyruğu, entryAttempt) · `data/` · `lib/` · `types/` (backend ile uyumlu; `permissions.ts` union ELLE taşınır) · `utils/` · `constants/` (`api.ts`, `stationScreens.ts` StationKind→ekran registry) · `theme/` · `test/` (guard testleri).
+- Ekran = ince kabuk + görünüm + ekran-hook + saf mantık modülü (yanında `.test.ts`); ekran HTTP kurmaz, `services/<domain>.service.ts` → `apiClient`.
+- API adresi `EXPO_PUBLIC_API_URL` → `src/constants/api.ts`, derleme anında gömülür; JWT `expo-secure-store`'da; kanal kimliği `app.config.js`ten `TEKSERP_KANAL` ile gelir, `app.json`a kanal için yazılmaz.
+- Donanım VERİdir: cihazlar backend `PeripheralDevice`'ta, tablette cihaz-yerel seçim yok; çözümleme oturum kapsamlı (`useMachinePeripherals`), oturum yoksa boş (fail-closed). HAL `services/hal/`, saha yolu BT-Classic; BLE'yi yeni işe seçme.
+- Okutma geri bildirimi yalnız `services/scanFeedback.signalScan` / `hooks/useScanFeedback`; HTML yazdırma yalnız `services/printHtml.ts`.
+- İdempotency token'ı `offline/entryAttempt.ts` tek kaynaktır; çuval mutasyonları online-only.
+- İzin union'ı `src/types/permissions.ts` backend kataloğundan ELLE taşınır.
+- Yeni paket kullanıcı onayı + `docs/standart/KUTUPHANELER.md` karar kaydı ister; native modül, izin, ikon, SDK veya config-plugin APK turu ister.
 
-## Donanım (HAL) ve oturum
+## Tuzaklar
 
-- **Donanım = VERİ:** cihazlar backend `PeripheralDevice`'ta (kind/connectionType/address/protokol/`simulate`); tablette device-local seçim YOK. HAL `services/hal/` (`btClassic.transport` HC-06 SPP + `meter.codec`), `usePeripheralIO.buildIoFromPeripheral`.
-- **Çözümleme OTURUM kapsamlı:** `useMachinePeripherals('METER'|'SCALE')` → `GET /peripherals/for-session`; oturum yoksa BOŞ (fail-closed). Oturumlu ekranlar `SessionGate` ile sarılı; yer onayı yalnız ODAKTAKİ ekranda (arka plandaki gate pasif — ping-pong yasağı). Yazıcı da oturumdan (`LabelPrinter`; manuel BT seçimi kalktı). Damgalı uçta `409 WORK_SESSION_REQUIRED` → yerel oturum düşer, gate yeniden sorar.
-- **Fail-closed:** cihaz yok / bond yok / okunamadı / değer ≤ 0 → net Türkçe toast, mutasyon HİÇ çağrılmaz; `simulate` cihazda uydurulmuş değer `source:'SIMULATED'` beyanıyla gider, backend karar verir (`MANUAL` muaf). BT tek soket: ikinci dokunuş `busyRef` ile sessizce yok sayılır. Okuma TEK DOKUNUŞ (⚖ → oku → kaydet), araya input modalı koyma; taşan aksiyonlar ⋮ menüsünde. Kendi açtığımız Android sistem diyalogları `withSystemDialog()` ile sarılır (idle kilidi "ayrıldı" sanmasın); HTML yazdırma yalnız `services/printHtml.ts`.
-- **Kamera:** `expo-camera` v17 (`CameraView` + `onBarcodeScanned`); yön tercihi cihazda (`cameraFacing`), `initialFacing` ZORLAMA; HID tarayıcılar sistem klavyesi. BLE (`react-native-ble-plx`) yolu bugün canlı kullanıcısız — saha yolu BT-Classic; BLE'yi yeni işe seçme.
-- Cihaz onayı: doğuş durumu sunucudan (`pairingRequired`), tek yüklem `navigation/pairingGate.ts`, `??` load-bearing. `docs/kurallar/kesif-cihaz.md`.
-
-## Okutma ve giriş kalıpları
-
-- **Okutma geri bildirimi ÜÇ ortak katman:** `services/scanFeedback.signalScan` (ses+titreşim; ekranlar okutma yolunda `Haptics`i doğrudan çağırmaz — bekçi `src/test/scan-haptics.guard.test.ts`, muafiyet gerekçeyle listede; onay modalı açan "soru" dalı ve ara adım sinyal VERMEZ, sonucu cevaptan sonra doğar; `docs/standart/MOBIL.md` § okutma) · `hooks/useScanFeedback` (`signalScan`i kendisi çağırır; `flash` + `rejects`) · `components/ScannerRollStrip` (son okutulanlar; `rolls` girişi EKLENME sırasındadır, şerit ters çevirir — ters sırada state tutan ekran çeviriyi KENDİ yapar, yoksa yeşil vurgu yanlış satıra gider). Bildirim varken yeşil tik bastırılır; flash (kadraja bakan göz) ile şerit (dönen operatör) birbirinin YERİNE geçmez, süreleri bilinçli farklı; tarayıcı açıkken ekranda, kapalıyken toast. Çok top okutan ekran `trigger="tap"`, tek okuyup kapanan `auto`.
-- **Okutma kararı saf yüklem** (`scanClassify` emsali): statü kontrolü çuval/sevkiyattan ÖNCE (`SHIPPED` topa "çuvaldan çıkar" deme).
-- **İdempotency:** token mantıksal deneme başına; yalnız belirsiz hatada yapışır (`offline/entryAttempt.ts` tek kaynak); retry payload'ı yeniden okumaz. Çuval mutasyonları online-only (kuyruğa girmez). Kalıcı düşüş anlık toast (`announceFailure`); çakışma 409'ları modal, toast değil. `docs/kurallar/kk1.md`.
-- **Numara girişi:** büyük tuş takımı; modalda `NumpadInput` + `useNativeKeyboard` (modalda `NumpadHost` yok); `NumpadHost autoActivate` yalnız tek alanda. Metraj kaynağı (elle ↔ makine) CİHAZ ayarı (`deviceSettingsStore.kk1ManualEntry`, `tamburCutMode`; `recutMode = cutMode`).
-- **Sebep seçimi:** `ReasonPresetPicker` tek bileşen (serbest metin ÜSTTE); katalog üç kademeli (sunucu → cihaz → zemin; zemin `WORK_ORDER_REWORK` için GERÇEK kod); sıra sürükleyerek `mergeVisibleOrder` ile. `docs/kurallar/sebep-katalogu.md`.
-- Kısa kesim → A1: fabrika ayarı + cihazda üç durumlu override (`server|on|off`), tek birleştirme `resolveShortCutConfig`; kural `Tambur/shortCutQuality.ts`. `docs/kurallar/tambur.md`.
-
-## UI/UX
-
-- Dokunma hedefi ≥56dp; ⚠️ font ölçüsü ÖLÇÜMLE düzeltildi (2026-09-05): 1.163 `fontSize` bildiriminin %83'ü 16'nın altında ve en yoğun değerler 12–13. Kural: **operatörün okuduğu birincil metin ≥14, ikincil/etiket ≥12, kritik rakam (metraj, barkod, sayaç) ≥20**; koyu header/açık içerik; her ekran iki yönde çalışır (tablet split view, telefon tek sütun).
-- Tıklanabilir her alan `react-native-paper`: `TouchableRipple` / `Button` / `IconButton` / `Appbar.Action` / `List.Item`; **`Card` + `onPress` KULLANMA** (`Card.Content` dokunmayı yutar); grid/picker hücrelerinde de aynı. **`SegmentedButtons` `flexDirection:'row'` kabının doğrudan çocuğu OLAMAZ** (yanındaki başlığı sıfır genişliğe iter; bekçi `test/segmented-buttons-row.guard.test.ts`).
-- Modallar `components/AppModal.tsx` (Portal + Reanimated); ÖN-DOLU metin kutusu `ModalTextInput` (portal mikrotask gecikmesi imleci çökertir). Picker'dan yeni kayıt: `PickerModal.leadingAction` (ilk hücre, mor). Ayarlar = menü + alt sayfa: yeni ayar bölümünü ana ekrana GÖMME; alt sayfa yap + menüye satır ekle (`RootStackParamList` + `RootNavigator`; kabuk `screens/Common/settings/` `SettingsPage`).
-- Sebep adımı üç bölge: başlık sabit · liste kayar (`flexShrink:1`) · footer sabit — Geri/Kaydet ekran dışında kalmasın.
-- **Yeni modül modalı `ModuleSheet` (tek kart) ya da `PagedSheet` (sayfalı) — üçüncü biçim yok** (kullanıcı 2026-09-18): gövde ekranın %70'inden uzunsa SAYFALI (adım göstergesi · Geri/İleri · son sayfa Kaydet + ÖZET; İleri'de hata O SAYFADA yazılır, sayfa değişmez), kısaysa TEK KART; düğmeler kartın İÇİNDE sabit, `AppModal`i `contentStyle`siz çağıran form yazılmaz; kesik metin yasak, chip/çoklu seçim yok, seçici daima `PickerModal` (`overlays`). Stil sözlüğü `sheet` (yerel StyleSheet kopyası YOK).
-- Liste: varsayılan cursor + sonsuz kaydırma (`useInfiniteQuery` + `FlashList` `onEndReached`, threshold 0.6); modal listesi `RemoteListSheet`; "Önceki/Sonraki" pager YOK. Hata mesajları Türkçe.
+- `runtimeVersion` native kimliğidir: native değişip artmazsa yeni JS eski native'i çağırır ve bütün tabletler çöker. OTA turunda `versionCode`a dokunulmaz.
+- `keystore/` git dışıdır; kaybı her tablette sil + yeniden kur demektir.
+- Sensör fail-closed: cihaz yok / bond yok / okunamadı / değer ≤ 0 → Türkçe toast, mutasyon HİÇ çağrılmaz; `simulate` cihazda uydurulan değer `source:'SIMULATED'` beyanıyla gider.
+- `Card` + `onPress` kullanma (`Card.Content` dokunmayı yutar); tıklanabilir alan Paper `TouchableRipple`/`Button`/`IconButton`/`List.Item`.
+- `SegmentedButtons` `flexDirection:'row'` kabının doğrudan çocuğu olamaz (yanındaki başlığı sıfır genişliğe iter).
+- Ön-dolu metin kutusu modalda `ModalTextInput` olur (portal gecikmesi imleci çökertir); modalda `NumpadHost` yok, `NumpadInput` var.
+- Yeni modül modalı `ModuleSheet` (tek kart) ya da `PagedSheet` (gövde ekranın %70'inden uzunsa); üçüncü biçim yok, düğmeler kartın içinde sabit.
+- `ScannerRollStrip` `rolls` girişini EKLENME sırasında bekler; ters sırada state tutan ekran çeviriyi kendi yapar, yoksa vurgu yanlış satıra gider.
+- Kendi açtığımız Android sistem diyaloğu `withSystemDialog()` ile sarılır (boşta kilidi "ayrıldı" sanmasın).
 - Yerleşim hatasında tahmin değil ölçüm: `adb exec-out screencap` + `uiautomator dump`.
-- **Tablet test sürücüsü** (`scripts/surucu/`, YENİ PAKET YOK): kullanıcı testi güzergâhının tablet adımlarını adb ile koşturup adım başına yeşil/kırmızı + görüntü + backend doğrulaması üretir. Seçici önceliği `accessibilityLabel`→content-desc > `testID`→resource-id (paket öneki YOK) > `<Text>`→text; sürücünün adlayacağı düğüme `testID`/`accessibilityLabel` konur (menü karoları `modul-karo-<key>`, PagedSheet düğmeleri `paged-*`). `input text` ASCII-only (TR düşer) — veri `TEST-` önekli; koşum reçetesi `scripts/surucu/README.md`.
 
-## Paketler
+## Dokunmadan önce oku
 
-Yeni paket için onay. `expo react-native react typescript react-native-worklets` · `expo-constants expo-status-bar expo-screen-orientation expo-build-properties expo-haptics expo-audio expo-asset expo-file-system expo-intent-launcher expo-updates` · navigation `@react-navigation/{native,native-stack} react-native-safe-area-context react-native-screens` · UI `react-native-paper @expo/vector-icons react-native-gesture-handler react-native-reanimated` · `expo-camera` · `react-native-ble-plx react-native-bluetooth-classic` · `zustand axios @tanstack/react-query (+persist-client, query-async-storage-persister)` · `expo-secure-store @react-native-async-storage/async-storage` · `expo-print` · `@shopify/flash-list react-native-sortables` · `@react-native-community/netinfo` · `react-native-keyboard-controller` · `react-native-toast-message` · `dayjs`. Karar kaydı ve katman × ihtiyaç tablosu: `docs/standart/KUTUPHANELER.md` §2.3 (bekçi `test_dependency_contract`); ölü paket hükümleri §7. Yeni ikon `@expo/vector-icons`ten alınır. OTA ile gider / APK ister ayrımı: yeni native modül, izin, ikon, SDK → APK.
+| Konu | Belge |
+|---|---|
+| Ekran kalıbı, çevrimdışı yazma, okutma, UI sözleşmesi, boyut, test | `docs/standart/MOBIL.md` |
+| Yeni ekran / özellik, OTA-APK kapıları (reçete) | `docs/RECETELER.md` |
+| KK1, idempotency, kurşun | `docs/kurallar/kk1.md` |
+| Tambur, kesim, refakat kartı | `docs/kurallar/tambur.md` |
+| Sebep kataloğu, numara serisi | `docs/kurallar/defter.md` |
+| Cihaz eşleme, keşif, HAL | `docs/kurallar/genel.md` |
+| OTA, APK, kanal | `docs/kurallar/surum-yayin.md`, `docs/ops/MOBIL-UZAKTAN-GUNCELLEME.md` |
+| Tablet test sürücüsü (adb) | `mobil/scripts/surucu/README.md` |

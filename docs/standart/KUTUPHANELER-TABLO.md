@@ -57,14 +57,14 @@ Paket `deploy/` ve `scripts/`yi TAŞIMAZ (`docs/KOD-KURALLARI.md` § deploy) —
 |---|---|---|
 | Çatı | `expo` ~54 · `react-native` 0.81.5 · `react` 19.1.0 | sürümler SDK pinli ([KU-12]) |
 | Navigasyon | `@react-navigation/native` + `native-stack` | `bottom-tabs` KULLANILMAZ (ölü, §7) |
-| UI | `react-native-paper` (132) | `Card` + `onPress` yasak (`mobil/CLAUDE.md` § UI/UX) |
+| UI | `react-native-paper` (132) | `Card` + `onPress` yasak (`docs/standart/MOBIL.md` [MO-15]) |
 | İkon | `@expo/vector-icons` | `react-native-vector-icons` KULLANILMAZ (peer DEĞİL — [KU-23]) |
 | Liste | `@shopify/flash-list` 2.0.2 (23 dosya) | `FlatList` 0 |
 | Toast | `react-native-toast-message` (64) | Paper `Snackbar` KULLANILMAZ |
 | Sunucu durumu | `@tanstack/react-query` + `-persist-client` + `query-async-storage-persister` | çevrimdışı kuyruk (`MOBIL.md`) |
 | İstemci durumu | `zustand` | — |
 | HTTP | `axios` (oturumlu) + ham `fetch` (kimliksiz) | ÇİFT ama BİLİNÇLİ AYRIM — [KU-05] |
-| Tarih | `dayjs` (27) | tarih SEÇİCİ paketi EKLENMEZ (`docs/kurallar/filtre-liste.md:84`) |
+| Tarih | `dayjs` (27) | tarih SEÇİCİ paketi EKLENMEZ (`docs/history/kurallar-2026-09/filtre-liste.md:84`) |
 | Depolama | `expo-secure-store` (sır) · `@react-native-async-storage/async-storage` | — |
 | Kamera · okutma geri bildirimi | `expo-camera` 17 · `expo-haptics` + `expo-audio` | ekranlar `Haptics`i doğrudan değil `scanFeedback.signalScan` üzerinden çağırır |
 | Bluetooth | `react-native-bluetooth-classic` (3 dosya, lazy `require`) | `react-native-ble-plx` canlı ama sahipsiz — §7 |

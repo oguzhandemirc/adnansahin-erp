@@ -27,7 +27,7 @@ Bu repodaki arızaların en pahalı sınıfı **sessizce yutulan** koddur: kural
 
 - **[IL-08]** İstek gövdesini elle kuran her istemci katmanı bir allowlist'tir — alan iki uçta birlikte eklenir; Zod tanımadığı anahtarı sessizce siler · zorlama: insan:sözleşme iki repoda · kanıt: 2026-08-13 "kesimde kat sessizce düşüyordu"
 - **[IL-09]** Yeni bir yüzey eklerken "kaç kapıdan geçiyor" sorusu ÖNCE sorulur: enum değeri · davranış bayrağı · izin kodu · rota+izin — hepsi çok-kapılı ve reçetelidir · zorlama: bekçi:`test_feature_flag_contract`, `test_permission_catalog` · kanıt: `docs/RECETELER.md`
-- **[IL-10]** Bir sayım/kapsam listesi "0 bulgu" verdiğinde bu "hiç bakılmadı" da olabilir → her sayım bekçisi **körlük zemini** taşır (ölçtüğü kümenin boş olmadığını da ölçer) · zorlama: bekçi · kanıt: `Teks-Erp/CLAUDE.md` § bekçi sözleşmesi; `scripts/check-lint-baseline.mjs` `EN_AZ_DOSYA`
+- **[IL-10]** Bir sayım/kapsam listesi "0 bulgu" verdiğinde bu "hiç bakılmadı" da olabilir → her sayım bekçisi **körlük zemini** taşır (ölçtüğü kümenin boş olmadığını da ölçer) · zorlama: bekçi · kanıt: `docs/standart/TEST-VE-DERLEME-BEKCI.md`; `scripts/check-lint-baseline.mjs` `EN_AZ_DOSYA`
 - **[IL-11]** Bir yeteneğin "VAR" sayılması için üçü birden gerekir: motor + en az bir çıkış yüzeyi + izin ataması · zorlama: insan:üç ayağın varlığı üç ayrı katmanda, tek bir AST'de görünmez · kanıt: 2026-08-26 yarı mamul (üç ucu birden açık kalmıştı: rota yok · izin 0 kullanıcıda · masaüstü çıkışı yok)
 
 ## 4 · Ölç, sonra karar ver
@@ -131,6 +131,6 @@ Politika `docs/KOD-KURALLARI.md` § Yorum politikası'nda; burada yalnız özeti
 
 ## 9 · Sır ve canlı veri
 
-- **[IL-29]** Süperadmin parolası/PIN'i/TOTP'si ve ayar şifresi repoya, log'a, sürüm notuna, audit yüküne GİRMEZ; `.env` uyarısı yalnız **anahtar adını** basar · zorlama: bekçi:`test_superadmin_provision §5` (sır audit'e/DB'ye/dosyaya sızmıyor — körlük zeminiyle) + `§8` (ölü `.env` satırı uyarısı: anahtar ADI evet, DEĞER asla) · kanıt: `Teks-Erp/scripts/test_superadmin_provision.ts:455,457,495` ve `:727`; kural kök `CLAUDE.md` § Sır hijyeni
+- **[IL-29]** Süperadmin parolası/PIN'i/TOTP'si ve ayar şifresi repoya, log'a, sürüm notuna, audit yüküne GİRMEZ; `.env` uyarısı yalnız **anahtar adını** basar · zorlama: bekçi:`test_superadmin_provision §5` (sır audit'e/DB'ye/dosyaya sızmıyor — körlük zeminiyle) + `§8` (ölü `.env` satırı uyarısı: anahtar ADI evet, DEĞER asla) · kanıt: `Teks-Erp/scripts/test_superadmin_provision.ts:455,457,495` ve `:727`; kural kök `CLAUDE.md` § Dokunulmazlar
 - **[IL-30]** `migrate reset` / reseed / toplu `DELETE` yasaktır; migration geri alınamaz kabul edilir; toplu düzeltme script'i dry-run varsayılandır ve `--apply` öncesi etkilenen her kaydı listeler · zorlama: hook:`scripts/claude-hooks/bash-guard.mjs` · kanıt: kök `CLAUDE.md` § Veri ve defter
-- **[IL-31]** Dev veritabanı fabrikanın verisinin **kopyasıdır**: test temizliği yalnız kendi damgasıyla eşleşen satırlara dokunur (`TEST-` / `TST-` ön ekleri), ön eksiz satır silinmez · zorlama: insan:bekçi sözleşmesi · kanıt: `Teks-Erp/CLAUDE.md` § bekçi yazma sözleşmesi
+- **[IL-31]** Dev veritabanı fabrikanın verisinin **kopyasıdır**: test temizliği yalnız kendi damgasıyla eşleşen satırlara dokunur (`TEST-` / `TST-` ön ekleri), ön eksiz satır silinmez · zorlama: insan:bekçi sözleşmesi · kanıt: `docs/standart/TEST-VE-DERLEME-BEKCI.md`

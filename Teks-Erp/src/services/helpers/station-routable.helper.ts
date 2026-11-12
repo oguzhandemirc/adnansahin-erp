@@ -2,7 +2,7 @@
 // ROTAYA GİREMEYEN İSTASYON TÜRLERİ — tek yüklem, iki çağıran
 // =============================================================================
 // Tezgah topun rotasında bir ADIM DEĞİL, kendi varlığı olan bir üretim alanıdır
-// (`docs/kurallar/dokuma.md`; top KK1'de doğar, `entrySource=WEAVING`). Ama tablet
+// (`docs/history/kurallar-2026-09/dokuma.md`; top KK1'de doğar, `entrySource=WEAVING`). Ama tablet
 // oturumu istasyon tabanlı olduğu için `StationKind.WEAVING` var ve `Station`
 // tablosunda oturur — rota şablonu ve iş emri rotası istasyonu id ile aldığı için
 // bir WEAVING istasyonu SESSİZCE adım olabilirdi. Bu kapı onu 400 ile durdurur.

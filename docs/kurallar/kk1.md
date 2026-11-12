@@ -1,118 +1,68 @@
-# KK1 · İdempotency · Çevrimdışı kuyruk
+# KK1 · İdempotency · Kurşun planlama
 
-> Alan kural dosyası — bu alana dokunmadan ÖNCE okunur. Kaynak: anlama turu 2026-09-05 (kök `CLAUDE.md` + `docs/history/CLAUDE-NOT-ARSIVI.md` notlarından ayrıştırıldı). Hikâye, ölçüm ve gerekçe arşivde; burada yalnız bugün geçerli kural. Sınıf: **[ÇEKİRDEK]** her kurulumda aynı · **[PROFİL]** bu fabrikanın seçimi.
+KK1 (RAW_QC) topun sisteme ilk girdiği istasyondur; burada çift basış, ağ kopması ve tekrar deneme bir topu iki kez doğurabilir, bu yüzden alan idempotency (`clientToken`) ve mükerrer tuzağının da evidir. Kurşun planlama, kurşun+KK2 adımlarının makinelere dağıtımı ve bypass rejimidir. Kapsadığı kod: `Teks-Erp/src/services/{inventory,kursun-qc,kursun-bypass}.service.ts`, `services/helpers/{duplicate-guard,token-replay,kursun-bypass-eligibility}.helper.ts`, `constants/kk1-entry-sources.ts`, tablet `mobil/src/offline/` ve `mobil/src/screens/Modules/KK1/`, panel `Electron/src/pages/Operations/KursunDagitim/`, `Electron/src/lib/attemptToken.ts`.
 
-> Hakem notu: 20 üye (8 kök, 4 alt-backend, 8 alt-mobil). Çekirdek zincir sağlam ve kodla doğrulandı: clientToken → atomik mükerrer tuzağı (8021) → uçuş penceresi → düşüş duyurusu. Üç bayat nokta: ① kök:59'daki 'çakışma 409'ları toast BASMAZ' kuralı 2026-08-29'da (`68486d3b`) kodda delindi — ekransız replay'de duyuruluyor, not güncellenmedi (EN RİSKLİ: not okunup kod geri çevrilirse BULGU-T3-001 geri gelir, top sessizce kaybolur); ② clientToken 'Roll/Order/WorkOrder' listesi 3 değil 15 model; şema sayıları ~78/~35 değil 124/68; ③ mobil 'KK1 auto kalır' parantezi bayat. kök:105 ve kök:107 aynı süperadmin P8 notunu iki kez taşıyor (mükerrer, ayrı kümenin kararı). R:2026-07-13 (parti), R:2026-08-12 top-listesi ve R:2026-08-26 (yayın) kendi kümelerinde kalır.
+## Kurallar
 
+### KK1 ve idempotency
 
-## Ortak (backend + panel + tablet)
+- "KK1'in işi olan top" kümesi tek sabittir: backend `KK1_ENTRY_SOURCES` ↔ mobil `KK1_LIST_ENTRY_SOURCES` birebir; SQL kaynak listesini elle yazmaz (`Prisma.join`). [bekçi: test_kk1_entry_sources]
+- Kayıt yaratan uç `clientToken` (`String? @unique @db.Uuid`) taşır; yeni kayıt yaratan uç da aynı sözleşmeyle doğar. [inceleme]
+- İstemci token'ı MANTIKSAL DENEME başına bir kez üretir ve tekrar denemede aynısını gönderir; `mutationFn` içinde gönderim anında token üretme. Panel `Electron/src/lib/attemptToken.ts` ve tablet `mobil/src/offline/attemptToken.ts` özdeş durum makinesidir. [bekçi: test_istemci_token_uretimi]
+- Token yalnız sonucu belirsiz bırakan hatada (ağ · zaman aşımı · 5xx) yapışır; kesin 4xx'te yenilenir — yapışırsa aynı yükü sonsuza dek gönderen döngü kurulur. [bekçi: entryAttempt.test.ts]
+- Token replay'i tek boğazdan geçer (`tokenReplay`, `helpers/token-replay.helper.ts`); token yazan/okuyan her birim `scripts/lib/token-replay-beyan.ts`te beyanlıdır ve borç sayısı yalnız düşer. [bekçi: test_token_replay_bogaz]
+- Replay'li yolda kaybeden deneme hangi hatayla düşerse düşsün cevap token'dan gelir; farklı gövdeyle aynı token 409 `CLIENT_TOKEN_COLLISION`. [bekçi: test_token_replay_zorlanmis_sira]
+- Token ön-okuması ile insert arasında kazananın yazdığını okuyan bir iş kuralı varsa token okuması `lockClientTokenTx` (8036) altında yapılır ve kilit tx'in ilk ifadesidir. [bekçi: test_cek_bordro_taslak_token]
+- KK1 mükerrer tuzağı tx içinde koşar ve tx'in İLK ifadesi `pg_advisory_xact_lock(8021, hashtext(anahtar))`'dır: kilit `findFirst`'ten önce (TOCTOU) ve `generateRollBarcode`'dan önce (ABBA deadlock). [bekçi: test_kk1_duplicate_guard]
+- Mükerrer penceresi operatörün bastığı anla (`Roll.clientEnteredAt`) ve iki yönlü (since/until) ölçülür; damgasız eski kayıt `createdAt`'e düşer. [bekçi: test_kk1_duplicate_guard]
+- Advisory kilit uzayları ayrıdır (8021 mükerrer · 8022 parti no · 8036 token); yeni uzay almadan önce `period-guard.helper.ts` envanterine bak. [bekçi: test_advisory_lock_namespaces]
+- `kk1.duplicateGuardEnabled` varsayılan kapalıdır ve engellemez, onaylatır: 409 `POSSIBLE_DUPLICATE` → `confirmDuplicate:true`; `createInitialEntry`'de `opts.duplicateGuard` ile opt-in, dahili çağıran etkilenmez. [bekçi: test_feature_flag_contract]
+- İlk girişte kalite çift kolondur (`qualityGrade` + `qualityGradeId`) ve birlikte dolar/boşalır; boş değer NULL kalır (sabit "1.KALITE" varsayılanı yazılmaz), bilinmeyen/pasif kod 400 ve top doğmaz. [bekçi: test_initial_entry_quality]
+- Retry formu/makineyi yeniden okumaz, düşen yükü birebir gönderir; uçuşta aynı yük gelirse uçuştaki kimlik yeniden kullanılır, farklı yük yeni top sayılır (`INFLIGHT_REUSE_WINDOW_MS = 90_000`, backend penceresiyle aynı). [bekçi: entryAttempt.test.ts]
+- Çevrimdışı sebebi `'link'` ise uçuş kimliği bırakılır, `'server'` ise korunur; ayrım saf `shouldReleaseInFlight`'ta yaşar, ekrandaki bir `if`'te değil. [bekçi: entryAttempt.test.ts]
+- Kalıcı düşüş köprüsü `MutationCache.onError`'da kalır; `setMutationDefaults`'a taşıma (component `onError` ezer). [bekçi: mutations.test.ts]
+- Kalıcı düşen kayıt anlık toast ile duyurulur (`announceFailure`), kalıcı kuyruğa/kutuya yazılmaz; ölü mektup kutusunu geri getirme. [bekçi: announceFailure.test.ts]
+- Çakışma 409'u ekran ayaktayken yalnız modalda görünür, EKRANSIZ replay'de duyurulur; belirsizlikte duyur. [bekçi: announceWire.test.ts]
+- Toast metni "kayıt oluşmadı" diyemez (zaman aşımında sunucu commit etmiş olabilir); önce doğrulatır: "Listede yoksa tekrar girin". [bekçi: announceFailure.test.ts]
+- `onMutate`'te yeşil "kaydedildi" basma; yeşil yalnız `onSuccess`'te. [inceleme]
+- Çevrimdışı hükmü yalnız yanıtsız düşen istekle verilir; 5xx "sunucuya ulaşılamadı" değildir. Yoklama adresi her çağrıda canlı okunur (`getCurrentBaseUrl`). [bekçi: serverReachability.test.ts]
+- Çok top okutan yüzey `trigger="tap"`, tek okuyup kapanan yüzey `auto`; ölçüt ekran adı değil yüzeydir. [bekçi: BarcodeScannerView.test.tsx]
+- Metraj kaynağı (elle ↔ makine) cihaz ayarıdır (`kk1ManualEntry`, `tamburCutMode`), oturum değil; bozuk disk değeri güvenli varsayılana düşer. [bekçi: deviceSettingsStore.test.ts]
+- Yazıcı kuyruğu (`printQueue`) kayıt kuyruğundan ayrıdır ve kaldırılmaz: "top kayıtlı, etiketi çıkmadı" kalıcı bir yüzeydir. [bekçi: printQueue.test.ts]
 
+### Kurşun planlama
 
-### Değişmezler
+- `production.kursunBypassEnabled` REJİM anahtarıdır, görünürlük anahtarı değil: karo izinle ve `production.enabled` modül kapısıyla süzülür. [bekçi: production-regime.test.ts]
+- Bayrak yalnız yeni atama oluşturmayı kapılar; rejim atama satırında kalıcıdır, dağıtılmış iş emri bayrak kapansa da bypass ile biter. [bekçi: test_kursun_bypass]
+- Kurşun tableti bayrak açıkken yalnız dağıtıma UYGUN adımda salt-okunurdur; tek kapı `assertKursunTabletMayWrite` beş yazma yolunu kapsar ve UI'ya güvenmez (offline kuyruk bayrak çevrildikten sonra gelebilir). [bekçi: test_kursun_regime_lock]
+- Uygunluk kuralı tek kaynak `resolveBypassBlockReason` + `loadBypassEligibilitySignals`; liste toplu, tablet tekil çağırır, kopyalanmaz. [bekçi: test_kursun_regime_lock]
+- Tablet salt-okunur kararını sunucu verir (`StepSummary.tabletReadOnly`); istemci yalnız uygular. [inceleme]
+- Dağıtım işin ön koşulu değildir: Tambur okutması dağıtılmamış kurşun adımını da kapatır; kapsam "bayrak açık VE adım uygun", tek kapı `resolveUnassignedTamburClosure` ve `assertKursunTabletMayWrite` ile aynı kaynaktan beslenir. [bekçi: test_kursun_unassigned_close]
+- Dağıtımsız kapanışta `RollMovement.machineId` NULL kalır — atıf uydurulmaz; boşluk `listDistribution.unassignedClosures` bandıyla görünür kılınır. [bekçi: test_kursun_unassigned_close]
+- Dağıtımsız kapanış marker'ı `KURSUN_BYPASS_MARKER_PREFIX`'ten türetilir, elle yazılmaz; idempotent tekrar `findCompletedUnassignedClosure` ile tanınır (o dal yoksa offline replay 404 alır). [bekçi: test_kursun_unassigned_close]
+- Makine içi sıra `listDistribution` içinde JS ile (`sortByPlanOrder`) kurulur; sıralama `WorkOrderStep.priority` üzerinden iki kümede (bekleyen · makine içi) yaşar, yeniden numaralama yalnız kendi kümesine dokunur. [bekçi: test_kursun_machine_order · queue-reorder.test.ts]
+- Kuyruk sıralaması planlama kararıdır: `PATCH /kursun-qc/queue/reorder` `quality:write` ∨ `workorder:distribute` ∨ `mobile:kursun-dagitim` kabul eder; daraltma. [inceleme]
+- Kurşun bypass ataması istasyon özelliğinde mod `AUTO` arar; satırın varlığı yetmez. [bekçi: test_station_property_mode]
+- Kapanış dispozisyonu TRANSFER'de bekleyen bypass ataması yeni iş emrine taşınır, split'te void edilir; force-void'den önce koşar. [bekçi: test_kursun_bypass_repoint]
+- Kurşun sırası ve dağıtımı tek ekrandadır (`/operations/kursun-dagitim`); ikinci kurşun ekranı açılmaz. [inceleme]
+- Sekme şeridi makine listesinden doğar: işsiz makinenin de sekmesi var, pasif ama açık işli makine `(pasif)` etiketiyle çizilir. [bekçi: machine-tabs.test.ts]
+- Yeni izin `permission-catalog.ts`'e yazılır, migration ile eklenmez; boot uzlaştırması yalnız ekler, kimseye atamaz. [bekçi: test_permission_catalog]
 
-- **[ÇEKİRDEK]** "KK1'in işi olan top" kümesi TEK sabittir: backend `constants/kk1-entry-sources.ts` `KK1_ENTRY_SOURCES` ↔ mobil `KK1_LIST_ENTRY_SOURCES` birebir; karne/liste SQL'i kaynak listesini elle yazmaz (`Prisma.join`). · bekçi: `scripts/test_kk1_entry_sources.ts (DB'siz; küme eşitliği + dashboard literal yok)`
-- **[ÇEKİRDEK]** Kayıt-yaratan uçlar istemci `clientToken`'ı taşır; kolon `String? @unique @db.Uuid`. Kapsam ÜÇ MODEL DEĞİL 15: Roll/Order/WorkOrder + SubcontractorReceipt, SwatchStockReduction, Sack, Shipment, ImportRun, WarehouseTransfer, GoodsReceipt, Invoice, Payment, CashTransaction, Cheque, PurchaseOrder. <sub>(CLAUDE.md:171, CLAUDE.md:148)</sub>
-- **[ÇEKİRDEK]** İstemci token'ı MANTIKSAL DENEME başına BİR KEZ üretir ve tekrar denemede AYNI token'ı gönderir; mutate çağrısı başına yeni token üretmek korumayı boşa düşürür. · bekçi: `mobil/src/offline/entryAttempt.test.ts` <sub>(CLAUDE.md:171)</sub>
-- **[ÇEKİRDEK]** Panel ve tablette token deneme başına tek yardımcıdan gelir (panel `Electron/src/lib/attemptToken.ts`, tablet ikizi `mobil/src/offline/attemptToken.ts` — durum makinesi iki istemcide özdeş, belirsiz-hata ölçütü istemci başına tek tanım); gönderim anında üretim (`clientToken: üret()`, `mutationFn` içi) yasaktır, token tutan her birim yardımcıya bağlıdır (kesin 4xx'te yeniler) ve deneme sonucu `onFailure`/`onSuccess`e verilir — `renew` yalnız açılışta. · bekçi: `Teks-Erp/scripts/test_istemci_token_uretimi.ts` (AST, sert kapı) <sub>(arşiv: 2026-09-26 D4 · D4b)</sub>
-- **[ÇEKİRDEK]** Token yalnız sonucu BELİRSİZ bırakan hatadan sonra YAPIŞIR (ağ hatası / zaman aşımı / 5xx — timeout 'yazılmadı' demek DEĞİLDİR). Kesin 4xx'te YAPIŞMAZ: yapışırsa aynı payload'ı sonsuza dek gönderen bir 'Tekrar Dene' döngüsü kurulur. · bekçi: `mobil/src/offline/entryAttempt.test.ts` <sub>(CLAUDE.md:171)</sub>
-- **[ÇEKİRDEK]** KK1 mükerrer tuzağı tx İÇİNDE koşar ve tx'in İLK ifadesi `pg_advisory_xact_lock(8021, hashtext(anahtar))`'dır. SIRA LOAD-BEARING: kilit `findFirst`'ten ÖNCE (sonra alınan kilit hiçbir şey kazandırmaz — TOCTOU) ve `generateRollBarcode`'dan da ÖNCE (ters sıra ABBA deadlock). · bekçi: `Teks-Erp/scripts/test_kk1_duplicate_guard.ts` <sub>(CLAUDE.md:54)</sub>
-- **[ÇEKİRDEK]** Advisory kilit uzayları AYRI tutulur: 8021 = KK1 mükerrer tuzağı, 8022 = parti no üreteci. Aynı uzayı paylaşan iki alt sistem birbirini sessizce serileştirir; yeni uzay alırken envantere bak. <sub>(CLAUDE.md:54, CLAUDE.md:161)</sub>
-- **[ÇEKİRDEK]** Token ön-okumasıyla insert arasında KAZANANIN yazdığını okuyan bir iş kuralı varsa (ör. "zaten aktif bordroda") token okuması `lockClientTokenTx` (8036, `hashtext(token)`) altında yapılır — kilitsiz okumada kaybeden deneme token'ı kaçırır ve replay yerine iş kuralı 409'u alır, panel token'ı bırakıp aynı denemeden ikinci kaydı kestirir. 8036 alınıyorsa tx'in İLK ifadesidir; K′ yolları 8036 ALMAZ, token okumasını yolun mevcut kilidinin arkasına koyar. · bekçi: `Teks-Erp/scripts/test_cek_bordro_taslak_token.ts` §4 ③c <sub>(arşiv:2026-09-26)</sub>
-- **[ÇEKİRDEK]** Token replay'i olan yolda kaybeden deneme HANGİ hatayla düşerse düşsün cevap token'dan gelir: ya 8036 tx'in ilk ifadesidir (K) ya da token her iş kuralından önce okunur ve tx hatasında yeniden okunur (R); replay gövde kapısı kimlik alanlarını karşılaştırır (farklı gövde 409 `CLIENT_TOKEN_COLLISION`). Yolun bekçisi yükle değil zorlanmış sırayla ölçer (`scripts/lib/zorlanmis-sira.ts`). · bekçi: `Teks-Erp/scripts/test_token_replay_zorlanmis_sira.ts` §1–§6 <sub>(arşiv: 2026-09-26 D1)</sub>
-- **[ÇEKİRDEK]** Token replay'i tek boğazdan geçer (`tokenReplay`, `helpers/token-replay.helper.ts`): politika find · alive (4. durum) · identity (≥1 kimlik alanı) · collision · respond taşır, kip çağrı yerinde seçilir (`run` R · `inTx` K · `behindLock` K′) ve boğaz önceki kaydı HAM döndürmez; token yazan/okuyan her birim `scripts/lib/token-replay-beyan.ts`te beyanlıdır (boğaz · helper · borç · kapalı muaf kümesi), borç sayısı yalnız düşer. · bekçi: `Teks-Erp/scripts/test_token_replay_bogaz.ts` (AST, cırcır) <sub>(arşiv: 2026-09-26 D2)</sub>
-- **[ÇEKİRDEK]** Mükerrer penceresi SUNUCU saatiyle değil operatörün bastığı anla (`Roll.clientEnteredAt`) ölçülür ve İKİ YÖNLÜ kurulur (since/until); damgası olmayan eski kayıt `createdAt`'e düşer. Tek yönlü `gte`, saati ileri kaymış cihazın satırlarını sonsuza dek ikiz gösterir. · bekçi: `Teks-Erp/scripts/test_kk1_duplicate_guard.ts` <sub>(CLAUDE.md:54)</sub>
+## Tuzaklar
 
-### Reçeteler
+- Token'ı mutate çağrısı başına üretmek korumayı tamamen boşa düşürür ve hiçbir hata vermez.
+- Timeout "yazılmadı" demek değildir; otomatik modda retry'da yeniden ölçmek metrajı değiştirip gereksiz 409 üretir.
+- Kilitsiz token ön-okumasında kaybeden deneme replay yerine iş kuralı 409'u alır; panel token'ı bırakır ve ikinci kaydı keser.
+- Uçuştaki iki basışı körü körüne birleştirmek sıradaki gerçek topu düşürür.
+- `NumpadHost` `autoActivate`'i aynı ekranda iki alana verilirse kazananı mount sırası belirler; metraj beklerken tuşlar En'i değiştirir. Modal içinde sayı girişi `NumpadInput` + `useNativeKeyboard` ister.
+- Makine içi sıralama satırı düşerse sürükleme DB'ye doğru yazar ama ekran değişmez: tek belirti "geri zıplıyor".
+- `listOpenCards` filtresini uygunlukla genişletme: tablet 5 sn'de bir yoklar, uygun olmayan adım listede kalıp sebebini kartta söylemelidir.
+- Her makine panelinin kendi `DndContext`'i vardır; makine değiştirmek sürükleme değil yeniden atamadır.
+- `GET /kursun-bypass/visibility` yalnız eski APK'lar için duruyor; Swagger'ındaki görünürlük kuralı bayattır, yeni yüzey ondan beslenmez.
+- Script çıkışında `$disconnect()` tek başına yetmez (havuz event loop'u 10 dk açık tutar); `process.exit(...)` ya da `$disconnect()` + `pool.end()`.
 
-- **[ÇEKİRDEK]** Yeni tarihli notu kök CLAUDE.md'ye YAZMA — tam metin `docs/history/CLAUDE-NOT-ARSIVI.md`'ye, köke yalnız `[ÇEKİRDEK]`/`[PROFİL]` etiketiyle BAŞLAYAN özet satırı. Bir alana dokunmadan önce arşivdeki TAM notu oku; kökteki satır 'dur ve arşive bak' tetiğidir. <sub>(CLAUDE.md:35)</sub>
+## Bekçiler
 
-## Backend
+test_kk1_entry_sources · test_istemci_token_uretimi · test_token_replay_bogaz · test_token_replay_zorlanmis_sira · test_cek_bordro_taslak_token · test_kk1_duplicate_guard · test_advisory_lock_namespaces · test_feature_flag_contract · test_initial_entry_quality · test_kursun_bypass · test_kursun_regime_lock · test_kursun_unassigned_close · test_kursun_machine_order · test_kursun_bypass_repoint · test_station_property_mode · test_permission_catalog · test_qc2_idempotency · istemci: entryAttempt.test.ts · attemptToken.test.ts · mutations.test.ts · announceFailure.test.ts · announceWire.test.ts · serverReachability.test.ts · BarcodeScannerView.test.tsx · deviceSettingsStore.test.ts · printQueue.test.ts · production-regime.test.ts · queue-reorder.test.ts · machine-tabs.test.ts
 
-
-### Değişmezler
-
-- **[ÇEKİRDEK]** Sayaç bazlı kartela düşümünün idempotency'si ayrı `SwatchStockReduction` olay modelindedir; token ondadır, `KartelaDispatch`'te BİLİNÇLİ olarak YOKTUR. <sub>(CLAUDE.md:171, CLAUDE.md:148)</sub>
-- **[ÇEKİRDEK]** SystemLog arşivi OTOMATİK (`jobs/archive-scheduler.ts`): start +60 sn, 24 saatte bir kontrol, 30 günde bir 6 aydan eskiyi taşır. Manuel `POST /api/admin/system-logs/archive {monthsToKeep:6}` yalnız acil disk baskısında (idempotent). <sub>(CLAUDE.md:282)</sub>
-- **[ÇEKİRDEK]** Rol (yetki şablonu) kataloğu üç parçalıdır: tek kaynak `constants/role-template-catalog.ts` + boot uzlaştırması (izin uzlaştırmasından SONRA, FK sırası) + mekanik bekçi. Rol SAYISINI koda/nota sabitleme — kanonik sayı dosyadadır. · bekçi: `Teks-Erp/scripts/test_role_template_catalog.ts` <sub>(CLAUDE.md:225)</sub>
-
-- **[ÇEKİRDEK]** İlk girişte kalite ÇİFT kolondur ve birlikte dolar/boşalır: verilen kod `qualityGrade` + `qualityGradeId` (katalog id'si, `resolveQualityGradeIdStrict`) olarak KOPYALANIR; alan yok · "" · whitespace üçü de NULL/NULL kalır ("Belirsiz" — sabit "1.KALITE" varsayılanı yazılmaz); bilinmeyen ve PASİF kod 400 ve top DOĞMAZ. Panel "Manuel Top Ekle" boş seçimi payload'dan düşürür (`"" → undefined`). · bekçi: `test_initial_entry_quality` (§1–§4, iki sonda) <sub>(d9 C2 bulgusu, 0c ölçtü 2026-09-14: kusur yok)</sub>
-
-### Tuzaklar
-
-- **[ÇEKİRDEK]** Script çıkışında `$disconnect()` TEK BAŞINA YETMEZ: havuzun `idleTimeoutMillis: 600_000`'i event loop'u 10 dk açık tutar, script 'bitti ama çıkmadı'da kalır (koşucu 180 sn'de SIGTERM → ZAMAN AŞIMI). İki geçerli kapanış: `process.exit(fail>0?1:0)` ya da `$disconnect()` + `pool.end()`. <sub>(CLAUDE.md:382)</sub>
-
-### Reçeteler
-
-- **[ÇEKİRDEK]** Uzun rapor basan scriptlerde `pool.end()` tercih edilir — `process.exit` boruya yazarken stdout'u kırpabilir. <sub>(CLAUDE.md:382)</sub>
-- **[ÇEKİRDEK]** Master Data CRUD için yeni kod yazma — `BaseController` + `BaseService` kullan (`searchFields` config'i yeterli). <sub>(CLAUDE.md:148)</sub>
-
-### Kararlar
-
-- **[PROFİL]** `kk1.duplicateGuardEnabled` varsayılan KAPALI (satır yoksa false) ve ENGELLEME değil ONAYLATMA: 409 `POSSIBLE_DUPLICATE` → `confirmDuplicate:true` ile geçilir (eşit metrajlı ardışık toplar meşru). `createInitialEntry`'de `opts.duplicateGuard` ile OPT-IN (F221) — dahili çağıran etkilenmez. · bekçi: `Teks-Erp/scripts/test_feature_flag_contract.ts` <sub>(CLAUDE.md:171)</sub>
-
-## Tablet (mobil)
-
-
-### Değişmezler
-
-- **[ÇEKİRDEK]** Retry, formu/makineyi YENİDEN OKUMAZ; düşen payload'ı birebir gönderir (otomatik modda yeniden ölçmek metrajı değiştirip gereksiz 409 üretir). <sub>(CLAUDE.md:171)</sub>
-- **[ÇEKİRDEK]** Çevrimdışı sebebi `'link'` ise uçuş kimliğini BIRAK (operatör çevrimdışı olduğunu biliyor, basışlar ayrı toplardır), `'server'` ise KORU (panik basışı olabilir). Ayrım ekrandaki bir `if`'te değil SAF katmanda (`shouldReleaseInFlight`) yaşar. · bekçi: `mobil/src/offline/entryAttempt.test.ts` <sub>(CLAUDE.md:54)</sub>
-- **[ÇEKİRDEK]** Çakışma 409'u (`POSSIBLE_DUPLICATE`/`CLIENT_TOKEN_COLLISION`) EKRAN VARKEN toast basmaz — tek yüzeyi ekranın modalıdır; ama EKRANSIZ replay'de (kuyruktan diriltilen kayıt) DUYURULUR, yoksa 409 hiçbir yerde görünmez ve fiziksel top sistemde doğmaz. Belirsizlikte DUYUR. · bekçi: `mobil/src/offline/announceWire.test.ts` <sub>(CLAUDE.md:59)</sub>
-- **[ÇEKİRDEK]** Toast metni 'kayıt oluşmadı' DİYEMEZ — zaman aşımında sunucu COMMIT etmiş olabilir. Metin ÖNCE doğrulatır: '… Listede yoksa tekrar girin.' · bekçi: `mobil/src/offline/announceFailure.test.ts` <sub>(CLAUDE.md:59)</sub>
-- **[ÇEKİRDEK]** `useNativeKeyboard` sistem decimal-pad'ini açar VE virgül→nokta normalizasyonunu korur ('40,5' → 40.5). <sub>(CLAUDE.md:332)</sub>
-- **[ÇEKİRDEK]** Çok top okutan YÜZEY `trigger="tap"` kullanır (kamera kendiliğinden okumaz); tek okuyup kapanan yüzey `auto` kalır. Ölçüt EKRAN ADI DEĞİL YÜZEY — KK1'in etiket-doğrulama tarayıcısı da tap. Sorun 'yanlış okuma' değil 'İSTENMEDEN okuma'dır. · bekçi: `mobil/src/components/BarcodeScannerView.test.tsx` <sub>(CLAUDE.md:415)</sub>
-- **[ÇEKİRDEK]** Metraj kaynağı (elle ↔ makineden oku) ekran state'i değil CİHAZ ayarı: `kk1ManualEntry` + `tamburCutMode`; ömür OTURUM değil CİHAZ (operatör değişse de kalır). Diskteki BOZUK değer güvenli varsayılana düşer; setter ÖNCE state'i SONRA diski yazar. · bekçi: `mobil/src/store/deviceSettingsStore.test.ts` <sub>(CLAUDE.md:365, CLAUDE.md:379)</sub>
-
-### Yasaklar
-
-- **[ÇEKİRDEK]** `onMutate`'te yeşil 'kaydedildi' basma — operatörü tekrar basmaya davet eder. Online'da nötr 'Kaydediliyor…', yeşil yalnız operatörün BEKLEDİĞİ deneme onaylanınca (`onSuccess`). <sub>(CLAUDE.md:54)</sub>
-- **[PROFİL]** Kalıcı düşen istasyon kaydı ANLIK TOAST ile duyurulur (`announceFailure`) ve HİÇBİR kalıcı kuyruğa/kutuya yazılmaz. Ölü mektup kutusunu (`failedOps` + `OutboxModal` + `retryFailedOp`) geri getirme — iki bambaşka olayı tek kırmızı başlıkta topluyordu. · bekçi: `mobil/src/offline/announceFailure.test.ts` <sub>(CLAUDE.md:59)</sub>
-- **[ÇEKİRDEK]** Kalıcı düşüş köprüsü `MutationCache.onError`'da kalır; `setMutationDefaults`'a TAŞINAMAZ — component `onError` onu ezer (query-core option sırası) ve kayıt 'bazen' yakalanır. · bekçi: `mobil/src/offline/mutations.test.ts` <sub>(CLAUDE.md:59)</sub>
-- **[ÇEKİRDEK]** `NumpadHost` `autoActivate`'i aynı ekranda yalnız TEK alana ver — ikisine birden verilirse kazananı MOUNT SIRASI belirler ve operatör metraj beklerken tuşlar sessizce En'i değiştirir. <sub>(CLAUDE.md:56)</sub>
-
-### Tuzaklar
-
-- **[ÇEKİRDEK]** 5xx 'sunucuya ulaşılamadı' DEĞİLDİR — yanıt geldiyse sunucu cevap vermiştir. Çevrimdışı hükmü yalnız bir isteğin YANITSIZ düşmesiyle verilir (link AND erişilebilirlik); aksi hâlde tek hatalı uç tüm kuyruğu durdurur. · bekçi: `mobil/src/offline/serverReachability.test.ts` <sub>(CLAUDE.md:54)</sub>
-- **[ÇEKİRDEK]** Sunucu yoklama adresi HER çağrıda canlı okunur (`getCurrentBaseUrl`), derleme zamanı sabitine bağlanmaz; ayrıca elle 'Şimdi dene' (`revalidateServer`) ve adres değişince otomatik yeniden değerlendirme bırakılır — yoksa uygulama asla çevrimiçiye dönmez. · bekçi: `mobil/src/offline/serverReachability.test.ts` <sub>(CLAUDE.md:59)</sub>
-- **[ÇEKİRDEK]** Modal içinde sayı girişi `NumpadInput` + `useNativeKeyboard`: büyük numpad bir `NumpadHost` ister, modalda host yoktur, tuşlar görünmez kalır. FAIL-SOFT yalnız Provider HİÇ YOKKEN devreye girer (`nativeMode = useNativeKeyboard || numpad === null`) — bayrak hâlâ zorunlu. <sub>(CLAUDE.md:332)</sub>
-
-### Reçeteler
-
-- **[ÇEKİRDEK]** İstemci uçuş penceresi `INFLIGHT_REUSE_WINDOW_MS = 90_000` ve backend penceresiyle BİLEREK AYNIdır: uçuşta AYNI yük gelirse uçuştaki kimliği (token + damga) yeniden kullan, FARKLI yük gelirse yeni top say. Körü körüne collapse etmek sıradaki GERÇEK topu düşürür. · bekçi: `mobil/src/offline/entryAttempt.test.ts` <sub>(CLAUDE.md:54)</sub>
-- **[ÇEKİRDEK]** Picker'dan seçenek eklenebiliyorsa tetik listenin İLK hücresindeki `leadingAction` kartıdır (diğer kartlarla aynı geometri, `colors.action` mor zemin — marka indigo'su 'seçili kart' vurgusudur); basılınca picker KAPANMAZ, asıl form `quickAddSlot`'ta açılır. Listenin üstüne ayrı outlined buton KOYMA. <sub>(CLAUDE.md:315)</sub>
-- **[ÇEKİRDEK]** Ölçüm aleti varsa okuma TEK DOKUNUŞ olmalı: ⚖ → oku → DOĞRUDAN kaydet → kartta göster. Araya input modalı KOYMA (operatörün eli maldadır); yanlışsa tekrar basar, idempotent üzerine yazar. <sub>(CLAUDE.md:327)</sub>
-
-### Kararlar
-
-- **[PROFİL]** Yazıcı kuyruğu (`printQueue`) DURUYOR ve kaldırılmaz — 'top KAYITLI, etiketi çıkmadı' ayrı ve KALICI bir yüzeydir; kayıt kuyruğuyla aynı kefeye koyma. · bekçi: `mobil/src/offline/printQueue.test.ts` <sub>(CLAUDE.md:59)</sub>
-- **[PROFİL]** Cihaz ayarı varsayılanları: KK1 manuel giriş KAPALI, Tambur kesim modu MANUEL. · bekçi: `mobil/src/store/deviceSettingsStore.test.ts` <sub>(CLAUDE.md:379)</sub>
-
-## Geçersiz kılınan kurallar — bunlara UYMA
-
-- **KISMI** `R:2026-07-14__idempotency-2026-07-14` → `R:2026-08-05__2026-08-05-kk1-mukerrer-korumasi`: Mükerrer tuzağının UYGULAMASI değişti: ikiz sorgusu tx DIŞINDA ve kilitsizdi (TOCTOU), pencere SUNUCU saatiyle ölçülüyordu. Artık guard tx İÇİNDE, tx'in İLK ifadesi pg_advisory_xact_lock(8021,hashtext(key)) ve pencere Roll.clientEnteredAt ile İKİ YÖNLÜ. Sözleşme (90 sn, aynı operatör/makine, onaylatma) aynı kaldı. ✅ çürütmeden geçti
-- **KISMI** `R:2026-08-05__2026-08-05-kk1-mukerrer-korumasi` → `R:2026-08-12__2026-08-12-kayit-kuyrugu-kaldirildi`: Kalıcı düşüşün VARIŞ NOKTASI değişti: 08-05'te MutationCache köprüsü kalıcı 'ölü mektup kutusuna' (failedOps + OutboxModal + retryFailedOp) yazıyordu; kutu SİLİNDİ, yerine anlık toast (announceFailure) geçti. Köprünün kendisi (MutationCache.onError) DURUYOR — setMutationDefaults'a taşınamaz kuralı da aynen geçerli. ✅ çürütmeden geçti
-- **KISMI** `R:2026-08-12__2026-08-12-kayit-kuyrugu-kaldirildi` → `KOD 68486d3b (2026-08-29) — mobil/src/offline/announceFailure.ts`: 'Çakışma 409'ları (POSSIBLE_DUPLICATE/CLIENT_TOKEN_COLLISION) toast BASMAZ — tek yüzey modal' kuralı DARALTILDI: modal yalnız kaydı yapan ekran ayaktayken çizilebilir; uygulama kapanıp açılınca kuyruktan replay edilen kaydın ekranı yoktur → çakışma da DUYURULUR (ekranYok). Belirsizlikte duyur. Kök CLAUDE.md:59 hâlâ eski mutlak hâli yazıyor. ✅ çürütmeden geçti
-- **KISMI** `B:undated__78-model-35-enum-idempotency-katmani` → `KOD ÖLÇÜMÜ (2026-09-05) — Teks-Erp/prisma/schema.prisma`: Envanter rakamları ve idempotency kapsamı bayat: '~78 model, ~35 enum' → 124 model / 68 enum; 'clientToken (Roll/Order/WorkOrder)' → 15 model (Roll, Order, WorkOrder, SubcontractorReceipt, SwatchStockReduction, Sack, Shipment, ImportRun, WarehouseTransfer, GoodsReceipt, Invoice, Payment, CashTransaction, Cheque, PurchaseOrder). Kuralın kendisi (kolon @unique) geçerli. ✅ çürütmeden geçti
-- **KISMI** `M:2026-08-05__cok-top-okutan-her-ekran` → `KOD (mobil/src/screens/Modules/KK1/KK1Screen.tsx:2347)`: Notun parantezi 'Tek okuyup kapanan ekranlar (KK1 / Tambur / Kartela / refakat kartı) auto kalır' KK1 için artık yanlış: KK1'in etiket-doğrulama (scan-back) tarayıcısı continuous + trigger="tap". Kuralın kendisi geçerli — ölçüt EKRAN ADI değil YÜZEY: çok-okutmalı yüzey tap, tek okuyup kapanan auto. ✅ çürütmeden geçti
-- **KISMI** `M:undated__modal-icinde-sayi-girisi` → `KOD (mobil/src/components/NumpadInput.tsx:67-71)`: 'Modalda host yoktur, tuşlar görünmez kalır' artık TAM doğru değil: NumpadInput FAIL-SOFT — Provider hiç yoksa (numpad === null) sistem klavyesine düşer. Ama fail-soft yalnız PROVIDER yokken devreye girer; Provider var / Host çizilmemişse tuşlar yine görünmez → useNativeKeyboard bayrağı hâlâ zorunlu, 'tek savunma hattı' olmaktan çıktı. ✅ çürütmeden geçti
-
-## Açık sorular
-
-- NumpadModalHost (NumpadProvider.tsx:161) export edilmiş ama HİÇBİR çağıranı yok (git grep → yalnız tanım). Telefon-landscape numpad yolu ölü mü, planlı mı BELİRSİZ; 'modal içinde NumpadInput' kuralına etkisi ölçülemedi.
-- kök CLAUDE.md:105 ve :107 aynı tarihli/aynı konulu iki 'Süperadmin doğuşu P8' satırı taşıyor (:107 :105'in alt kümesi). Hangisinin silineceği süperadmin kümesinin kararı — bu kümede çözülmedi.
-- R:2026-08-12 kayıt kuyruğu notundaki 'toast metni kayıt oluşmadı DİYEMEZ' kuralının ekransız çakışma dalındaki güncel metni okunmadı (failureToastText'in ilk dalı kısaltılmış görüldü); metin sözleşmesinin bugünkü tam hâli doğrulanmadı.
-
-## Bekçiler — bu alana dokununca koş
-
-`cd Teks-Erp && npx tsx scripts/run-all-tests.ts <ad-parçası>` (tek testte tip kapısı atlanır) · Electron `npx vitest run <yol>` · mobil `npx jest <yol>`.
-
-**Ne ölçtükleri, DB gerektirip gerektirmedikleri ve bayatlık işaretleri: `Teks-Erp/docs/BEKCI-HARITASI.md` → bu alanın bölümü.** ⚠️ = orada gerekçesi yazılı bayatlık şüphesi.
-
-Backend: `test_barcode_reservation`, `test_initial_entry_quality`, `test_istemci_token_uretimi`, `test_kk1_entry_sources`, `test_depo_roll_cancel_permission`⚠️, `test_duplicate_rolls`, `test_e2e_full_flow`, `test_item_quick_create`, `test_kk1_duplicate_guard`, `test_kk1_weight_flag`, `test_master_data_merge_race`, `test_p1b_barcode_collision`⚠️, `test_roll_barcode`, `test_roll_entry_station`, `test_semi_finished_entry`, `test_tambur_manual_produce`, `test_token_replay_bogaz`, `test_token_replay_cancelled`, `test_token_replay_d3_yollari`, `test_token_replay_d5_yollari`, `test_token_replay_kimlik_tablosu`, `test_token_replay_zorlanmis_sira`, `test_work_session_stamping`
-
-İstemci: `attemptToken.test.ts`, `fason-receive-attempt.test.ts`, `BarcodeScannerView.test.tsx`, `PickerModal.test.tsx`, `SyncStatusChip.test.tsx`, `rollHistoryFilter.test.ts`, `duplicateEntryChoice.test.ts`, `useReasonPresets.test.tsx`, `announceFailure.test.ts`, `announceWire.test.ts`, `backoff.test.ts`, `barcode.test.ts`, `deadline.test.ts`, `entryAttempt.test.ts`, `flushThenLogout.test.ts`, `mutations.test.ts`, `persistPolicy.test.ts`, `printQueue.test.ts`, `serverReachability.test.ts`, `sessionSwitch.test.ts`, `receiveAttempt.test.ts`, `EntryConflictModal.test.tsx`, `appUpdate.service.test.ts`, `sessionEntriesStore.test.ts`, `queryState.test.ts`
-
-## Arşiv notları (tam metin, gerekçe ve ölçüm)
-
-- 2026-08-05 · 2026-08-05 — KK1 mükerrer top koruması TAMAMLANDI: guard atomik + pencere OPERATÖRÜN saatiyle + "sunucu ölü" a — `CLAUDE-NOT-ARSIVI.md:151-162`
-- 2026-08-12 · 2026-08-12 — KAYIT KUYRUĞU KALDIRILDI: kalıcı düşüş artık DUYURULUR, saklanmaz + KK1'de tek kırmızı yüzey — `CLAUDE-NOT-ARSIVI.md:214-225`
+Gerekçe ve ölçüm hikâyesi: eski sürüm history dizininde.

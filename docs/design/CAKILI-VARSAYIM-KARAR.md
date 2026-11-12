@@ -3,7 +3,7 @@
 > **Durum: KARARLAR ONAYLI (yönetici, 2026-09-13), UYGULAMA BAŞLAMADI.**
 > Bulguların kendisi `CAKILI-VARSAYIM-TARAMA.md`'de.
 >
-> Her karar dörtlü merdivenden geçti (`docs/kurallar/modul-bayrak.md`):
+> Her karar dörtlü merdivenden geçti (`docs/history/kurallar-2026-09/modul-bayrak.md`):
 > ① [ÇEKİRDEK] → ② VERİ → ③ AKSİYON ANINDA SEÇİM → ④ [PROFİL] BAYRAK.
 > **Yedi kararın sonucu: SIFIR yeni bayrak.**
 >

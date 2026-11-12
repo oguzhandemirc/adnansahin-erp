@@ -187,9 +187,7 @@ kanalla mı üretilmiş), derleme sonrası (APK'nın kendi kimliği), paket üre
 imza kanalın, çıktı kanala ayrı klasörde), yayın (APK paket adı · manifestteki varlık adresleri ·
 bundle'daki ERP adresi ↔ `--musteri`). Sonuncusu künyeye DEĞİL artefakta bakar.
 
-Hazırlık kanalı (`testfabrika`) tabletin durum çubuğu şeridinde **"TEST FABRİKA"** gösterir
-(kayıttaki `gorunurEtiket`; üretim kanalında alan hiç doğmaz). Test sürücüsü:
-`node scripts/surucu/guzergah.mjs --kanal=testfabrika …` (paket adı kayıttan).
+Tek kanal `adnansahin` (hazırlık kanalı ve terfi kapısı yok); sahaya yayın yalnız kullanıcının o sürüm için açık onayıyla.
 
 ---
 
@@ -223,7 +221,7 @@ yayınla. Tersi, tabletleri indirecek bir şey olmadan kilitler.
 | Anahtar | Yer | Kaybının bedeli |
 |---|---|---|
 | **Mühür** (APK imzası) | `mobil/keystore/tekserp-release.keystore` + `.properties` | Her tablette uygulama **silinip yeniden kurulur** |
-| **Kod imzalama** (paket imzası) — kanal başına | `mobil/keystore/ota-keys/private-key.pem` (adnansahin) · `mobil/keystore/ota-keys-testfabrika/private-key.pem` (testfabrika) | O kanalın uzaktan güncellemesi durur; yeni sertifikayla **yeni APK** gerekir |
+| **Kod imzalama** (paket imzası) — kanal başına | `mobil/keystore/ota-keys/private-key.pem` (adnansahin) | O kanalın uzaktan güncellemesi durur; yeni sertifikayla **yeni APK** gerekir |
 
 İkisi de `keystore/` altında ve git dışında. **Yedekleri şifreleriyle birlikte repo dışında
 saklanmalı.** İmza `plugins/withReleaseKeystore.js` ile her prebuild'de yeniden yazılır

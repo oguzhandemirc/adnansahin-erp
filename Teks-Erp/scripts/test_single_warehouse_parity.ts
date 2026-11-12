@@ -185,7 +185,7 @@ async function main(): Promise<void> {
   // > 1` idi; ikinci depo açan herkes yüzeyleri de açmış oluyordu ve backend'de
   // karşılığı yoktu. Bugünkü tek kaynak `depo.multiEnabled` modül anahtarıdır ve
   // transfer uçlarındaki `requireDepoMultiEnabled` AYNI değeri okur — "karo var
-  // ama uç 403" ayrışması imkânsız (docs/kurallar/modul-bayrak.md).
+  // ama uç 403" ayrışması imkânsız (docs/kurallar/yetki-izin.md).
   check(
     "§4b multiWarehouse kararı modül BAYRAĞINDAN okunuyor (uçla tek kaynak)",
     hook.includes("useFeatureFlags") && hook.includes("depoMultiEnabled"),

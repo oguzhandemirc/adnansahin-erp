@@ -5,7 +5,7 @@
 > (mobil / Electron) kaynağı yoktu. Backend tarafı ölçüldü ve kesin; istemci
 > tarafı **çıkarım**, doğrulaması sizde.
 >
-> ⚠️ **Durum (2026-09-05):** Bulgu **B** ve **C** 2026-09-04'te KAPANDI (cihaz onay kapısı bayraktan türer; keşif "bir satır = bir sunucu" — `docs/kurallar/kesif-cihaz.md`). §0'daki `appVersion` önerisi **UYGULANMADI**: `schema.prisma`'da `appVersion`/`clientVersion` kolonu yok; istemci sürümü bugün yalnız `client-version-policy` ekseninde yaşıyor.
+> ⚠️ **Durum (2026-09-05):** Bulgu **B** ve **C** 2026-09-04'te KAPANDI (cihaz onay kapısı bayraktan türer; keşif "bir satır = bir sunucu" — `docs/history/kurallar-2026-09/kesif-cihaz.md`). §0'daki `appVersion` önerisi **UYGULANMADI**: `schema.prisma`'da `appVersion`/`clientVersion` kolonu yok; istemci sürümü bugün yalnız `client-version-policy` ekseninde yaşıyor.
 >
 > **Repo hedefi önerisi:** `docs/ops/ISTEMCI-BULGULARI-2026-09-04.md`
 

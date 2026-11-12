@@ -106,6 +106,11 @@ export function bekciAlanlari(dosyalar: Map<string, string>): BekciAlani[] {
         if (kapanis >= 0) out.push({ dosya, satir: i + 1, icerik: parca.slice(0, kapanis), tamSatir: s });
         from = bas;
       }
+      // Yeni biçim (kural dosyaları 2026-11-12'de yeniden yazıldı): satır sonu
+      // zorlama etiketi `[bekçi: ad · ad]`; içerik kapanan köşeli paranteze kadar.
+      for (const m of s.matchAll(/\[bekçi: ([^\]]+)\]/g)) {
+        out.push({ dosya, satir: i + 1, icerik: m[1].trim(), tamSatir: s });
+      }
     });
   }
   return out;

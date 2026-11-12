@@ -2,7 +2,7 @@
 
 > **Durum:** PLAN + inen dilimler karışık. Her bölüm neyin BUGÜN doğru, neyin HEDEF olduğunu
 > kendi başlığında söyler — bu belgeyi okuyup "öyleyse kodda da böyledir" diye varsaymayın.
-> Kural satırları `docs/kurallar/fason.md` ve `docs/kurallar/finans.md`de; burada GEREKÇE ve ÖLÇÜM var.
+> Kural satırları `docs/kurallar/fason.md` ve `docs/history/kurallar-2026-09/finans.md`de; burada GEREKÇE ve ÖLÇÜM var.
 > Faz kararı: kullanıcı, 2026-09-17. Faz kapısı aşağıda (§6) — **saha dump'ının taze kopyasında
 > prova yeşil olmadan paket YOK.**
 

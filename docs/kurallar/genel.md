@@ -1,95 +1,68 @@
-# Genel · Uzak erişim · Konvansiyon
+# Genel, uzak erişim, keşif ve cihaz
 
-> Alan kural dosyası — bu alana dokunmadan ÖNCE okunur. Kaynak: anlama turu 2026-09-05 (kök `CLAUDE.md` + `docs/history/CLAUDE-NOT-ARSIVI.md` notlarından ayrıştırıldı). Hikâye, ölçüm ve gerekçe arşivde; burada yalnız bugün geçerli kural. Sınıf: **[ÇEKİRDEK]** her kurulumda aynı · **[PROFİL]** bu fabrikanın seçimi.
+Birden çok alanı kesen konvansiyonlar (audit, katman sırası, hata/mesaj sözleşmesi), uzak erişim (Cloudflare tüneli, uzak/LAN ayrımı, TOTP), sunucu keşfi, cihaz onayı ve donanım (kantar, metre, yazıcı). Kod: `Teks-Erp/src/middlewares/` (remote-access, web-hardening, client-info), `Teks-Erp/src/server.ts`, `Teks-Erp/src/services/audit*`, `Electron/shared/discovery.ts`, `Electron/electron/` (ipc, discovery), `mobil/src/lib/discovery.ts`, `mobil/src/services/` (discovery, hal), `mobil/src/navigation/pairingGate.ts`.
 
-> Hakem notu: 6 üye: 1 tarihli not (2026-09-01 patron/uzak erişim, CANLI ve koddan doğrulandı) + 5 tarihsiz sözleşme satırı (izinli npm paketleri, yeni-uç kontrol listesi maddesi, Electron dizin ağacı, audit sözleşmesi, TR mesaj kuralı). Küme tematik değil ARTIK kümesidir; ortak konu yok, bu yüzden ezilme zinciri de yok. İki bayatlık ölçüldü: ① audit satırındaki '/health sayacına düşer' — sayaç /api/admin/health'e taşınmış (app.ts:606-608, 722, 922); ② Electron ağacında route haritası router.tsx'te değil src/routes/content-routes.tsx'te. EN RİSKLİ ÇELİŞKİ: backend kontrol listesindeki 'tünelde 404' cümlesi — modül kapısı KODDA koşulsuz 403 (module.middleware.ts:76-81 '403 (404 değil)') ve bekçi de 403 bekliyor; cümle yeni uç yazan kişiyi yanlış davranışa iter, silinmeli.
+## Kurallar
 
+### Konvansiyon ve audit
+- Her CUD `AuditService.log()` ile yazılır; istisna yalnız `AUDIT_EXEMPT_MODELS`te kapalı sınıf kümesinden biriyle beyanlıdır, beyansız sessizlik kırmızıdır. [bekçi: test_audit_muafiyeti]
+- Audit best-effort ve transaction DIŞINDADIR; hata isteği düşürmez, sayacı `/api/admin/health`tedir — `/health`in alan kümesi dondurulmuştur. [inceleme]
+- Audit yalnız ayak izidir: çalışan kod `SystemLog`dan karar, sayı, durum ya da join türetmez; okuyabilen yalnız insana gösteren yüzeylerdir. [bekçi: test_audit_okuma_kaynagi]
+- Katman sırası Routes → Controllers → Services → Prisma; route/controller `lib/prisma` import etmez. [lint]
+- P2002'nin hangi kolondan geldiği yalnız `src/utils/p2002.ts` yardımcılarıyla okunur; `meta.target` doğrudan okunmaz (pg adaptörü onu vermez). [bekçi: test_p2002_hedef_tek_kaynak]
+- Validation mesajları Türkçedir; i18n kurulmaz. [inceleme]
+- Firma adı koda gömülmez: ekran, belge ve etiket bağlanılan sunucunun `company.name` ayarını okur, yedek nötr `DEFAULT_COMPANY_NAME`dir. [bekçi: test_musteri_adi_kodda_yok]
+- Backend'e yeni npm paketi kullanıcı onayı olmadan eklenmez; önce "kendin yaz" denenir. `bonjour-service` `1.4.4` sabit (`^` yok) kalır, tembel `require` + try/catch ile yüklenir ve Electron'da `dependencies`te durur. [bekçi: discovery-ipc-contract.test.ts]
+- İndirilen içe aktarım şablonunun başlığı dondurulmuş sözleşmedir: mevcut sütun adı değiştirilmez, bilgi yeni sütunla eklenir. [inceleme]
+- Ölü kumanda yasak: o kurulumda etkisiz olan ayar panelde düzenlenebilir görünmez, devre dışı bırakılıp sebebi yazılır; uç ile zamanlayıcı aynı yüklemi kullanır. [bekçi: test_backup]
+- Offsite yedek hedefi göreli olamaz (`isAcceptableTarget`): yazarken 400, okurken `configured:false`; aynı makinedeki hedef işaretlenir. [bekçi: test_offsite_sweep]
+- Hedefi ancak iş koşunca bilinen kontrol, uyarısını açılışta tahminle değil o koşumdan basar. [bekçi: test_offsite_sweep]
+- Node süreç uyarıları yığın iziyle log'a düşer (`lib/process-warnings.ts`); canlıda `--trace-deprecation` için yeniden başlatılmaz. [bekçi: test_process_warnings]
+- Electron `webPreferences`: `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`; renderer `electron`/`fs`/`path`/`child_process` import etmez, native API'ye yalnız `window.api` ile ulaşır. [inceleme]
+- Electron renderer'ında token localStorage'a yazılmaz (`safeStorage` + `electron-store`); tek istisna `window.api` olmayan web derlemesidir. [inceleme]
+- Süperadmin kapısı yalnız `Electron/src/lib/superadmin-gate.ts`ten import edilir, kopyası yazılmaz. [inceleme]
 
-## Ortak (backend + panel + tablet)
+### Uzak erişim
+- Uzak/LAN ayrımı soketten (`req.socket.localPort`) çözülür; `clientType` güvenlik sınırı değildir, soket okunamazsa istek LAN sayılır. [bekçi: test_remote_access_guard]
+- Tünel dinleyicisi yalnız `127.0.0.1`e bağlanır, `0.0.0.0`a açılmaz; iki dinleyici aynı process'tir, ikinci Node süreci açılmaz. [bekçi: test_remote_access_guard]
+- Uzakta kapalı yollar (PIN/kart girişi, `mobile-users`, `/api/devices`, `/api/discovery`, `/api/mobile`, `/api-docs`) 404 döner, 403 değil; modül kapısı ise her yerde 403 `MODULE_DISABLED`dır. [bekçi: test_remote_access_guard]
+- Uzak `/api` isteğinde Cloudflare Access JWT fail-closed'dır; JWKS önbelleğinde TTL tazeliktir — bayat anahtar döner ve tazelenir, hiç dolmadıysa reddedilir. [bekçi: test_remote_access_guard]
+- `CLIENT_IP_HEADER` yalnız uzak istekte okunur, `TRUST_PROXY` app-wide açılmaz (LAN'dan sahte `CF-Connecting-IP` giriş kilidini deler). [bekçi: test_remote_access_guard]
+- `quickPin` 6 hane, düz metin, sistem genelinde `@unique` ve tek başına kimliktir; log, sürüm notu, audit yükü ve uzak uçtan sızmaz. [bekçi: test_remote_access_guard]
+- TOTP kurulumu yalnız yöneticinin açtığı 15 dakikalık tek kullanımlık pencereden yapılır; ikinci faktör `issueToken`den önce koşar. [bekçi: test_totp]
+- helmet iki ayrı örnek kurulur (HSTS LAN'a sızmaz) ve dispatcher fonksiyonunun adı `helmetMiddleware`dır. [bekçi: test_middleware_order]
+- `X-Client-*` künye başlıkları hiçbir kapıya girmez; yalnız gözlem olarak `Session.clientVersion`a yazılır, dolu satır değişmez. [bekçi: test_client_registry]
+- `GET /api/boss/overview` izin süzmesini serviste yapar (yetkisiz bölümün sorgusu koşmaz) ve yeni izin kodu açmaz. [bekçi: test_boss_overview]
 
+### Keşif ve cihaz
+- Keşifte bir satır = bir sunucu: tekilleştirme `installationId` ile (`groupByInstallation`), önce tekilleştir sonra sırala. [bekçi: discovery-logic.test.ts]
+- Keşif kuralı `KEŞİF-İKİZ` bloğunda tek metin olarak Electron ve mobilde birebir durur; biri değişirse öbürü aynı commit'te değişir. [bekçi: discovery.contract.test.ts]
+- `DISCOVERY_PORTS = [4000, 5000, 3000, 8080]` tek kaynaktır, varsayılan port ondan türer; yedek portlar yalnız mDNS + varsayılan port sıfır aday verirse ve bulunan ilk portta durarak taranır. [bekçi: discovery-logic.test.ts]
+- Yedek portta kimlik zorunludur (`identityRequiredForPort`); çıplak `/health` `UP` aday saymaya yetmez. [bekçi: discovery-logic.test.ts]
+- Mobilde yedek portlar yalnız kullanıcının "Ağda Ara" yolunda açılır; arka plan self-heal turu açmaz. [bekçi: discovery.service.test.ts]
+- Yeni cihazın doğuş durumu `devicePairingRequired`dan türer (kapalıysa APPROVED); bayrak sonradan açılınca onaylı cihaz düşürülmez, PENDING ya da revoke edilmiş cihaz APPROVED'a yükselmez. [bekçi: test_device_pairing_flag]
+- Cihaz onayı kararını sunucu verir; mobilde tek yüklem `navigation/pairingGate.ts`, oradaki `??` `||`'ya çevrilmez. [bekçi: pairingGate.test.ts]
+- Bluetooth tek sokettir: okuma sürerken ikinci dokunuş `busyRef` ile sessizce yok sayılır, ikinci bağlantı açılmaz. [inceleme]
+- Backend'e seri port / donanım polling girmez; sürücüler istemcide yaşar (Electron main IPC, mobil HAL), simülasyon per-cihaz `PeripheralDevice.simulate` verisidir. [inceleme]
+- Donanım fail-closed: cihaz yok / okunamadı / değer ≤ 0 → net Türkçe toast, mutasyon çağrılmaz, varsayılana sapılmaz. [bekçi: useSackWeigh.test.tsx]
+- Uydurulmuş değer `source:'SIMULATED'` beyanıyla gider ve kararı backend verir (`shipping.simulatedWeightEnabled` kapalıyken 400); elle giriş `MANUAL`dır. [bekçi: test_sack_weigh_source]
+- Kamera `initialFacing` verildiğinde cihaz tercihi ne okunur ne yazılır. [bekçi: BarcodeScannerView.test.tsx]
+- Kısa kesim → otomatik A1 kuralının tamamı `shortCutQuality.ts`te, geçerli ayarın tek cevabı `resolveShortCutConfig`tedir; kopyalanmaz. [bekçi: shortCutQuality.test.ts]
+- Mobil modal primitifi `AppModal`dır; `react-native-modal` geri getirilmez, `SimplePortal`ın mikrotask ertelemesi kaldırılmaz. [inceleme]
 
-### Değişmezler
+## Tuzaklar
+- `X-Client-*` göndermeyen eski istemci de envanterde görünür (sürüm User-Agent'tan, `declared:false`); `okhttp` sürümü uygulama sürümü değildir.
+- Kapanış 5 sn zorla-çıkışa düşerse log fazı ve açık bağlantı sayısını basar; asılı istek erişim log'unda iz bırakmaz.
+- Electron route haritası `src/router.tsx`te değil `src/routes/content-routes.tsx`tedir.
+- `BossShell` sekme sistemini atlar ama router altyapısını kullanır; kendi memory router'ını kurmak geri okunu ve modal portalını sessizce bozar.
+- Ekran manifestosu okunamazsa "gizlenecekler" listesi hiç çizilmez; boş liste "hiçbir şey gizlenmez" yalanıdır.
+- `ModalTextInput`ta eşitleme koşulu `value` prop'unun değişmesidir, "taslaktan farklı olması" değil.
+- Komut kancası (`bash-guard.mjs`) yasağı yalnız çalıştırılan kabuk komutunda arar; dosyaya yazılıp çalıştırılan script kapsam dışıdır. Kanca yolu göreli yazılırsa kanca sessizce ölür.
+- Yeni ekran görünmüyorsa sırayla bak: izin satırı DB'de mi, kullanıcıya atanmış mı, kullanıcı yeniden giriş yaptı mı (JWT bayat).
 
-- **[ÇEKİRDEK]** İstemci envanteri künyesini BİLDİREMEYENİ de listeler: `X-Client-*` yoksa sürüm User-Agent'tan çıkarılır (yalnız Electron; `okhttp` KÜTÜPHANE sürümüdür, uygulama sanılmaz) ve satır `declared:false` damgası taşır — ekran çıkarımı beyan gibi göstermez. Görülmesi en gereken istemci, kendini tanıtamayacak kadar eski olandır. · bekçi: `scripts/test_client_registry.ts §5` <sub>(arşiv:2026-09-10 künyesiz istemci)</sub>
-- **[ÇEKİRDEK]** Künye başlığı (`X-Client-*`) hiçbir kapıya girmez ve bu ÜÇ KOLLU ölçülür — başlık ADI · `CLIENT_INFO_HEADERS` SABİTİ (import kaçağı) · değeri dışarı taşıyan tek fonksiyonun BEYANLI okuyucuları, ki o okuyucularda değer bir koşula/atmaya giremez. Değer kalıcı bir satıra (`Session.clientVersion`) yazılabilir, çünkü orada bir GÖZLEMdir: yetki kazandırmaz ve eksikliği güvenli yöndedir (başlığı göndermeyen istemci NULL bırakır, "temiz" değil "ÖLÇÜLEMEDİ" sayılır). Sürüm login ANINDA yazılır ve sonraki isteklerde YALNIZ NULL'dan doluya tamamlanır (panel sürümü asenkron okuyor, ilk istek sürümsüz gidebilir); dolu satır ikinci bir sürümle DEĞİŞMEZ — bir oturum tek istemciye aittir. · bekçi: `scripts/test_client_registry.ts §1/§1b/§1c/§4b`, `scripts/test_session_registry.ts §9` <sub>(arşiv:2026-09-17 oturum sürümü)</sub>
-- **[ÇEKİRDEK]** Kapanış 5sn'lik zorla-çıkışa düşerse log FAZI ve AÇIK BAĞLANTI SAYISINI basar (bağlantı > 0 → asılı istek, 0 → zincir fazın kendisinde durmuş); tek cümlelik "tamamlanmadı" YETMEZ. Sebep erişim log'undan ÇIKARILAMAZ — o, isteği yalnız BİTTİĞİNDE yazar, asılı istek hiç iz bırakmaz. <sub>(arşiv:2026-09-10 prod log ③)</sub>
-- **[ÇEKİRDEK]** Komut kapısı (`scripts/claude-hooks/bash-guard.mjs`) yasağı ÇALIŞTIRILACAK KOMUTTA arar, yazılan/aranan METİNDE değil: komut ayıraçlara (tırnak farkındalıklı) bölünür, tamamı metin aracı olan boru hatları atlanır, heredoc gövdesi ancak ALICISI onu çalıştırmıyorsa (`cat`/`tee`/`git commit`/yorumlayıcı) veri sayılır — `psql <<EOF` ve `bash <<EOF` beyaz listede DEĞİLDİR. ⚠️ KAPSAM: kabuk komutu incelenir, PROGRAM DAVRANIŞI incelenmez; bir dosyaya yazılıp sonra çalıştırılan script kapsam DIŞIDIR ve kapı bu sınırı reddederken ÇIKTIYA basar. · bekçi: `Teks-Erp/scripts/test_bash_guard_scope.ts` <sub>(arşiv:2026-09-13 ölü kapı)</sub>
-- **[ÇEKİRDEK]** Kancanın yolu KABUĞUN DİZİNİNDEN bağımsız olur (mutlak ya da `${CLAUDE_PROJECT_DIR}` çapalı): göreli yol, kabuk kökten çıktığı her an kancayı SESSİZCE öldürür ve Claude Code bunu non-blocking sayar (ölçüldü 2026-09-13: 4.962 ölü-kapı olayı, 24 ayrı dizin). Başlatılamayan bir kancayı engelleyici yapan bir ayar YOKTUR — tek kalıcı koruma yapılandırmanın doğruluğunu ÖLÇMEKTİR. · bekçi: `Teks-Erp/scripts/test_hook_config.ts` <sub>(arşiv:2026-09-13 ölü kapı)</sub>
-- **[ÇEKİRDEK]** Her CUD operasyonu `AuditService.log()` ile `SystemLog`a yazılır; **istisnalar `AUDIT_EXEMPT_MODELS`te BEYANLIDIR** ve sınıf kümesi KAPALI (`KULLANICI_TERCIHI` · `TELEMETRI` · `KIMLIK_AKISI` · `EBEVEYN_EYLEMDE` · `SISTEM_ISI`) — **beyansız bir sessizlik kırmızıdır**, çünkü beyansız sessizlik UNUTULMUŞ bir audit'ten ayırt edilemez. Denetim modelin YAZMA YOLUNDA aranır, dosya KATMANINDA değil: serviste `AuditService.log` da, ucunda `tableName:` de olur. ⚠️ Ölçüldü 2026-09-14: "tek istisna `UserPreference`" cümlesi YANLIŞTI — CUD yapan 136 modelin 127'si audit yazıyor, DOKUZU sessiz ve sekizi meşru ama beyansızdı. `EBEVEYN_EYLEMDE` bir İDDİADIR ve ölçülür (yazan yardımcının çağıranlarından en az biri audit taşımalı). · bekçi: `test_audit_muafiyeti.ts` (§2 sessizlik beyanlı · §3 ölü muafiyet · §4 kapalı küme · §5 ebeveyn iddiası ölçülür · §7 dosya düzeyi cırcır) + `test_audit_depth.ts` (kapsam kısmi) <sub>(arşiv:2026-09-14; CLAUDE.md:285)</sub>
-- **[ÇEKİRDEK]** Audit best-effort'tur: yazım hatası isteği DÜŞÜRMEZ ve çağrı transaction DIŞINDA yapılır. Başarısızlık sayacı `/health`te DEĞİL `/api/admin/health`tedir (`auditWriteFailures`) — `/health`in alan kümesi DONDURULMUŞ, yeni operasyonel metrik `buildRichHealth`e eklenir. <sub>(CLAUDE.md:285)</sub>
-- **[ÇEKİRDEK]** Validation hata mesajları Türkçe yazılır. <sub>(CLAUDE.md:297)</sub>
-- **[ÇEKİRDEK]** Uzak/LAN ayrımı SOKETTEN çözülür (`req.socket.localPort` === REMOTE_PORT); `clientType` gövdeden gelir ve GÜVENLİK SINIRI DEĞİLDİR. Soket okunamazsa istek LAN sayılır — fail-closed yönü budur (LAN kuralları zaten dar). · bekçi: `scripts/test_remote_access_guard.ts` <sub>(CLAUDE.md:95)</sub>
-- **[ÇEKİRDEK]** Uzak `/api` isteğinde Cloudflare Access JWT ikinci katmandır ve FAIL-CLOSED'dır (politika panelden kalkarsa sessiz açık değil gürültülü arıza). JWKS önbelleğinde TTL TAZELİKTİR geçerlilik değil: bayat anahtar döner + arka planda tazelenir; önbellek HİÇ dolmadıysa fail-closed KALIR. · bekçi: `scripts/test_remote_access_guard.ts (Access JWT negatif sondası)` <sub>(CLAUDE.md:95)</sub>
-- **[ÇEKİRDEK]** `users.quickPin` 6 hane, DÜZ METİN ve sistem genelinde `@unique` — PIN tek başına kimliği belirler. PIN/kart uçları internete açılmaz; PIN repoya, log'a, sürüm notuna ve audit diff'ine girmez. · bekçi: `scripts/test_remote_access_guard.ts (denylist sondası)` <sub>(CLAUDE.md:95)</sub>
-- **[ÇEKİRDEK]** İki dinleyici İKİ PROCESS DEĞİLDİR: presence Map'i, feature-flag cache'i ve zamanlayıcı bayrakları process-local'dir; aynı `app`i ikinci bir sokette dinletmek invariantı bozmaz — İKİNCİ BİR NODE SÜRECİ hâlâ YASAK. <sub>(CLAUDE.md:95)</sub>
-- **[ÇEKİRDEK]** TOTP kurulumunun TEK yolu yöneticinin açtığı 15 dk'lık tek kullanımlık penceredir (TOFU REDDEDİLDİ: parola sızmışsa saldırgan 2FA'yı kendi telefonuna bağlar); ikinci faktör `issueToken`den ÖNCE koşar; üç hata üç ayrı statü (403/409/401) ve giriş kilidi yalnız 401'i sayar. · bekçi: `scripts/test_totp.ts (RFC 4226/6238 dış vektörleri)` <sub>(CLAUDE.md:95)</sub>
-- **[ÇEKİRDEK]** Kullanıcının indirdiği içe aktarım şablonu bir SÖZLEŞMENİN DONDURULMUŞ KOPYASIDIR: panel Excel başlığını etiketle eşler, başlık/sütun adı değişikliği sürüm kırıcıdır ve `minVersion` uygulanamaz — mevcut başlık korunur, bilgi yeni sütunla/yardım metniyle eklenir ("Miktar (m)" + "Birim" emsali). <sub>(arşiv:2026-09-13)</sub>
+## Bekçiler
+Backend: `test_audit_muafiyeti` · `test_audit_depth` · `test_audit_okuma_kaynagi` · `test_p2002_hedef_tek_kaynak` · `test_musteri_adi_kodda_yok` · `test_firma_adi_dondur` · `test_backup` · `test_offsite_sweep` · `test_process_warnings` · `test_remote_access_guard` · `test_totp` · `test_middleware_order` · `test_client_registry` · `test_session_registry` · `test_boss_overview` · `test_device_pairing_flag` · `test_sack_weigh_source` · `test_bash_guard_scope` · `test_hook_config`
 
-- **[ÇEKİRDEK]** Müşteri adı koda gömülmez: ekranda, belgede ve etikette firma adı bağlanılan sunucunun `company.name` ayarından okunur, okunamazsa nötr yedek "TeksERP" (`constants/company.ts` + iki istemci aynası) gösterilir; bir müşteriye özgü görünüm kanal kaydında ya da veride yaşar. · bekçi: `scripts/test_musteri_adi_kodda_yok.ts`, `scripts/test_firma_adi_dondur.ts` <sub>(arşiv 2026-09-28 firma adı)</sub>
+İstemci: `discovery-logic.test.ts` · `discovery-ipc-contract.test.ts` · `boss-shell.test.ts` · `BackupScheduleCard.test.tsx` · `discovery.contract.test.ts` · `discovery.test.ts` · `discovery.service.test.ts` · `pairingGate.test.ts` · `useSackWeigh.test.tsx` · `BarcodeScannerView.test.tsx` · `shortCutQuality.test.ts` · `resolveShortCutConfig.test.ts` · `ModalTextInput.test.tsx`
 
-### Yasaklar
-
-- **[ÇEKİRDEK]** Tünel dinleyicisi YALNIZ `127.0.0.1`e bağlanır; uzak port `0.0.0.0`a AÇILMAZ (açılırsa uzak/LAN ayrımı komple çöker, iki yönde de kural seti sessizce yanlış uygulanır) ve `HOST` env'i bu dinleyicide bilerek onurlandırılmaz. · bekçi: `scripts/test_remote_access_guard.ts` <sub>(CLAUDE.md:95)</sub>
-- **[ÇEKİRDEK]** Uzakta kapalı yollar 404 döner, 403 DEĞİL (403 'burada bir şey var' der, keşfe davet eder): login-card · login-quick-pin · mobile-users + /api/devices, /api/discovery, /api/mobile, /api-docs. Liste YOL bazlıdır; servis katmanında ikinci hat `assertNotRemote` vardır. · bekçi: `scripts/test_remote_access_guard.ts` <sub>(CLAUDE.md:95)</sub>
-- **[ÇEKİRDEK]** `CLIENT_IP_HEADER` app-wide OKUNMAZ — yalnız uzak istekte geçerlidir (`clientIpHeaderRemoteOnly`, `REMOTE_PORT`ten türer); `TRUST_PROXY` de app-wide AYARLANMAZ. Aksi hâlde LAN'daki biri `CF-Connecting-IP` uydurup giriş kilidini VE hız sınırını etkisizleştirir (her denemede farklı kova). · bekçi: `scripts/test_remote_access_guard.ts (IP başlığı negatif sondası)` <sub>(CLAUDE.md:95)</sub>
-
-## Backend
-- **[ÇEKİRDEK]** P2002'nin hangi kolondan geldiği YALNIZ `src/utils/p2002.ts` yardımcılarıyla okunur (`p2002OnField` · `p2002TargetParts` · `p2002UniqueColumn` · `p2002Mentions`); `meta.target` doğrudan okunmaz — pg adaptörü (Prisma 7) onu VERMEZ, hedef `meta.driverAdapterError.cause` altındadır; doğrudan okuyan retry/409 yüklemi adaptör altında hiç eşleşmez. · bekçi: `test_p2002_hedef_tek_kaynak` (AST, takma ad + yapı çözme; hızlı mandal) + `test_numara_yarisi_levent_dokuma` ① <sub>(arşiv:2026-09-23)</sub>
-
-
-### Değişmezler
-
-- **[ÇEKİRDEK]** bonjour-service bilinçli istisnadır: sürüm SABİT (`1.4.4`, `^` YOK — sonraki ana sürümler ESM-only olup `require()` yolunu sessizce kırar) ve kullanım tek dosyada tembel `require` + try/catch (paket kaybolsa da sunucu ayakta kalır). <sub>(CLAUDE.md:152)</sub>
-- **[ÇEKİRDEK]** ÖLÜ KUMANDA YASAK: bir ayar o kurulumda hiçbir şey yapmıyorsa panel onu düzenlenebilir göstermez — DEVRE DIŞI bırakır ve SEBEBİNİ yazar (gizlemek "böyle bir ayar yok" derdi; ayar var, başka yerden yönetiliyor). Emsal: `BACKUP_SCHEDULE_ENABLED=false` kurulumunda "Otomatik yedek saati" (`GET /backups.scheduleEnabled`). Uç ile zamanlayıcı AYNI yüklemi kullanır (`=== "false"` → kapalı, tanımsız = AÇIK); iki farklı yüklem panelin yanlış kumandayı açması demektir. · bekçi: `scripts/test_backup.ts §S` + `Electron BackupScheduleCard.test.tsx` <sub>(arşiv:2026-09-10 O-1)</sub>
-- **[ÇEKİRDEK]** Offsite hedefi GÖRELİ olamaz: `gdrive` (iki noktasız) rclone'da yerel yola çözülür ve tüm yedekler DB ile aynı diske gider — üstelik `copy` ve `lsf` aynı yanlış yere gittiği için gösterge YEŞİL kalır. Kural `isAcceptableTarget` tek kaynağında (`ad:` ya da tam yol; UNC/mutlak MEŞRU) ve İKİ KAPIDA uygulanır — yazarken 400, **OKURKEN** `configured:false`. İkincisi asıl olan: zaten kayıtlı yanlışı yalnız o görünür kılar. Geçerli ama bu makinede olan hedef ENGELLENMEZ, `remoteIsLocalPath` ile İŞARETLENİR ("başarılı" ≠ "yeterli"). · bekçi: `scripts/test_offsite_sweep.ts §3` <sub>(arşiv:2026-09-10 K-1)</sub>
-- **[ÇEKİRDEK]** Açılışta TAHMİNE dayalı felaket uyarısı basılmaz: hedefi/durumu ancak iş KOŞUNCA bilinen bir kontrol, uyarısını da o koşumdan basar (offsite süpürücü emsali — boot'ta env'e bakıp "yedekler aynı diskte OLABİLİR" demek, hedefi panelden tanımlı fabrikada her açılışta YANLIŞ ALARM'dı). Sinyal silinmez, ölçüldüğü ana TAŞINIR; uyarı körlüğü gerçek felaketi de gizler. · bekçi: `scripts/test_offsite_sweep.ts` <sub>(arşiv:2026-09-10 offsite yanlış alarmı)</sub>
-- **[ÇEKİRDEK]** Node süreç uyarıları YIĞIN İZİYLE log'a düşer (`lib/process-warnings.ts`, boot'ta kurulur): Node'un önerdiği `--trace-deprecation` canlıda YENİDEN BAŞLATMA demek, oysa `warning` olayının `w.stack`i çağrı yerini BAYRAKSIZ DA taşır. İz ETİKETSİZ basılır (`logger.yiginIzi`), imza çağrı yerini içerir (aynı metin başka yerden gelirse ayrı sorundur). ⚠️ `util.deprecate` uyarıları SÜREÇ BAŞINA BİR KEZ basar — log'dan SIKLIK okunamaz. · bekçi: `scripts/test_process_warnings.ts` <sub>(arşiv:2026-09-07 D-2)</sub>
-- **[ÇEKİRDEK]** helmet İKİ AYRI ÖRNEK kurulur (HSTS/CSP-upgrade LAN'a sızarsa panel kullanıcının HSTS önbelleğinde kilitlenir; geri dönüş sunucuda değil tarayıcıdadır) ve dispatcher'ın FONKSİYON ADI `helmetMiddleware` OLMAK ZORUNDA — Express katman adını fonksiyondan alır, isimsiz arrow sıra bekçisini kör eder. · bekçi: `scripts/test_middleware_order.ts` <sub>(CLAUDE.md:95)</sub>
-
-### Yasaklar
-
-- **[ÇEKİRDEK]** Backend'de yalnız izinli paket listesindeki paketler kullanılır; yeni ihtiyaçta önce 'kendin yaz' denenir (node-cron→setInterval, handlebars→kendi şablon motoru, CSV paketi→hiç). <sub>(CLAUDE.md:152)</sub>
-
-### Kararlar
-
-- **[PROFİL]** `GET /api/boss/overview` beş bölümü TEK uçtan döner, izin süzmesi SERVİSTE yapılır (yetkisiz bölümün sorgusu HİÇ koşmaz) ve YENİ İZİN KODU AÇILMAZ; patron üretim kartı ADET basar — metraj ikinci bir 'üretilen' tanımı doğururdu. · bekçi: `scripts/test_boss_overview.ts` <sub>(CLAUDE.md:95)</sub>
-
-## Panel (Electron)
-
-
-### Tuzaklar
-
-- **[ÇEKİRDEK]** Route haritası `src/router.tsx`te DEĞİL `src/routes/content-routes.tsx`tedir (router.tsx 39 satır: yalnız login/forbidden/totp/AuthLanding); `src/` altında ağaçta yazmayan data/, providers/, routes/, test/ de vardır. <sub>(CLAUDE.md:31)</sub>
-- **[PROFİL]** `BossShell` sekme sistemini bypass eder ama router altyapısını KULLANIR — kendi memory router'ını kurma (sayfalar useTabId/TabPortalProvider/history-depth'e bağlı; PageHeader geri oku sessizce ölür, modaller yanlış portallanır). Hash `useHashPath` ile REAKTİF okunur. · bekçi: `Electron/src/test/boss-shell.test.ts` <sub>(CLAUDE.md:95)</sub>
-
-### Reçeteler
-
-- **[ÇEKİRDEK]** Electron yerleşimi sabittir: `electron/` main süreci (main/preload/menu + `ipc/` DOMAİN BAŞINA BİR DOSYA), `shared/` main↔renderer sözleşmeleri, `src/` renderer; her modül kendi `pages/<Modul>/` klasörüne yazılır ve küçük dosyalara bölünür. <sub>(CLAUDE.md:31)</sub>
-
-## Geçersiz kılınan kurallar — bunlara UYMA
-
-- **KISMI** `R:undated__her-cud-operasyonu-tablosu-istisna-kisisel` → `kök CLAUDE.md 2026-08-25 notu ('Prod'un üç dev'de yapılacaklar notu', CLAUDE.md:84) — küme dışı`: Audit best-effort sayacının adresi: eski satır 'yazım hatası … /health sayacına düşer' der; 2026-08-25 notu '/health'te auditGuard YOK (/api/admin/health)' diyerek operasyonel alanların taşındığını kaydeder. /health'in alan kümesi DONDURULMUŞ; auditWriteFailures buildRichHealth() içinde, yalnız /api/admin/health'ten okunur. Kuralın 'best-effort + tx dışında' kısmı geçerli; değişen ADRES. ✅ çürütmeden geçti
-
-## Çözülmüş çelişkiler
-
-- `B:undated__uc-bir-module-aitse-router-adlandirilmis` ↔ `R:2026-09-01__2026-09-01-patron-modulu-fabrikaya`: Kod patron notunu uyguluyor: uzakta 404 YALNIZ sabit yol denylist'idir (login-card/login-quick-pin/mobile-users + /api/devices,/api/discovery,/api/mobile,/api-docs). Modül kapısı uzak/LAN ayrımına HİÇ bakmaz, her zaman 403 + details.code döner ve bekçi de bunu ölçer. Kontrol listesindeki 'tünelde 404' cümlesi hatalıdır, SİLİNMELİ.
-
-## Açık sorular
-
-- Tarihsiz dört sözleşme üyesinin (izinli paketler · Electron ağacı · audit · TR mesaj) kök dizinde SATIRI YOK ve olmamalı — bunlar alt-CLAUDE / Ortak Konvansiyonlar metinleridir; archiveOnly listesi 'dizin satırı gerekmez' anlamındadır, 'arşive taşı' değil.
-
-## Bekçiler — bu alana dokununca koş
-
-`cd Teks-Erp && npx tsx scripts/run-all-tests.ts <ad-parçası>` (tek testte tip kapısı atlanır) · Electron `npx vitest run <yol>` · mobil `npx jest <yol>`.
-
-**Ne ölçtükleri, DB gerektirip gerektirmedikleri ve bayatlık işaretleri: `Teks-Erp/docs/BEKCI-HARITASI.md` → bu alanın bölümü.** ⚠️ = orada gerekçesi yazılı bayatlık şüphesi.
-
-Backend: `test_audit_depth`, `test_audit_labels`, `test_boss_overview`, `test_device_activity`, `test_device_pairing_flag`, `test_discovery_identity`, `test_dispatch_allocation_fresh`, `test_identity_ledger`, `test_label_snapshot_audit_split`, `test_manual_attributes_reason`, `test_merge_field_picks`, `test_o19_operator_trace`, `test_observability_cache`, `test_observability_contract`, `test_period_close`, `test_permission_grant_source`, `test_phase0_quickwins`, `test_process_warnings`, `test_record_provenance`, `test_remote_access_guard`, `test_report_day_boundary`, `test_reports`, `test_roll_entry_station`, `test_sack_notes`, `test_settings_password`, `test_shipment_invoice`, `test_superadmin`, `test_superadmin_provision`, `test_superadmin_visible`, `test_system_log`, `test_system_log_query_gate`, `test_totp`, `test_user_credentials_guard`, `test_web_hardening`, `test_work_session_close_all`, `test_work_session_stamping`, `test_mobil_enum_aynasi`, `test_musteri_adi_kodda_yok`, `test_firma_adi_dondur`
-
-## Arşiv notları (tam metin, gerekçe ve ölçüm)
-
-- 2026-09-01 · 2026-09-01 — Patron modülü: fabrikaya GELEN PORT AÇMADAN uzaktan takip — `CLAUDE-NOT-ARSIVI.md:1791-2032`
-- 2026-09-10 · 2026-09-10 — Fabrika prod log'undan üç bulgu (kapanış teşhisi ③) [ÇEKİRDEK] — `CLAUDE-NOT-ARSIVI.md` §2026-09-10
-- 2026-09-10 · 2026-09-10 — Künyesiz istemci görünmezdi: sürüm UA'dan okunuyor [ÇEKİRDEK] — `CLAUDE-NOT-ARSIVI.md` §2026-09-10 künyesiz
-- 2026-09-17 · 2026-09-17 — Oturum kaydına istemci sürümü: künye ilk kez kalıcı satıra yazıldı, §1 üç kollu oldu [ÇEKİRDEK] — `CLAUDE-NOT-ARSIVI.md` §2026-09-17 oturum sürümü
-- 2026-09-28 · 2026-09-28 — Müşteri adı koddan çıktı: firma adı sunucudan, yedek nötr; mevcut kurulumun adı migration ile dondu [ÇEKİRDEK] — `CLAUDE-NOT-ARSIVI.md` §2026-09-28 firma adı
+Gerekçe ve ölçüm hikâyesi: eski sürüm history dizininde.

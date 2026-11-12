@@ -358,7 +358,7 @@ paketi yeniden derlenir. Patron modülünü (web) kullanan kurulumlarda arayüz 
     (`workorder.partyCodeAuto` → `numberSource`, bir kez) · biçim satırları göçü · rapor
     görünürlük denetimi. Dokuma bayrağı kapalıyken vardiya takvimi no-op'tur.
   - **Yayın günü veri adımları** — migration DEĞİLDİR, `migrate deploy` ile gelmez; hepsi dry-run
-    varsayılan, `--apply`ı KULLANICI koşar, teşhis çıktısı saklanır (`docs/kurallar/deploy-kurulum.md`,
+    varsayılan, `--apply`ı KULLANICI koşar, teşhis çıktısı saklanır (`docs/history/kurallar-2026-09/deploy-kurulum.md`,
     `docs/kurallar/surum-yayin.md`). ⚠️ Paket bu betikleri ve `tsx`i TAŞIMAZ (paket: `dist` ·
     `prisma` · `node_modules --omit=dev`); repo ağacından, `DATABASE_URL` fabrika DB'sini AÇIKÇA
     gösterecek biçimde koşulur — nereden koşulacağı kurulumdan önce kararlaştırılır. DB adı

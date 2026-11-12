@@ -1,83 +1,58 @@
-# TeksERP — Backend (`Teks-Erp/`)
+# Adnan Şahin ERP — Backend
 
-Express 5 + Prisma 7 + PostgreSQL. Domain kuralları kök `CLAUDE.md`; alan kuralları `docs/kurallar/<alan>.md`; teknik desenler `docs/KOD-KURALLARI.md`; reçeteler `docs/RECETELER.md`. Bu dosya yalnız backend-geneli çalışma düzenini taşır (yeniden yazım 2026-09-05; önceki sürüm git `6695afc2`).
+Express 5 + Prisma 7 + PostgreSQL API sunucusu (port 4000); panel ve tablet buna HTTP ile bağlanır. Çekirdek değişmezler kök `CLAUDE.md`de, burada tekrarlanmaz.
 
-> Derin referans `ARCHITECTURE.md` — §7–§10 pattern/gerekçe içeriği değerlidir; §2–§6 envanter sayıları bayattır (ör. "~114 migration" → 232). **Sayıyı dokümana sabitleme**; kanonik kaynak `schema.prisma`, `permission-catalog.ts`, `role-template-catalog.ts`.
-
-## Komutlar ve döngü
+## Komutlar
 
 ```bash
-npm run dev                     # nodemon + ts-node (server.ts, hot reload) — port 4000; ajan/bekçi yolu: PORT=<port> npx tsx src/server.ts (hot reload YOK)
-npm run build                   # tsc + scripts/build-araclar.mjs (dist/tools/*.cjs)
-npm run seed                    # temiz fabrika (yalnız admin/123123)  ·  npm run seed:fixtures  # PATOS/MAVI/MUS-001 iş fixture'ları
-npm run prisma:generate         # şema değişince ZORUNLU
-npm run prisma:migrate          # migrate deploy — pull'lanmış migration'ı BU uygular (dev DEĞİL)
-npm run typecheck               # yalnız src/ · typecheck:scripts = scripts/+prisma/+src/ · *:plain = grep'lenebilir
-npm test                        # run-all-tests.ts — productionDbGate (yerel olmayan DATABASE_URL → DUR; kaçış ALLOW_NONLOCAL_TEST_DB=1) + tip kapısı (~28 sn) + migration durumu kapısı + TÜM bekçiler sıralı (6,5 dk, ölçüldü)
-npx tsx scripts/run-all-tests.ts <ad-parçası>   # tek bekçi (tip kapısı atlanır; acil: SKIP_TYPECHECK=1)
-npm run check:migrations · check:docs
+npm install && npm run prisma:generate          # şema değişince generate ZORUNLU
+npm run prisma:migrate                          # migrate deploy: pull'lanan migration'ı BU uygular
+npm run dev                                     # nodemon; bayat Prisma istemcisini önce üretir
+npm run typecheck                               # src/ · typecheck:scripts → scripts/+prisma/ · *:plain → grep'lenebilir
+npm run lint                                    # src + scripts + prisma
+npx tsx scripts/run-all-tests.ts <ad-parçası>   # tek bekçi; tam paket (npm test) CI'da
+npx tsx scripts/apply-migration.ts <ad> [--apply]   # elle migration, varsayılan dry-run
+npm run check:migrations && npm run check:docs
 ```
 
-- **Pull sonrası sıra:** `npm install` → `prisma:generate` → `prisma:migrate` → `dev`. `migrate dev` başkasının migration'ını almak için DEĞİL, yeni migration yazmak içindir ve her diff'te iki DEFERRABLE composite FK'yı (`rolls_sackId_shipmentId_consistency`, `swatches_…`) DROP etmek ister → `--create-only` + `DropForeignKey` satırlarını sil.
-- **Prisma komutları `Teks-Erp/` içinden** (`prisma.config.ts` `.env`'i kendi dizinine sabitler; kökten `--config Teks-Erp/prisma.config.ts` ile de koşar, önerilmez).
-- **tsc çıktısı boruda renklidir:** "temiz" hükmü ÇIKIŞ KODUNDAN (`npm run typecheck; echo $?`), grep'leyeceksen `*:plain`.
-- **`.env`:** `PORT=4000`, `DATABASE_URL="postgresql://tekserp:<parola>@localhost:55433/tekserp_demo?schema=public"` (Docker `tekserp-local-db`), `JWT_SECRET`. DB adı PROFİL değeridir — koda/dokümana sabitleme (saha: `tekserp`). Ayrıntı: `docs/GELISTIRME-DONGUSU.md`.
-- **Sunucu süreci:** yalnız kendi başlattığın PID'i durdur ya da ayrı port; `pkill -f tsx` YASAK.
+Ağır koşum `node ../scripts/agir-is.mjs -- <komut>` ile. Prisma komutları `Teks-Erp/` içinden koşulur. Bu klonda `.env` yok; DB isteyen iş oturumun kendi `_test` veritabanında yapılır.
 
-## Katmanlar
+## Mimari sınırlar
 
-**Routes → Controllers → Services → Prisma**, alt katman atlanmaz. ⚠️ Controller'sız inline handler İSTİSNA DEĞİL NORMDUR (80 route dosyasının 45'i, 672 handler'ın 323'ü; ölçüldü 2026-09-05): route içinde Zod parse + servise delege, iş mantığı yine serviste. Controller yalnız master-data CRUD (`new BaseController`) ya da ≥4 uçlu aile için açılır — ölçüt ve katman içerikleri `docs/standart/BACKEND.md`. **route/controller'da `prisma` import YASAK** — mekanik: ESLint `no-restricted-imports`. Lint kapsamı `src` + `scripts` + `prisma` (2026-09-05'te açıldı; `scripts/` 554 dosya hiç lint edilmiyordu). Kurallar ve ölçüm gerekçeleri `eslint.config.mjs` başlığında.
+- Routes → (Controller) → Service → Prisma; route/controller `prisma` import etmez, tx açmaz. Yeni uç varsayılan olarak controller'sız ince handler'dır: Zod parse → servis → `res.json`.
+- İş kuralı, `$transaction`, atomik claim ve `AuditService.log()` (tx dışında) yalnız serviste; `services/reports/` salt okur.
+- Yeni izin = `src/constants/permission-catalog.ts`e tek satır; boot uzlaştırması DB'ye getirir, kimseye ATAMAZ; izin için migration yazılmaz. Rol şablonları `role-template-catalog.ts`.
+- Mobil ucun kapısı `requireAnyPermission('<web-izni>', ...MOBILE_X)`; `mobil/src/types/permissions.ts` union'ı elle güncellenir.
+- Modül kapısı adlandırılmış middleware'dir (`module.middleware.ts`, `finance.middleware.ts`); jenerik `requireModule("x")` yazılmaz.
+- Test altyapısı `scripts/test_*.ts` + `run-all-tests.ts`; jest/vitest kurulmaz. Paylaşılan fixture `fixture-*.ts` adını taşır.
+- Yeni paket kullanıcı onayı + `docs/standart/KUTUPHANELER.md` karar kaydı ister; `bonjour-service` 1.4.4'te SABİTTİR.
 
-- `controllers/` HTTP + Zod · `services/` (+`helpers/`, `reports/`) iş mantığı, transaction, `AuditService.log()` · `routes/` Swagger JSDoc + `verifyToken` + `requirePermission` · `middlewares/` (auth, rbac, error, device, uuid-param, latency, login-lockout, module, system-account, settings-password… — dizin kanonik) · `prisma/schema.prisma` (`@prisma/adapter-pg`; `clientToken @unique @db.Uuid` 15+ modelde).
-- Master data CRUD için `BaseController` + `BaseService` (`searchFields`); liste/cursor/özet tek where `buildListWhere`.
-- Hata kodu `details.code`; kapalı modül 403 `MODULE_DISABLED` (uzakta da 403); uzakta kapalı yollar 404 `REMOTE_DENIED` listesi.
+## Veritabanı kuralları
 
-## İzin ve rol — katalog koda, atama panele
+Büyük tabloda (`Roll`, `RollMovement`, `RollOperation`, `SystemLog`, `TravelerCardScan`) cursor pagination, `MAX_OFFSET=10000` · `include` değil `select` · ağır aggregation `$queryRaw` · toplu yazım `createMany` · tx kısa, içinde dış I/O yok · büyük tabloya değen yeni uçta `EXPLAIN ANALYZE` · listede snapshot JSON çekilmez · canlıda index migration'ı vardiya dışında. Index, enum, model ve migration kuralları `docs/standart/VERITABANI.md`.
 
-- Yeni izin = `src/constants/permission-catalog.ts`'e TEK satır; boot uzlaştırması (`jobs/permission-catalog.job.ts`) DB'ye getirir, KİMSEYE ATAMAZ; AST bekçisi `test_permission_catalog.ts` katalogda olmayan kodu düşürür. Migration YAZMA (`20260801020000_…` emsal değil). Uzlaştırma yalnız ekler; kaldırma bilinçli veri migration'ıdır.
-- Rol şablonları aynı üçlü: `role-template-catalog.ts` + `jobs/role-template-catalog.job.ts` + `test_role_template_catalog.ts`. `mode:"all"` yalnız "Admin (Tam Yetki)"; kimlik `code` (ad değil), `code=null` fabrikanındır; sistem rolü pasifleştirilir, sert silinmez; kapsam bekçisi Admin dışında koşar, muaflar `ROLE_COVERAGE_EXEMPT`'te gerekçeli ve iki yönlü denetlenir.
-- Mobil ucun kapısı `requireAnyPermission('<web-izni>', ...MOBILE_X)`; mobil `types/permissions.ts` union'ı elle taşınır. Kategori `web` izinler (`settings:workstation`, `document-template:*`) `admin:*` ile GELMEZ. Ekran canlıda görünmüyorsa: satır DB'de mi → atanmış mı → yeniden giriş (JWT bayat). Ayrıntı: `docs/kurallar/yetki-izin.md`.
+## Tuzaklar
 
-## Veritabanı kuralları (her zaman)
+- `migrate dev` her diff'te iki DEFERRABLE composite FK'yı düşürmek ister: yalnız `--create-only` koş ve `DropForeignKey` satırlarını sil.
+- Uygulanmış migration dosyası yorum dahil değişmez (checksum `migrate deploy`u kilitler); `migrate resolve --applied` SQL'in koştuğunu kanıtlamaz, `apply-migration.ts` kullan.
+- Şema-dışı nesne (partial index, CHECK, trigger, DEFERRABLE FK…) kuran migration aynı commit'te `scripts/test_db_invariants.ts` envanterine yazılır; kırmızıya cevap nesneyi silmek değil satırı yazmaktır.
+- `BaseController` gövdeyi Zod'suz servise geçirir: modele eklenen her skaler kolon o uçtan yazılabilir olur; istenmiyorsa açıkça kapat.
+- `PG_SESSION_OPTIONS` (`-c timezone=UTC`) silinmez ve `new Pool(` kuran her dosya onu geçirir; fabrika günü yalnız `src/constants/time.ts`ten.
+- Decimal kolonda JS float yok: `Prisma.Decimal` ya da DB-side increment/decrement.
+- Depo çuvalı içeriğine dokunan yazım `touchWarehouseSackTx`, PLANNED sevkiyat kümesi `touchShipmentPlannedTx`, içerik değişimi `markSackContentChangedTx`'ten geçer; `Sack.notes` bu kapının dışındadır.
+- `@unique` numara/barkod üreten yazım `withBarcodeRetry` kullanır ve sıra okuması tx İÇİNDEdir.
+- Sözleşme kıran değişiklikte (uç kaldırma · alan adı · tip/birim · zorunlu parametre · enum · izin) eski istemcinin ne yapacağı yazılır; `src/config/client-version-policy.ts` `minVersion` sahadakinden büyük olamaz, mobilde ikinci eksen `minPaketTarihi`.
+- Tek bekçi de `run-all-tests.ts <ad>` ile koşulur: `productionDbGate` koşucunun kapısıdır, `npx tsx scripts/test_x.ts` onu atlar. Ayrı sunucu isteyen bekçi sunucu yoksa bölümünü atlar — atlanan kontrol yeşil sayılmaz.
 
-1. Her `@relation` kolonuna `@@index` (düşük trafik "kim yaptı" FK'ları hariç). 2. Composite sıra: eşitlik önce, range/order sonra; sık birlikte süzülen kolonlar tek composite. 3. Partial index ham SQL migration ile; şemada `@@index` bırak (predicate drift sayılmaz, index↔unique farkı SAYILIR → partial unique için `@@unique`). 4. Şema-dışı nesneler `scripts/test_db_invariants.ts` envanterinde — **DOKUZ liste** (partial index · CHECK · DEFERRABLE FK · genişletilmiş istatistik · `EXPRESSION_UNIQUES` · trigger · eklenti · fonksiyon · collation); yeni nesne → envantere yaz, kırmızıya tepki silmek değil. 5. Yüksek hacim tablolar (`Roll`, `RollMovement`, `RollOperation`, `SystemLog`, `TravelerCardScan`) cursor pagination; `MAX_OFFSET=10000`. 6. JSON alan sorgulanacaksa GIN önce. 7. `select`, `include` değil. 8. Karmaşık aggregation `$queryRaw`. 9. `createMany`. 10. Tx kısa, dış I/O tx içinde yok (`idle_in_transaction_session_timeout=5min`). 11. `tx.*` + `Promise.all` YASAK (ESLint). 12. Yeni uç büyük tabloya değiyorsa `EXPLAIN ANALYZE`. 13. Snapshot JSON'ları listede çekme. 14. Canlıda index migration vardiya dışında; büyük tabloda `SET statement_timeout = 0;` migration başına (DB `statement_timeout=50s`).
-- **Elle migration:** `npx tsx scripts/apply-migration.ts <ad> [--apply]` (git add → db execute → resolve → doğrula tek komutta). `migrate resolve --applied` SQL'in koştuğunu doğrulamaz; commit edilmemiş migration prod'da sessiz eksiktir. Bekçiler: `check-migrations.mjs` · `test_migration_hygiene.ts` · `test_schema_drift.ts` · `test_migration_order.ts` (dört ayrı soru). Ayrıntı: `docs/kurallar/deploy-kurulum.md`.
-- **Zaman:** her `DateTime` `@db.Timestamptz` (bekçi `test_timestamptz_contract.ts`, tek bekçi — ikincisini yazma); `PG_SESSION_OPTIONS` (`-c timezone=UTC`) silinmez, `new Pool(` kuran her dosya geçirir; ham SQL'de çıplak `now()` tercih (gerekçeli `-- tz-ok:`; `test_raw_sql_hygiene.ts`); fabrika günü `src/constants/time.ts` (`factoryDaySql/…`, `test_report_day_boundary.ts`). Ayrıntı: `docs/kurallar/raporlar.md`.
-- **Decimal** kolonda JS float yok — DB-side increment/decrement ya da `Prisma.Decimal`.
+## Dokunmadan önce oku
 
-## Operasyonel bakım (özet)
-
-- `statement_timeout=50s` DB-level, elle uygulanır; slow query log (>500 ms) yalnız üretimde.
-- Yedekleme backend'de (`backup.service.ts`, `pg_dump` ayrı process, doğrulama, GÜN bazlı saklama + en yeni 3 dosya); sahada gece yedeğini Windows görevi alır, backend zamanlayıcısı kapalı. Yedek ön ekleri yaşam döngüsüdür (`tekserp_` rotasyona girer, `premigrate_`/`pre-restore_` girmez). Kopyaya geri yükleme `<canlı>_restore_<damga>` + iki RENAME; geri yükleme bilinçli olarak backend'de DEĞİL (`pm2 stop` + `pg_restore`); etki raporunda ölçülemeyen UPDATE hacmine "ölçülemedi" yazılır, 0 değil. `applied_steps_count` doğrulamada KULLANILMAZ.
-- SystemLog arşivi otomatik (6 aydan eskisi 30 günde bir); kalıcı sayaç/rapor `SystemLog`tan değil kolondan okunur. `sessions/purge` 6 ayda bir. Mutabakat (`consistency-check.sql` + `test_consistency.ts`) `npm test`te; kırmızı üç şey olabilir (kod hatası · iş kararı bekleyen veri · sorgunun kör noktası) — bölümü daraltma.
-- Bloat takvimle değil ölçümle (`index-health.sql` §8/§9 → `REINDEX CONCURRENTLY`).
-
-## Yeni endpoint kontrol listesi
-
-- [ ] Yeni FK için `@@index` · `prisma generate` koştu
-- [ ] Service: transaction + `AuditService.log()` (tx dışında) · Controller: Zod + servis · Route: `verifyToken` + `requirePermission(kod)` + Swagger JSDoc (kod katalogda)
-- [ ] Modüle aitse ADLANDIRILMIŞ kapı (`requireProductionEnabled` / `requireTicaretEnabled` / `requireIplikEnabled` / `requireDepoMultiEnabled` — `module.middleware.ts`; `requireFinanceEnabled` — `finance.middleware.ts`, 30 mount); jenerik `requireModule("x")` YASAK; kapı gerekmiyorsa muaf listesinde gerekçeli
-- [ ] `app.ts`'e `app.use("/api/...", routes)` · fiziksel DELETE yok · `any` yok · `tx` içinde `Promise.all` yok
-- [ ] Dış referans ID'leri var-mı + `isActive` · `@unique` numara/barkod → `withBarcodeRetry` + sequence okuma tx İÇİNDE
-- [ ] Durum geçişi → atomik claim (`updateMany WHERE {id, durum}` + `count===0 → 409`; claim'den SONRA içerik tx İÇİNDE taze okunur)
-- [ ] Mobil dokunacaksa `requireAnyPermission(web, ...MOBILE_X)` · Decimal'de float yok
-- [ ] Depo çuvalı içeriğine dokunuyorsa `touchWarehouseSackTx` (shipmentId IS NULL); PLANNED sevkiyat kümesi `touchShipmentPlannedTx`; içerik değişince `markSackContentChangedTx` (kg sıfırlama + `labelDirty`). **`Sack.notes` istisna** — guard uygulanmaz, ekleme (özellik 409'a düşer).
-- [ ] Eski istemci ne yapar? (altı sözleşme tetiği: uç kaldırma · alan adı · tip/birim · zorunlu parametre · enum · izin) → gerekirse `client-version-policy.ts` `minVersion` (sahadakinden büyük olamaz; önce istemci yayınlanır). Mobilde iki eksen (`minVersion` + `minPaketTarihi`). Bekçi `test_client_policy.ts`.
-
-## Bekçi (test) yazma sözleşmesi
-
-Test altyapısı `scripts/test_*.ts` — jest/vitest YOK, kurma. Server'sız entegrasyon VARSAYILAN: servis + prisma doğrudan, HTTP yok. Beş bekçi ayrı sunucu ister ve kendi portunu bekler (finance 4100 · module_flag_off 4101 · superadmin 4104 · settings_password 4112 · module_profile 4122); sunucu yoksa o bölümler SESSİZCE atlanır — yeşil ≠ kapsandı. HTTP/0-izin bekçileri kendi geçici kullanıcısını `ensureTestAdmin`/fixture ile yaratır (seed şifresine güvenilmez).
-- Fixture business-key ile; hardcoded UUID yazma; üretilen veri `TEST-` ön ekli, damgalı (partial UNIQUE seddi ikinci koşumu P2002'ye düşürür). Fason/kartela firması YALNIZ `scripts/fixture-subcontractor.ts`'ten (`ensureTestDyeHouse/…`, kalıcı, SİLME); "herhangi bir aktif firma bul" ÇÖZÜM DEĞİL. Yardımcı/fixture dosyasına `test_` ön eki verme.
-- Ortamdaki veriye BAĞIMLI OLMA (`findFirst` ile "herhangi bir kayıt" üstüne test kurma — temiz CI DB'de düşer ya da vakumen yeşil kalır; `test_field_address`/`test_fason_visibility` emsali). Sayım kontrollerine körlük zemini koy (0 bulgu ≠ hiç bakılmadı).
-- Temizlik `finally` içinde ve FK sırasına göre. Bayrak/global durum yazan bekçinin İLK adımı `hedefDbEngeli()` (`productionDbGate` KOŞUCUNUN kapısıdır, tek dosya doğrudan koşulunca çalışmaz — tek bekçi de `run-all-tests.ts <ad>` ile koşulur); değiştirilen `SystemSetting` `finally`de BİREBİR geri yüklenir; muaf listesi elle değil KEŞİFLE kurulur, her koşumda basılır ve iki yönlü denetlenir (ölü muaf da kırmızı); bekçinin yarattığı kullanıcı sert silinmez (`system_logs_userId_fkey`); fason kabulü yapan her cleanup `rollVariance.deleteMany` içerir (RESTRICT FK); kesim/kapanış yapan cleanup ise `warehouseMovement`ı `rollVariance`tan ÖNCE siler (aynı sınıf: defter satırı sapmaya `Restrict` ile bağlı).
-- Çıktı: `check(label, ok)` + `=== Sonuç: N geçti, M başarısız ===` + `process.exit(fail>0?1:0)` ya da `$disconnect()` + `pool.end()` (`$disconnect` tek başına yetmez, havuz 10 dk açık kalır → 180 sn zaman aşımı).
-- **Negatif sonda zorunlu:** yeni bekçi, korunan davranış bozulunca KIRMIZI verdiği ölçülerek yazılır; sondanın kendisi kataloğa girebilecek gerçek kod kullanmaz. Yarış bekçisi elle açık tutulan tx ile kurulur; gate-tx promise'ine `await`ten önce no-op `.catch`.
-- Alan → bekçi haritası: `Teks-Erp/docs/BEKCI-HARITASI.md`. Reçete: `docs/RECETELER.md` § bekçi.
-
-## Paketler
-
-Politika **kayıtlı kararla açıktır** (yasak liste değil): yeni kütüphane `docs/standart/KUTUPHANELER.md`'ye 6 satırlık karar kaydıyla girer. Bugünkü küme: `express dotenv cors helmet compression` · `prisma @prisma/client pg @prisma/adapter-pg` · `jsonwebtoken bcryptjs` · `zod` · `swagger-ui-express swagger-jsdoc` · `morgan` · `uuid` · `bwip-js` · `bonjour-service` (**1.4.4 SABİT**, tembel `require` + try/catch, tek dosya `jobs/mdns-advertiser.job.ts`) · `opentype.js`. Paket `deploy/` ve `scripts/`yi TAŞIMAZ; sunucu araçları `dist/tools/*.cjs`'e derlenir.
-
-## Sürüm gotcha'ları
-
-Zod v4 `z.record(z.string(), z.unknown())` · Express 5 `req.params.id as string` · Prisma 7 şema değişince `prisma:generate` · Prisma'nın iki motoru: şema motoru NATIVE (`docs/kurallar/deploy-kurulum.md`).
+| Konu | Belge |
+|---|---|
+| Katman, servis anatomisi, zarf/hata, boyut | `docs/standart/BACKEND.md`, `docs/standart/BACKEND-HTTP.md` |
+| Atomik claim, advisory kilit, idempotency | `docs/standart/ESZAMANLILIK.md` |
+| Model, index, migration, şema-dışı nesne | `docs/standart/VERITABANI.md`, `docs/standart/VERITABANI-MIGRATION.md` |
+| Bekçi yazımı, kadans, commit kapısı | `docs/standart/TEST-VE-DERLEME-BEKCI.md`, `docs/standart/TEST-VE-DERLEME.md` |
+| Yeni uç, bayrak, enum değeri, izin (reçete) | `docs/RECETELER.md` |
+| İzin, rol, modül bayrağı, süperadmin | `docs/kurallar/yetki-izin.md` |
+| Migration, deploy, sürüm | `docs/kurallar/surum-yayin.md` |
+| Alan → bekçi haritası | `Teks-Erp/docs/BEKCI-HARITASI.md` |

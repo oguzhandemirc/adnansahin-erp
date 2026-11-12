@@ -34,7 +34,7 @@ Onay şartı kök `CLAUDE.md` § Süreç'te (yeni paket eklemeden önce kullanı
 6. Dağıtım      : mobilde OTA mı APK mı · Electron'da rebuild gerekiyor mu
 ```
 
-- **[KU-07]** "Elle yazmak" her kayıtta gerçek bir alternatiftir ve seçilebilir · zorlama: insan:alternatif değerlendirmesi mekanik değil · kanıt: `docs/kurallar/filtre-liste.md:84` — mobil takvim ızgarası elle yazıldı, sıfır bağımlılık · devralınan: yok
+- **[KU-07]** "Elle yazmak" her kayıtta gerçek bir alternatiftir ve seçilebilir · zorlama: insan:alternatif değerlendirmesi mekanik değil · kanıt: `docs/history/kurallar-2026-09/filtre-liste.md:84` — mobil takvim ızgarası elle yazıldı, sıfır bağımlılık · devralınan: yok
 - **[KU-08]** Kaydı olmayan bağımlılık üründe kalamaz · zorlama: bekçi:`test_dependency_contract.ts` (negatif sonda: bir paketi tabloya yazmadan ekle → kırmızı → geri al) · kanıt: `k01-olu-paket-uc-kanal.json` § `kaldirmaSirasi[8]` · devralınan: yok
 - **[KU-09]** Lisans permissive olacak (MIT/ISC/BSD/Apache-2.0/OFL); copyleft (GPL/LGPL/AGPL/SSPL) GİRMEZ ve istisnası yalnız kullanıcı kararıdır · zorlama: insan:lisans metni `package.json` alanından okunur ama "kabul edilebilir mi" hukuki karardır · kanıt: k01 § `lisans` — üç projede 2.858 paket tarandı, doğrudan bağımlılıklarda copyleft **0** · devralınan: yok
 - **[KU-10]** Geçişli tarama da yapılır ve çift lisanslı pakette seçilen permissive seçenek kayda YAZILIR · zorlama: insan:seçim beyandır, dosyadan okunmaz · kanıt: k01 § `lisans` — `jszip` "(MIT OR GPL-3.0-or-later)" → MIT seçilir; `node-forge` "(BSD-3 OR GPL-2.0)" → BSD-3; MPL-2.0/EPL-2.0 5 paket dosya düzeyinde zayıf copyleft, kütüphane olarak kullanım kapalı dağıtımı engellemez · devralınan: yok

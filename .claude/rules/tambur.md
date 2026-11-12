@@ -3,10 +3,22 @@ paths:
   - "**/*tambur*"
   - "**/*Tambur*"
   - "**/*finalize*"
-  - "**/*cut*"
-  - "**/*undo*"
   - "**/*roll-step*"
   - "**/*plan-gate*"
+  - "Teks-Erp/**/*undo*"
+  - "**/*roll-cancel*"
+  - "**/*RollCancel*"
+  - "**/*RollEdit*"
+  - "**/*manual-move*"
+  - "**/*manualAdjust*"
+  - "Teks-Erp/scripts/test_manual_*"
+  - "**/*scrap*"
+  - "**/*relabel*"
+  - "**/*Relabel*"
+  - "**/*variance*"
+  - "**/*traveler*"
+  - "**/*Traveler*"
+  - "**/*refakat*"
 ---
 
-Dokunduğun dosya **Tambur · Finalize · Kesim · Geri alma** alanına giriyor. Kod yazmadan/değiştirmeden ÖNCE `docs/kurallar/tambur.md` dosyasını oku (bugün geçerli kurallar, geçersiz kılınanlar, çözülmüş çelişkiler, koşulacak bekçiler). Bitince o alanın bekçilerini koş (`/bekci-kos`). Yeni karar çıktıysa `/karar-notu` ile yaz.
+Dokunduğun dosya **Tambur · Top düzeltme · Refakat kartı** alanına giriyor. Kod yazmadan/değiştirmeden ÖNCE `docs/kurallar/tambur.md` dosyasını oku (kurallar, tuzaklar, alanın bekçileri). Bitince o alanın bekçilerini koş (`/bekci-kos`). Yeni karar çıktıysa `/karar-notu` ile yaz.

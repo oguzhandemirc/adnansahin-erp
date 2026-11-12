@@ -259,7 +259,14 @@ function main(): void {
   // gerekirdi — yani kapı doğru davranışı PAHALILAŞTIRIRDI.
   const capalar = capaAlanlari(dosyalar.index);
   // KÖRLÜK ZEMİNİ: hiç `Çapa:` bulunamazsa "ölü ad yok" cümlesi VAKUMEN doğru olur.
-  check("körlük zemini: `Çapa:` alanı bulundu", capalar.length > 0, `${capalar.length} alan`);
+  // `Çapa:` yalnız eski "· bekçi: `…`" biçiminin kardeşidir; yeni `[bekçi: …]` biçiminde
+  // vaat ZORLANMAYANLAR.md'de yaşar. Eski biçim satırı varken zemin sert kalır.
+  const eskiBicim = alanlar.filter((a) => a.tamSatir.includes("bekçi: `")).length;
+  check(
+    "körlük zemini: `Çapa:` alanı bulundu (eski biçim yoksa kol konusuz)",
+    capalar.length > 0 || eskiBicim === 0,
+    `${capalar.length} alan · eski biçim ${eskiBicim} satır`,
+  );
   const oluCapa = capalar.filter(
     (c) => !c.kapanirVar && adAdaylari(c.icerik).some((ad) => !gercek.has(ad)),
   );

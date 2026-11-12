@@ -252,7 +252,7 @@ if (staged.some((f) => SURUM_NOTU_YOLLARI.has(f))) {
   });
 }
 
-// KANAL KAPILARI (testfabrika D2): dağıtım kanalı kimliğine ya da yayın betiklerine dokunan
+// KANAL KAPILARI: dağıtım kanalı kimliğine ya da yayın betiklerine dokunan
 // commit iki kanal bekçisini görür — ikisi de zero-dep/DB'siz/ağsız, CI dışında yalnız burada
 // koşarlar. Tetik bekçilerin OKUDUĞU kümeden türer (`kanalBekcisiTetigi`, elle sayılmaz);
 // kapsamını check-kanallar §6 ve test_kanal_yayin_kapisi 5i ölçer (okunandan dar olamaz).

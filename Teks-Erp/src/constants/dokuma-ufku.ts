@@ -1,5 +1,5 @@
 // =============================================================================
-// DOKUMA UFKU — TEK KAYNAK, AYRI AD (rapor sözleşmesi ②, `docs/kurallar/dokuma.md`)
+// DOKUMA UFKU — TEK KAYNAK, AYRI AD (rapor sözleşmesi ②, `docs/history/kurallar-2026-09/dokuma.md`)
 // =============================================================================
 // Tezgah verisinin (duruş · koşum · indirme · karne) toplanmaya başladığı fabrika
 // günü: rapor "her şey tutuyor" demez, "şu günden sonrası ölçülü" der ve ufuktan

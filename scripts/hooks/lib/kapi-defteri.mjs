@@ -11,7 +11,7 @@
 //
 // KAPSAM BEYANI: yalnız BU MAKİNENİN commit kapıları ve `agir-is.mjs` ile sarmalanan
 //    işler; CI kapıları burada yok, tmpdir temizlenirse iz gider. Bir ölçüm aracıdır,
-//    defter/denetim kaydı değil (saklama süresi sonlu — kök CLAUDE.md § telemetri).
+//    defter/denetim kaydı değil (saklama süresi sonlu — docs/kurallar/defter.md).
 //
 // ⚠️ BEST-EFFORT: defter yüzünden kapı ASLA düşmez — yazılamıyorsa sessiz. Tek istisna
 //    TANIMSIZ GLİF: ✅/❌/⏭ dışı bir sonuç satır OLMAZ (sessiz "?" değil) ve stderr'e tek

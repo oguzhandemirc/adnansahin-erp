@@ -72,7 +72,7 @@ describe("derlenen kanal — kimlik kayıttan", () => {
 
   it("her kayıtlı kanal çözülüyor: adres kökten türer, başlık ürün adını (ve varsa etiketi) taşır", () => {
     const kodlar = registeredChannelCodes();
-    expect(kodlar.length).toBeGreaterThanOrEqual(2);
+    expect(kodlar.length).toBeGreaterThanOrEqual(1);
     for (const kod of kodlar) {
       const k = panelChannel(kod);
       expect(k.updateFeedUrl, kod).toBe(`${UPDATE_BASE_URL}${kod}/electron/`);
@@ -84,29 +84,29 @@ describe("derlenen kanal — kimlik kayıttan", () => {
 
   it("⭐ üretim kanalında etiket YOK → başlık ürün adının kendisi (bugünkü görünüm)", () => {
     expect(windowTitleOf("Adnan Şahin ERP", null)).toBe("Adnan Şahin ERP");
-    expect(windowTitleOf("TeksERP Test Fabrika", "TEST FABRİKA")).toBe("TEST FABRİKA · TeksERP Test Fabrika");
+    expect(windowTitleOf("Örnek ERP", "TEST")).toBe("TEST · Örnek ERP");
   });
 
   it("⭐ tanınmayan kanal derlemeyi DURDURUR (fail-closed)", () => {
-    expect(() => panelChannel("testfabirka")).toThrow(/BİLİNMEYEN KANAL/);
-    expect(buildChannelCode({ [CHANNEL_ENV]: "testfabrika" })).toBe("testfabrika");
+    expect(() => panelChannel("adnansahn")).toThrow(/BİLİNMEYEN KANAL/);
+    expect(buildChannelCode({ [CHANNEL_ENV]: "adnansahin" })).toBe("adnansahin");
     expect(buildChannelCode({})).toBe(musteri.kod);
   });
 
   it("sanal modül her alanı adlı dışa aktarım olarak verir (ağaç sallama kullanılmayanı atar)", () => {
-    const src = virtualModuleSource(panelChannel("testfabrika"));
-    expect(src).toContain('export const appId = "com.etkiliyazilim.teks-erp.testfabrika";');
-    expect(src).toContain('export const label = "TEST FABRİKA";');
+    const src = virtualModuleSource(panelChannel("adnansahin"));
+    expect(src).toContain('export const appId = "com.etkiliyazilim.adnan-sahin-erp";');
+    expect(src).toContain("export const label = null;");
     expect(src).not.toMatch(/export default/);
   });
 
   it("⭐ index.html başlığı kanaldan yazılır; yer tutucu yoksa derleme durur", () => {
     const html = readFileSync(resolve(process.cwd(), "index.html"), "utf-8");
     expect(html).toContain(`<title>${TITLE_PLACEHOLDER}</title>`);
-    const hook = channelPlugin(panelChannel("testfabrika")).transformIndexHtml as unknown as {
+    const hook = channelPlugin(panelChannel("adnansahin")).transformIndexHtml as unknown as {
       handler: (h: string) => string;
     };
-    expect(hook.handler(html)).toContain("<title>TEST FABRİKA · TeksERP Test Fabrika</title>");
+    expect(hook.handler(html)).toContain("<title>Adnan Şahin ERP</title>");
     expect(() => hook.handler("<title>Adnan Şahin ERP</title>")).toThrow(/yer tutucusu/);
   });
 });

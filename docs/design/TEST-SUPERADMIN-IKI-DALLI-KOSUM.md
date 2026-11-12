@@ -3,7 +3,7 @@
 > **Bu belge bir TASARIMDIR; fikstür kararı VERİLDİ (2026-09-12), kod henüz
 > yazılmadı.** Hedef "3 atlama"yı sıfırlamak DEĞİL: her atlamanın gerekçesinin
 > ÖLÇÜLMÜŞ olması ve atlanan kontrolün **bir yerde** ölçülmüş olması. Kural
-> satırı `docs/kurallar/superadmin.md`'ye girer.
+> satırı `docs/history/kurallar-2026-09/superadmin.md`'ye girer.
 
 ## Soru
 

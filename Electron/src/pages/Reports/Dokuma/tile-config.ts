@@ -2,7 +2,7 @@ import { Gauge, ListChecks, ClipboardList, Link2, Timer } from "lucide-react";
 import type { HubTile } from "../_components/ReportHubGrid";
 
 /**
- * Dokuma raporları — rapor sözleşmesi `docs/kurallar/dokuma.md` § Raporların sözleşmesi.
+ * Dokuma raporları — rapor sözleşmesi `docs/history/kurallar-2026-09/dokuma.md` § Raporların sözleşmesi.
  * Üç rapor + karne listesi (mühür eylemleri). Adres kalıbı ÜÇ segment (`ReportSideRail`).
  * Karo yalnız `dokuma.enabled` açıkken çizilir (`dokuma-regime.ts`).
  */

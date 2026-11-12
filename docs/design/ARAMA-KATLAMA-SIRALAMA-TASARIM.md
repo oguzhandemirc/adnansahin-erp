@@ -2,7 +2,7 @@
 
 > **Durum:** F1-F4 UYGULANDI ve commit edildi (2026-08-19) — bkz. §0.2 "Uygulamada değişenler".
 > F5 (canlı deploy) 2026-08-24'te SURUM-2.9.0 ile sahaya çıktı; F6 ayrı iş.
-> ⚠️ Planın dayandığı "cumartesi veri sıfırlaması" GERÇEKLEŞMEDİ (rafa kalktı) — sıfırlamaya bağlı her karar sonradan değişti; bkz. §0.2 D3 ve `docs/kurallar/mukerrer.md`.
+> ⚠️ Planın dayandığı "cumartesi veri sıfırlaması" GERÇEKLEŞMEDİ (rafa kalktı) — sıfırlamaya bağlı her karar sonradan değişti; bkz. §0.2 D3 ve `docs/history/kurallar-2026-09/mukerrer.md`.
 > Aşağıdaki plan metni ORİJİNALDİR; uygulama sırasında ölçümle değişen kararlar §0.2'de listelenir. Cumartesi (2026-08-22) veri sıfırlaması;
 > uygulama sıfırlama penceresinde ya da hemen sonrasında (tablolar boşken index/generated kolon bedava).
 > **Kapsam:** Teks-Erp (backend + migration) · Electron · mobil. **Ön çalışma:** `b66829d5` (adlar BÜYÜK, istemci katlaması).

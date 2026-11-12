@@ -2,7 +2,7 @@
 // DOKUMA RAPOR SÖZLEŞMESİNİN ÖN KOŞULLARI
 //
 // ⚠️ BU BEKÇİ RAPORU ÖLÇMEZ — RAPORUN ÖLÇÜLEBİLİR OLMASINI ÖLÇER. Fark önemli:
-// `docs/kurallar/dokuma.md`'deki üç rapor cümlesi (① randıman üç oran ·
+// `docs/history/kurallar-2026-09/dokuma.md`'deki üç rapor cümlesi (① randıman üç oran ·
 // ② Pareto iki eksen · ③ kaynak kırılımı) raporun ÇIKTISI üzerinde mandaldır ve
 // o çıktı bugün YOKTUR — ne rapor servisi ne de sözleşmenin adıyla andığı
 // taşıyıcı (`MachineShiftStat`) indi (ölçüldü 2026-09-13). Çıktı bekçisini

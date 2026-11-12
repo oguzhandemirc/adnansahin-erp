@@ -50,8 +50,8 @@ release/<sürüm>/           latest.yml              latest.yml'e bakar
   çizilir — giriş ekranında, tam panelde ve patron kabuğunda. Giriş ekranında
   kaydedilmemiş iş olmadığı için geri sayım 15 sn'dir (oturum açıkken 2 dk kalır).
   Eskiden kapı yalnız giriş sonrası kabuktaydı: giriş ekranında inen paket
-  `pending`de bekledi, kapatıp açmak kurmadı (1.3.5 ve 1.3.6 testfabrikada bu
-  yüzden kurulmadı, 2026-09-28). Sürüm politikası kilidi (`minVersion`) yalnız
+  `pending`de bekledi, kapatıp açmak kurmadı (1.3.5 ve 1.3.6 eski hazırlık
+  kanalında bu yüzden kurulmadı, 2026-09-28). Sürüm politikası kilidi (`minVersion`) yalnız
   oturum açıkken uygulanır. Bekçi: `src/test/update-gate-her-ekranda.test.tsx`.
 - **Kapanışta sessiz kurulum bilerek KAPALI** (`autoInstallOnAppQuit = false`):
   uygulama "Program Files"a kurulu olduğu için Windows izin sorar; kapanışta
@@ -263,8 +263,7 @@ Kural + bekçi: `scripts/lib/surum.mjs` · `scripts/test_surum.mjs`.
 Script kanalın kimliğini kayıttan alır ve **derleme anında** iki derleyiciye verir
 (electron-builder `-c.*` + `TEKSERP_KANAL` → electron-vite); ağaca kimlik yazmaz (yalnız
 sürüm numarasını), derlemeden **sonra** paketin içini okuyup doğru kanalı gösterdiğini
-doğrular. Hazırlık kanalı (`testfabrika`) pencere başlığında ve üst şeritte **"TEST FABRİKA"**
-işaretini taşır; üretim kanalında işaret yoktur.
+doğrular. Tek kanal `adnansahin` (hazırlık kanalı ve terfi kapısı yok); yayın yalnız kullanıcının o sürüm için açık onayıyla.
 
 ⚠️ **Ham `npm run build:win` kullanma.** O, ağaçtaki dinlenme tabanıyla (`varsayilan`
 kanal) derler ve hiçbir kapıdan geçmez. Paketleme script'i tam olarak bu hatayı önlemek için var.

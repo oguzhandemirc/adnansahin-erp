@@ -9,6 +9,22 @@ paths:
   - "**/*content-routes*"
   - "**/*ProtectedRoute*"
   - "**/*PermissionGate*"
+  - "**/*superadmin*"
+  - "**/*system-account*"
+  - "**/*settings-password*"
+  - "**/*SettingsPassword*"
+  - "**/*auth*"
+  - "**/*totp*"
+  - "**/*feature-flag*"
+  - "**/*featureFlag*"
+  - "**/*module-flag*"
+  - "**/*module-profile*"
+  - "**/*module.middleware*"
+  - "**/*system-setting*"
+  - "**/GeneralSettings/**"
+  - "**/*flag-modules*"
+  - "**/*screen-catalog*"
+  - "**/*settings-surface*"
 ---
 
-Dokunduğun dosya **Yetki · İzin · Rol** alanına giriyor. Kod yazmadan/değiştirmeden ÖNCE `docs/kurallar/yetki-izin.md` dosyasını oku (bugün geçerli kurallar, geçersiz kılınanlar, çözülmüş çelişkiler, koşulacak bekçiler). Bitince o alanın bekçilerini koş (`/bekci-kos`). Yeni karar çıktıysa `/karar-notu` ile yaz.
+Dokunduğun dosya **Yetki · İzin · Rol · Süperadmin · Modül bayrakları** alanına giriyor. Kod yazmadan/değiştirmeden ÖNCE `docs/kurallar/yetki-izin.md` dosyasını oku (kurallar, tuzaklar, alanın bekçileri). Bitince o alanın bekçilerini koş (`/bekci-kos`). Yeni karar çıktıysa `/karar-notu` ile yaz.
