@@ -35,7 +35,7 @@ function oku(path: string, q: Query | undefined): unknown {
   if (p[0] === "anlik" && p[1]) {
     const veri = ORNEK_ANLIK()[p[1]];
     if (veri === undefined) throw yok();
-    return { projeksiyon: p[1], veri, surum: "1" };
+    return { projeksiyon: p[1], veri, surum: new Date(Date.now() - 180_000).toISOString() };
   }
   if (p[0] === "veri" && p[1] && p[2]) {
     const r = (ORNEK_LISTE()[p[1]] ?? []).find((x) => x.id === p[2]);

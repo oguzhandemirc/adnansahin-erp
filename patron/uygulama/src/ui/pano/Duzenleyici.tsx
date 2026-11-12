@@ -26,6 +26,7 @@ export function DuzenListesi({ kutular, onCikar, onTasi }: {
   }
   return (
     <View style={s.liste} testID="duzen-listesi">
+      <Text style={s.ipucu}>Okla sırayı değiştir, eksi ile panodan kaldır. Değişiklik bu cihazda saklanır.</Text>
       {kutular.map((a, i) => {
         const k = kutu(a);
         return (
@@ -53,8 +54,8 @@ function OkDugmesi({ icon, etiket, kapali, onPress, testID }: { readonly icon: "
   const t = useTokens();
   const s = useStyles();
   return (
-    <Basilabilir onPress={onPress} disabled={kapali} style={[s.ok, kapali && { opacity: 0.3 }]} basiliZemin={t.color.pressed} accessibilityRole="button" accessibilityLabel={etiket} accessibilityState={{ disabled: kapali }} testID={testID}>
-      <Ionicons name={icon} size={22} color={t.color.text} />
+    <Basilabilir onPress={onPress} disabled={kapali} style={s.ok} basiliZemin={t.color.pressed} accessibilityRole="button" accessibilityLabel={etiket} accessibilityState={{ disabled: kapali }} testID={testID}>
+      <Ionicons name={icon} size={22} color={kapali ? t.color.border : t.color.text} />
     </Basilabilir>
   );
 }
@@ -144,6 +145,7 @@ export function KutuEkleSayfasi({ acik, katalog, ekli, onDegis, onKapat }: {
 
 const useStyles = makeStyles((t) => ({
   liste: { gap: space.s },
+  ipucu: { ...typography.footnote, color: t.color.textMuted, marginBottom: space.xs },
   bos: { ...typography.callout, color: t.color.textMuted, textAlign: "center" as const, paddingVertical: space.xxl },
   satir: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, minHeight: 60, paddingLeft: space.xs, paddingRight: space.xxs, borderRadius: t.radius.card, borderWidth: 1, borderColor: t.color.cardBorder, backgroundColor: t.color.card, ...t.shadow.soft },
   cikar: { width: 40, height: TOUCH, alignItems: "center" as const, justifyContent: "center" as const },

@@ -1,18 +1,19 @@
-// "ÖRNEK VERİ" rozeti: örnek veri kipinde (yalnız geliştirme) her ekranın üstünde kalıcı, dokunmayı geçirir.
+// "ÖRNEK VERİ" rozeti: örnek veri kipinde (yalnız geliştirme) her ekranda sol altta, sekme çubuğunun hemen üstünde
+// kalıcı; dokunmayı geçirir. Başlık çubuğundaki küçük başlıkla ve eylem düğmeleriyle çakışmasın diye altta.
 // Ekrandaki sayıların gerçek olmadığını hiçbir an unutturmaz.
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ornekVeriAcik } from "../ornek/kapi";
 import { useTokens } from "./theme-context";
-import { typography } from "./tokens";
+import { TAB_BAR_HEIGHT, space, typography } from "./tokens";
 
 export function OrnekVeriRozeti() {
   const t = useTokens();
   const insets = useSafeAreaInsets();
   if (!ornekVeriAcik()) return null;
   return (
-    <View pointerEvents="none" testID="ornek-veri-rozeti" style={{ position: "absolute", top: insets.top + 2, left: 0, right: 0, alignItems: "center" }}>
-      <View style={{ backgroundColor: t.color.warning.bg, borderColor: t.color.warning.fg, borderWidth: 1, borderRadius: t.radius.badge, paddingHorizontal: 8, paddingVertical: 1 }}>
+    <View pointerEvents="none" testID="ornek-veri-rozeti" style={{ position: "absolute", bottom: TAB_BAR_HEIGHT + insets.bottom + space.s, left: space.s }}>
+      <View style={{ backgroundColor: t.color.warning.bg, borderColor: t.color.warning.fg, borderWidth: 1, borderRadius: t.radius.badge, paddingHorizontal: space.s, paddingVertical: 1, ...t.shadow.soft }}>
         <Text style={{ ...typography.micro, color: t.color.warning.fg, letterSpacing: 0.6 }} maxFontSizeMultiplier={1.2}>ÖRNEK VERİ</Text>
       </View>
     </View>

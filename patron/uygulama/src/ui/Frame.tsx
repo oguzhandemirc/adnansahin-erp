@@ -15,7 +15,7 @@ import { MODULE_ICON } from "./icons";
 import { Banner } from "./kit";
 import { LargeHeader, LargeTitle, useHeaderScroll } from "./LargeHeader";
 import { RoleBadge } from "./RoleBadge";
-import { RAIL_GROUPS } from "./tabs";
+import { RAIL_GROUPS, TABS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
 import { CONTENT_MAX, RAIL_WIDTH, TOUCH, WIDE_MIN, space, typography } from "./tokens";
 import { UYGULAMA_ADI } from "../lib/kimlik";
@@ -96,7 +96,7 @@ export interface ScreenProps {
   /** Verilirse izin yoksa içerik yerine uyarı çizilir. */
   readonly module?: ModuleKey;
   readonly children: ReactNode;
-  /** Telefonda geri düğmesi; verilmezse "Pano" dışındaki her ekranda var. Sekme kökleri `false` verir. */
+  /** Telefonda geri düğmesi; verilmezse sekme kökleri (`TABS` yolları) dışındaki her ekranda var. */
   readonly back?: boolean;
   /** Aşağı çekip yenileme (verilirse). */
   readonly onRefresh?: () => void;
@@ -120,7 +120,8 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const { permissions, switchError } = useSession();
   const { scrollY, onScroll } = useHeaderScroll();
   const allowed = module === undefined || moduleVisible(permissions, module);
-  const showBack = !wide && (back ?? title !== "Pano");
+  const path = usePathname();
+  const showBack = !wide && (back ?? !TABS.some((tab) => tab.route === path));
   const pad = wide ? space.xl : space.l;
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/pano"));
   return (

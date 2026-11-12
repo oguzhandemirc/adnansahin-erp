@@ -1,7 +1,7 @@
 // Kademeli giriş: liste/kart ilk çizildiğinde öğeler sırayla, hafif aşağıdan solarak belirir (reanimated `entering`,
 // UI iş parçacığında). Gecikme `kademe(sira)` ile sınırlı → toplam ≤ 400 ms. Hareket azaltıldıysa düz görünüm.
 import type { ReactNode } from "react";
-import { View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useHareketAzalt } from "./azalt";
 import { EGRI, KADEME, SURE, kademe } from "./sabitler";
@@ -22,7 +22,9 @@ export function solmaAnimasyonu(azalt: boolean) {
 
 export function KademeliGiris({ sira = 0, children, style, testID }: { readonly sira?: number; readonly children: ReactNode; readonly style?: StyleProp<ViewStyle>; readonly testID?: string }) {
   const azalt = useHareketAzalt();
-  if (azalt) return <View style={style} testID={testID}>{children}</View>;
+  // Web'de reanimated giriş animasyonu, yeniden çizilen kapları donmuş mutlak konumlu kopya olarak bırakıyor
+  // (pano kutuları üst üste biniyordu); web düz görünüm çizer, telefon animasyonlu kalır.
+  if (azalt || Platform.OS === "web") return <View style={style} testID={testID}>{children}</View>;
   return (
     <Animated.View entering={girisAnimasyonu(sira, false)} style={style} testID={testID}>
       {children}
