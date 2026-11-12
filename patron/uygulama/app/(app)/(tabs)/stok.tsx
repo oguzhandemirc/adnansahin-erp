@@ -1,18 +1,16 @@
 // Stok — "ne var, kaç gündür duruyor": ham · yarı mamul · bitmiş (metre + top) · ölü stok uyarısı · yaş dağılımı ·
-// müşteri malı (emanet, PB1: `emanet-bakiye`) · kumaş bazında ilk satırlar. Tek kaynak `stok-karnesi` (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
+// müşteri malı (emanet, PB1: `emanet-bakiye`) · ürün bazında ilk satırlar. Renk/depo kırılımı veride yok → çizilmez. Tek kaynak `stok-karnesi` (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { DEAD_STOCK_STATUS, STOCK_AGE_TONE, UNIT } from "../../../src/lib/labels/uretim";
 import { AgingBar } from "../../../src/ui/charts";
 import { Screen } from "../../../src/ui/Frame";
-import { KpiCard, KpiGrid } from "../../../src/ui/KpiCard";
-import { ListGroup, ListRow } from "../../../src/ui/ListRow";
+import { KademeliGiris } from "../../../src/ui/hareket";
+import { ListeBlogu, ListeSatiri, SectionCard, StatCard } from "../../../src/ui/ortak";
 import { arr, num, obj, pct, qty, str } from "../../../src/ui/pano/read";
 import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { ConsignedSection } from "../../../src/ui/fason/FasonCards";
-import { SectionHeader } from "../../../src/ui/SectionHeader";
-import { StatusBadge } from "../../../src/ui/StatusBadge";
 import { makeStyles } from "../../../src/ui/theme-context";
 import { space, typography } from "../../../src/ui/tokens";
 
@@ -39,25 +37,31 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
   return (
     <View>
       {stamp}
-      <KpiGrid testID="stok-kpi">
-        <KpiCard label="Ham" value={qty(o.hamMiktar)} unit={UNIT.metre} caption={`${qty(o.hamAdet)} ${UNIT.top}`} domain="stok" icon="layers-outline" testID="kpi-ham" />
-        <KpiCard label="Yarı mamul" value={qty(o.yariMamulMiktar)} unit={UNIT.metre} caption={`${qty(o.yariMamulAdet)} ${UNIT.top}`} domain="stok" icon="sync-outline" testID="kpi-yari" />
-        <KpiCard label="Bitmiş" value={qty(o.bitmisMiktar)} unit={UNIT.metre} caption={`${qty(o.bitmisAdet)} ${UNIT.top}`} domain="stok" icon="cube-outline" testID="kpi-bitmis" />
-      </KpiGrid>
-
-      <View style={[s.dead, dead ? s.deadOn : null]} testID="olu-stok" accessible accessibilityLabel={`Ölü stok: ${qty(o.oluMiktar)} ${UNIT.metre}`}>
-        <View style={s.deadHead}>
-          <Text style={s.deadTitle}>Ölü stok</Text>
-          <StatusBadge kind={deadSt.tone} label={deadSt.label} size="sm" testID="olu-stok-rozet" />
+      <KademeliGiris sira={0} style={s.ikili}>
+        <View style={s.yarim}>
+          <StatCard etiket="Ham" icon="layers-outline" ton="teal" degerler={[{ deger: qty(o.hamMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.hamAdet)} ${UNIT.top}`} testID="kpi-ham" />
         </View>
-        <Text style={s.deadValue}>{`${qty(o.oluMiktar)} ${UNIT.metre}`}</Text>
-        <Text style={s.deadNote}>{`${qty(o.oluStokGun)} günden uzun duran ve siparişi olmayan bitmiş stok · yaşlı ${qty(o.yasliMiktar)} ${UNIT.metre}`}</Text>
-      </View>
+        <View style={s.yarim}>
+          <StatCard etiket="Yarı mamul" icon="sync-outline" ton="blue" degerler={[{ deger: qty(o.yariMamulMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.yariMamulAdet)} ${UNIT.top}`} testID="kpi-yari" />
+        </View>
+      </KademeliGiris>
+      <KademeliGiris sira={1} style={s.ikili}>
+        <View style={s.yarim}>
+          <StatCard etiket="Bitmiş" icon="cube-outline" ton="green" degerler={[{ deger: qty(o.bitmisMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.bitmisAdet)} ${UNIT.top}`} testID="kpi-bitmis" />
+        </View>
+        <View style={s.yarim}>
+          <StatCard
+            etiket="Ölü stok" icon="hourglass-outline" ton={dead ? "amber" : "green"}
+            degerler={[{ deger: qty(o.oluMiktar), birim: UNIT.metre }]}
+            ipucu={`${deadSt.label} · ${qty(o.oluStokGun)} günden uzun, siparişsiz`}
+            testID="olu-stok"
+          />
+        </View>
+      </KademeliGiris>
 
       {ages.length > 0 ? (
-        <>
-          <SectionHeader title="Yaş dağılımı" domain="stok" testID="bolum-yas" />
-          <View style={s.card}>
+        <KademeliGiris sira={2} style={s.blok}>
+          <SectionCard baslik="Yaş dağılımı" aciklama={`Yaşlı ${qty(o.yasliMiktar)} ${UNIT.metre}`} testID="bolum-yas">
             <AgingBar
               testID="yas-kovalari"
               segments={ages.map((a) => ({
@@ -68,43 +72,38 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
               }))}
             />
             {(num(o.yassizAdet) ?? 0) > 0 ? <Text style={s.footnote}>{`Yaşı bilinmeyen: ${qty(o.yassizAdet)} ${UNIT.top} · ${qty(o.yassizMiktar)} ${UNIT.metre}`}</Text> : null}
-          </View>
-        </>
+          </SectionCard>
+        </KademeliGiris>
       ) : null}
 
       <ConsignedSection scorecardOzet={o} />
 
       {items.length > 0 ? (
-        <>
-          <SectionHeader title="Kumaş bazında" domain="stok" testID="bolum-kumas" />
-          <ListGroup testID="stok-kumaslar">
-            {items.map((i) => {
+        <KademeliGiris sira={3}>
+          <ListeBlogu baslik="Ürün bazında" sayi={items.length} testID="stok-kumaslar">
+            {items.map((i, n) => {
               const open = (num(i.siparissizMiktar) ?? 0) > 0;
               const oldest = num(i.enEskiGun);
               return (
-                <ListRow
+                <ListeSatiri
                   key={String(i.anahtar)}
-                  title={str(i.etiket) ?? "—"}
-                  subtitle={`${qty(i.adet)} ${UNIT.top}${oldest === null ? "" : ` · en eski ${qty(oldest)} ${UNIT.gun}`}${open ? ` · siparişsiz ${qty(i.siparissizMiktar)} ${UNIT.metre}` : ""}`}
-                  value={`${qty(i.miktar)} ${UNIT.metre}`}
-                  domain="stok"
+                  birincil={str(i.etiket) ?? "—"}
+                  ikincil={`${qty(i.adet)} ${UNIT.top}${oldest === null ? "" : ` · ${qty(oldest)} ${UNIT.gun}`}${open ? ` · siparişsiz ${qty(i.siparissizMiktar)}` : ""}`}
+                  deger={`${qty(i.miktar)} ${UNIT.metre}`}
+                  ayrac={n > 0}
                 />
               );
             })}
-          </ListGroup>
-        </>
+          </ListeBlogu>
+        </KademeliGiris>
       ) : null}
     </View>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  card: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, marginBottom: space.m, ...t.cardShadow },
-  dead: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, borderWidth: 1, borderColor: t.color.cardBorder, borderLeftColor: t.status.iyi.fill, marginBottom: space.m, ...t.cardShadow },
-  deadOn: { borderLeftColor: t.status.uyari.fill },
-  deadHead: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const },
-  deadTitle: { ...typography.headline, color: t.text },
-  deadValue: { ...typography.kpi, color: t.text, marginTop: space.s },
-  deadNote: { ...typography.footnote, color: t.textSecondary, marginTop: space.xs },
-  footnote: { ...typography.footnote, color: t.textSecondary, marginTop: space.m },
+  ikili: { flexDirection: "row" as const, gap: space.m, marginBottom: space.m },
+  yarim: { flex: 1, minWidth: 0 },
+  blok: { marginBottom: space.m },
+  footnote: { ...typography.footnote, color: t.color.textMuted, marginTop: space.m },
 }));

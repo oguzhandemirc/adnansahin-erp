@@ -24,7 +24,7 @@ export function SectionHeader({ title, count, icon, actionLabel = "Tümü", onAc
   return (
     <View style={s.row} testID={testID}>
       {icon ? <IconChip domain={domain ?? "genel"} icon={icon} size={28} /> : null}
-      <Text style={[s.title, domain ? { color: t.domain[domain].fg } : null]} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>
+      <Text style={s.title} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>
         {title}
       </Text>
       {count !== undefined ? <Text style={s.count}>{count}</Text> : null}
@@ -40,10 +40,11 @@ export function SectionHeader({ title, count, icon, actionLabel = "Tümü", onAc
 }
 
 const useStyles = makeStyles((t) => ({
-  row: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginTop: space.l, marginBottom: space.s },
-  title: { ...typography.title3, color: t.text },
-  count: { ...typography.footnote, ...tabularNums, fontWeight: "600" as const, color: t.textSecondary, backgroundColor: t.surfaceAlt, borderRadius: t.radius.chip, paddingHorizontal: space.s, paddingVertical: 1, overflow: "hidden" as const },
+  // Yeni bölüm başlığı dili (ortak `BlokBasligi` ile aynı): küçük, büyük harf, muted; alan rengi YOK (tek tema rengi).
+  row: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, minHeight: 32, marginTop: space.l, marginBottom: space.xs },
+  title: { ...typography.caption, fontWeight: "600" as const, color: t.color.textMuted, textTransform: "uppercase" as const, letterSpacing: 0.5 },
+  count: { ...typography.caption, ...tabularNums, fontWeight: "600" as const, color: t.color.textMuted },
   flex: { flex: 1 },
   action: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: 2, paddingLeft: space.s },
-  actionText: { ...typography.subhead, color: t.tint },
+  actionText: { fontSize: 15, lineHeight: 20, fontWeight: "600" as const, color: t.color.link },
 }));
