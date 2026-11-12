@@ -38,6 +38,15 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Benzer adlı müşteri varsa telefon kartı RET alır ("Benzer müşteri var: …"); eşik panelin uyarı yüzeyiyle aynı `findSimilarNames`tir, panel aynı adayda yalnız uyarır — ayrı firma ise kart panelden açılır. [bekçi: test_patron_bulut_gelen_kutusu]
 - Belirsiz hatalı mesaj üç turda makbuzlu "fabrikada işlenemedi" retle kapanır; deneme sayacı süreç belleğindedir ve yeniden başlatma idempotent tekrarla zararsızdır. [bekçi: test_patron_bulut_gelen_kutusu]
 
+### Rapor isteği (D5)
+
+- Rapor fabrikada hesaplanır: patron isteği buluttan çekilir ve panel ucunun çağırdığı servis panelin argümanlarıyla çağrılır (`cloud-sync/remote-reports.ts`); ikinci rapor tanımı yazılmaz. [bekçi: test_patron_bulut_rapor]
+- Telefon ve panel aynı rapora aynı sayıyı verir: sonuç panelin `res.json` serileştirmesinden geçer ve panel ucunun `data`sıyla kanonik eşitliği ölçülür. [bekçi: test_patron_bulut_rapor]
+- Yalnız `rapor-katalogu`ndaki 6 karne istenebilir; katalog dışı kod `RAPOR_BILINMIYOR`, panelde kapalı rapor `RAPOR_KAPALI`, geçersiz parametre `PARAMETRE_GECERSIZ` RET'iyle döner. [bekçi: test_patron_bulut_rapor]
+- Rapor sonucu finans alanı taşımaz: finans adlı her anahtar (iç içe) gönderilmeden önce düşürülür. [bekçi: test_patron_bulut_rapor]
+- Aynı anda tek rapor hesaplanır ve rapor başına süre sınırı 60 sn'dir: aşan istek `ZAMAN_ASIMI` alır, o hesap bitmeden yeni rapor başlamaz; 4 MB (gzip) üstü sonuç `SONUC_BUYUK` RET'idir. [bekçi: test_patron_bulut_rapor]
+- Rapor işinin ayrı düğmesi yoktur: eşitleme ön koşulu açıkken başlar, kapanınca durur; aralık `patronCloud.reportIntervalSeconds` (20–600 sn, varsayılan 30; aralık dışı değer varsayılana düşer). [bekçi: test_patron_bulut_rapor]
+
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 
 1. `.env`: `PATRON_CLOUD_URL=https://<bulut kökeni>` ve `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (dosya veri dizininde, repoda değil).
@@ -54,9 +63,11 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ## Bekçiler
 
-Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
+Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
+
+Rapor isteği hacim ölçümü bekçi değildir, yalnız yerel `_prova`/`_test` veritabanında koşar: `Teks-Erp/scripts/olcum_patron_bulut_rapor.ts` (6 karne × süre, boyut, panel eşitliği, yük altında panel sorgusu gecikmesi).
 
 Uçtan uca eşitleme ölçümü de bekçi değildir, yalnız yerel `_prova`/`_test` veritabanı ve `127.0.0.1` bulutuyla koşar: `Teks-Erp/scripts/olcum_patron_esitleme_uctan_uca.ts` (ilk TAM, sayım eşleşmesi, artımlı, bulut kapalı/açık, kapatma).
 

@@ -111,9 +111,8 @@ function disarmNet(): void {
 }
 
 // ── karşılaştırma yardımcıları ──────────────────────────────────────────────
-type Dmmf = { datamodel: { models: Array<{ name: string; fields: Array<{ name: string; kind: string; type: string }> }> } };
 function scalarFields(model: string): string[] {
-  const m = (Prisma as unknown as { dmmf: Dmmf }).dmmf.datamodel.models.find((x) => x.name === model);
+  const m = Prisma.dmmf.datamodel.models.find((x) => x.name === model);
   return (m?.fields ?? []).filter((f) => f.kind === "scalar" || f.kind === "enum").map((f) => f.name);
 }
 function norm(v: unknown): unknown {
@@ -406,7 +405,8 @@ async function main(): Promise<void> {
     // ── §d benzer ad ─────────────────────────────────────────────────────────
     console.log("\n§d benzer ad → RET; eşik panelin uyarı yüzeyiyle aynı kod yolu");
     check("⭐ benzerlik fonksiyonu panel servisininkiyle AYNI (kopya eşik yok)", inboxCardWriter.findSimilarNames === customerService.findSimilarNames);
-    const panelConfig = (customerService as unknown as { config: unknown }).config;
+    // `config` korumalı üye: imza değil DEĞER karşılaştırılır, okuma tipsiz kalır.
+    const panelConfig: unknown = Reflect.get(customerService, "config");
     check("⭐ telefon kart yazıcısının yapılandırması panelinkiyle birebir", canonical(INBOX_CUSTOMER_CONFIG) === canonical(panelConfig));
     const inputName = (mC.govde as { ad: string }).ad;
     const baseName = (await prisma.customer.findUniqueOrThrow({ where: { id: c1?.varlikId ?? "" }, select: { name: true } })).name;

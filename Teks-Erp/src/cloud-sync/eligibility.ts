@@ -7,8 +7,10 @@ import type { KeyObject } from "node:crypto";
 import { loadKeyFile, resolveKeyFilePath, type KeyFileResult } from "../lib/cloud-signing/key-file";
 import { getCachedInstallationIdentity } from "../jobs/installation-identity.job";
 import {
+  DEFAULT_PATRON_CLOUD_REPORT_INTERVAL_SECONDS,
   readPatronCloudInboxEnabled,
   readPatronCloudInboxIntervalSeconds,
+  readPatronCloudReportIntervalSeconds,
   readPatronCloudSyncEnabled,
   readPatronCloudSyncIntervalMinutes,
 } from "../services/system-setting.service";
@@ -102,4 +104,30 @@ export async function inboxEligibility(overrides: Partial<InboxEligibilityDeps> 
   } catch {
     return { ok: false, reason: "YAZMA_AYARI_OKUNAMADI" };
   }
+}
+
+// ---------------------------------------------------------------- rapor isteği (D5)
+
+export type ReportEligibility =
+  | (Extract<CloudEligibility, { ok: true }> & { readonly reportIntervalSeconds: number })
+  | { readonly ok: false; readonly reason: CloudBlockReason };
+
+export interface ReportEligibilityDeps extends CloudEligibilityDeps {
+  readonly reportIntervalSeconds: () => Promise<number>;
+}
+
+/**
+ * Rapor isteği = eşitleme ön koşulunun DÖRT koşulu; ayrı düğme YOK (rapor okumadır, yazmaz). Aralık ayarı
+ * okunamazsa varsayılan aralık (ön koşul kapanmaz — kapı yalnız dört koşuldur).
+ */
+export async function reportEligibility(overrides: Partial<ReportEligibilityDeps> = {}): Promise<ReportEligibility> {
+  const base = await cloudEligibility(overrides);
+  if (!base.ok) return base;
+  let s = DEFAULT_PATRON_CLOUD_REPORT_INTERVAL_SECONDS;
+  try {
+    s = overrides.reportIntervalSeconds ? await overrides.reportIntervalSeconds() : await readPatronCloudReportIntervalSeconds(overrides.settings);
+  } catch {
+    s = DEFAULT_PATRON_CLOUD_REPORT_INTERVAL_SECONDS;
+  }
+  return { ...base, reportIntervalSeconds: s };
 }

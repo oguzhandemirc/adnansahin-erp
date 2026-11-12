@@ -755,6 +755,8 @@ export const SETTING_KEYS = {
   PATRON_CLOUD_INBOX_ENABLED: "patronCloud.inboxEnabled",
   /** Gelen kutusu yoklama aralığı (saniye, 20–600; varsayılan 30). */
   PATRON_CLOUD_INBOX_INTERVAL_SECONDS: "patronCloud.inboxIntervalSeconds",
+  /** Rapor isteği yoklama aralığı (saniye, 20–600; varsayılan 30) — ayrı düğme YOK, eşitleme açıkken çalışır. */
+  PATRON_CLOUD_REPORT_INTERVAL_SECONDS: "patronCloud.reportIntervalSeconds",
 } as const;
 
 const DEFAULT_DEADLINE_DAYS = 7;
@@ -6593,6 +6595,27 @@ export async function readPatronCloudInboxIntervalSeconds(
   if (n === null || !Number.isInteger(n)) return DEFAULT_PATRON_CLOUD_INBOX_INTERVAL_SECONDS;
   if (n < MIN_PATRON_CLOUD_INBOX_INTERVAL_SECONDS || n > MAX_PATRON_CLOUD_INBOX_INTERVAL_SECONDS) {
     return DEFAULT_PATRON_CLOUD_INBOX_INTERVAL_SECONDS;
+  }
+  return n;
+}
+
+export const DEFAULT_PATRON_CLOUD_REPORT_INTERVAL_SECONDS = 30;
+export const MIN_PATRON_CLOUD_REPORT_INTERVAL_SECONDS = 20;
+export const MAX_PATRON_CLOUD_REPORT_INTERVAL_SECONDS = 600;
+
+/** Rapor isteği aralığı (saniye); kayıt yok, tam sayı değil ya da 20–600 dışı ⇒ varsayılan. */
+export async function readPatronCloudReportIntervalSeconds(
+  tx?: Pick<typeof prisma, "systemSetting">,
+): Promise<number> {
+  const client = tx ?? prisma;
+  const setting = await client.systemSetting.findUnique({
+    where: { key: SETTING_KEYS.PATRON_CLOUD_REPORT_INTERVAL_SECONDS },
+    select: { value: true },
+  });
+  const n = asNumber(setting?.value);
+  if (n === null || !Number.isInteger(n)) return DEFAULT_PATRON_CLOUD_REPORT_INTERVAL_SECONDS;
+  if (n < MIN_PATRON_CLOUD_REPORT_INTERVAL_SECONDS || n > MAX_PATRON_CLOUD_REPORT_INTERVAL_SECONDS) {
+    return DEFAULT_PATRON_CLOUD_REPORT_INTERVAL_SECONDS;
   }
   return n;
 }
