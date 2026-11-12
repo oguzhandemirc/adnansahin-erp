@@ -53,7 +53,7 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
         {footer ? <Animated.View key={`alt-${title}`} entering={anim(1)} style={s.footer}>{footer}</Animated.View> : null}
         <View style={s.secure}>
           <Ionicons name="lock-closed" size={13} color={t.color.onPrimary} />
-          <Text style={s.secureText}>Parola + doğrulama kodu ile korunur</Text>
+          <Text style={s.secureText}>Parola ile korunur · doğrulama kodu isteğe bağlı</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
