@@ -44,6 +44,8 @@ export interface TaramaSonucu {
   iliskiIhlal: string[];
   sqlSayisi: number;
   sqlIhlal: string[];
+  /** Süzgeci TAM ham SQL başvurularının yeri (`dosya:satır`) — tüketici beyanlı okuyucu kümesiyle karşılaştırır. */
+  sqlYerleri: string[];
   istisnalar: string[];
 }
 
@@ -127,7 +129,7 @@ export function aktifYuklemTara(kok: string, tanimlar: AktifYuklemTanimi[]): Map
     const tipler = alanlar.flatMap((a) => [`${a.model}$${a.alan}Args`, `${a.model}CountOutputTypeCount${buyuk(a.alan)}Args`]);
     const iliskiTipi = new RegExp(`\\b(${t.model}ListRelationFilter|${tipler.map((x) => x.replace(/\$/g, "\\$")).join("|")})\\b`);
     const sonuc: TaramaSonucu = {
-      silme: [], cagriSayisi: 0, cagriIhlal: [], iliskiSayisi: 0, iliskiIhlal: [], sqlSayisi: 0, sqlIhlal: [], istisnalar: [],
+      silme: [], cagriSayisi: 0, cagriIhlal: [], iliskiSayisi: 0, iliskiIhlal: [], sqlSayisi: 0, sqlIhlal: [], sqlYerleri: [], istisnalar: [],
     };
     sonuclar.set(t.delegate, sonuc);
     return { t, adlar: new Set(alanlar.map((a) => a.alan)), iliskiTipi, sonuc };
@@ -241,6 +243,7 @@ export function aktifYuklemTara(kok: string, tanimlar: AktifYuklemTanimi[]): Map
           const eksik = sqlEksikSuzgec(n.getText(sf), t.tablo, t.damga ?? "revokedAt");
           if (eksik !== null) {
             sonuc.sqlSayisi++;
+            sonuc.sqlYerleri.push(yer(n));
             if (eksik.length > 0 && !istisnaMi(n, sonuc, t.damga ?? "revokedAt")) sonuc.sqlIhlal.push(`${yer(n)} ${eksik.join(",")}`);
           }
         }
