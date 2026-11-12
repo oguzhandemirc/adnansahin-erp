@@ -1,6 +1,6 @@
 // ÖRNEK VERİ — yalnız geliştirme önizlemesi (`kapi.ts`). Bütün adlar açıkça uydurmadır ("Örnek", "Deneme",
 // "Numune"…); gerçek müşteri/kişi adı YOKTUR. Tel şekli uygulamanın okuyucularıyla aynı (savunmalı okunur).
-import type { FacilityStatus, LoginResponse, ProjectionRecord } from "../api/wire";
+import type { CustomerSummary, CustomerSummaryPeriod, CustomerSummaryResponse, FacilityStatus, LoginResponse, ProjectionRecord } from "../api/wire";
 
 const GUN = 86_400_000;
 const once = (gun: number, saat = 0): string => new Date(Date.now() - gun * GUN - saat * 3_600_000).toISOString();
@@ -32,7 +32,7 @@ export function ornekOturum(): FacilityStatus {
     projeksiyonlar: Object.keys(ORNEK_ANLIK()),
     esitleme: { sonEsitleme: once(0, 0.05), ufuk: once(0, 0.05), ufukTakildi: false, sozlesmeUyarisi: null, fabrikaSurumu: "örnek" },
     hizmet: { asama: "ACIK", bitis: null, saltOkunurBitis: null },
-    liste: { kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "cari-hesap"], siparisId: ["siparis-kalemi"] }, aranabilir: ["cari-kart", "siparis"] },
+    liste: { kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "cari-hesap", "iade"], siparisId: ["siparis-kalemi"] }, aranabilir: ["cari-kart", "siparis"] },
   };
 }
 
@@ -184,6 +184,8 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         musteriAdi: c.ad,
         cariKartId: c.id,
         durum,
+        // Fabrikanın türettiği "açık" (PENDING · APPROVED · PARTIAL_SHIPPED); bulut `suzgec=ACIK` bununla süzer.
+        acik: durum === "PENDING" || durum === "APPROVED" || durum === "PARTIAL_SHIPPED",
         yon: i % 4 === 3 ? "EXPORT" : "DOMESTIC",
         siparisTarihi: once(i * 3 + 1).slice(0, 10),
         termin: sonra(10 + i * 4),
@@ -229,5 +231,58 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
       planBitis: sonra(3 + i * 2),
     }),
   );
-  return { siparis, "siparis-kalemi": kalem, "cari-kart": cari, sevkiyat, "is-emri": isEmri };
+  // İade: yalnız "Örnek Tekstil"de; biri iptal (storno) — sayıma girmez, listede "İptal" rozetiyle.
+  const iade = [
+    { no: "IA-2026-0042", urun: "Örnek Saten 280 cm", renk: "Krem", metre: "62.50", sebep: "Renk farkı", gun: 4 },
+    { no: "IA-2026-0042", urun: "Örnek Saten 280 cm", renk: "Krem", metre: "58.00", sebep: "Renk farkı", gun: 4 },
+    { no: "IA-2026-0037", urun: "Deneme Keten 150 cm", renk: "Antrasit", metre: "41.20", sebep: "Dokuma hatası", gun: 19 },
+    { no: "IA-2026-0031", urun: "Numune Tül 320 cm", renk: "Ekru", metre: "35.00", sebep: "Ölçü farkı", gun: 33, iptal: true },
+  ].map((x, i) =>
+    kayit(`i${i + 1}`, {
+      iadeNo: x.no, cariKartId: "c1", siparisId: "s1", sevkiyatId: "v2", urunAdi: x.urun, renkAdi: x.renk, en: "280.00", metre: x.metre,
+      sebepAdi: x.sebep, musteriAdi: CARILER[0]!.ad, iptalTarihi: x.iptal ? once(x.gun - 1) : null, olusturulma: once(x.gun, 2),
+    }),
+  );
+  return { siparis, "siparis-kalemi": kalem, "cari-kart": cari, sevkiyat, "is-emri": isEmri, iade };
+}
+
+const donemOzeti = (o: { siparis: number; mt: number; kg?: number; sevkM: number; top: number; cuval: number; tartili: number; kgSevk: number; iadeTop: number; iadeM: number; urunCarpan: number }): CustomerSummaryPeriod => ({
+  siparisSayisi: o.siparis,
+  kalemSayisi: Math.round(o.siparis * 1.4),
+  siparisMiktari: [...(o.kg ? [{ birim: "KG", miktar: o.kg }] : []), { birim: "MT", miktar: o.mt }],
+  sevk: { metre: o.sevkM, top: o.top, kg: o.kgSevk, tartiliCuval: o.tartili, cuval: o.cuval },
+  iade: { adet: o.iadeTop, metre: o.iadeM },
+  enCokUrun: [
+    { urunId: "u1", urunAdi: "Örnek Saten 280 cm", renkId: "r1", renkAdi: "Krem", birim: "MT", miktar: 15500 * o.urunCarpan, siparisSayisi: Math.round(9 * o.urunCarpan) || 1 },
+    { urunId: "u2", urunAdi: "Deneme Keten 150 cm", renkId: "r2", renkAdi: "Antrasit", birim: "MT", miktar: 9800 * o.urunCarpan, siparisSayisi: Math.round(6 * o.urunCarpan) || 1 },
+    { urunId: "u3", urunAdi: "Numune Tül 320 cm", renkId: null, renkAdi: null, birim: "MT", miktar: 7250 * o.urunCarpan, siparisSayisi: Math.round(5 * o.urunCarpan) || 1 },
+    { urunId: "u4", urunAdi: "Prova Kadife", renkId: "r4", renkAdi: "Bordo", birim: "KG", miktar: 640 * o.urunCarpan, siparisSayisi: Math.round(3 * o.urunCarpan) || 1 },
+    { urunId: "u5", urunAdi: "Taslak Şifon 300 cm", renkId: "r5", renkAdi: "Pudra", birim: "MT", miktar: 4100 * o.urunCarpan, siparisSayisi: Math.round(3 * o.urunCarpan) || 1 },
+    { urunId: "u6", urunAdi: "Örnek Krep", renkId: "r6", renkAdi: "Siyah", birim: "MT", miktar: 2900 * o.urunCarpan, siparisSayisi: Math.round(2 * o.urunCarpan) || 1 },
+  ],
+});
+
+/**
+ * `GET /cari-ozeti/:id` örnekleri — c1 iadeli, c2 iadesiz, c3 anlık "henüz gelmedi" (404), c4 sade, c5 (tedarikçi)
+ * `ozet: null` (hiç hareket yok). Sayılar uydurmadır; para YOK, birimler ayrı.
+ */
+export function ORNEK_CARI_OZETI(id: string): CustomerSummaryResponse | undefined {
+  const tam = (ozet: CustomerSummary | null): CustomerSummaryResponse => ({ cariKartId: id, son12AyBaslangic: once(365), surum: once(0, 0.05), ozet });
+  const sonTarihler = { sonSiparisTarihi: once(3), sonSevkTarihi: once(1) };
+  if (id === "c1") {
+    return tam({
+      tumZamanlar: donemOzeti({ siparis: 48, mt: 84250.5, kg: 1350, sevkM: 61230.4, top: 1712, cuval: 224, tartili: 210, kgSevk: 18450.5, iadeTop: 3, iadeM: 161.7, urunCarpan: 1 }),
+      son12Ay: donemOzeti({ siparis: 20, mt: 30100, sevkM: 22010, top: 610, cuval: 41, tartili: 41, kgSevk: 6120, iadeTop: 3, iadeM: 161.7, urunCarpan: 0.4 }),
+      // Açık sayılar örnek sipariş listesiyle tutarlı (c1'de tek açık sipariş: SIP-2026-0451).
+      acik: { siparisSayisi: 1, kalemSayisi: 1, acikMiktar: [{ birim: "MT", miktar: 2400 }] },
+      ...sonTarihler,
+    });
+  }
+  if (id === "c2" || id === "c4") {
+    const k = id === "c2" ? 1 : 0.35;
+    const d = (c: number) => donemOzeti({ siparis: Math.round(31 * c), mt: Math.round(42800 * c), sevkM: Math.round(37950 * c), top: Math.round(988 * c), cuval: 0, tartili: 0, kgSevk: 0, iadeTop: 0, iadeM: 0, urunCarpan: 0.6 * c });
+    return tam({ tumZamanlar: d(k), son12Ay: d(k * 0.5), acik: id === "c2" ? { siparisSayisi: 2, kalemSayisi: 3, acikMiktar: [{ birim: "MT", miktar: 9900 }] } : { siparisSayisi: 1, kalemSayisi: 2, acikMiktar: [{ birim: "MT", miktar: 4950 }] }, ...sonTarihler });
+  }
+  if (id === "c5") return tam(null);
+  return undefined;
 }

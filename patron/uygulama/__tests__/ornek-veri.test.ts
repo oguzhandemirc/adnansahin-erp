@@ -87,6 +87,23 @@ describe("örnek veri istemcisi", () => {
     expect(f).not.toHaveBeenCalled();
   });
 
+  it("M2 cari özeti: iadeli · iadesiz · henüz gelmedi (404) · hareketsiz; para yok; açık süzgeci sahte sunucuda", async () => {
+    const api = createApi(createOrnekClient());
+    const c1 = await api.customerSummary("c1");
+    expect(c1.ozet?.tumZamanlar.iade.adet).toBeGreaterThan(0);
+    expect((await api.customerSummary("c2")).ozet?.tumZamanlar.iade.adet).toBe(0);
+    await expect(api.customerSummary("c3")).rejects.toMatchObject({ status: 404 });
+    expect((await api.customerSummary("c5")).ozet).toBeNull();
+    expect(JSON.stringify(c1)).not.toMatch(/tutar|doviz|fiyat|bakiye/i);
+    // Liste satırları sayılmaz ama örnek tutarlı olsun: iptal edilmeyen iade topları özetle aynı.
+    const iade = (await api.list("iade", { cariKartId: "c1" })).kayitlar.filter((r) => !(r.kayit as { iptalTarihi: unknown }).iptalTarihi);
+    expect(iade).toHaveLength(c1.ozet!.tumZamanlar.iade.adet);
+    expect((await api.list("iade", { cariKartId: "c2" })).kayitlar).toEqual([]);
+    const acik = (await api.list("siparis", { cariKartId: "c1", suzgec: "ACIK" })).kayitlar;
+    expect(acik.length).toBeGreaterThan(0);
+    expect(acik.every((r) => (r.kayit as { acik: unknown }).acik === true)).toBe(true);
+  });
+
   it("firma adları açıkça uydurma", () => {
     for (const r of ORNEK_LISTE()["cari-kart"]!) expect(String((r.kayit as { ad: string }).ad)).toMatch(/^(Örnek|Deneme|Numune|Taslak|Prova) /);
   });
