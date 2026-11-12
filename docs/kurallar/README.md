@@ -15,5 +15,6 @@ Kök `CLAUDE.md` her oturumda yüklenir ve yalnız çekirdek değişmezleri taş
 | Yetki · izin · rol · süperadmin · modül bayrakları | `yetki-izin.md` |
 | Sürüm · yayın · kurulum · migration | `surum-yayin.md` |
 | Genel · uzak erişim · keşif · cihaz · donanım | `genel.md` |
+| Patron bulutu · eşitleme · imza · kapatma düğmesi | `patron-bulutu.md` |
 
 Eski (2026-09) sürümler — `dokuma.md` ve `finans.md` dahil, bu fabrikada kapsam dışı olanlar — gerekçe ve ölçüm hikâyesiyle birlikte `docs/history/kurallar-2026-09/` dizinindedir; yalnız başvuru içindir.
