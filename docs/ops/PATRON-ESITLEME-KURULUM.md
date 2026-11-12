@@ -49,6 +49,9 @@ Ardından panelde top listesi açılır, tabletten bir okutma yapılır (normal 
 
 Geri dönüş: aynı uç `"false"` → `eşitleme işi durdu` + `tetikleyiciler kapatıldı (28; AYAR_KAPALI; …)`. Adresi `.env`den silip yeniden başlatmak da açık kalmış tetikleyicileri açılışta kapatır.
 
+### Sözleşme genişletmesinde sıra (M2a cari özeti ve sonrası)
+Önce bulut, sonra fabrika. Ters sırada (yeni fabrika + eski bulut) eşitleme DURMAZ: eski bulut paketi 200 ile alır, tanımadığı `iade` ve `cari-ozeti`yi girdi bazında `PROJEKSIYON_BILINMIYOR` ile reddeder, siparişin katalog sürümü 2 için TAM ister (ölçüldü 2026-11-12, `main` bulutuyla); ama tur `KISMI` olur (tek UYARI satırı), reddedilen iadeler her turda baştan, cari özeti her anlık aralığında yeniden gider — bulut güncellenince kendiliğinden düzelir. Eski uygulama yeni bulutla çalışır (var olan uçların yanıtı değişmedi).
+
 ### Ölçülen (yerel prova, 2026-11-12; 13 projeksiyon, 5.703 kayıt)
 - İlk TAM yükleme 6,1 sn · 3 istek · en büyük gövde 1.825 KB açık / 302 KB gzip · ölçüm sürecinin RSS'i 339 → 367 MB; bulut tesis DB'si 14 MB (`projection_rows` 5 MB).
 - Fabrika ↔ bulut satır sayısı 13 projeksiyonda birebir (sipariş 969, sevkiyat 493, çuval 1.620, iş emri 1.150 …).

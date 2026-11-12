@@ -13196,3 +13196,13 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 
 **Ölçüm.** `test_patron_bulut_rapor` 53/0, üç negatif sonda kırmızı. `tekserp_d5_prova` (gerçek hacim, "bugün" 2026-11-10): 6 karne × (30 gün, 366 gün) en yavaş `subcontract/scorecard` ~91 ms (sınır 60 sn), en büyük sonuç `quality/scorecard` 366 gün 37,9 KB ham / 10,3 KB gzip; hepsi panel servisiyle EŞİT; finans alanı düşen 0; panel benzeri sorgu medyanı 0,4 → 1,2 ms (rapor hesaplanırken).
 
+## 2026-11-12 — Patron bulutu M2a: cari özeti veri yolu (iade · açık sipariş · müşteri toplamları) [PROFİL]
+
+**Ne eklendi.** Telefonun cari kartındaki "henüz gelmedi" satırları (iadeler · toplamlar · en çok alınan ürünler) için yalnız VERİ YOLU: kayıt projeksiyonu `iade` (`roll_returns`; serbest sebep metni, not ve kişi gitmez), siparişe fabrikanın türettiği `acik` (katalog sürümü 2 → siparişler bir kez TAM gider), anlık `cari-ozeti` (müşteri başına tüm zamanlar + son 12 ay: sipariş/kalem adedi, birim başına miktar, BRÜT sevk m/top/kg/çuval, iade adet/m, açık sipariş, ilk 10 ürün). Bulutta `GET /api/veri/iade?cariKartId=|siparisId=|urunId=`, `GET /api/veri/siparis?…&suzgec=ACIK`, `GET /api/cari-ozeti/:cariKartId` (anlıktan tek girdi; girdi yoksa `ozet:null`, anlık yoksa 404). Migration yok: iade satırı hiç sert silinmez, `updatedAt` filigranı yeter.
+
+**Neden / ana üründen sapma.** Ana üründe bu genişletme yok; Adnan'a özgüdür ve tel sözleşmesi yalnız EKLEYEREK genişledi (var olan uç/alan/projeksiyon değişmedi). Uygulamada yalnız `src/api/wire.ts` aynası ve iki dışa aktarma etiketi değişti; ekran ayrı dilim.
+
+**Bulgu.** (1) İlk yazımda "son 12 ay"ın başı `now − 365 gün` idi: içerik özeti her turda değiştiği için anlık her turda yeniden gidiyordu (`test_patron_bulut_anliklar` yakaladı); baş fabrika gününe hizalandı. (2) Gerçek hacimde (`tekserp_m2_prova`, en hareketli 3 müşteri) sipariş adedi, açık miktar, brüt sevk, iade ve en çok ürün özet = düz SQL = panel uçları; tek fark panelin "Açık miktar" kutucuğu (`/api/orders/stats` `totalOpenQty`): TAMAMLANAN siparişlerin fazla sevkini eksi sayan net çıkarma (7198…: 74.594,3 m; açık sipariş listesi ve telefon 83.498,8 m). Panelin müşteri sipariş profili de iptal siparişleri sayar ve en sık (satır adedi) ürünü seçer; telefon iptalsiz ve miktar sırasıdır. (3) Eski bulut (main) yeni fabrikanın paketini 200 ile karşılar: `iade`/`cari-ozeti` girdi bazında `PROJEKSIYON_BILINMIYOR`, sipariş için TAM istenir; tur düşmez.
+
+**Ölçüm.** Fabrika bekçisi `test_patron_bulut_cari_ozeti` 26/0 (dört negatif sonda kırmızı), bulut `test_cari_ozeti` 15/0 (iki sonda kırmızı), bulut paketi 41/41, uygulama tsc 0 + jest 436/436; anlık 26 müşteride ~97 KB ham / ~7,4 KB gzip, kurucu ~0,2–0,7 sn.
+

@@ -47,6 +47,16 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Aynı anda tek rapor hesaplanır ve rapor başına süre sınırı 60 sn'dir: aşan istek `ZAMAN_ASIMI` alır, o hesap bitmeden yeni rapor başlamaz; 4 MB (gzip) üstü sonuç `SONUC_BUYUK` RET'idir. [bekçi: test_patron_bulut_rapor]
 - Rapor işinin ayrı düğmesi yoktur: eşitleme ön koşulu açıkken başlar, kapanınca durur; aralık `patronCloud.reportIntervalSeconds` (20–600 sn, varsayılan 30; aralık dışı değer varsayılana düşer). [bekçi: test_patron_bulut_rapor]
 
+### Cari özeti (M2a)
+
+- Cari özeti fabrikada hesaplanır (`cloud-sync/snapshot-cari-ozeti.ts`, panelin karne servisleri ve `_shipped.ts`); bulut `GET /api/cari-ozeti/:cariKartId` ile saklanan anlıktan o müşterinin girdisini aynen döner, toplamaz (bulut bekçisi `patron/sunucu/scripts/test_cari_ozeti.ts`). [bekçi: test_patron_bulut_cari_ozeti]
+- Cari özeti para taşımaz: tutar, fiyat, bakiye, döviz alanı yazılmaz; katı şema tanımadığı alanda mühürde fırlar. [bekçi: test_patron_bulut_cari_ozeti]
+- Farklı birimler toplanmaz: sipariş ve açık miktar birim başına ayrı satırdır (`[{birim, miktar}]`). [bekçi: test_patron_bulut_cari_ozeti]
+- Sevk BRÜT'tür, iade ayrı sayıdır ve çıkıştan düşülmez; iptal edilen iade sayılmaz. [bekçi: test_patron_bulut_cari_ozeti]
+- "Son 12 ay"ın başı fabrika gününe hizalanır; veri değişmedikçe anlığın içerik özeti gün içinde değişmez. [bekçi: test_patron_bulut_cari_ozeti]
+- Tel sözleşmesi yalnız EKLEYEREK genişler: var olan uç, alan, projeksiyon adı değişmez; yeni alan katalog sürümünü artırır. [inceleme]
+- Sözleşme genişletmesinde kurulum sırası önce bulut, sonra fabrikadır; eski bulut bilinmeyen projeksiyonu yalnız o girdide reddeder (tur KISMI, düşmez) ama reddedilen kayıt her turda baştan, anlık her aralıkta yeniden gönderilir. [inceleme]
+
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 
 1. `.env`: `PATRON_CLOUD_URL=https://<bulut kökeni>` ve `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (dosya veri dizininde, repoda değil).
@@ -63,7 +73,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ## Bekçiler
 
-Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
+Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 
