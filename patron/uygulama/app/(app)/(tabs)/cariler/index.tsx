@@ -1,57 +1,77 @@
-// Cariler (şartname §4.7): arama (sunucu `ara`) + "Rol: Tümü" süzgeci modalla (sunucu `suzgec`, `LIST_SEARCH.cari-kart`)
-// + tam genişlik tek satırlar: ad · il · rol rozetleri. Bakiye ayrıntıda (`cari-hesap`, cari kart satırı bakiye taşımaz). İstemci süzmez.
+// Cariler (şartname §4.7): yapışkan veri tablosu — arama (ad/kod), süzgeç (rol + aktiflik), sütun seçimi, sıralanabilir
+// başlık. Süzme/sıralama SUNUCUDA (`useVeriTablosu`), görünüm tercihi profilde (`tablo.cari-kart`). Bakiye ayrıntıda
+// (`cari-hesap`, cari kart satırı bakiye taşımaz).
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { View } from "react-native";
-import { LIST_SEARCH } from "../../../../src/api/wire";
+import { Text, View } from "react-native";
+import type { ProjectionRecord } from "../../../../src/api/wire";
 import { can } from "../../../../src/lib/access";
+import { cariRoles } from "../../../../src/lib/labels/siparis";
 import { useSession } from "../../../../src/state/session";
-import { FilterChip } from "../../../../src/ui/FilterChip";
 import { Screen } from "../../../../src/ui/Frame";
-import { KademeliGiris } from "../../../../src/ui/hareket";
-import { ListeBlogu } from "../../../../src/ui/ortak";
-import { useDebounced } from "../../../../src/ui/Picker";
-import { ChoiceSheet } from "../../../../src/ui/siparis/ChoiceSheet";
-import { CustomerRow } from "../../../../src/ui/siparis/CustomerRow";
-import { CapsuleButton, ListStates, SearchField, StaleNote } from "../../../../src/ui/siparis/parts";
-import { useRemoteList } from "../../../../src/ui/siparis/useRemoteList";
-import { space } from "../../../../src/ui/tokens";
-import { EMPTY_ICON, MODULE_ICON } from "../../../../src/ui/icons";
+import { MODULE_ICON } from "../../../../src/ui/icons";
+import { Rozet, type RozetTonu } from "../../../../src/ui/ortak";
+import { asObj, str } from "../../../../src/ui/siparis/OrderRow";
+import { CapsuleButton, StaleNote } from "../../../../src/ui/siparis/parts";
+import type { SutunTanimi } from "../../../../src/ui/tablo/model";
+import { TabloListesi, TabloUstu, useVeriTablosu } from "../../../../src/ui/tablo/useVeriTablosu";
+import { useTokens } from "../../../../src/ui/theme-context";
+import { space, typography } from "../../../../src/ui/tokens";
 
-const SPEC = LIST_SEARCH["cari-kart"]!;
-const ROLE_CHOICES = [{ key: "tumu", label: "Tümü" }, ...(SPEC.suzgec?.secenekler ?? []).map((o) => ({ key: o.deger, label: o.etiket }))];
+const k = (r: ProjectionRecord) => asObj(r.kayit);
+const ROL_TONU: Readonly<Record<string, RozetTonu>> = { musteriRolu: "primary", tedarikciRolu: "info", fasonRolu: "warning" };
+
+/** Dar sütunda tek rozet: ilk rol + kalan rol sayısı ("+1"); tam liste erişilebilirlik etiketinde. */
+function RolHucresi({ r }: { r: ProjectionRecord }) {
+  const t = useTokens();
+  const roller = cariRoles(k(r));
+  if (roller.length === 0) return <Text style={[typography.subhead, { color: t.textSecondary }]}>—</Text>;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs, minWidth: 0 }}>
+      <Rozet label={roller[0]!.label} tone={ROL_TONU[roller[0]!.key] ?? "soft"} />
+      {roller.length > 1 ? <Text style={[typography.caption, { color: t.textSecondary }]}>{`+${roller.length - 1}`}</Text> : null}
+    </View>
+  );
+}
+
+const CARI_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
+  { key: "ad", baslik: "Ad", ad: "Cari adı", agirlik: 2, sirala: "ad", hucre: (r) => str(k(r).ad) ?? "—" },
+  { key: "kod", baslik: "Kod", ad: "Cari kodu", agirlik: 1, sirala: "kod", hucre: (r) => str(k(r).kod) ?? "—" },
+  { key: "il", baslik: "İl", agirlik: 1, sirala: "il", hucre: (r) => str(k(r).il) ?? "—" },
+  { key: "ilce", baslik: "İlçe", agirlik: 1, sirala: "ilce", hucre: (r) => str(k(r).ilce) ?? "—" },
+  { key: "ulke", baslik: "Ülke", agirlik: 1, sirala: "ulke", hucre: (r) => str(k(r).ulke) ?? "—" },
+  { key: "rol", baslik: "Rol", agirlik: 1.3, hucre: (r) => cariRoles(k(r)).map((x) => x.label).join(", ") || "—", ogeler: (r) => <RolHucresi r={r} /> },
+  { key: "durum", baslik: "Durum", agirlik: 0.9, hucre: (r) => (k(r).aktif === false ? "Pasif" : "Aktif") },
+];
+
+const AYAR = {
+  projeksiyon: "cari-kart",
+  anahtar: "tablo.cari-kart",
+  sutunlar: CARI_SUTUNLARI,
+  varsayilan: ["ad", "il", "rol"],
+  aramaIpucu: "Ad ya da kod",
+  testID: "cari",
+} as const;
 
 export default function Customers() {
   const { permissions, offline } = useSession();
   const router = useRouter();
-  const [term, setTerm] = useState("");
-  const [rol, setRol] = useState("tumu");
-  const [sheet, setSheet] = useState(false);
-  const ara = useDebounced(term.trim(), 300);
-  const list = useRemoteList("cari-kart", { ara: ara || undefined, suzgec: rol === "tumu" ? undefined : rol });
+  const tablo = useVeriTablosu(AYAR);
+  const { list } = tablo;
   const canWrite = can(permissions, "bulut:cari:yaz");
   return (
     <Screen
       title="Cariler" module="cariler"
       onRefresh={list.reload} refreshing={list.refreshing}
+      onEndReached={list.loadMore}
       subtitle={<StaleNote stale={list.stale} savedAt={list.savedAt} />}
       headerRight={canWrite ? <CapsuleButton label="Yeni cari" icon="add" disabled={offline} onPress={() => router.push("/cariler/yeni")} testID="yeni-cari" /> : undefined}
+      sticky={<TabloUstu tablo={tablo} />}
     >
-      <KademeliGiris sira={0} style={{ gap: space.s, marginTop: space.xs }}>
-        <SearchField value={term} onChangeText={setTerm} placeholder="Ad ya da kod ara" testID="cari-ara" />
-        <View style={{ flexDirection: "row" }}>
-          <FilterChip label={SPEC.suzgec?.etiket ?? "Rol"} value={ROLE_CHOICES.find((c) => c.key === rol)?.label ?? "Tümü"} selected={rol !== "tumu"} onPress={() => setSheet(true)} testID="suzgec-rol" />
-        </View>
-      </KademeliGiris>
-      <KademeliGiris sira={1}>
-        {list.items.length > 0 ? (
-          <ListeBlogu baslik={rol === "tumu" ? "Tüm cariler" : (ROLE_CHOICES.find((c) => c.key === rol)?.label ?? "Cariler")} sayi={!list.loading && !list.hasMore ? list.items.length : undefined} testID="cari-listesi">
-            {list.items.map((r, i) => <CustomerRow key={r.id} r={r} ayrac={i > 0} onPress={() => router.push({ pathname: "/cariler/[id]", params: { id: r.id } } as never)} />)}
-          </ListeBlogu>
-        ) : null}
-        <ListStates list={list} empty={ara ? "Eşleşen cari yok" : "Cari yok"} icon={ara ? EMPTY_ICON.arama : MODULE_ICON.cariler.icon} testID="cariler" />
-      </KademeliGiris>
-      <ChoiceSheet visible={sheet} title={SPEC.suzgec?.etiket ?? "Rol"} choices={ROLE_CHOICES} value={rol} onSelect={setRol} onClose={() => setSheet(false)} testIDPrefix="rol-" />
+      <TabloListesi
+        tablo={tablo}
+        onPress={(r) => router.push({ pathname: "/cariler/[id]", params: { id: r.id } } as never)}
+        bos="Cari yok" bosSuzgecli="Eşleşen cari yok" icon={MODULE_ICON.cariler.icon}
+      />
     </Screen>
   );
 }

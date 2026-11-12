@@ -233,11 +233,11 @@ describe("§5 sipariş listesi 'Açık' süzgeci (bulut `LIST_SEARCH` aynasında
     mockList.mockResolvedValue(page(ACIK, rec("s2", { siparisNo: "SP-0102", durum: "COMPLETED", acik: false })));
     render(<Orders />);
     await settle();
-    fireEvent.press(screen.getByTestId("suzgec-durum"));
+    fireEvent.press(screen.getByTestId("siparis-suzgec"));
     await settle();
-    expect(screen.getByTestId("durum-ACIK")).toBeTruthy();
+    expect(screen.getByTestId("siparis-suzgec-secici-ana-ACIK")).toBeTruthy();
     expect(screen.getByText("Açık (gönderilmeyi bekleyen)")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("durum-ACIK"));
+    fireEvent.press(screen.getByTestId("siparis-suzgec-secici-ana-ACIK"));
     await settle();
     expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ suzgec: "ACIK" }));
     // Sunucu ne döndürdüyse o çizilir (ör. eski satır) — istemci `acik` alanına bakıp süzmez.

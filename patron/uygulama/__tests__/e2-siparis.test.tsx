@@ -170,25 +170,26 @@ describe("§4 süzgeç ve arama SUNUCUDA", () => {
     expect(screen.getByText("1.251")).toBeTruthy(); // 1250.5 m → tam sayı biçimi (yuvarlamayı biçimleyici yapar)
   });
 
-  it("cariler: arama `ara`, rol çipi `suzgec` olarak sunucuya gider; Tümü süzgeci kaldırır", async () => {
+  it("cariler: arama `ara`, rol süzgeci `suzgec` olarak sunucuya gider; Tümü süzgeci kaldırır", async () => {
     jest.useFakeTimers();
     try {
+      mockSession.facility = YENI_SUNUCU;
       mockList.mockResolvedValue(page(rec(ID1, { ad: "Deniz Tekstil", kod: "C-1", musteriRolu: true, fasonRolu: true })));
       render(<Customers />);
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("cari-kart", expect.objectContaining({ ara: undefined, suzgec: undefined }));
-      expect(screen.getByText("Müşteri")).toBeTruthy();
-      expect(screen.getByText("Fason")).toBeTruthy();
+      expect(screen.getByText("Müşteri")).toBeTruthy(); // dar sütunda ilk rol rozeti + kalan sayısı
+      expect(screen.getByText("+1")).toBeTruthy();
+      expect(screen.getByTestId(`cari-satir-${ID1}`).props.accessibilityLabel).toContain("Müşteri, Fason");
       fireEvent.changeText(screen.getByTestId("cari-ara"), " deniz ");
       await act(async () => { jest.advanceTimersByTime(350); });
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("cari-kart", expect.objectContaining({ ara: "deniz" }));
-      fireEvent.press(screen.getByTestId("suzgec-rol"));
-      fireEvent.press(screen.getByTestId("rol-TEDARIKCI"));
+      fireEvent.press(screen.getByTestId("cari-suzgec"));
+      fireEvent.press(screen.getByTestId("cari-suzgec-secici-ana-TEDARIKCI"));
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("cari-kart", expect.objectContaining({ ara: "deniz", suzgec: "TEDARIKCI" }));
-      fireEvent.press(screen.getByTestId("suzgec-rol"));
-      fireEvent.press(screen.getByTestId("rol-tumu"));
+      fireEvent.press(screen.getByTestId("cari-suzgec-secici-ana-tumu"));
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("cari-kart", expect.objectContaining({ suzgec: undefined }));
     } finally {
