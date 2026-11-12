@@ -32,6 +32,7 @@ Birden çok alanı kesen konvansiyonlar (audit, katman sırası, hata/mesaj söz
 - TOTP kurulumu yalnız yöneticinin açtığı 15 dakikalık tek kullanımlık pencereden yapılır; ikinci faktör `issueToken`den önce koşar. [bekçi: test_totp]
 - helmet iki ayrı örnek kurulur (HSTS LAN'a sızmaz) ve dispatcher fonksiyonunun adı `helmetMiddleware`dır. [bekçi: test_middleware_order]
 - `X-Client-*` künye başlıkları hiçbir kapıya girmez; yalnız gözlem olarak `Session.clientVersion`a yazılır, dolu satır değişmez. [bekçi: test_client_registry]
+- Bağlı Cihazlar (`GET /api/sessions/active`) açık oturumları salt okur; yanıta jti/token girmez, cihaz kimliği yalnız 8 haneyle döner, sürümsüz satır "ölçülemedi"dir, eski değil. [bekçi: test_active_sessions]
 - `GET /api/boss/overview` izin süzmesini serviste yapar (yetkisiz bölümün sorgusu koşmaz) ve yeni izin kodu açmaz. [bekçi: test_boss_overview]
 
 ### Keşif ve cihaz
@@ -61,8 +62,8 @@ Birden çok alanı kesen konvansiyonlar (audit, katman sırası, hata/mesaj söz
 - Yeni ekran görünmüyorsa sırayla bak: izin satırı DB'de mi, kullanıcıya atanmış mı, kullanıcı yeniden giriş yaptı mı (JWT bayat).
 
 ## Bekçiler
-Backend: `test_audit_muafiyeti` · `test_audit_depth` · `test_audit_okuma_kaynagi` · `test_p2002_hedef_tek_kaynak` · `test_musteri_adi_kodda_yok` · `test_firma_adi_dondur` · `test_backup` · `test_offsite_sweep` · `test_process_warnings` · `test_remote_access_guard` · `test_totp` · `test_middleware_order` · `test_client_registry` · `test_session_registry` · `test_boss_overview` · `test_device_pairing_flag` · `test_sack_weigh_source` · `test_bash_guard_scope` · `test_hook_config` · `test_patron_bulut_imza` · `test_patron_bulut_uygunluk`
+Backend: `test_audit_muafiyeti` · `test_audit_depth` · `test_audit_okuma_kaynagi` · `test_p2002_hedef_tek_kaynak` · `test_musteri_adi_kodda_yok` · `test_firma_adi_dondur` · `test_backup` · `test_offsite_sweep` · `test_process_warnings` · `test_remote_access_guard` · `test_totp` · `test_middleware_order` · `test_client_registry` · `test_active_sessions` · `test_session_registry` · `test_boss_overview` · `test_device_pairing_flag` · `test_sack_weigh_source` · `test_bash_guard_scope` · `test_hook_config` · `test_patron_bulut_imza` · `test_patron_bulut_uygunluk`
 
-İstemci: `discovery-logic.test.ts` · `discovery-ipc-contract.test.ts` · `boss-shell.test.ts` · `BackupScheduleCard.test.tsx` · `discovery.contract.test.ts` · `discovery.test.ts` · `discovery.service.test.ts` · `pairingGate.test.ts` · `useSackWeigh.test.tsx` · `BarcodeScannerView.test.tsx` · `shortCutQuality.test.ts` · `resolveShortCutConfig.test.ts` · `ModalTextInput.test.tsx`
+İstemci: `discovery-logic.test.ts` · `connected-devices-utils.test.ts` · `discovery-ipc-contract.test.ts` · `boss-shell.test.ts` · `BackupScheduleCard.test.tsx` · `discovery.contract.test.ts` · `discovery.test.ts` · `discovery.service.test.ts` · `pairingGate.test.ts` · `useSackWeigh.test.tsx` · `BarcodeScannerView.test.tsx` · `shortCutQuality.test.ts` · `resolveShortCutConfig.test.ts` · `ModalTextInput.test.tsx`
 
 Gerekçe ve ölçüm hikâyesi: eski sürüm history dizininde.

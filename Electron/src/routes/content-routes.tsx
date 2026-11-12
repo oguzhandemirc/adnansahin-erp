@@ -9,6 +9,7 @@ import {
   SYSTEM_ACTIVITY_ACCESS,
   SYSTEM_BACKUPS_ACCESS,
   SYSTEM_CLIENTS_ACCESS,
+  SYSTEM_SESSIONS_ACCESS,
   SYSTEM_HUB_ACCESS,
   SYSTEM_ROLL_ARCHIVE_ACCESS,
   SYSTEM_SERVER_STATUS_ACCESS,
@@ -100,6 +101,7 @@ import { ArchiveSearchPage } from "@/pages/System/Archive/ArchiveSearchPage";
 import RollArchivePage from "@/pages/System/RollArchivePage";
 import { ServerStatusPage } from "@/pages/System/ServerStatus/ServerStatusPage";
 import { ClientsPage } from "@/pages/System/Clients/ClientsPage";
+import { ConnectedDevicesPage } from "@/pages/System/ConnectedDevices/ConnectedDevicesPage";
 import { PerfPage } from "@/pages/System/Perf/PerfPage";
 import { WorkSessionsPage } from "@/pages/System/WorkSessions/WorkSessionsPage";
 import { DataImportPage } from "@/pages/System/DataImport/DataImportPage";
@@ -712,6 +714,15 @@ export const contentRoutes: RouteObject[] = [
     element: (
       <ProtectedRoute requireAnyPermission={SYSTEM_CLIENTS_ACCESS}>
         <ClientsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    // Bağlı Cihazlar — karo ile AYNI izin (`tile-config.ts` → key "sessions").
+    path: "system/sessions",
+    element: (
+      <ProtectedRoute requireAnyPermission={SYSTEM_SESSIONS_ACCESS}>
+        <ConnectedDevicesPage />
       </ProtectedRoute>
     ),
   },
