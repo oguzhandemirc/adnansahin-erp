@@ -3,7 +3,7 @@
 import { BASMA } from "./hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -112,6 +112,28 @@ export interface ScreenProps {
 }
 
 /** Her ekranın kabı: büyük başlık, bantlar, kaydırma ve aşağı çek-yenile; izin kapısı. */
+/**
+ * Yenileme çarkı yalnız KULLANICI çekince döner: açılışta önbellekten çizilip arkada tazelenen ekranda çark tepede
+ * belirip içeriği itmesin (arka plan tazelemesi sessizdir; tazelik "fabrika verisi" damgasında görünür).
+ */
+export function useUserPull(refreshing: boolean | undefined, onRefresh: (() => void) | undefined) {
+  const [pulled, setPulled] = useState(false);
+  useEffect(() => {
+    if (!pulled) return;
+    if (refreshing) return;
+    // Çekildi ama tazeleme başlamadıysa (ya da bittiyse) çark kısa süre sonra bırakılır.
+    const id = setTimeout(() => setPulled(false), 400);
+    return () => clearTimeout(id);
+  }, [pulled, refreshing]);
+  return {
+    spinning: pulled && (refreshing ?? false),
+    onRefresh: () => {
+      setPulled(true);
+      onRefresh?.();
+    },
+  };
+}
+
 export function Screen({ title: titleProp, module, children, back, onRefresh, refreshing, headerRight, subtitle, footer }: ScreenProps) {
   const title = titleProp ?? (module ? moduleTitle(module) : "");
   const t = useTokens();
@@ -126,6 +148,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const showBack = !wide && (back ?? !TABS.some((tab) => tab.route === path));
   const pad = ekranOlugu(wide);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/pano"));
+  const pull = useUserPull(refreshing, onRefresh);
   return (
     <View style={s.screen}>
       <LargeHeader title={title} scrollY={scrollY} topInset={wide ? space.s : insets.top} onBack={showBack ? goBack : undefined} right={headerRight} />
@@ -133,7 +156,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         onScroll={onScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
-        refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={t.tint} colors={[t.tint]} progressBackgroundColor={t.surface} /> : undefined}
+        refreshControl={onRefresh ? <RefreshControl refreshing={pull.spinning} onRefresh={pull.onRefresh} tintColor={t.tint} colors={[t.tint]} progressBackgroundColor={t.surface} /> : undefined}
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + space.xl, paddingHorizontal: pad }]}
       >
         <LargeTitle title={title} scrollY={scrollY} subtitle={subtitle} bleed={pad} />

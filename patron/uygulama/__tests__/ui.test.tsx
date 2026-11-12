@@ -158,3 +158,18 @@ describe("fabrika değiştir (çok tesis)", () => {
     expect(screen.getByTestId("tesis-gecis-hatasi")).toBeTruthy();
   });
 });
+
+describe("yenileme çarkı", () => {
+  const { useUserPull } = require("../src/ui/Frame") as typeof import("../src/ui/Frame");
+  const { renderHook, act } = require("@testing-library/react-native") as typeof import("@testing-library/react-native");
+  it("arka plan tazelemesinde dönmez; kullanıcı çekince döner, bitince bırakır", () => {
+    const onRefresh = jest.fn();
+    const h = renderHook(({ r }: { r: boolean }) => useUserPull(r, onRefresh), { initialProps: { r: true } });
+    expect(h.result.current.spinning).toBe(false);
+    act(() => h.result.current.onRefresh());
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(h.result.current.spinning).toBe(true);
+    h.rerender({ r: false });
+    expect(h.result.current.spinning).toBe(false);
+  });
+});

@@ -38,5 +38,6 @@ export function AcilisPerdesi({ hazir }: { readonly hazir: boolean }) {
 
 const styles = StyleSheet.create({
   perde: { backgroundColor: BRAND_PRIMARY, alignItems: "center", justifyContent: "center" },
-  gorsel: { width: 200, height: 200 },
+  // Yerel açılış ekranı görseli tüm ekrana "aspect fit" serer; perde de aynısını yapar (logo boyu sıçramasın).
+  gorsel: { width: "100%", height: "100%" },
 });
