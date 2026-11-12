@@ -24,10 +24,10 @@ aynı izin).
 
 ## 2. Ne değişti
 
-- **`GET /api/work-orders?filter[fasonFirma]=<uuid,...>`**: iş emrinin en az bir topu şu an o
+- **`GET /api/work-orders?filter[fasonFirma]={uuid,...}`**: iş emrinin en az bir topu şu an o
   fasoncuda (`AT_SUBCONTRACTOR` ve o firmaya açık bir sevk belgesinde bekleyen kalemi var) olan iş emirleri.
   Yalnız planlanan firma eşleşmez.
-- **`GET /api/work-orders?filter[asama]=<uuid,...>`**: iş emrinin en az bir topu
+- **`GET /api/work-orders?filter[asama]={uuid,...}`**: iş emrinin en az bir topu
   şu an o istasyonda üretimde (`IN_PRODUCTION`). Yalnız üretim (INTERNAL) istasyonları kabul edilir; EXTERNAL
   istasyon kimliği, uuid olmayan ya da bilinmeyen kimlik → 400 `details.code=INVALID_FILTER_VALUE`.
 - **`GET /api/work-orders/where-options`** (yeni uç): `{ firms, stages }`, her seçenekte `workOrderCount`.
@@ -89,5 +89,5 @@ PowerShell'de; SYSTEM görevinde `-Kok C:\TeksERP -GeriAl -Zorla`) bu kurulumun 
 - `backend-err*.log` son satırlar — yeni hata var mı
 - `GET /api/work-orders/where-options` (yetkili oturumla) 200, `firms`/`stages` dizileri döner;
   `GET /api/work-orders?filter[asama]=x` 400 `INVALID_FILTER_VALUE` (500 DEĞİL)
-- bir aşama seçeneğinin `workOrderCount`u = aynı parametrelerle `filter[asama]=<o id>` listesinin `total`ı
+- bir aşama seçeneğinin `workOrderCount`u = aynı parametrelerle `filter[asama]={o id}` listesinin `total`ı
 - ölçülen kesinti
