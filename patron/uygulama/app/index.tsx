@@ -1,5 +1,6 @@
 // Açılış yönlendirmesi: oturum okunurken giriş ekranıyla aynı lacivert zemin (beyaz parlama olmasın).
 import { Redirect } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { useSession } from "../src/state/session";
 import { useTokens } from "../src/ui/theme-context";
@@ -10,6 +11,7 @@ export default function Index() {
   if (phase === "yukleniyor") {
     return (
       <View style={{ flex: 1, backgroundColor: t.color.primary, alignItems: "center", justifyContent: "center" }}>
+        <StatusBar style="light" />
         <ActivityIndicator color={t.color.primarySoft} size="large" accessibilityLabel="Yükleniyor" />
       </View>
     );
