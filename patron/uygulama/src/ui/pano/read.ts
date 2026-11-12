@@ -1,7 +1,7 @@
 // Anlık okuyucular (saf): fabrikanın tel şekli (`Teks-Erp/src/cloud-sync/snapshots.ts`) savunmalı okunur — eksik alan
 // "—" olur, ekran çökmez. Uygulama ARİTMETİK YAPMAZ: toplam/yüzde fabrikadan gelir; burada yalnız seçme, sıralama
 // ve "sıfırdan büyük mü" karşılaştırması var.
-import { formatAgo, formatMoney, formatNumber, syncIsLate } from "../../lib/format";
+import { formatMoney, formatNumber } from "../../lib/format";
 import { CHEQUE_BUCKET, CHEQUE_KIND, CHEQUE_KIND_SHORT, FREE_STOCK_LABEL, PERIOD_LABEL, UNIT, type PeriodKey } from "../../lib/labels/uretim";
 import { lookup } from "../../lib/labels";
 import { stockConsignedText } from "../../lib/fason-summary";
@@ -92,18 +92,14 @@ export interface AttentionItem {
   readonly tone: StatusKind;
   readonly title: string;
   readonly detail: string;
-  /** Dokununca gidilecek bölüm; yoksa `action` (ör. eşitlemeyi yenile) ya da dokunulmaz. */
+  /** İlgili bölüm. */
   readonly route?: string;
-  readonly action?: "esitle";
 }
 
 export interface AttentionInput {
   readonly health?: unknown;
   readonly orders?: unknown;
   readonly finance?: unknown;
-  /** Fabrika veri anı (`esitleme.ufuk`); `null` = hiç gelmedi. `undefined` = tesis bilgisi yok (madde çıkmaz). */
-  readonly lastSync?: string | null;
-  readonly nowMs?: number;
 }
 
 /** Dikkat maddeleri — en ağır ton önce. Her madde fabrikanın verdiği bir sinyalden gelir. */
@@ -130,15 +126,6 @@ export function attentionItems(i: AttentionInput): AttentionItem[] {
   const soon = dueRows(i.finance, ["SOON"]);
   if (soon.length > 0) {
     out.push({ key: "cek-yakin", tone: "uyari", title: `7 gün içinde vadesi gelen çek/senet`, detail: soon.slice(0, 2).map((r) => `${dueLabel(r)} · ${dueAmount(r)}`).join("\n"), route: "/finans" });
-  }
-  if (i.lastSync !== undefined && syncIsLate(i.lastSync, i.nowMs)) {
-    out.push({
-      key: "esitleme",
-      tone: "uyari",
-      title: "Fabrikadan veri gecikti",
-      detail: i.lastSync ? `Son eşitleme ${formatAgo(i.lastSync, i.nowMs)} · dokun, yeniden dene` : "Fabrikadan henüz veri gelmedi",
-      action: "esitle",
-    });
   }
   const weight: Readonly<Record<StatusKind, number>> = { kritik: 0, uyari: 1, bilgi: 2, iyi: 3 };
   return out.sort((a, b) => weight[a.tone] - weight[b.tone]);

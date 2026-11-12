@@ -154,6 +154,8 @@ describe("§5 boş durum", () => {
 
 describe("§6 görsel kayıt (emülatör yok: PNG yerine ekran metinleri anlık görüntüsü)", () => {
   it("maliyet izinli teklif listesi", async () => {
+    // Başlıktaki göreli süre saate bağlı: anlık görüntü sabit kalsın diye damga "3 dk önce".
+    mockSession.factoryStamp = new Date(Date.now() - 3 * 60_000).toISOString();
     mockSession.permissions = ["bulut:teklif:oku", "bulut:maliyet:oku"];
     mockApi.list.mockImplementation(async () => page([
       { id: U(1), kayit: QUOTE, finans: { toplamTutar: "1000.00", kur: "34", toplamMaliyetTl: "28000.00", brutMarjPct: "17.65" }, surum: "1" },

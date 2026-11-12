@@ -2,8 +2,8 @@
 
 exports[`§6 görsel kayıt (emülatör yok: PNG yerine ekran metinleri anlık görüntüsü) maliyet izinli teklif listesi 1`] = `
 [
-  "Geri",
   "Teklifler",
+  "3 dk önce",
   "Gönderilen teklifler",
   "2",
   "Akın Tekstil",

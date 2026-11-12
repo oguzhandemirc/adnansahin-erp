@@ -1,31 +1,28 @@
-// Eşitleme göstergesi: "● 2 dk önce eşitlendi" — iyi: yeşil canlı nokta · gecikti: amber · çevrimdışı: gri bulut.
-// Zaman fabrikanın eşitleme damgasıdır; metin + ikon + renk birlikte (yalnız renk değil).
+// Eşitleme göstergesi: başlığın yanında simge + kısa göreli süre ("3 saat önce"). Uyarı rengi/bant YOK — tazelik
+// bilgidir, alarm değil; çevrimdışıyken yalnız simge değişir. Damga yoksa (fabrika henüz bağlanmadı) hiç çizilmez.
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
-import { formatAgo, syncIsLate } from "../lib/format";
-import { BASMA, SURE } from "./hareket/sabitler";
-import { makeStyles, useReducedMotion, useTokens } from "./theme-context";
-import { TOUCH, space, typography, type StatusKind } from "./tokens";
+import { formatSince } from "../lib/format";
+import { BASMA } from "./hareket/sabitler";
+import { makeStyles, useTokens } from "./theme-context";
+import { space, typography } from "./tokens";
 
-export type SyncState = "canli" | "gecikti" | "cevrimdisi";
+/** Göreli sürenin yenilenme aralığı: metin dakika çözünürlüğünde. */
+export const SYNC_TICK_MS = 60_000;
 
-export function syncState(last: string | null | undefined, offline: boolean, nowMs: number = Date.now()): SyncState {
-  if (offline) return "cevrimdisi";
-  return syncIsLate(last, nowMs) ? "gecikti" : "canli";
+/** Dakikada bir yeniden çizdiren saat. */
+function useMinuteClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), SYNC_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+  return now;
 }
 
-export function syncText(state: SyncState, last: string | null | undefined, nowMs: number = Date.now()): string {
-  if (state === "cevrimdisi") return last ? `Çevrimdışı · son veri ${formatAgo(last, nowMs)}` : "Çevrimdışı";
-  if (!last) return "Henüz eşitleme yok";
-  return `${formatAgo(last, nowMs)} eşitlendi`;
-}
-
-// Görünen satır sıkı (başlığa yapışık); dokunma hedefi payla 44 pt kalır.
-const SATIR_PAYI = { top: 8, bottom: 8, left: 8, right: 8 } as const;
-
-const TONE: Readonly<Record<SyncState, StatusKind>> = { canli: "iyi", gecikti: "uyari", cevrimdisi: "bilgi" };
+// Görünen satır sıkı; dokunma hedefi payla ≥ 44 pt.
+const PAY = { top: 12, bottom: 12, left: 8, right: 8 } as const;
 
 export function SyncIndicator({ last, offline = false, onPress, testID = "esitleme-gostergesi" }: {
   readonly last: string | null | undefined;
@@ -35,41 +32,25 @@ export function SyncIndicator({ last, offline = false, onPress, testID = "esitle
 }) {
   const t = useTokens();
   const s = useStyles();
-  const reduced = useReducedMotion();
-  const state = syncState(last, offline);
-  const color = t.status[TONE[state]].fill;
-  const text = syncText(state, last);
-  const o = useSharedValue(1);
-  useEffect(() => {
-    if (reduced || state !== "canli") {
-      o.value = 1;
-      return;
-    }
-    o.value = withRepeat(withTiming(0.35, { duration: SURE.nabiz }), -1, true);
-    return () => cancelAnimation(o);
-  }, [o, reduced, state]);
-  const pulse = useAnimatedStyle(() => ({ opacity: o.value }));
+  const now = useMinuteClock();
+  if (!last) return null;
+  const text = formatSince(last, now);
+  const label = `${offline ? "Çevrimdışı · son eşitleme" : "Son eşitleme"} ${text}`;
   const body = (
     <View style={s.row}>
-      {state === "cevrimdisi" ? (
-        <Ionicons name="cloud-offline-outline" size={14} color={color} />
-      ) : (
-        <Animated.View style={[s.dot, { backgroundColor: color }, pulse]} />
-      )}
-      <Text style={[s.text, state === "gecikti" ? { color: t.status.uyari.fill } : null]} numberOfLines={1}>{text}</Text>
+      <Ionicons name={offline ? "cloud-offline-outline" : "sync-outline"} size={13} color={t.textSecondary} />
+      <Text style={s.text} numberOfLines={1}>{text}</Text>
     </View>
   );
-  if (!onPress) return <View testID={testID} accessible accessibilityLabel={`Eşitleme: ${text}`}>{body}</View>;
+  if (!onPress) return <View testID={testID} accessible accessibilityLabel={label}>{body}</View>;
   return (
-    <Pressable onPress={onPress} testID={testID} accessibilityRole="button" accessibilityLabel={`Eşitleme: ${text}. Yenile`} style={({ pressed }) => [s.press, pressed && { opacity: BASMA.opaklik }]} hitSlop={SATIR_PAYI}>
+    <Pressable onPress={onPress} testID={testID} accessibilityRole="button" accessibilityLabel={`${label}. Yenile`} style={({ pressed }) => pressed && { opacity: BASMA.opaklik }} hitSlop={PAY}>
       {body}
     </Pressable>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  row: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs + 2 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  row: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
   text: { ...typography.footnote, color: t.textSecondary },
-  press: { minHeight: TOUCH - 2 * SATIR_PAYI.top, justifyContent: "center" as const },
 }));

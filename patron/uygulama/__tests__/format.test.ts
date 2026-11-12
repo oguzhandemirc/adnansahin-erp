@@ -1,4 +1,4 @@
-import { formatAgo, formatCountPossessive, formatDate, formatDateTime, formatMoney, formatNumber, syncIsLate } from "../src/lib/format";
+import { formatAgo, formatCountPossessive, formatDate, formatDateTime, formatMoney, formatNumber, formatSince } from "../src/lib/format";
 import { formatValue, humanize, recordTitle, scalarEntries } from "../src/lib/present";
 import { DEFAULT_FACTORY_TIMEZONE, setFactoryTimezone } from "../src/lib/factory-time";
 
@@ -36,14 +36,29 @@ describe("TR biçimleri", () => {
     expect(formatDate("2026-09-29")).toBe("29.09.2026");
     expect(formatDate(null)).toBe("—");
   });
-  it("göreli süre ve eşitleme gecikmesi", () => {
+  it("göreli süre", () => {
     const now = Date.parse("2026-09-29T10:00:00Z");
     expect(formatAgo("2026-09-29T09:59:30Z", now)).toBe("az önce");
     expect(formatAgo("2026-09-29T09:48:00Z", now)).toBe("12 dk önce");
     expect(formatAgo("2026-09-29T07:00:00Z", now)).toBe("3 sa önce");
-    expect(syncIsLate("2026-09-29T09:45:00Z", now)).toBe(false);
-    expect(syncIsLate("2026-09-29T09:00:00Z", now)).toBe(true);
-    expect(syncIsLate(null, now)).toBe(true);
+  });
+  it("eşitleme göstergesinin kısa süresi: şimdi / dk / saat / gün sınırları", () => {
+    const now = Date.parse("2026-09-29T10:00:00Z");
+    const once = (ms: number) => formatSince(new Date(now - ms).toISOString(), now);
+    expect(once(0)).toBe("şimdi");
+    expect(once(59_999)).toBe("şimdi");
+    expect(once(60_000)).toBe("1 dk önce");
+    expect(once(59 * 60_000 + 59_000)).toBe("59 dk önce");
+    expect(once(60 * 60_000)).toBe("1 saat önce");
+    expect(once(36 * 60 * 60_000)).toBe("36 saat önce");
+    expect(once(47 * 60 * 60_000 + 59 * 60_000)).toBe("47 saat önce");
+    expect(once(48 * 60 * 60_000)).toBe("2 gün önce");
+    expect(once(71 * 60 * 60_000)).toBe("2 gün önce");
+    expect(once(72 * 60 * 60_000)).toBe("3 gün önce");
+    // Saat kayması (gelecek damga) "şimdi"; damga yok/bozuk → "—".
+    expect(formatSince(new Date(now + 120_000).toISOString(), now)).toBe("şimdi");
+    expect(formatSince(null, now)).toBe("—");
+    expect(formatSince("bozuk", now)).toBe("—");
   });
 });
 

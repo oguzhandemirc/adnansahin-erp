@@ -70,13 +70,17 @@ export function formatAgo(iso: unknown, nowMs: number = Date.now()): string {
   return formatDateTime(iso);
 }
 
-/** Eşitleme gecikmesi eşiği: fabrika 5 dakikada bir gönderir; 30 dk sessizlik bant açar. */
-export const SYNC_LATE_MS = 30 * 60_000;
-
-export function syncIsLate(lastSyncIso: string | null | undefined, nowMs: number = Date.now()): boolean {
-  if (!lastSyncIso) return true;
-  const t = Date.parse(lastSyncIso);
-  return !Number.isFinite(t) || nowMs - t > SYNC_LATE_MS;
+/** Kısa göreli süre (başlıktaki eşitleme göstergesi): "şimdi" · "5 dk önce" · "36 saat önce" · "2 gün önce"; geçersiz → "—". */
+export function formatSince(iso: unknown, nowMs: number = Date.now()): string {
+  if (typeof iso !== "string") return "—";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "—";
+  const dk = Math.floor(Math.max(0, nowMs - t) / 60_000);
+  if (dk < 1) return "şimdi";
+  if (dk < 60) return `${dk} dk önce`;
+  // 48 saate kadar saat ("36 saat önce" "1 gün önce"den bilgilidir), sonra gün.
+  if (dk < 48 * 60) return `${Math.floor(dk / 60)} saat önce`;
+  return `${Math.floor(dk / (24 * 60))} gün önce`;
 }
 
 export const STATUS_LABEL: Readonly<Record<string, string>> = {

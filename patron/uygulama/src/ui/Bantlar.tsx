@@ -1,4 +1,4 @@
-// Durum bantları: çevrimdışı / salt-okunur / eşitleme gecikti. `Banner` üstüne kurulur; testID'ler sabit.
+// Durum bantları: çevrimdışı / salt-okunur / bağlanıyor. `Banner` üstüne kurulur; testID'ler sabit.
 import { Banner } from "./kit";
 
 export function OfflineBand({ text, testID = "bant-cevrimdisi" }: { readonly text: string; readonly testID?: string }) {
@@ -12,8 +12,4 @@ export function ReadOnlyBand({ text, testID = "bant-salt-okunur" }: { readonly t
 /** Fabrika buluta henüz bağlanmadı (hiç eşitleme yok): sakin bilgi bandı, uyarı rengi değil. */
 export function PendingConnectionBand({ text, testID = "bant-baglaniyor" }: { readonly text: string; readonly testID?: string }) {
   return <Banner tone="off" icon="sync-outline" text={text} testID={testID} />;
-}
-
-export function SyncLateBand({ text, testID = "bant-gecikme" }: { readonly text: string; readonly testID?: string }) {
-  return <Banner tone="warn" icon="time-outline" text={text} testID={testID} />;
 }

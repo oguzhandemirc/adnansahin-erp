@@ -15,7 +15,8 @@ import { IconTile } from "./ortak";
 import { DOMAIN_TONE } from "./tokens";
 import { MODULE_ICON } from "./icons";
 import { Banner } from "./kit";
-import { LargeHeader, LargeTitle, useHeaderScroll } from "./LargeHeader";
+import { ScreenHeader, useHeaderScroll } from "./LargeHeader";
+import { SyncIndicator } from "./SyncIndicator";
 import { RoleBadge } from "./RoleBadge";
 import { RAIL_GROUPS, TABS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
@@ -109,13 +110,12 @@ export interface ScreenProps {
   readonly sticky?: ReactNode;
   /** Kaydırma sona yaklaşınca (sonsuz kaydırma). */
   readonly onEndReached?: () => void;
-  /** Büyük başlığın altındaki satır (ör. tesis adı + SyncIndicator). */
+  /** Başlık satırının altındaki satır (ör. pano: tesis adı). */
   readonly subtitle?: ReactNode;
   /** Kaydırmanın altında sabit kalan çubuk (ör. düzenleme kipinin eylemleri). */
   readonly footer?: ReactNode;
 }
 
-/** Her ekranın kabı: büyük başlık, bantlar, kaydırma ve aşağı çek-yenile; izin kapısı. */
 /**
  * Yenileme çarkı yalnız KULLANICI çekince döner: açılışta önbellekten çizilip arkada tazelenen ekranda çark tepede
  * belirip içeriği itmesin (arka plan tazelemesi sessizdir; tazelik "fabrika verisi" damgasında görünür).
@@ -145,7 +145,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const wide = useWide();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { permissions, switchError } = useSession();
+  const { permissions, switchError, factoryStamp, offline } = useSession();
   const { scrollY, onScroll } = useHeaderScroll(onEndReached);
   const allowed = module === undefined || moduleVisible(permissions, module);
   const path = usePathname();
@@ -153,22 +153,39 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const pad = ekranOlugu(wide);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/pano"));
   const pull = useUserPull(refreshing, onRefresh);
+  const [subFilled, setSubFilled] = useState(true);
+  const seamless = !!subtitle && subFilled;
   return (
     <View style={s.screen}>
-      <LargeHeader title={title} scrollY={scrollY} topInset={wide ? space.s : insets.top} onBack={showBack ? goBack : undefined} />
+      <ScreenHeader
+        title={title}
+        topInset={(wide ? 0 : insets.top) + space.xs}
+        gutter={pad}
+        scrollY={scrollY}
+        seamless={seamless}
+        onBack={showBack ? goBack : undefined}
+        action={headerRight}
+        meta={<SyncIndicator last={factoryStamp} offline={offline} onPress={onRefresh} />}
+      />
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         // Sayı klavyesinin "bitti" tuşu yok: içeriği sürüklemek klavyeyi indirir.
         keyboardDismissMode="on-drag"
-        // Yapışık şerit HEP 1. çocuktur (0: başlık bloğu): koşullu çocuklar indeksi kaydırmasın diye sarılı.
+        // Yapışık şerit HEP 1. çocuktur (0: bant bloğu): koşullu çocuklar indeksi kaydırmasın diye sarılı.
         stickyHeaderIndices={sticky && allowed ? [1] : undefined}
         refreshControl={onRefresh ? <RefreshControl refreshing={pull.spinning} onRefresh={pull.onRefresh} tintColor={t.tint} colors={[t.tint]} progressBackgroundColor={t.surface} /> : undefined}
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + space.xl, paddingHorizontal: pad }]}
+        contentContainerStyle={[s.content, { paddingTop: seamless ? 0 : space.l, paddingBottom: insets.bottom + space.xl, paddingHorizontal: pad }]}
       >
         <View>
-          <LargeTitle title={title} scrollY={scrollY} subtitle={subtitle} bleed={pad} action={headerRight} />
+          {/* Alt satır (ör. tesis adı, özet şeridi) başlığın krom zemininde devam eder ama kaydırmayla gider. */}
+          {subtitle ? (
+            <View style={[subFilled ? s.subtitle : s.subtitleEmpty, { marginHorizontal: -pad, paddingHorizontal: pad }]} testID="baslik-alt-satiri">
+              {/* Alt satır boş çizilebilir (ör. taze veride `StaleNote`): boşken krom şerit bırakmaz. */}
+              <View onLayout={(e) => setSubFilled(e.nativeEvent.layout.height > 0)}>{subtitle}</View>
+            </View>
+          ) : null}
           <StatusBands />
           {switchError ? <Banner tone="error" text={switchError} testID="bant-tesis-gecisi" /> : null}
         </View>
@@ -183,7 +200,9 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
 const useStyles = makeStyles((t) => ({
   screen: { flex: 1, backgroundColor: t.bg },
   sticky: { backgroundColor: t.bg, zIndex: 2 },
-  content: { paddingTop: 0, maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
+  subtitle: { backgroundColor: t.color.chrome, borderBottomWidth: 1, borderBottomColor: t.color.chromeBorder, paddingBottom: space.m, marginBottom: space.l },
+  subtitleEmpty: { height: 0, overflow: "hidden" as const },
+  content: { maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },
   facilityPress: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
   facilitySwitch: { ...typography.footnote, color: t.tint },
