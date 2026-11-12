@@ -1,0 +1,11 @@
+# Patron API sitesi — VDS /opt/adnan/proxy/Caddyfile içindeki blokla AYNI; alan adı orada yazılıdır (burada ortamdan).
+# Caddy `adnan-ag` ağından patron-api:4620'ye konuşur; patron-api'nin yayınlanmış portu YOKTUR. Cloudflare yok:
+# Caddy X-Forwarded-For'u istemci adresiyle kurar, sunucu onu IC_VEKIL_AGLARI (adnan-ag alt ağı) üzerinden okur.
+{$PATRON_ALAN_ADI} {
+	import guvenlik
+	encode zstd gzip
+	# İç/yönetim ad alanları (patron/sunucu/src/http/web-static.ts IC_ONEKLER) kenarda kapalı.
+	@ic path_regexp ic ^/(ic|yonetim)(/|$)
+	respond @ic 404
+	reverse_proxy patron-api:4620
+}

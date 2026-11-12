@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.expo/
+web-build/
+*.log
+.env
+.env.*
+!.env.example
+
+# Native: prebuild çıktısı (scripts/build-aab.mjs her derlemede --clean ile yeniden üretir)
+/android
+/ios
+.kotlin/
+
+# Firebase (F5 telefon push): proje dosyaları REPOYA GİRMEZ — örnek: google-services.example.json
+google-services.json
+GoogleService-Info.plist
