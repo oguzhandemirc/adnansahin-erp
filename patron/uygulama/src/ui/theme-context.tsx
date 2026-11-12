@@ -1,8 +1,9 @@
 // Tema: görünüm tercihi (kip · tema rengi · zemin · köşe · simge kareleri) cihazda `patron.gorunum` (JSON); eski
 // `patron.tema` (yalnız kip) bir kez okunup göçer. Uygulanış anlıktır. Sağlayıcı yoksa (testler) varsayılan açık tema.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { AccessibilityInfo, useColorScheme } from "react-native";
+import { useColorScheme } from "react-native";
 import type { KeyValue } from "../state/store";
+import { useHareketAzalt } from "./hareket/azalt";
 import { APPEARANCE_KEY, DEFAULT_APPEARANCE, LEGACY_THEME_KEY, MODE_LABEL, MODE_PREFS, resolveAppearance, resolveScheme, type Appearance, type ModePref } from "./appearance";
 import { buildTheme, light, type Theme } from "./tokens";
 
@@ -111,24 +112,8 @@ export function useThemePref(): { pref: ThemePref; setPref: (p: ThemePref) => vo
   return { pref: appearance.mode, setPref: (p) => setAppearance({ mode: p }) };
 }
 
-/** Hareket azaltma (erişilebilirlik) açık mı — animasyonlar kısalır/kapanır. */
-export function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    let live = true;
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((v) => {
-        if (live) setReduced(!!v);
-      })
-      .catch(() => undefined);
-    const sub = AccessibilityInfo.addEventListener("reduceMotionChanged", (v) => setReduced(!!v));
-    return () => {
-      live = false;
-      sub?.remove?.();
-    };
-  }, []);
-  return reduced;
-}
+/** Eski ad: hareket azaltma tek okuyucusu `hareket/azalt.ts`. */
+export const useReducedMotion = useHareketAzalt;
 
 /** Temaya bağlı stil fabrikası: her tema için bir kez kurulur (bileşen başına yeniden hesaplanmaz). */
 export function makeStyles<T>(build: (t: Theme) => T): () => T {

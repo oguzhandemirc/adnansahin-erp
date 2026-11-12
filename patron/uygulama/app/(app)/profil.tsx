@@ -1,5 +1,5 @@
-// Profil: lacivert kimlik kartı (ad, e-posta, rol, tesis; çok tesiste fabrika değiştir), Görünüm (Sistem · Açık · Koyu —
-// anında uygulanır, tercih cihazda saklanır), güvenlik (parola değişimi ayrı sayfada, TOTP ile), bildirimlere geçiş,
+// Profil: tema renkli kimlik kartı (ad, e-posta, rol, tesis; çok tesiste fabrika değiştir), Görünüm'e geçiş (kip, renk,
+// zemin, köşe, kareler — `gorunum.tsx`), güvenlik (parola değişimi ayrı sayfada, TOTP ile), bildirimlere geçiş,
 // hesabımı sil (ayrı ekran: açıklama + parola + TOTP), çıkış (iki adım).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
@@ -14,12 +14,12 @@ import { FacilitySwitchModal } from "../../src/ui/FacilitySwitcher";
 import { Screen } from "../../src/ui/Frame";
 import { Banner, Button, ConfirmButton, Field } from "../../src/ui/kit";
 import { ListGroup, ListRow } from "../../src/ui/ListRow";
-import { SegmentedControl } from "../../src/ui/SegmentedControl";
-import { makeStyles, THEME_PREF_LABEL, THEME_PREFS, useThemePref, useTokens } from "../../src/ui/theme-context";
+import { MODE_LABEL, PRESET_LABEL, SURFACE_LABEL } from "../../src/ui/appearance";
+import { makeStyles, useAppearance, useTokens } from "../../src/ui/theme-context";
 import { READABLE_MAX, space, typography } from "../../src/ui/tokens";
 import { useWrite } from "../../src/ui/useWrite";
 
-// Lacivert kart her temada koyudur: üstündeki metin `onNavy` token'larındandır.
+// Kimlik kartı tema rengi dolgusudur: üstündeki metin `onPrimary`dir.
 
 function PasswordSheet({ visible, onClose, onDone }: { readonly visible: boolean; readonly onClose: () => void; readonly onDone: () => void }) {
   const { api } = useSession();
@@ -65,7 +65,7 @@ export default function Profile() {
   const router = useRouter();
   const t = useTokens();
   const s = useStyles();
-  const { pref, setPref } = useThemePref();
+  const { appearance } = useAppearance();
   const [sheet, setSheet] = useState(false);
   const [switcher, setSwitcher] = useState(false);
   const [ok, setOk] = useState(false);
@@ -110,11 +110,9 @@ export default function Profile() {
 
       <GroupCaption>Görünüm</GroupCaption>
       <ListGroup testID="profil-gorunum">
-        <View style={s.pad}>
-          <SegmentedControl items={THEME_PREFS.map((k) => ({ key: k, label: THEME_PREF_LABEL[k] }))} value={pref} onChange={setPref} testIDPrefix="tema-" accessibilityLabel="Tema" />
-        </View>
+        <ListRow title="Görünüm" subtitle={`${MODE_LABEL[appearance.mode]} · ${PRESET_LABEL[appearance.preset]} · ${SURFACE_LABEL[appearance.surface]}`} icon="color-palette-outline" domain="genel"
+          onPress={() => router.push("/gorunum" as never)} testID="gorunum-git" />
       </ListGroup>
-      <GroupNote>Sistem seçiliyken telefonun açık/koyu ayarı izlenir. Seçim bu cihazda saklanır.</GroupNote>
 
       {ok ? <Banner tone="off" icon="checkmark-circle" text="Parola değişti" /> : null}
       <GroupCaption>Güvenlik</GroupCaption>
@@ -161,7 +159,6 @@ const useStyles = makeStyles((t) => ({
   facMeta: { ...typography.footnote, marginTop: 1 },
   switch: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, borderRadius: t.radius.chip, paddingHorizontal: space.m, minHeight: 36 },
   switchText: { ...typography.subhead, fontWeight: "600" as const },
-  pad: { padding: space.m },
   logout: { marginTop: space.l },
   sheet: { flex: 1 },
   sheetBar: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: space.l, paddingTop: space.l, paddingBottom: space.s },

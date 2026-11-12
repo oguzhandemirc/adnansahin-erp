@@ -1,4 +1,4 @@
-// "Diğer" dilimi ekranları: tema seçimi anında uygulanır ve saklanır · hesap ayrıntısında ham izin kodu görünmez ·
+// "Diğer" dilimi ekranları: profilden Görünüm'e geçiş · hesap ayrıntısında ham izin kodu görünmez ·
 // gelen kutusu süzgeci sunucuya gider (istemci süzmez) · Diğer'de bekleyen rozeti · gövde özeti · kısa yoklama.
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
@@ -50,16 +50,14 @@ function Probe() {
 }
 
 describe("profil: görünüm", () => {
-  it("⭐ Sistem · Açık · Koyu seçimi anında uygulanır ve cihazda saklanır", async () => {
-    const store = { get: jest.fn(async () => null), set: jest.fn(async () => undefined) };
+  it("Görünüm satırı özet taşır ve Görünüm ekranını açar (ayarlar orada: gorunum.test)", async () => {
+    const store = { get: jest.fn(async () => JSON.stringify({ mode: "koyu", preset: "teal" })), set: jest.fn(async () => undefined) };
     render(<ThemeProvider store={store}><Profile /><Probe /></ThemeProvider>);
     await act(async () => undefined);
-    expect(screen.getByTestId("sema").props.children).toBe("light");
-    fireEvent.press(screen.getByTestId("tema-koyu"));
     expect(screen.getByTestId("sema").props.children).toBe("dark");
-    expect(store.set).toHaveBeenCalledWith("patron.gorunum", expect.stringContaining('"mode":"koyu"'));
-    fireEvent.press(screen.getByTestId("tema-acik"));
-    expect(screen.getByTestId("sema").props.children).toBe("light");
+    expect(screen.getByText("Koyu · Turkuaz · Lavanta")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("gorunum-git"));
+    expect(mockRouter.push).toHaveBeenCalledWith("/gorunum");
   });
   it("lacivert kartta rol: hesap yönetimi izni Yönetici", () => {
     render(<Profile />);
