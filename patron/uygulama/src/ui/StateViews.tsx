@@ -6,7 +6,7 @@ import { Text, View } from "react-native";
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { DOMAIN_ICON, type IconName } from "./icons";
 import { Banner, Button } from "./kit";
-import { durations } from "./motion";
+import { SURE } from "./hareket/sabitler";
 import { makeStyles, useReducedMotion, useTokens } from "./theme-context";
 import { space, typography, type Domain } from "./tokens";
 
@@ -38,7 +38,7 @@ export function LoadingSkeleton({ variant = "list", rows = 3, testID }: { readon
   const o = useSharedValue(1);
   useEffect(() => {
     if (reduced) return;
-    o.value = withRepeat(withTiming(0.5, { duration: durations.slower * 2 }), -1, true);
+    o.value = withRepeat(withTiming(0.5, { duration: SURE.nabiz }), -1, true);
     return () => cancelAnimation(o);
   }, [o, reduced]);
   const pulse = useAnimatedStyle(() => ({ opacity: o.value }));

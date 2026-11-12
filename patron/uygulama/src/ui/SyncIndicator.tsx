@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { formatAgo, syncIsLate } from "../lib/format";
-import { durations } from "./motion";
+import { SURE } from "./hareket/sabitler";
 import { makeStyles, useReducedMotion, useTokens } from "./theme-context";
 import { TOUCH, space, typography, type StatusKind } from "./tokens";
 
@@ -42,7 +42,7 @@ export function SyncIndicator({ last, offline = false, onPress, testID = "esitle
       o.value = 1;
       return;
     }
-    o.value = withRepeat(withTiming(0.35, { duration: durations.slower * 2 }), -1, true);
+    o.value = withRepeat(withTiming(0.35, { duration: SURE.nabiz }), -1, true);
     return () => cancelAnimation(o);
   }, [o, reduced, state]);
   const pulse = useAnimatedStyle(() => ({ opacity: o.value }));

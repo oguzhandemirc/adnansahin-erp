@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View, type LayoutChangeEvent } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { haptic } from "./haptics";
-import { durations, springs } from "./motion";
+import { SURE, YAY } from "./hareket/sabitler";
 import { makeStyles, useReducedMotion, useTokens } from "./theme-context";
 import { FONT_SCALE, TOUCH, space, typography } from "./tokens";
 
@@ -36,7 +36,7 @@ export function SegmentedControl<K extends string>({ items, value, onChange, tes
 
   useEffect(() => {
     const to = index * segW;
-    x.value = reduced ? withTiming(to, { duration: durations.instant }) : withSpring(to, springs.press);
+    x.value = reduced ? withTiming(to, { duration: SURE.anlik }) : withSpring(to, YAY.basma);
   }, [index, segW, reduced, x]);
 
   const indicator = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));

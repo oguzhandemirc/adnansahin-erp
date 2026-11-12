@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "../../../src/state/session";
 import { useWide } from "../../../src/ui/Frame";
 import { TABS, tabVisible } from "../../../src/ui/tabs";
+import { useGezinme } from "../../../src/ui/hareket/gezinme";
 import { useTokens } from "../../../src/ui/theme-context";
 import { TAB_BAR_HEIGHT, space, typography } from "../../../src/ui/tokens";
 
@@ -15,10 +16,13 @@ export default function TabsLayout() {
   const t = useTokens();
   const wide = useWide();
   const insets = useSafeAreaInsets();
+  const g = useGezinme();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        animation: g.sekme.animation,
+        transitionSpec: g.sekme.transitionSpec,
         tabBarInactiveTintColor: t.textMuted,
         tabBarLabelStyle: { fontSize: 11, lineHeight: 14, flexShrink: 0, fontWeight: typography.caption.fontWeight },
         tabBarItemStyle: { paddingTop: space.xs + 2, paddingBottom: space.xs },

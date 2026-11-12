@@ -6,12 +6,14 @@ import { useNotificationTaps } from "../../src/push/taps";
 import { useSession } from "../../src/state/session";
 import { SideNav, useWide } from "../../src/ui/Frame";
 import { Loading } from "../../src/ui/kit";
+import { MODAL_EKRANLAR, useGezinme } from "../../src/ui/hareket/gezinme";
 import { useTokens } from "../../src/ui/theme-context";
 
 export default function AppLayout() {
   const { phase } = useSession();
   const wide = useWide();
   const t = useTokens();
+  const g = useGezinme();
   useNotificationTaps(phase === "hazir");
   if (phase === "yukleniyor") return <Loading />;
   if (phase !== "hazir") return <Redirect href="/giris" />;
@@ -19,7 +21,9 @@ export default function AppLayout() {
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: t.bg }}>
       {wide ? <SideNav /> : null}
       <View style={{ flex: 1 }}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg }, ...g.yigin }}>
+          {MODAL_EKRANLAR.map((name) => <Stack.Screen key={name} name={name} options={g.modal} />)}
+        </Stack>
       </View>
     </View>
   );
