@@ -1,0 +1,266 @@
+// EŞİTLEME TURU (§2 akış ①…⑨): ön koşul → güvenli ufuk → kirli kökler → satır kurulumu →
+// paket(ler) → imzalı POST → onaylanan filigranların TEK tx'te ilerletilmesi. Kaynak: ana ürün
+// 19aa48a9 aynı dosya; Adnan farkı: anlık kayıt yok (D3b), modül bayrağı yalnız üretim, ön koşul D1'in async
+// `cloudEligibility`si, sürüm `lib/app-version`.
+// Bir tur bitmeden ikincisi başlamaz (çağıran iş `running` korumasıyla). Filigran YALNIZ
+// bulutun `kabul` listesiyle ilerler; onaysız paket sonraki turda aynı konumdan yeniden kurulur.
+import { gzipSync } from "node:zlib";
+import { randomUUID } from "node:crypto";
+import { readProductionEnabled } from "../services/system-setting.service";
+import { APP_VERSION } from "../lib/app-version";
+import { cloudEligibility, type CloudEligibility } from "./eligibility";
+import { computeHorizon } from "./horizon";
+import { cloudContext, cloudPost, type CloudCallContext, type CloudTransport } from "./cloud-client";
+import { collectProjectionChanges } from "./change-scan";
+import { buildRecords } from "./record-builder";
+import { membershipDigest, parentLinkOf } from "./reconcile";
+import { chainOf, entryOf, needsFull, packDrafts, planFull, retentionOf, toUnits, withCompletion, type PacketDraft, type Unit } from "./packing";
+import { RECORD_PROJECTIONS, type ModuleKey } from "./projections";
+import { FULL_RESEND_MARKER, formatRoundCounter, loadWatermarks, saveWatermarks, wmKey, type StoredWatermark, type WatermarkWrite } from "./watermarks";
+import {
+  ENVELOPE_VERSION,
+  MAX_COMPRESSED_BYTES,
+  MAX_RECONCILE_PENDING,
+  MAX_DECOMPRESSED_BYTES,
+  PackageSchema,
+  SYNC_CONTRACT_VERSION,
+  SYNC_PATHS,
+  SyncResponseSchema,
+  type ReconcileEntry,
+  type SyncPackage,
+  type SyncResponseRead,
+  type SyncRoundKind,
+  type Watermark,
+} from "./wire";
+
+export interface RoundOptions {
+  readonly kind: Extract<SyncRoundKind, "ARTIMLI" | "UZLASTIRMA">;
+}
+
+export interface RoundDeps {
+  readonly transport: CloudTransport;
+  readonly nowMs?: () => number;
+  /** Test kancası: ön koşul hazır verilir (yoksa `cloudEligibility()` okunur). */
+  readonly eligibility?: () => Promise<CloudEligibility>;
+  /** Ölçüm kancası: gönderilen her paketin açık/sıkışmış bayt sayısı. */
+  readonly onPacket?: (info: { readonly rawBytes: number; readonly gzipBytes: number; readonly records: number }) => void;
+}
+
+export interface RoundOutcome {
+  readonly status: "GONDERILMEDI" | "TAMAM" | "KISMI" | "HATA";
+  readonly reason: string | null;
+  readonly packets: number;
+  readonly accepted: string[];
+  readonly rejected: Array<{ projection: string; code: string }>;
+  /** Bulutun ne kabul ne ret listesine koyduğu kayıt projeksiyonları (log özeti için). */
+  readonly unaccepted: string[];
+  readonly fullRequested: string[];
+  readonly horizon: string | null;
+  /** Tavana takılan kaynak var — iş beklemeden bir tur daha koşmalı. */
+  readonly more: boolean;
+  readonly contractWarning: string | null;
+  /** Bu uzlaştırmada iki uçta aynı kümeyle sayılamayan projeksiyonlar (ÖLÇÜLEMEDİ — TAM istenmez). */
+  readonly reconcileSkipped: string[];
+}
+
+interface ModuleFlags {
+  readonly production: boolean;
+}
+
+function moduleOn(m: ModuleKey | undefined, flags: ModuleFlags): boolean {
+  if (m === "production.enabled") return flags.production;
+  return true;
+}
+
+/** ③–⑥ kayıt projeksiyonları: TAM gerekenler sayfalı, diğerleri (w, H] değişiklikleriyle. */
+async function planRecordUnits(
+  stored: ReadonlyMap<string, StoredWatermark>,
+  horizon: Date,
+  flags: ModuleFlags,
+  nowMs: number,
+): Promise<{ units: Unit[]; idle: WatermarkWrite[]; more: boolean }> {
+  const units: Unit[] = [];
+  const idle: WatermarkWrite[] = [];
+  let more = false;
+  for (const p of RECORD_PROJECTIONS) {
+    if (!moduleOn(p.module, flags)) continue;
+    const chain = stored.get(wmKey.chain(p.name));
+    if (needsFull(p, chain)) {
+      units.push(...(await planFull(p, chain, horizon, nowMs)));
+      continue;
+    }
+    const changes = await collectProjectionChanges(p, stored, horizon);
+    more ||= changes.truncated;
+    if (changes.needsFull) {
+      idle.push({ source: wmKey.chain(p.name), digest: FULL_RESEND_MARKER });
+      continue;
+    }
+    // Değişikliği olmayan kaynaklar bulut onayı beklemeden ilerler (gönderilecek satır yok).
+    if (changes.dirty.size === 0 && changes.deleted.size === 0) {
+      idle.push(...changes.positions);
+      continue;
+    }
+    const built = await buildRecords(p, [...changes.dirty], nowMs);
+    const removed = [...built.removed, ...[...changes.deleted].map((id) => ({ id, neden: "SILINDI" as const }))];
+    units.push(...withCompletion(toUnits({ projection: p, built: built.rows, removed, full: null }), changes.positions));
+  }
+  return { units, idle, more };
+}
+
+/**
+ * Günlük uzlaştırma (§4.4): küme − bekleyen (son onaylı ufuktan sonra doğanlar, ebeveyni öyle olanlar). Ebeveyni
+ * onaylanmamış çocuk ya da tavanı aşan bekleyen ÖLÇÜLEMEDİ sayılır: entry gitmez, TAM da istenmez.
+ */
+async function planReconcile(stored: ReadonlyMap<string, StoredWatermark>, flags: ModuleFlags): Promise<{ entries: ReconcileEntry[]; skipped: string[] }> {
+  const entries: ReconcileEntry[] = [];
+  const skipped: string[] = [];
+  let budget = MAX_RECONCILE_PENDING;
+  for (const p of RECORD_PROJECTIONS) {
+    if (!moduleOn(p.module, flags)) continue;
+    const chain = stored.get(wmKey.chain(p.name));
+    if (needsFull(p, chain) || !chain?.at) continue;
+    const link = parentLinkOf(p);
+    const parentChain = link ? stored.get(wmKey.chain(link.projection.name)) : undefined;
+    if (link && (needsFull(link.projection, parentChain) || !parentChain?.at)) {
+      skipped.push(p.name);
+      continue;
+    }
+    const d = await membershipDigest(p, { retentionFrom: retentionOf(p, chain), createdBefore: chain.at, parentCreatedBefore: parentChain?.at ?? null });
+    if (d.pendingOverflow || d.pending.length > budget) {
+      skipped.push(p.name);
+      continue;
+    }
+    budget -= d.pending.length;
+    entries.push({ projeksiyon: p.name, adet: d.count, ozet: d.digest, ufukTarihi: retentionOf(p, chain)?.toISOString() ?? null, bekleyen: d.pending });
+  }
+  return { entries, skipped };
+}
+
+interface SendState {
+  readonly ctx: CloudCallContext;
+  readonly kind: RoundOptions["kind"];
+  readonly onPacket?: RoundDeps["onPacket"];
+  readonly horizon: Date;
+  counter: number;
+  readonly chains: Map<string, Watermark | null>;
+  readonly failed: Set<string>;
+  readonly outcome: { packets: number; accepted: string[]; rejected: Array<{ projection: string; code: string }>; fullRequested: string[]; contractWarning: string | null };
+}
+
+/** Bulut yanıtını fabrikaya yansıtır — filigran YALNIZ kabul edilen birimde ilerler (tek tx). */
+async function applyResponse(r: SyncResponseRead, draft: { units: Unit[]; snapshots: PacketDraft["snapshots"] }, yeni: Watermark, st: SendState): Promise<void> {
+  const horizon = st.horizon;
+  const acceptedNames = new Set(r.kabul.map((k) => k.projeksiyon));
+  const rejectedNames = new Set(r.ret.map((x) => x.projeksiyon));
+  const writes: WatermarkWrite[] = [{ source: wmKey.round, tie: [formatRoundCounter(st.counter)] }];
+  for (const u of draft.units) {
+    const name = u.projection.name;
+    if (!u.entries.every((e) => acceptedNames.has(e.name))) {
+      st.failed.add(name);
+      continue;
+    }
+    st.chains.set(name, yeni);
+    // TAM tamamlanana dek işaret kalır: yarıda kalan TAM sonraki turda baştan başlar.
+    writes.push({ source: wmKey.chain(name), at: horizon, tie: [yeni.k], catalogVersion: u.projection.catalogVersion, digest: u.full && !u.onComplete ? FULL_RESEND_MARKER : null });
+    if (u.onComplete) writes.push(...u.onComplete);
+    if (!st.outcome.accepted.includes(name)) st.outcome.accepted.push(name);
+  }
+  for (const s of draft.snapshots) if (!rejectedNames.has(s.projection)) writes.push({ source: wmKey.snapshot(s.projection), digest: s.digest, at: horizon });
+  for (const x of r.ret) st.outcome.rejected.push({ projection: x.projeksiyon, code: x.kod });
+  for (const want of r.istenen) {
+    const main = want.projeksiyon.split(".")[0]!;
+    if (want.tur !== "TAM" || !RECORD_PROJECTIONS.some((p) => p.name === main)) continue;
+    writes.push({ source: wmKey.chain(main), digest: FULL_RESEND_MARKER });
+    if (!st.outcome.fullRequested.includes(main)) st.outcome.fullRequested.push(main);
+  }
+  for (const [name, iso] of Object.entries(r.ufukTarihi)) {
+    if (RECORD_PROJECTIONS.some((p) => p.name === name)) writes.push({ source: wmKey.chain(name), retentionFrom: iso ? new Date(iso) : null });
+  }
+  if (r.sozlesmeUyarisi) st.outcome.contractWarning = r.sozlesmeUyarisi;
+  await saveWatermarks(writes);
+}
+
+function buildPacket(draft: PacketDraft, units: Unit[], yeni: Watermark, st: SendState): SyncPackage {
+  return {
+    v: ENVELOPE_VERSION,
+    sozlesme: SYNC_CONTRACT_VERSION,
+    paketId: randomUUID(),
+    kurulumId: st.ctx.installationId,
+    tur: st.kind,
+    ufuk: st.horizon.toISOString(),
+    uretimBilgisi: { uygulamaSurum: APP_VERSION.slice(0, 40), katalogSurum: SYNC_CONTRACT_VERSION },
+    kayitlar: units.flatMap((u) => u.entries.map((e) => entryOf(e, u, { onceki: u.startsChain ? null : (st.chains.get(u.projection.name) ?? null), yeni }))),
+    anliklar: draft.snapshots.map((s) => ({ projeksiyon: s.projection, icerikOzeti: s.digest, veri: s.data })),
+    uzlastirma: draft.reconcile,
+  };
+}
+
+/** ⑧–⑨ paketleri sırayla gönderir; ağ/yanıt hatasında durur (sonraki tur aynı konumdan). */
+async function sendDrafts(queue: PacketDraft[], st: SendState): Promise<{ status: RoundOutcome["status"]; reason: string | null }> {
+  let status: RoundOutcome["status"] = "TAMAM";
+  let reason: string | null = null;
+  for (let qi = 0; qi < queue.length; qi++) {
+    const draft = queue[qi]!;
+    const live = draft.units.filter((u) => !st.failed.has(u.projection.name));
+    st.counter++;
+    const yeni: Watermark = { t: st.horizon.toISOString(), k: formatRoundCounter(st.counter) };
+    // Sözleşmede olmayan anahtar dışarı çıkamaz: kendi ürettiğimizi de katı şemadan geçiririz.
+    const checked = PackageSchema.parse(buildPacket(draft, live, yeni, st));
+    const raw = Buffer.from(JSON.stringify(checked), "utf8");
+    const gzipBytes = gzipSync(raw).length;
+    if (raw.length > MAX_DECOMPRESSED_BYTES || gzipBytes > MAX_COMPRESSED_BYTES) {
+      st.counter--;
+      if (live.length > 1) {
+        const half = Math.ceil(live.length / 2);
+        queue.splice(qi + 1, 0, { units: live.slice(0, half), snapshots: draft.snapshots, reconcile: draft.reconcile }, { units: live.slice(half), snapshots: [], reconcile: [] });
+        continue;
+      }
+      status = "HATA";
+      reason = "PAKET_BUYUK";
+      for (const u of live) st.failed.add(u.projection.name);
+      continue;
+    }
+    st.onPacket?.({ rawBytes: raw.length, gzipBytes, records: checked.kayitlar.reduce((n, e) => n + e.yaz.length + e.sil.length, 0) });
+    const res = await cloudPost(st.ctx, SYNC_PATHS.SYNC, checked, { gzip: true });
+    st.outcome.packets++;
+    const parsed = res.ok ? SyncResponseSchema.safeParse(res.json) : null;
+    if (!res.ok || !parsed?.success || parsed.data.paketId !== checked.paketId) {
+      return { status: st.outcome.packets > 1 ? "KISMI" : "HATA", reason: res.ok ? "YANIT_GECERSIZ" : res.code };
+    }
+    await applyResponse(parsed.data, { units: live, snapshots: draft.snapshots }, yeni, st);
+  }
+  return { status, reason };
+}
+
+export async function runSyncRound(opts: RoundOptions, deps: RoundDeps): Promise<RoundOutcome> {
+  const now = deps.nowMs ?? Date.now;
+  const elig = await (deps.eligibility ?? (() => cloudEligibility()))();
+  const empty = { packets: 0, accepted: [], rejected: [], unaccepted: [], fullRequested: [], more: false, contractWarning: null, reconcileSkipped: [] };
+  if (!elig.ok) return { ...empty, status: "GONDERILMEDI", reason: elig.reason, horizon: null };
+
+  const ctx = cloudContext(elig, deps.transport);
+  const horizon = (await computeHorizon(now())).at;
+  const stored = await loadWatermarks();
+  const flags: ModuleFlags = { production: await readProductionEnabled() };
+
+  const plan = opts.kind === "ARTIMLI" ? await planRecordUnits(stored, horizon, flags, now()) : { units: [], idle: [], more: false };
+  await saveWatermarks(plan.idle);
+  const reconcile = opts.kind === "UZLASTIRMA" ? await planReconcile(stored, flags) : { entries: [], skipped: [] };
+
+  const st: SendState = {
+    ctx,
+    kind: opts.kind,
+    onPacket: deps.onPacket,
+    horizon,
+    counter: Number(stored.get(wmKey.round)?.tie?.[0] ?? "0") || 0,
+    chains: new Map(RECORD_PROJECTIONS.map((p) => [p.name, chainOf(stored.get(wmKey.chain(p.name)))])),
+    failed: new Set(),
+    outcome: { packets: 0, accepted: [], rejected: [], fullRequested: [], contractWarning: null },
+  };
+  // ANLIK projeksiyonlar D3b'de: bu dilimde paket yalnız kayıt ve uzlaştırma taşır.
+  const sent = await sendDrafts(packDrafts(plan.units, [], reconcile.entries), st);
+  const status = sent.status === "TAMAM" && (st.failed.size > 0 || st.outcome.rejected.length > 0) ? "KISMI" : sent.status;
+  const rejectedRoots = new Set(st.outcome.rejected.map((r) => r.projection.split(".")[0]!));
+  const unaccepted = [...st.failed].filter((n) => !rejectedRoots.has(n));
+  return { ...st.outcome, unaccepted, more: plan.more, status, reason: sent.reason, horizon: horizon.toISOString(), reconcileSkipped: reconcile.skipped };
+}
