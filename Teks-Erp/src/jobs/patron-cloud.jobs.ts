@@ -48,7 +48,8 @@ export function pgErrorCode(err: unknown): string | null {
     const o = e as Record<string, unknown>;
     for (const k of ["originalCode", "code"]) {
       const v = o[k];
-      if (typeof v === "string" && /^[0-9A-Z]{5}$/.test(v)) return v;
+      // Prisma'nın kendi kodu (`P2010` ham sorgu hatası) da beş karakterdir: PG kodu değil, içine bakılır.
+      if (typeof v === "string" && /^[0-9A-Z]{5}$/.test(v) && !/^P\d{4}$/.test(v)) return v;
     }
     for (const k of ["cause", "meta", "driverAdapterError"]) {
       const r = walk(o[k], depth + 1);
