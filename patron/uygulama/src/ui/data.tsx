@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text, View } from "react-native";
 import { errorMessage } from "../api/client";
-import type { Page, ProjectionRecord } from "../api/wire";
+import type { FacilityStatus, Page, ProjectionRecord } from "../api/wire";
 import { formatAgo, formatDateTime, formatMoney, syncIsLate } from "../lib/format";
 import { FINANCE_FIELD, isMoneyField, moneyCurrencyOf } from "../lib/labels/finans";
 import { formatValue, humanize, isHiddenKey, nestedEntries, recordSubtitle, recordTitle, scalarEntries } from "../lib/present";
 import { useSession } from "../state/session";
 import { useRemote } from "../state/useRemote";
 import { Banner, Button, Card, Muted } from "./kit";
-import { OfflineBand, ReadOnlyBand, SyncLateBand } from "./Bantlar";
+import { OfflineBand, PendingConnectionBand, ReadOnlyBand, SyncLateBand } from "./Bantlar";
 import { DOMAIN_ICON } from "./icons";
 import { BosDurum, Iskelet, ListeBlogu, ListeSatiri, type ListeSatiriProps } from "./ortak";
 import { makeStyles, useTokens } from "./theme-context";
@@ -158,13 +158,24 @@ const useFieldStyles = makeStyles((t) => ({
   statValue: { ...typography.title2, ...tabularNums, color: t.text, marginTop: space.xs },
 }));
 
-/** Ekran üstü şerit: çevrimdışı (son veri) ve eşitleme gecikmesi. */
+/**
+ * Hizmet bandı: bulut "hiç kurulum/eşitleme yok" ile "süre bitti"yi ayırmaz (ikisi de SALT_OKUNUR). Fabrikadan hiç paket
+ * gelmemişse (`esitleme === null`) hizmet bitmedi, henüz BAŞLAMADI → sakin "bağlanıyor"; paket geldiyse eski uyarı kalır.
+ */
+export function serviceBand(facility: Pick<FacilityStatus, "esitleme" | "hizmet"> | null | undefined): "acik" | "baglaniyor" | "salt-okunur" {
+  if (!facility) return "acik";
+  if (facility.esitleme === null) return "baglaniyor";
+  return facility.hizmet?.asama === "SALT_OKUNUR" ? "salt-okunur" : "acik";
+}
+
+/** Ekran üstü şerit: çevrimdışı (son veri), bağlantı kuruluyor, salt okunur ve eşitleme gecikmesi. */
 export function StatusBands() {
   const { offline, offlineSince, facility } = useSession();
   const last = facility?.esitleme?.sonEsitleme ?? null;
   // Eski sunucu/önbellek `hizmet` taşımayabilir → açık say (bugünkü davranış).
   const service = facility?.hizmet;
-  const readOnly = service?.asama === "SALT_OKUNUR";
+  const band = serviceBand(facility);
+  const readOnly = band === "salt-okunur";
   return (
     <View>
       {offline ? <OfflineBand text={`Çevrimdışı — son veri ${offlineSince ? formatAgo(offlineSince) : "bilinmiyor"}. Değişiklik yapılamaz.`} /> : null}
@@ -173,7 +184,8 @@ export function StatusBands() {
           text={`${UYGULAMA_ADI} hizmeti ${formatDateTime(service?.bitis)} tarihinde sona erdi — veriler ${formatDateTime(service?.saltOkunurBitis)} tarihine kadar yalnız görüntülenir ve dışa aktarılabilir (Hesaplar › Dışa aktar); yeni kayıt girilemez.`}
         />
       ) : null}
-      {facility && !readOnly && syncIsLate(last) ? (
+      {band === "baglaniyor" ? <PendingConnectionBand text="Fabrika bağlantısı kuruluyor — veriler geldiğinde burada görünecek." /> : null}
+      {facility && band === "acik" && syncIsLate(last) ? (
         <SyncLateBand text={last ? `Fabrikadan eşitleme gecikti — son eşitleme ${formatAgo(last)}` : "Fabrikadan henüz veri gelmedi"} />
       ) : null}
     </View>

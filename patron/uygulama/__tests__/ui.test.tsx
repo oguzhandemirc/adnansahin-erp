@@ -87,6 +87,20 @@ describe("hizmet sonu bandı (Ek-6/A §4.2)", () => {
     expect(screen.queryByTestId("bant-salt-okunur")).toBeNull();
     mockSession.facility = null;
   });
+  it("hiç eşitleme yok + SALT_OKUNUR (kurulum kaydı yok): 'sona erdi' DEĞİL sakin 'bağlanıyor' bandı", () => {
+    mockSession.facility = {
+      tesis: { id: "t", ad: "Örnek", saklamaAy: 13 },
+      hesap: { ad: "A" },
+      esitleme: null,
+      hizmet: { asama: "SALT_OKUNUR", bitis: "2026-11-12T03:47:00Z", saltOkunurBitis: "2027-02-10T03:47:00Z" },
+    };
+    render(<Screen title="Pano"><Text>X</Text></Screen>);
+    expect(screen.getByTestId("bant-baglaniyor")).toHaveTextContent(/Fabrika bağlantısı kuruluyor/);
+    expect(screen.queryByTestId("bant-salt-okunur")).toBeNull();
+    expect(screen.queryByTestId("bant-gecikme")).toBeNull();
+    expect(screen.queryByText(/sona erdi/)).toBeNull();
+    mockSession.facility = null;
+  });
 });
 
 describe("yıkıcı işlem onayı", () => {
