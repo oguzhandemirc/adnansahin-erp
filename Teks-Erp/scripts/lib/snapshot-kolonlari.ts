@@ -204,15 +204,17 @@ WHERE r.status = 'TAMBUR_CONSUMED' AND r."preTamburCloseQty" IS NULL AND r."stat
     model: "Order",
     alan: "destination",
     sinif: "DONMUS_ILERI",
-    yazan: [SVC + "order.service.ts"],
+    yazan: [SVC + "order.service.ts", SVC + "patron-inbox/order-create.ts"],
     neden:
       "sipariş AÇILIRKEN şube → cari zincirinden donan yön (2026-09-23 kullanıcı kararı); kart sonradan değişse de " +
-      "değişmez, sipariş raporları buradan okur. Tek yazar `OrderService.create` ve siparişin AÇIKÇA başka cariye/şubeye " +
+      "değişmez, sipariş raporları buradan okur. Yazarlar `OrderService.create`, onun telefon kopyası (patron bulutu gelen " +
+      "kutusu — aynı `resolveShipmentDestination` çağrısı, doğuşta bir kez) ve siparişin AÇIKÇA başka cariye/şubeye " +
       "taşındığı `update` claim'i (yeni hedef için yeniden çözülür — bilinçli). Geri doldurma script'i (`scripts/`) yalnız " +
       "NULL satırlara bir kez yazar",
     bekci: [
       { dosya: "test_order_destination_frozen.ts", bolum: "⑤", ne: "cari ve şube kartı değişince eski sipariş kolonu değişmez" },
       { dosya: "test_rapor_yon_ekseni.ts", bolum: "2c", ne: "kart değişince sipariş raporu kümesi kıpırdamaz" },
+      { dosya: "test_patron_bulut_gelen_kutusu.ts", bolum: "e", ne: "telefon siparişinin yönü panel siparişininkiyle aynı" },
     ],
   },
   {

@@ -138,6 +138,8 @@ export const TABLE_LABELS: Record<string, string> = {
   MACHINE_SHIFT_SEAL: "Vardiya Karnesi Mührü",
   KURSUN_BYPASS_ASSIGNMENT: "Kurşun Dağıtım Ataması",
   PERIPHERAL_TEMPLATE_ROUTE: "Cihaz–Şablon Yönlendirmesi",
+  // Patron bulutu gelen kutusu: telefondan gelen sipariş/cari mesajının makbuzu.
+  CLOUD_INBOX_RECEIPT: "Telefondan Gelen Kayıt Makbuzu",
   // Boot uzlaştırması + panel işleri: tablo adı küçük harfle yazılmış
   // (backend'de bilinçli, kayıt "kod tarafı" olduğunu belli etsin diye).
   permissions: "Yetki Kataloğu",

@@ -592,6 +592,16 @@ async function main() {
       file: "docs/kurallar/patron-bulutu.md",
       needle: "patronCloud.syncIntervalMinutes",
     },
+    PATRON_CLOUD_INBOX_ENABLED: {
+      why: "Telefondan yazma düğmesi (gelen kutusu) — ham ayar ucu, reçete docs/kurallar/patron-bulutu.md",
+      file: "docs/kurallar/patron-bulutu.md",
+      needle: "patronCloud.inboxEnabled",
+    },
+    PATRON_CLOUD_INBOX_INTERVAL_SECONDS: {
+      why: "Gelen kutusu yoklama aralığı (20–600 sn) — ham ayar ucu, reçete docs/kurallar/patron-bulutu.md",
+      file: "docs/kurallar/patron-bulutu.md",
+      needle: "patronCloud.inboxIntervalSeconds",
+    },
     BACKUP_OFFSITE_DIR: {
       why: "Panel: Sistem → Yedekler → Offsite Yedek kartı (PATCH /api/admin/backups/offsite)",
       file: "Teks-Erp/src/routes/admin.routes.ts",

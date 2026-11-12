@@ -13173,3 +13173,14 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Bulgu.** `pgErrorCode` Prisma sarmalının `P2010` kodunu (beş karakter) PG kodu sanıyordu ⇒ gerçek 55P03 hiç tekrar edilmiyordu; yeni bekçinin gerçek kilit bölümü yakaladı, Prisma `P####` kodu artık atlanır. Bulut tarafı: `kurulum-kaydet --bitis=yok` `cloudUntil=null` yazar ve her istek 403 `PATRON_BULUT_KAPALI` alır (D6'ya; yerelde `--bitis=2099-12-31T00:00:00.000Z`).
 
 **Ölçüm.** `test_patron_bulut_esitleme` 32/0, üç negatif sonda kırmızı. Uçtan uca (yerel prova, 5.703 kayıt): ilk TAM 6,1 sn · 3 istek · en büyük gövde 1.825 KB açık / 302 KB gzip · RSS 339 → 367 MB; 13 projeksiyonda fabrika = bulut; artımlı 3 yazım → 1 istek, 8 kayıt, 0,4–0,7 sn. Ayrıntı `docs/ops/PATRON-ESITLEME-KURULUM.md` § Eşitlemeyi açma.
+
+## 2026-11-12 — Patron bulutu D4: telefondan yeni sipariş + yeni müşteri (gelen kutusu) [ÇEKİRDEK]
+
+**Kaynak.** Ana ürün `19aa48a9` `services/cloud-inbox.service.ts`, `jobs/cloud-inbox.job.ts`, `cloud-sync/inbox-wire.ts`. **Ana üründen farklar.** (1) Panelin sipariş/müşteri yaratma kodu DEĞİŞMEDİ: adımları `private` ve tx'e dikilemez olduğundan telefon yolu `services/patron-inbox/` altında kopyadır (müşteri yazıcısı `CustomerService`ten türer; ad boğazları ve `findSimilarNames` aynı koddur). (2) Yazma ayrı ayar (`patronCloud.inboxEnabled`, varsayılan kapalı). (3) Birim fiyat yok sayılır. (4) Benzer adlı müşteri RET (panel yalnız uyarır; telefonda insan yok, sessiz ikinci kart da haksız ret de yanlış — en az zararlı RET + açık neden). (5) Desteklenmeyen tür makbuzsuz ret. (6) Belirsiz hata 3 turda makbuzlu ret.
+
+**Canlı dosyalara dokunuş.** `auth.service.ts` `issueToken` başı: teknik kullanıcı → 401 (tek `jwt.sign` burada; token yenileme ucu yok). `permission-management.service.ts` `listUsers`: teknik kullanıcı süzülür. İkisi de kayıt yoksa no-op; maliyet giriş ve liste başına PK ile tek `system_settings` okuması. Negatif sonda: koruma kaldırılınca teknik kullanıcı parola/PIN/kartla TOKEN aldı (masaüstü izin kapısı onu durdurmuyor) ⇒ koruma tek engeldir.
+
+**Bulgu.** Telefon `termin`i (YYYY-MM-DD) Prisma'ya çıplak gün olarak gidiyordu ve DateTime kolonu reddediyordu ⇒ terminli her sipariş 3 denemede "işlenemedi" olurdu; panel formu `new Date(gün).toISOString()` gönderir, telefon yolu aynı biçime çevrildi (karşılaştırma bekçisinde eşit).
+
+**Ölçüm.** `test_patron_bulut_gelen_kutusu` 85/0, altı negatif sonda kırmızı. Panel ↔ telefon: sipariş 22 alan, kalem 20 alan × 2, kart 28 alan, cari hesap (finans açık/kapalı) ve audit yükü eşit; beyanlı farklar kimlik · numara · zaman · `clientToken` · Oluşturan (panel siparişte boş bırakır, telefon teknik kullanıcıyı yazar) · audit kaynak izi.
+

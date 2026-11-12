@@ -751,6 +751,10 @@ export const SETTING_KEYS = {
   PATRON_CLOUD_SYNC_ENABLED: "patronCloud.syncEnabled",
   /** Patron bulutu yoklama aralığı (dakika, 1–60; varsayılan 5). */
   PATRON_CLOUD_SYNC_INTERVAL_MINUTES: "patronCloud.syncIntervalMinutes",
+  /** Telefondan YAZMA (gelen kutusu) düğmesi — kayıt yoksa KAPALI; eşitleme açık olsa da ayrıca açılır. */
+  PATRON_CLOUD_INBOX_ENABLED: "patronCloud.inboxEnabled",
+  /** Gelen kutusu yoklama aralığı (saniye, 20–600; varsayılan 30). */
+  PATRON_CLOUD_INBOX_INTERVAL_SECONDS: "patronCloud.inboxIntervalSeconds",
 } as const;
 
 const DEFAULT_DEADLINE_DAYS = 7;
@@ -6556,6 +6560,39 @@ export async function readPatronCloudSyncIntervalMinutes(
   if (n === null || !Number.isInteger(n)) return DEFAULT_PATRON_CLOUD_SYNC_INTERVAL_MINUTES;
   if (n < MIN_PATRON_CLOUD_SYNC_INTERVAL_MINUTES || n > MAX_PATRON_CLOUD_SYNC_INTERVAL_MINUTES) {
     return DEFAULT_PATRON_CLOUD_SYNC_INTERVAL_MINUTES;
+  }
+  return n;
+}
+
+export const DEFAULT_PATRON_CLOUD_INBOX_INTERVAL_SECONDS = 30;
+export const MIN_PATRON_CLOUD_INBOX_INTERVAL_SECONDS = 20;
+export const MAX_PATRON_CLOUD_INBOX_INTERVAL_SECONDS = 600;
+
+/** Telefondan yazma açık mı? Default FALSE; eşitleme ön koşulunun ÜSTÜNE ayrı düğmedir. */
+export async function readPatronCloudInboxEnabled(
+  tx?: Pick<typeof prisma, "systemSetting">,
+): Promise<boolean> {
+  const client = tx ?? prisma;
+  const setting = await client.systemSetting.findUnique({
+    where: { key: SETTING_KEYS.PATRON_CLOUD_INBOX_ENABLED },
+    select: { value: true },
+  });
+  return asBoolean(setting?.value);
+}
+
+/** Gelen kutusu aralığı (saniye); kayıt yok, tam sayı değil ya da 20–600 dışı ⇒ varsayılan. */
+export async function readPatronCloudInboxIntervalSeconds(
+  tx?: Pick<typeof prisma, "systemSetting">,
+): Promise<number> {
+  const client = tx ?? prisma;
+  const setting = await client.systemSetting.findUnique({
+    where: { key: SETTING_KEYS.PATRON_CLOUD_INBOX_INTERVAL_SECONDS },
+    select: { value: true },
+  });
+  const n = asNumber(setting?.value);
+  if (n === null || !Number.isInteger(n)) return DEFAULT_PATRON_CLOUD_INBOX_INTERVAL_SECONDS;
+  if (n < MIN_PATRON_CLOUD_INBOX_INTERVAL_SECONDS || n > MAX_PATRON_CLOUD_INBOX_INTERVAL_SECONDS) {
+    return DEFAULT_PATRON_CLOUD_INBOX_INTERVAL_SECONDS;
   }
   return n;
 }

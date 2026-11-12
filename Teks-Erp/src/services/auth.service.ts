@@ -10,6 +10,7 @@ import { randomBytes, randomInt, randomUUID } from "crypto";
 import { JwtPayload } from "../types/api.types";
 import { AppError } from "../utils/app-error";
 import { AuditService } from "./audit.service";
+import { readPatronCloudUserId } from "./helpers/patron-cloud-user.helper";
 import {
   readSessionDurationMinutes,
   readAutoLogoutOnExpiry,
@@ -364,6 +365,11 @@ export class AuthService {
     },
     ctx?: LoginContext
   ): Promise<{ token: string; user: JwtPayload }> {
+    // Patron bulutu teknik kullanıcısının GİRİŞ YÖNTEMİ YOKTUR: parolası sıfırlansa ya da PIN/kart verilse bile
+    // oturum açılmaz (tek token üreticisi burası; mesaj genel — hesabın varlığını doğrulamaz). Kayıt yoksa no-op.
+    if (user.id === (await readPatronCloudUserId())) {
+      throw AppError.unauthorized("Geçersiz kullanıcı adı veya şifre");
+    }
     const permissions = await this.getEffectivePermissions(user.id);
 
     // Masaüstü (Electron VE web paneli) girişi: kullanıcının en az bir MASAÜSTÜ

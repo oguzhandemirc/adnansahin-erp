@@ -37,6 +37,8 @@ export const TOKEN_YOLLARI: Record<string, TokenYolu> = {
   [`${S}warp-beam-consume.service.ts::consumeBeam`]: { giris: { [`${S}warp-beam-consume.service.ts::consumeBeam`]: "R" } },
   [`${S}order.service.ts::prepareOrderCreate`]: { giris: { [`${S}order.service.ts::create`]: "R", [`${S}order.service.ts::quickOrderTx`]: "K" } },
   [`${S}order.service.ts::quickOrderFromRolls`]: { giris: { [`${S}order.service.ts::quickOrderTx`]: "K" } },
+  // Patron bulutu gelen kutusu: sipariş + makbuz aynı tx; boğaz makbuz tablosu (`messageId`), siparişin token'ı = mesajId.
+  [`${S}patron-inbox/order-create.ts::prepareInboxOrder`]: { giris: { [`${S}patron-inbox/inbox.service.ts::createOrderFromMessage`]: "K" } },
   [`${S}cheque-delivery-note.service.ts::createTx`]: { giris: { [`${S}cheque-delivery-note.service.ts::create`]: "K" } },
   [`${S}subcontractor.service.ts::receiveInner`]: { giris: { [`${S}subcontractor.service.ts::receive`]: "R" } },
   [`${S}tambur.service.ts::cutWarehouseRollInner`]: { giris: { [`${S}tambur.service.ts::cutWarehouseRoll`]: "R" } },
@@ -119,6 +121,7 @@ export const KIMLIK_BEYANI: Record<string, readonly string[]> = {
   [`${S}machine-run.service.ts::runReplay`]: ["machineId", "productionLineNo", "weavingOrderId"],
   [`${S}order.service.ts::orderReplay`]: ["customerId", "branchId", "satırlar", "orderNumber"],
   [`${S}order.service.ts::quickOrderReplay`]: ["customerId", "branchId", "lines"],
+  [`${S}patron-inbox/inbox.service.ts::inboxReceiptReplay`]: ["tur", "govdeOzeti"],
   [`${S}packing-group.service.ts::groupReplay`]: ["customerId", "sackIds"],
   [`${S}payment.service.ts::paymentReplay`]: ["direction", "method", "amount", "cashBoxId", "bankAccountId", "taraf", "currency", "exchangeRate", "paymentDate"],
   [`${S}purchase-order.service.ts::poReplay`]: ["taraf", "satırlar", "currency", "orderDate", "expectedDate"],

@@ -22,11 +22,24 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Eşitleme hatası istek yolunu etkilemez: tık asla fırlatmaz, hata tek satır log + geri çekilmedir (aralık × 2^n, tavan 60 dk). [bekçi: test_patron_bulut_esitleme]
 - Kirli-bayrak Proxy'si (ana üründeki `withDirtyTracking`) bilerek taşınmadı: değişiklik en geç bir yoklama aralığı sonra gider. [inceleme]
 
+### Telefondan yazma (gelen kutusu, D4)
+
+- Altın kural: telefondan gelen yeni sipariş/müşteri insan onayı beklemeden işlenir, ama her kapı işlendiği anda GÜNCEL fabrika verisine karşı koşar; ret okunur Türkçe nedenle buluta döner ve kayıt doğmaz. [bekçi: test_patron_bulut_gelen_kutusu]
+- Yazma ayrı ayardır: `patronCloud.inboxEnabled` varsayılan KAPALI ve eşitleme açıkken de ayrıca açılır; kapalıyken iş kurulmaz, gelen kutusuna istek gitmez, teknik kullanıcı doğmaz. Aralık `patronCloud.inboxIntervalSeconds` (20–600 sn, varsayılan 30; aralık dışı değer varsayılana düşer). [bekçi: test_patron_bulut_gelen_kutusu]
+- Yalnız iki tür işlenir (yeni sipariş · yeni müşteri); tanınmayan tür makbuzsuz retle buluta bildirilir. [bekçi: test_patron_bulut_gelen_kutusu]
+- Aynı `mesajId` tek kayıt doğurur: kayıt ile makbuz AYNI tx'te yazılır, 8036 kilidi tx'in ilk ifadesidir ve makbuz `messageId` UNIQUE son seddir; tekrar ya da yarış makbuzdaki sonucu alır. [bekçi: test_patron_bulut_gelen_kutusu]
+- Panelin canlı sipariş/müşteri yaratma kodu (`order.service.ts`, `customer.service.ts`, `base.service.ts`, iki route) bu yol için değiştirilmez; telefon yolu `services/patron-inbox/` altındaki kopyadır ve panelle alan alan aynı satırı doğurduğu karşılaştırmayla ölçülür. [bekçi: test_patron_bulut_gelen_kutusu]
+- Teknik kullanıcının giriş yöntemi yoktur: `AuthService.issueToken` onu reddeder (parola/PIN/kart 401), izin verilmez, kullanıcı listesinde görünmez, kimliği ham ayar ucuna kapalıdır; yazma kapanınca kullanıcı aktif kalır. [bekçi: test_patron_bulut_gelen_kutusu]
+- Telefondan gelen birim fiyat yok sayılır (kalemde fiyat ve toplam boş, makbuz mesajı söyler); finans verisi telefondan alınmaz. [bekçi: test_patron_bulut_gelen_kutusu]
+- Benzer adlı müşteri varsa telefon kartı RET alır ("Benzer müşteri var: …"); eşik panelin uyarı yüzeyiyle aynı `findSimilarNames`tir, panel aynı adayda yalnız uyarır — ayrı firma ise kart panelden açılır. [bekçi: test_patron_bulut_gelen_kutusu]
+- Belirsiz hatalı mesaj üç turda makbuzlu "fabrikada işlenemedi" retle kapanır; deneme sayacı süreç belleğindedir ve yeniden başlatma idempotent tekrarla zararsızdır. [bekçi: test_patron_bulut_gelen_kutusu]
+
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 
 1. `.env`: `PATRON_CLOUD_URL=https://<bulut kökeni>` ve `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (dosya veri dizininde, repoda değil).
 2. `cd Teks-Erp && npx tsx scripts/patron-bulut-anahtar.ts` — dosya yoksa üretir (0600), varsa okur; `--kurulum=` ve `--acik-anahtar=` değerlerini basar, özel anahtarı basmaz. Bu iki değer bulutta `tesis.ts kurulum-kaydet`e verilir; `--bitis=yok` değil uzak bir tarih (adımlar, bitiş notu ve ölçümler: `docs/ops/PATRON-ESITLEME-KURULUM.md` § 5).
 3. Ayar: `PUT /api/admin/settings/patronCloud.syncEnabled` `{"value":"true"}` (admin:settings + ayar şifresi); geri dönüş aynı ucu `"false"` ile çağırmaktır. Yoklama aralığı `patronCloud.syncIntervalMinutes` (1–60 dk, varsayılan 5; aralık dışı değer varsayılana düşer).
+4. Telefondan yazma (okumadan en az bir hafta sonra): `PUT /api/admin/settings/patronCloud.inboxEnabled` `{"value":"true"}`; geri dönüş aynı uç `"false"`. Gelen kutusu aralığı `patronCloud.inboxIntervalSeconds` (20–600 sn, varsayılan 30). Adımlar: `docs/ops/PATRON-ESITLEME-KURULUM.md` § 6.
 
 ## Tuzaklar
 
@@ -35,7 +48,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ## Bekçiler
 
-Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_feature_flag_contract` · `test_db_invariants`
+Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_gelen_kutusu` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 

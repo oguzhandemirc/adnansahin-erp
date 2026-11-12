@@ -53,6 +53,18 @@ Geri dönüş: aynı uç `"false"` → `eşitleme işi durdu` + `tetikleyiciler 
 - Artımlı tur (3 yazım): 1 istek, 8 kayıt, 0,4–0,7 sn, gövde < 5 KB.
 - Bulut kapalıyken API çağrıları 200 döndü; ilk hata turu tek UYARI satırı, bulut açılınca aralık × 2 sonra kendiliğinden toparlandı, kesintide yapılan yazım kayıpsız gitti. Kapatınca tetikleyici 0, `sync_marks` büyümedi, dış istek 0.
 
+## 6. Telefondan yazmayı açma (okumadan EN AZ BİR HAFTA sonra, kullanıcıya gösterilerek)
+
+Ön koşul: § 5 en az bir haftadır sorunsuz çalışıyor (eşitleme turu hatasız, telefonda okunan sayılar fabrikayla aynı).
+
+1. Ayar: `PUT /api/admin/settings/patronCloud.inboxEnabled` `{"value":"true"}` (admin:settings + ayar şifresi). Beklenen log: `teknik kullanıcı doğdu (…)` (yalnız ilk açılışta) + `gelen kutusu işi başladı (telefondan yazma AÇIK)`. Teknik kullanıcı `patronbulutu` panel kullanıcı listesinde GÖRÜNMEZ ve giriş yapamaz; kullanıcı adı başka bir hesapta doluysa doğmaz ve log `KULLANICI_ADI_DOLU` der (iş başlamaz).
+2. Telefondan deneme: patron uygulamasından bir yeni sipariş gönder → en geç `patronCloud.inboxIntervalSeconds` (varsayılan 30 sn) sonra panelde sipariş görünür, "Oluşturan: Patron Bulutu (telefon)"; uygulamada sonuç "işlendi" + sipariş no. Ret (ör. pasif müşteri) uygulamada Türkçe nedenle görünür.
+3. İzle: hata tek satırdır (`UYARI [patron-bulut] gelen kutusu turu başarısız …`), iş aralık × 2^n geri çekilir (tavan 10 dk). Üç denemede işlenemeyen mesaj `… makbuzlu ret yazıldı` satırıyla kapanır ve telefonda "fabrikada işlenemedi" görünür.
+
+Geri dönüş TEK AYAR: aynı uç `"false"` → `gelen kutusu işi durdu`; okuma (eşitleme) etkilenmez, teknik kullanıcı aktif ama girişsiz kalır. İşlenmiş kayıtlar silinmez (normal sipariş/müşteri kaydıdır; panelden iptal/pasif).
+
+Bilinenler: telefondan gelen birim fiyat yok sayılır (fiyatı panelden girin). Benzer adlı müşteri varsa telefon kartı reddedilir — kısa adlarda (≤ 8 harf) eşik düşüktür ve gerçekten farklı bir firma da reddedilebilir; o kart panelden açılır.
+
 ## Ölçülen süreler (yerel prova, ~23,5 bin top)
 - Migration SQL'i < 1 sn (89–169 ms + 9–17 ms; süreç dahil 1,0–1,8 sn); en uzun tablo kilidi ≈ 91 ms (yüklü makinede 129 ms).
 - Asıl süre yedek + backend'i durdurup başlatmaktır.

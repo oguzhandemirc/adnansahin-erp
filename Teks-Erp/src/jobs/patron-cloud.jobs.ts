@@ -13,6 +13,9 @@ import { cloudEligibility, type CloudEligibility } from "../cloud-sync/eligibili
 import { getCloudUrl } from "../cloud-sync/cloud-url";
 import { whenIdentityReady } from "./installation-identity.job";
 import { startCloudSync, stopCloudSync } from "./cloud-sync.job";
+import { inboxEligibility, type InboxEligibility } from "../cloud-sync/eligibility";
+import { startCloudInbox, stopCloudInbox } from "./cloud-inbox.job";
+import { ensurePatronCloudUser, type EnsureResult } from "../services/patron-cloud-user.service";
 
 const SETTING_PREFIX = "patronCloud.";
 const IDENTITY_WAIT_MS = 5 * 60 * 1000;
@@ -78,11 +81,51 @@ export async function switchTriggers(enabled: boolean, deps: TriggerSwitchDeps =
   }
 }
 
+/** Telefondan yazma (gelen kutusu) ayağı — eşitleme AÇIKKEN ayrıca sorulur. */
+export interface InboxReconcileDeps {
+  readonly eligibility: () => Promise<InboxEligibility>;
+  readonly ensureUser: () => Promise<EnsureResult>;
+  readonly start: () => void;
+  readonly stop: () => void;
+}
+
 export interface ReconcileDeps {
   readonly eligibility: () => Promise<CloudEligibility>;
   readonly switch: TriggerSwitchDeps;
   readonly start: () => void;
   readonly stop: () => void;
+  /** Verilmezse canlı gelen kutusu ayağı. */
+  readonly inbox?: InboxReconcileDeps;
+}
+
+export const LIVE_INBOX_RECONCILE: InboxReconcileDeps = {
+  eligibility: () => inboxEligibility(),
+  ensureUser: ensurePatronCloudUser,
+  start: startCloudInbox,
+  stop: stopCloudInbox,
+};
+
+/** Gelen kutusu: yazma ayarı açık ∧ teknik kullanıcı hazır ⇒ iş; aksi hâlde durur. Fırlatmaz. */
+async function reconcileInbox(d: InboxReconcileDeps, reason: string): Promise<void> {
+  try {
+    const e = await d.eligibility();
+    if (!e.ok) {
+      d.stop();
+      return;
+    }
+    const u = await d.ensureUser();
+    if (!u.ok) {
+      d.stop();
+      uyari("patron-bulut", `telefondan yazma açık ama teknik kullanıcı hazır değil (${u.reason}; ${reason}) — gelen kutusu BAŞLAMADI`);
+      return;
+    }
+    if (u.created) bilgi("patron-bulut", `teknik kullanıcı doğdu (${reason})`);
+    d.start();
+  } catch (err) {
+    d.stop();
+    const msg = err instanceof Error ? err.message : String(err);
+    uyari("patron-bulut", `gelen kutusu uzlaştırması hata verdi (${reason}): ${msg.replace(/\s+/g, " ").slice(0, 200)}`);
+  }
 }
 
 const LIVE_RECONCILE: ReconcileDeps = {
@@ -96,20 +139,24 @@ export type ReconcileResult = "BASLADI" | "DURDU" | "TETIKLEYICI_ACILAMADI" | "T
 
 /** Bir uzlaştırma: ön koşul → tetikleyici → iş. Fırlatmaz. */
 export async function reconcilePatronCloud(reason: string, deps: ReconcileDeps = LIVE_RECONCILE): Promise<ReconcileResult> {
+  const inbox = deps.inbox ?? LIVE_INBOX_RECONCILE;
   try {
     const elig = await deps.eligibility();
     if (elig.ok) {
       const r = await switchTriggers(true, deps.switch);
       if (!r.ok) {
         deps.stop();
+        inbox.stop();
         uyari("patron-bulut", `tetikleyiciler açılamadı (${r.code}, ${r.retries} tekrar; ${reason}) — eşitleme BAŞLAMADI`);
         return "TETIKLEYICI_ACILAMADI";
       }
       if (r.changed > 0) bilgi("patron-bulut", `tetikleyiciler açıldı (${r.changed}; ${reason})`);
       deps.start();
+      await reconcileInbox(inbox, reason);
       return "BASLADI";
     }
     deps.stop();
+    inbox.stop();
     // Ön koşul kapalı: yalnız AÇIK kalmış tetikleyici varsa anahtara dokunulur (salt okuma ilk adım).
     if ((await deps.switch.enabledCount()) === 0) return "DURDU";
     const r = await switchTriggers(false, deps.switch);
@@ -121,6 +168,7 @@ export async function reconcilePatronCloud(reason: string, deps: ReconcileDeps =
     return "DURDU";
   } catch (err) {
     deps.stop();
+    inbox.stop();
     const msg = err instanceof Error ? err.message : String(err);
     uyari("patron-bulut", `uzlaştırma hata verdi (${reason}): ${msg.replace(/\s+/g, " ").slice(0, 200)}`);
     return "HATA";
@@ -148,6 +196,7 @@ export function startPatronCloudJobs(): void {
 
 export function stopPatronCloudJobs(): void {
   stopCloudSync();
+  stopCloudInbox();
 }
 
 /** `SystemSettingService.set` her yazımdan sonra çağırır; yalnız `patronCloud.*` anahtarında iş yapar. Fırlatmaz, beklenmez. */

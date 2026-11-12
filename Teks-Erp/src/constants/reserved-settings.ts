@@ -55,6 +55,13 @@ export const SETTINGS_PASSWORD_HASH_KEY = "security.settingsPasswordHash";
 export const PROFILE_STAMP_SETTING_KEY = "system.profile";
 
 /**
+ * Patron bulutu TEKNİK KULLANICISININ kimliği (telefondan gelen kayıtların aktörü). AYAR DEĞİL, KAYIT:
+ * ham ayar ucundan yazılabilseydi `admin:settings` taşıyan biri bir İNSANIN kimliğini basıp onu girişsiz
+ * bırakır ve telefondan gelen kayıtları ona yazdırırdı. Tek yazıcısı `services/patron-cloud-user.service.ts`.
+ */
+export const PATRON_CLOUD_USER_SETTING_KEY = "patronBulutu.teknikKullaniciId";
+
+/**
  * `PUT /api/admin/settings/:key` ucunun REDDETTİĞİ anahtarlar.
  *
  * Kümeye ek olarak ön ek kuralı da uygulanır (`isReservedSettingKey`) — küme
@@ -64,6 +71,7 @@ export const PROFILE_STAMP_SETTING_KEY = "system.profile";
 export const RESERVED_SETTING_KEYS: ReadonlySet<string> = new Set([
   SETTINGS_PASSWORD_HASH_KEY,
   PROFILE_STAMP_SETTING_KEY,
+  PATRON_CLOUD_USER_SETTING_KEY,
 ]);
 
 /** `security.` ile başlıyor mu — liste/dışa-aktarım süzgeçlerinin yüklemi. */

@@ -6,7 +6,12 @@ import type prisma from "../lib/prisma";
 import type { KeyObject } from "node:crypto";
 import { loadKeyFile, resolveKeyFilePath, type KeyFileResult } from "../lib/cloud-signing/key-file";
 import { getCachedInstallationIdentity } from "../jobs/installation-identity.job";
-import { readPatronCloudSyncEnabled, readPatronCloudSyncIntervalMinutes } from "../services/system-setting.service";
+import {
+  readPatronCloudInboxEnabled,
+  readPatronCloudInboxIntervalSeconds,
+  readPatronCloudSyncEnabled,
+  readPatronCloudSyncIntervalMinutes,
+} from "../services/system-setting.service";
 import { getCloudUrl } from "./cloud-url";
 
 export const CLOUD_BLOCK_REASONS = [
@@ -67,4 +72,34 @@ export async function cloudEligibility(overrides: Partial<CloudEligibilityDeps> 
   const key = deps.loadKey(keyPath);
   if (!key.ok) return { ok: false, reason: key.problem === "DOSYA_YOK" ? "ANAHTAR_YOK" : "ANAHTAR_GECERSIZ" };
   return { ok: true, baseUrl, installationId, privateKey: key.key.privateKey, intervalMinutes };
+}
+
+// ---------------------------------------------------------------- telefondan yazma (gelen kutusu, D4)
+
+export type InboxBlockReason = CloudBlockReason | "YAZMA_KAPALI" | "YAZMA_AYARI_OKUNAMADI";
+
+export type InboxEligibility =
+  | (Extract<CloudEligibility, { ok: true }> & { readonly inboxIntervalSeconds: number })
+  | { readonly ok: false; readonly reason: InboxBlockReason };
+
+export interface InboxEligibilityDeps extends CloudEligibilityDeps {
+  readonly inboxEnabled: () => Promise<boolean>;
+  readonly inboxIntervalSeconds: () => Promise<number>;
+}
+
+/**
+ * Gelen kutusu = eşitleme ön koşulunun DÖRT koşulu ∧ `patronCloud.inboxEnabled`. Varsayılan KAPALI: okuma açıkken
+ * de yazma ayrıca açılır; eşitleme kapalıyken yazma ayarına hiç bakılmaz. FAIL-CLOSED.
+ */
+export async function inboxEligibility(overrides: Partial<InboxEligibilityDeps> = {}): Promise<InboxEligibility> {
+  const base = await cloudEligibility(overrides);
+  if (!base.ok) return base;
+  try {
+    const enabled = overrides.inboxEnabled ? await overrides.inboxEnabled() : await readPatronCloudInboxEnabled(overrides.settings);
+    if (!enabled) return { ok: false, reason: "YAZMA_KAPALI" };
+    const s = overrides.inboxIntervalSeconds ? await overrides.inboxIntervalSeconds() : await readPatronCloudInboxIntervalSeconds(overrides.settings);
+    return { ...base, inboxIntervalSeconds: s };
+  } catch {
+    return { ok: false, reason: "YAZMA_AYARI_OKUNAMADI" };
+  }
 }

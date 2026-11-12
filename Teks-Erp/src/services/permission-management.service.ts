@@ -15,6 +15,7 @@ import { AuthService } from "./auth.service";
 import { readLoginMethods } from "./system-setting.service";
 import { SessionRegistryService } from "./session-registry.service";
 import { foldNameForCompare } from "./helpers/name-normalize.helper";
+import { readPatronCloudUserId } from "./helpers/patron-cloud-user.helper";
 
 /** Yetki (son-admin) guard'ı advisory lock namespace'i (F-KIM-GUV-003). Tek anahtar:
  *  guard sistem geneli tek bir seri kapıdır, kullanıcı başına DEĞİL. */
@@ -116,12 +117,14 @@ export class PermissionManagementService {
   // Kullanıcı listesi (admin paneli için minimal alanlar)
   // ---------------------------------------------------------------------------
   static async listUsers() {
+    // Patron bulutu teknik kullanıcısı (giriş yöntemi yok) insan kullanıcı listesinde görünmez; kayıt yoksa no-op.
+    const patronCloudUserId = await readPatronCloudUserId();
     return prisma.user.findMany({
       // Silinmiş kullanıcılar (deletedAt dolu) listede GÖRÜNMEZ — yalnız veri
       // bütünlüğü/sistem geçmişi için DB'de durur. Pasif (isActive=false, deletedAt
       // null) kayıtlar görünür ki admin aktifleştirebilsin.
       // ⚠️ 2026-09-04: satıcı (en yetkili) hesabı ARTIK GÖRÜNÜR — gizleme kaldırıldı.
-      where: { deletedAt: null },
+      where: { deletedAt: null, ...(patronCloudUserId ? { NOT: { id: patronCloudUserId } } : {}) },
       select: {
         id: true,
         username: true,
