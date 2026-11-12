@@ -64,7 +64,7 @@ export function Button(p: { label: string; onPress: () => void; tone?: Tone; dis
   const s = useStyles();
   const tone = p.tone ?? "primary";
   const off = p.disabled || p.busy;
-  const fg = tone === "primary" ? t.onTint : tone === "danger" ? t.status.kritik.fill : tone === "secondary" ? t.tint : t.text;
+  const fg = tone === "primary" ? t.onTint : tone === "danger" ? t.color.danger.fg : tone === "secondary" ? t.tint : t.text;
   return (
     <Pressable
       accessibilityRole="button"
@@ -208,7 +208,8 @@ const useStyles = makeStyles((t) => ({
   btn_primary: { backgroundColor: t.tint },
   btn_secondary: { backgroundColor: t.tintContainer },
   btn_plain: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.separator },
-  btn_danger: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.status.kritik.fill },
+  // Tehlike metni kart zemininde AA (≥ 4.5:1) olan `danger.fg`; dolgu tonu (`solid`) koyu kipte kartta okunmaz.
+  btn_danger: { backgroundColor: t.color.card, borderWidth: 1, borderColor: t.color.danger.fg },
   btnOff: { opacity: 0.45 },
   btnInner: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
   btnText: { ...typography.callout, fontWeight: "600" as const },

@@ -122,6 +122,7 @@ describe("§3 okunurluk — her bileşim", () => {
         need(name, "metin/kart", fg, c.card, 4.5);
       }
       need(name, "link/kart", c.link, c.card, 4.5);
+      need(name, "tehlike düğmesi danger.fg/kart", c.danger.fg, c.card, 4.5);
       need(name, "onPrimary/primary", c.onPrimary, c.primary, 4.5);
       need(name, "onPrimarySoft/primarySoft", c.onPrimarySoft, c.primarySoft, 4.5);
       for (const k of ["success", "warning", "danger", "info"] as const) need(name, `${k}.fg/bg`, c[k].fg, c[k].bg, 4.5);
