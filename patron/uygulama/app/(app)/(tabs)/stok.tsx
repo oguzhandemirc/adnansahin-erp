@@ -2,7 +2,7 @@
 // müşteri malı (emanet, PB1: `emanet-bakiye`) · ürün bazında ilk satırlar. Renk/depo kırılımı veride yok → çizilmez. Tek kaynak `stok-karnesi` (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
-import { DEAD_STOCK_STATUS, STOCK_AGE_TONE, UNIT } from "../../../src/lib/labels/uretim";
+import { DEAD_STOCK_STATUS, FREE_STOCK_HINT, FREE_STOCK_LABEL, STOCK_AGE_TONE, UNIT } from "../../../src/lib/labels/uretim";
 import { AgingBar } from "../../../src/ui/charts";
 import { Screen } from "../../../src/ui/Frame";
 import { KademeliGiris } from "../../../src/ui/hareket";
@@ -47,7 +47,7 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
       </KademeliGiris>
       <KademeliGiris sira={1} style={s.ikili}>
         <View style={s.yarim}>
-          <StatCard etiket="Bitmiş" icon="cube-outline" ton="green" degerler={[{ deger: qty(o.bitmisMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.bitmisAdet)} ${UNIT.top}`} testID="kpi-bitmis" />
+          <StatCard etiket={FREE_STOCK_LABEL} icon="cube-outline" ton="green" degerler={[{ deger: qty(o.bitmisMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.bitmisAdet)} ${UNIT.top} · ${FREE_STOCK_HINT}`} testID="kpi-bitmis" />
         </View>
         <View style={s.yarim}>
           <StatCard

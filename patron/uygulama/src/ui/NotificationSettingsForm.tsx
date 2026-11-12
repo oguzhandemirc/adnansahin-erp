@@ -3,14 +3,21 @@
 import { View } from "react-native";
 import type { NotificationKindInfo } from "../api/wire";
 import { notificationKind } from "../lib/labels/diger";
-import type { NotificationForm } from "../lib/notification-form";
+import { DUE_DATE_KIND, type NotificationForm } from "../lib/notification-form";
 import { GroupNote, ToggleRow } from "./diger/parts";
 import { Field } from "./kit";
 import { ListeBlogu } from "./ortak";
 import { space } from "./tokens";
 
-export function NotificationSettingsForm(p: { form: NotificationForm; kinds: readonly NotificationKindInfo[]; onChange: (f: NotificationForm) => void }) {
+export function NotificationSettingsForm(p: {
+  form: NotificationForm;
+  kinds: readonly NotificationKindInfo[];
+  onChange: (f: NotificationForm) => void;
+  /** Fabrika termin türevi gönderiyor mu; göndermiyorsa geciken kalem türü ve eşiği çizilmez (hiç tetiklenmez). */
+  dueDates?: boolean;
+}) {
   const f = p.form;
+  const kinds = p.dueDates ? p.kinds : p.kinds.filter((k) => k.tur !== DUE_DATE_KIND);
   const set = <K extends keyof NotificationForm>(k: K, v: NotificationForm[K]) => p.onChange({ ...f, [k]: v });
   return (
     <View>
@@ -19,7 +26,7 @@ export function NotificationSettingsForm(p: { form: NotificationForm; kinds: rea
           icon={f.acik ? "notifications" : "notifications-off-outline"} domain="gelenKutusu" />
       </ListeBlogu>
       <ListeBlogu baslik="Bildirim türleri" ayracli testID="bildirim-turleri">
-        {p.kinds.map((k) => {
+        {kinds.map((k) => {
           const look = notificationKind(k.tur);
           return (
             <ToggleRow key={k.tur} label={k.finans ? `${k.ad} (finans)` : k.ad} testID={`tur-${k.tur}`} icon={look.icon} domain={look.domain}
@@ -42,8 +49,8 @@ export function NotificationSettingsForm(p: { form: NotificationForm; kinds: rea
       <ListeBlogu baslik="Eşikler" testID="bildirim-esikler">
         <View style={{ paddingHorizontal: space.l, paddingTop: space.l, paddingBottom: space.xs }}>
           <Field label="Ham stok şu miktarın altına inince" value={f.hamStokAlt} onChangeText={(t) => set("hamStokAlt", t)} placeholder="Kapalı" keyboardType="decimal-pad" />
-          <Field label="Bitmiş stok şu miktarın altına inince" value={f.bitmisStokAlt} onChangeText={(t) => set("bitmisStokAlt", t)} placeholder="Kapalı" keyboardType="decimal-pad" />
-          <Field label="Geciken sipariş kalemi şu sayıyı aşınca" value={f.gecikenKalemUst} onChangeText={(t) => set("gecikenKalemUst", t)} placeholder="Kapalı" keyboardType="number-pad" />
+          <Field label="Serbest stok şu miktarın altına inince" value={f.bitmisStokAlt} onChangeText={(t) => set("bitmisStokAlt", t)} placeholder="Kapalı" keyboardType="decimal-pad" />
+          {p.dueDates ? <Field label="Geciken sipariş kalemi şu sayıyı aşınca" value={f.gecikenKalemUst} onChangeText={(t) => set("gecikenKalemUst", t)} placeholder="Kapalı" keyboardType="number-pad" /> : null}
           <Field label="Günlük üretim şu miktarın altındaysa" value={f.gunlukUretimAlt} onChangeText={(t) => set("gunlukUretimAlt", t)} placeholder="Kapalı" keyboardType="decimal-pad" />
           <Field label="Günlük üretim kontrol saati (0–23)" value={f.gunlukUretimSaati} onChangeText={(t) => set("gunlukUretimSaati", t.replace(/\D/g, "").slice(0, 2))} keyboardType="number-pad" />
           <Field label="Fabrikadan şu kadar dakika veri gelmezse" value={f.esitlemeGecikmeDk} onChangeText={(t) => set("esitlemeGecikmeDk", t.replace(/\D/g, "").slice(0, 5))} keyboardType="number-pad" />
