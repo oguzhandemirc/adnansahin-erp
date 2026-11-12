@@ -579,6 +579,19 @@ async function main() {
       file: "Teks-Erp/src/routes/admin.routes.ts",
       needle: "SETTING_KEYS.BACKUP_OFFSITE_REMOTE",
     },
+    // Patron bulutu kapatma düğmesi (D1, 2026-11-12): feature-flag yükü panel/tablet açılış yüküdür,
+    // eşitleme ayarını istemcinin bilmesi gerekmez. Yüzey bugün ham ayar ucu (admin:settings + ayar şifresi),
+    // açma reçetesi alan kural dosyasında; panel satırı patron dilimleriyle gelir.
+    PATRON_CLOUD_SYNC_ENABLED: {
+      why: "Patron bulutu kapatma düğmesi — ham ayar ucu (PUT /api/admin/settings/:key), reçete docs/kurallar/patron-bulutu.md",
+      file: "docs/kurallar/patron-bulutu.md",
+      needle: "patronCloud.syncEnabled",
+    },
+    PATRON_CLOUD_SYNC_INTERVAL_MINUTES: {
+      why: "Patron bulutu yoklama aralığı (1–60 dk) — ham ayar ucu, reçete docs/kurallar/patron-bulutu.md",
+      file: "docs/kurallar/patron-bulutu.md",
+      needle: "patronCloud.syncIntervalMinutes",
+    },
     BACKUP_OFFSITE_DIR: {
       why: "Panel: Sistem → Yedekler → Offsite Yedek kartı (PATCH /api/admin/backups/offsite)",
       file: "Teks-Erp/src/routes/admin.routes.ts",

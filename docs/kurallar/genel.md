@@ -61,7 +61,7 @@ Birden çok alanı kesen konvansiyonlar (audit, katman sırası, hata/mesaj söz
 - Yeni ekran görünmüyorsa sırayla bak: izin satırı DB'de mi, kullanıcıya atanmış mı, kullanıcı yeniden giriş yaptı mı (JWT bayat).
 
 ## Bekçiler
-Backend: `test_audit_muafiyeti` · `test_audit_depth` · `test_audit_okuma_kaynagi` · `test_p2002_hedef_tek_kaynak` · `test_musteri_adi_kodda_yok` · `test_firma_adi_dondur` · `test_backup` · `test_offsite_sweep` · `test_process_warnings` · `test_remote_access_guard` · `test_totp` · `test_middleware_order` · `test_client_registry` · `test_session_registry` · `test_boss_overview` · `test_device_pairing_flag` · `test_sack_weigh_source` · `test_bash_guard_scope` · `test_hook_config`
+Backend: `test_audit_muafiyeti` · `test_audit_depth` · `test_audit_okuma_kaynagi` · `test_p2002_hedef_tek_kaynak` · `test_musteri_adi_kodda_yok` · `test_firma_adi_dondur` · `test_backup` · `test_offsite_sweep` · `test_process_warnings` · `test_remote_access_guard` · `test_totp` · `test_middleware_order` · `test_client_registry` · `test_session_registry` · `test_boss_overview` · `test_device_pairing_flag` · `test_sack_weigh_source` · `test_bash_guard_scope` · `test_hook_config` · `test_patron_bulut_imza` · `test_patron_bulut_uygunluk`
 
 İstemci: `discovery-logic.test.ts` · `discovery-ipc-contract.test.ts` · `boss-shell.test.ts` · `BackupScheduleCard.test.tsx` · `discovery.contract.test.ts` · `discovery.test.ts` · `discovery.service.test.ts` · `pairingGate.test.ts` · `useSackWeigh.test.tsx` · `BarcodeScannerView.test.tsx` · `shortCutQuality.test.ts` · `resolveShortCutConfig.test.ts` · `ModalTextInput.test.tsx`
 

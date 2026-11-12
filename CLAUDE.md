@@ -98,9 +98,10 @@ Her adım istasyon kataloğu + rota şablonundan kurulur; rotanın SON adımı t
 | `yetki-izin.md` | izin kataloğu · rol · süperadmin · ayar şifresi · modül bayrakları |
 | `surum-yayin.md` | sürüm notu · panel/tablet yayını · backend paketi · kurulum · migration |
 | `genel.md` | audit · hata sözleşmesi · uzak erişim · keşif · cihaz/donanım |
+| `patron-bulutu.md` | patron bulutu eşitlemesi · kapatma düğmesi · istek imzası · anahtar dosyası |
 | `ZORLANMAYANLAR.md` | hiçbir araçla zorlanmayan kurallar ve kapı önerileri |
 
-Eski sürümler ve kapsam dışı `dokuma.md`/`finans.md` yalnız başvuru için `docs/history/kurallar-2026-09/` altında. Patron bulutu, gelen kutusu ve patron uygulaması kuralları kod kopyasıyla birlikte yazılacak.
+Eski sürümler ve kapsam dışı `dokuma.md`/`finans.md` yalnız başvuru için `docs/history/kurallar-2026-09/` altında. Gelen kutusu ve patron uygulaması kuralları kod kopyasıyla birlikte `patron-bulutu.md`ye yazılacak.
 
 ## Çalışma düzeni
 
