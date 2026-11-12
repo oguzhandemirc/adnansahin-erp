@@ -38,6 +38,21 @@ Ardından panelde top listesi açılır, tabletten bir okutma yapılır (normal 
 - Uygulama sorunu: eski backend paketi bu şemayla çalışır (ölçüldü: okuma sonuçları birebir, tetikleyiciler kapalıyken sıfır çağrı) — yalnız paketi geri koy, şemaya dokunma.
 - Şema sorunu: migration geri alınmaz; backend durdurulur, 1. adımdaki yedekten geri yüklenir (`docs/kurallar/surum-yayin.md` § Migration).
 
+## 5. Eşitlemeyi açma (ayrı bakım işi, kullanıcıya gösterilerek)
+1. Anahtar: `.env`e `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (veri dizininde, repoda değil) → `cd Teks-Erp && npx tsx scripts/patron-bulut-anahtar.ts`; dosya yoksa 0600 üretir, `--kurulum=` ve `--acik-anahtar=` değerlerini basar (özel anahtarı basmaz).
+2. Buluta kaydet: bulutta `tesis.ts kurulum-kaydet --kurulum=… --acik-anahtar=… --bitis=<ISO tarih>`. ⚠️ `--bitis=yok` KULLANILMAZ: bitişi boş yazar ve bulut her isteği 403 `PATRON_BULUT_KAPALI` ile reddeder (bulut hatası, düzelene kadar); açık uçlu kurulum için uzak bir tarih ver (`2099-12-31T00:00:00.000Z`).
+3. Ortam: `.env`e `PATRON_CLOUD_URL=https://<bulut kökeni>` → backend yeniden başlatılır. Adres tek başına açmaz; açılış log'u sessizdir.
+4. Ayar: `PUT /api/admin/settings/patronCloud.syncEnabled` `{"value":"true"}` (admin:settings + ayar şifresi). Beklenen log: `tetikleyiciler açıldı (28; …)` + `eşitleme işi başladı`; psql `SELECT * FROM patron_sync_status()` → `enabled_triggers = 28`.
+5. İlk yüklemeyi izle: ilk tur 30 sn sonra koşar; başarı sessizdir (bulut log'unda `POST /v1/esitle 200`), hata tek satırdır: `UYARI [patron-bulut] eşitleme turu HATA (<kod>)` — iş aralık × 2^n geri çekilir (tavan 60 dk) ve kendiliğinden toparlanınca `eşitleme toparlandı` yazar.
+
+Geri dönüş: aynı uç `"false"` → `eşitleme işi durdu` + `tetikleyiciler kapatıldı (28; AYAR_KAPALI; …)`. Adresi `.env`den silip yeniden başlatmak da açık kalmış tetikleyicileri açılışta kapatır.
+
+### Ölçülen (yerel prova, 2026-11-12; 13 projeksiyon, 5.703 kayıt)
+- İlk TAM yükleme 6,1 sn · 3 istek · en büyük gövde 1.825 KB açık / 302 KB gzip · ölçüm sürecinin RSS'i 339 → 367 MB; bulut tesis DB'si 14 MB (`projection_rows` 5 MB).
+- Fabrika ↔ bulut satır sayısı 13 projeksiyonda birebir (sipariş 969, sevkiyat 493, çuval 1.620, iş emri 1.150 …).
+- Artımlı tur (3 yazım): 1 istek, 8 kayıt, 0,4–0,7 sn, gövde < 5 KB.
+- Bulut kapalıyken API çağrıları 200 döndü; ilk hata turu tek UYARI satırı, bulut açılınca aralık × 2 sonra kendiliğinden toparlandı, kesintide yapılan yazım kayıpsız gitti. Kapatınca tetikleyici 0, `sync_marks` büyümedi, dış istek 0.
+
 ## Ölçülen süreler (yerel prova, ~23,5 bin top)
 - Migration SQL'i < 1 sn (89–169 ms + 9–17 ms; süreç dahil 1,0–1,8 sn); en uzun tablo kilidi ≈ 91 ms (yüklü makinede 129 ms).
 - Asıl süre yedek + backend'i durdurup başlatmaktır.
