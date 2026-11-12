@@ -20,6 +20,10 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Ayar ↔ tetikleyici ↔ iş uzlaştırması tek yerdedir (`jobs/patron-cloud.jobs.ts`): açarken önce tetikleyiciler, başarırsa iş; kapatırken iş durur ve tetikleyiciler kapanır; açılışta ve her `patronCloud.*` ayar yazımında aynı uzlaştırma koşar. [bekçi: test_patron_bulut_esitleme]
 - 55P03 tekrarı sınırlıdır (6 deneme, toplam ≈ 6 sn); Prisma sarmalının kendi kodu (`P2010`) PG kodu sayılmaz, içindeki kod okunur. [bekçi: test_patron_bulut_esitleme]
 - Eşitleme hatası istek yolunu etkilemez: tık asla fırlatmaz, hata tek satır log + geri çekilmedir (aralık × 2^n, tavan 60 dk). [bekçi: test_patron_bulut_esitleme]
+- Anlık projeksiyon (`cloud-sync/snapshots.ts` + `snapshot-schemas.ts`) finans alanı ve termin/gecikme türevi taşımaz; şeması katıdır, tanımadığı alan gitmez. [bekçi: test_patron_bulut_anliklar]
+- Telefon ve panel aynı soruya aynı sayıyı verir: anlık, panelin kullandığı rapor/servisi aynen çağırır, ikinci tanım yazmaz. [bekçi: test_patron_bulut_anliklar]
+- Anlık hesabı fabrikanın yazma yoluna yük bindirmez: yalnız eşitleme işinde, aralık başına en çok bir kez, kaynaklar sırayla ve tur başına bir kez hesaplanır; bir anlığın hatası yalnız o anlığı düşürür. [bekçi: test_patron_bulut_anliklar]
+- `ozet`in bir bölümünün hatası özeti düşürmez: her bölüm (`ozet.stok` · `ozet.siparis` · `ozet.uretim` · `ozet.sevkiyat` · `ozet.fason`) ayrı kurulur, hatalı bölüm o turda gönderilmez ve tek satır log'a düşer. [bekçi: test_patron_bulut_anliklar]
 - Kirli-bayrak Proxy'si (ana üründeki `withDirtyTracking`) bilerek taşınmadı: değişiklik en geç bir yoklama aralığı sonra gider. [inceleme]
 
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
@@ -31,11 +35,12 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 ## Tuzaklar
 
 - Windows'ta dosya izin bitleri NTFS ACL'yi yansıtmaz; orada 0600 denetimi atlanır ve koruma anahtar dizininin ACL'sidir.
+- Üretim akışının "Depo" kolonu binadaki BÜTÜN `WAREHOUSE` topunu (çuvaldakiler dahil) sayar; stok karnesinin "Bitmiş"i yalnız çuvala/sevkiyata girmemiş serbest stoktur — iki ayrı kavramdır, birini ötekine eşitleme; ayrımı etiket taşır.
 - Kurulum kimliği keşif kimliğiyle aynıdır (`system.installationId`); boot işi üretir — araç onu yalnız okur, DB'ye yazmaz.
 
 ## Bekçiler
 
-Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_feature_flag_contract` · `test_db_invariants`
+Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_feature_flag_contract` · `test_db_invariants`
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 
