@@ -15,6 +15,16 @@ import { listReadyFacilities, withTesis } from "../lib/tenant";
 import type { CloudContext } from "./context";
 
 export const CLOUD_MODULE_KEY = "patron-bulut";
+/** Süresiz hak: NULL bitiş "hak dondu" demektir (satıcı kipi), "bitiş yok" değil — süresizlik açık bir uzak tarihtir. */
+export const SURESIZ_BITIS = new Date("9999-12-31T23:59:59.999Z");
+
+/** Satıcı CLI'sinin `--bitis=<ISO|yok>` argümanı: `yok` = süresiz (lisans/abonelik olmayan kurulum). */
+export function parseCloudUntilArg(arg: string): Date {
+  if (arg === "yok") return SURESIZ_BITIS;
+  const ms = Date.parse(arg);
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(arg) || Number.isNaN(ms)) throw new Error(`--bitis biçimsiz: ISO tarih-saat ya da "yok" bekleniyor`);
+  return new Date(ms);
+}
 /** Hizmet bitişinden sonra salt okuma + dışa aktarma süresi (Ek-6/A §4.2). */
 export const READ_ONLY_DAYS = 90;
 const DAY_MS = 86_400_000;

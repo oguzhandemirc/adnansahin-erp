@@ -21,6 +21,7 @@ import { Client } from "pg";
 import { withTesis } from "../src/lib/tenant";
 import { LOCK_NAMESPACES } from "../src/lib/locks";
 import { girdi, imzali, kanonik, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, tesisUrl, type Ortam, type TestKurulumu } from "./lib/test-ortam";
+import { parseCloudUntilArg } from "../src/services/service-lifecycle";
 
 type SyncBody = { kabul: { projeksiyon: string }[]; ret: { projeksiyon: string; kod: string }[]; istenen: { projeksiyon: string; neden: string }[]; sozlesmeUyarisi: unknown; ufukTarihi: Record<string, string> };
 
@@ -137,6 +138,7 @@ async function kapilar(o: Ortam, k: TestKurulumu): Promise<void> {
   const test = await tesisKur(o, { sinif: "TEST" });
   const bitmis = await tesisKur(o, { bitis: new Date(o.saat.simdi() - 1000) });
   const haksiz = await tesisKur(o, { patronBulut: false });
+  const suresiz = await tesisKur(o, { bitis: parseCloudUntilArg("yok") });
   try {
     const t1 = await imzali(o, test, "/v1/esitle", { govde: paket(test, { ufuk: new Date(ufuk) }) });
     kontrol("§5j TEST sınıfı → 403 SINIF_GONDEREMEZ", t1.status === 403 && t1.json.details?.code === "SINIF_GONDEREMEZ");
@@ -144,8 +146,10 @@ async function kapilar(o: Ortam, k: TestKurulumu): Promise<void> {
     kontrol("§5k abonelik bitti → 403 PATRON_BULUT_KAPALI", t2.status === 403 && t2.json.details?.code === "PATRON_BULUT_KAPALI");
     const t3 = await imzali(o, haksiz, "/v1/esitle", { govde: paket(haksiz, { ufuk: new Date(ufuk) }) });
     kontrol("§5l patron-bulut modülü yok → 403 PATRON_BULUT_KAPALI", t3.status === 403 && t3.json.details?.code === "PATRON_BULUT_KAPALI");
+    const t4 = await imzali(o, suresiz, "/v1/esitle", { govde: paket(suresiz, { ufuk: new Date(ufuk) }) });
+    kontrol("§5l2 `kurulum-kaydet --bitis=yok` (süresiz) → 200", t4.status === 200, `${t4.status} ${t4.json.details?.code ?? ""}`);
   } finally {
-    for (const x of [test, bitmis, haksiz]) await temizleTesis(o, x.tesisId);
+    for (const x of [test, bitmis, haksiz, suresiz]) await temizleTesis(o, x.tesisId);
   }
   await gondericiSiniflar(o, ufuk);
   const kilitci = new Client({ connectionString: tesisUrl(o, k.tesisId, "esitleme") });

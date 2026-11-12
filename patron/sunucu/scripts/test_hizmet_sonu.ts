@@ -18,7 +18,9 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { withTesis } from "../src/lib/tenant";
 import { destroyFacility } from "../src/services/facility-destruction";
-import { READ_ONLY_DAYS, refreshServiceEnd, serviceState, type ServiceFacts } from "../src/services/service-lifecycle";
+import { cloudEntitlementError } from "../src/services/installation-auth";
+import type { InstallationRecord } from "../src/services/installation-directory";
+import { READ_ONLY_DAYS, SURESIZ_BITIS, parseCloudUntilArg, refreshServiceEnd, serviceState, type ServiceFacts } from "../src/services/service-lifecycle";
 import { setFacilityStatus } from "../src/services/vendor-admin.service";
 import { TEST_PAROLASI, api, girdi, girisYap, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, tesisUrl, totpKodu, type Ortam, type TestKurulumu } from "./lib/test-ortam";
 
@@ -44,6 +46,18 @@ function saf(): void {
   kontrol("§1g hak düştü (bitiş NULL) → donmuş damga süreyi taşır (KAPALI)", donmus.phase === "KAPALI" && donmus.endedAt?.getTime() === t0 - 100 * GUN);
   kontrol("§1h damgasız hak düşmesi → bitiş şimdi (süre sayılmaya başlar)", serviceState(f({ installations: [kurulum(null, { modules: [] })] }), t0).endedAt?.getTime() === t0);
   kontrol("§1i pasif kurulum sözleşmeyi açık tutmaz", serviceState(f({ installations: [kurulum(t0 + GUN, { active: false })] }), t0).phase === "SALT_OKUNUR");
+  // `kurulum-kaydet --bitis=yok`: lisanssız fabrikada hak SÜRESİZDİR (NULL'a düşerse her istek 403 alıyordu).
+  const suresiz = parseCloudUntilArg("yok");
+  kontrol("§1j --bitis=yok → süresiz uzak tarih (NULL DEĞİL)", suresiz.getTime() === SURESIZ_BITIS.getTime());
+  kontrol("§1k süresiz kurulum → ACIK", serviceState(f({ installations: [kurulum(suresiz.getTime())] }), t0).phase === "ACIK");
+  const kayit = (cloudUntil: Date | null) => ({ licenseClass: "URETIM", modules: ["patron-bulut"], cloudUntil, handedOver: false }) as unknown as InstallationRecord;
+  kontrol("§1l süresiz kurulum eşitleme kapısından geçer", cloudEntitlementError(kayit(suresiz), t0) === null);
+  const gecmis = parseCloudUntilArg("2026-01-01T00:00:00.000Z");
+  kontrol("§1m geçmiş tarihli bitiş → 403 PATRON_BULUT_KAPALI", cloudEntitlementError(kayit(gecmis), t0)?.code === "PATRON_BULUT_KAPALI");
+  kontrol("§1n NULL bitiş (satıcı kipinde hak dondu) kapalı kalır", cloudEntitlementError(kayit(null), t0)?.code === "PATRON_BULUT_KAPALI");
+  let red = false;
+  try { parseCloudUntilArg("2099-13"); } catch { red = true; }
+  kontrol("§1o biçimsiz --bitis reddedilir", red);
 }
 
 async function paketGonder(o: Ortam, k: TestKurulumu, ad: string): Promise<{ siparisId: string; cariId: string }> {

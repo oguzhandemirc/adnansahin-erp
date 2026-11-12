@@ -5,6 +5,7 @@
 //   npx tsx scripts/tesis.ts tesis-durum --tesis=<uuid> --durum=AKTIF|PASIF
 //   npx tsx scripts/tesis.ts kurulum-kaydet --tesis=<uuid> --kurulum=<uuid> --acik-anahtar=<x> \
 //        --sinif=URETIM --moduller=patron-bulut,production.enabled --bitis=<ISO|yok> [--pasif]
+//        (`yok` = SÜRESİZ hak; NULL bitiş "hak dondu" demektir, CLI onu yazmaz)
 //   npx tsx scripts/tesis.ts yonetici-davet --tesis=<uuid> --eposta=<e-posta> --ad="Ad Soyad" [--saat=72]
 //   npx tsx scripts/tesis.ts yonetici-yeniden-davet --tesis=<uuid> --eposta=<e-posta> [--saat=72]
 //        (ikisi de tesiste AKTİF hesap yöneticisi varken REDDEDİLİR; zorunluysa yalnız
@@ -29,6 +30,7 @@ import { prepareFacilityDb } from "../src/lib/tesis-db-hazirlik";
 import { expectedSchemaVersion } from "../src/lib/tesis-goc";
 import { cliDeps } from "./tesis-db";
 import { destroyFacility } from "../src/services/facility-destruction";
+import { parseCloudUntilArg } from "../src/services/service-lifecycle";
 import { inviteFacilityAdmin, openFacility, overrideFromArgs, registerInstallation, reinviteAdmin, resetIdentity, setFacilityStatus } from "../src/services/vendor-admin.service";
 
 function args(argv: readonly string[]): Record<string, string> {
@@ -79,14 +81,13 @@ async function main(): Promise<void> {
         break;
       }
       case "kurulum-kaydet": {
-        const bitis = need(a, "bitis");
         const r = await registerInstallation(db, {
           tesisId: uuidArg(a, "tesis"),
           installationId: uuidArg(a, "kurulum"),
           publicKeyX: need(a, "acik-anahtar"),
           licenseClass: z.enum(["URETIM", "TEST", "DR", "DEMO", "BAYI", "BARINDIRILAN"]).parse(need(a, "sinif")) as LicenseClass,
           modules: need(a, "moduller").split(",").map((s) => s.trim()).filter(Boolean),
-          cloudUntil: bitis === "yok" ? null : new Date(z.iso.datetime().parse(bitis)),
+          cloudUntil: parseCloudUntilArg(need(a, "bitis")),
           active: a.pasif !== "true",
         });
         console.log(`✅ kurulum ${r.installationId} — ${r.licenseClass}, patron bulutu ${r.modules.includes("patron-bulut") ? "VAR" : "yok"}`);

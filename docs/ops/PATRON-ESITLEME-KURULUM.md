@@ -40,7 +40,7 @@ Ardından panelde top listesi açılır, tabletten bir okutma yapılır (normal 
 
 ## 5. Eşitlemeyi açma (ayrı bakım işi, kullanıcıya gösterilerek)
 1. Anahtar: `.env`e `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (veri dizininde, repoda değil) → `cd Teks-Erp && npx tsx scripts/patron-bulut-anahtar.ts`; dosya yoksa 0600 üretir, `--kurulum=` ve `--acik-anahtar=` değerlerini basar (özel anahtarı basmaz).
-2. Buluta kaydet: bulutta `tesis.ts kurulum-kaydet --kurulum=… --acik-anahtar=… --bitis=<ISO tarih>`. ⚠️ `--bitis=yok` KULLANILMAZ: bitişi boş yazar ve bulut her isteği 403 `PATRON_BULUT_KAPALI` ile reddeder (bulut hatası, düzelene kadar); açık uçlu kurulum için uzak bir tarih ver (`2099-12-31T00:00:00.000Z`).
+2. Buluta kaydet: bulutta `tesis.ts kurulum-kaydet --kurulum=… --acik-anahtar=… --bitis=yok`. `yok` = süresiz hak (lisans/abonelik yok); süreli kurulumda ISO tarih verilir. Eski bulut imajı (2026-11-12 öncesi) `yok`u boş yazıp her isteği 403 `PATRON_BULUT_KAPALI` ile reddediyordu; o imajda kayıtlı kurulum yeni imajla aynı komutu yeniden koşarak düzelir.
 3. Ortam: `.env`e `PATRON_CLOUD_URL=https://<bulut kökeni>` → backend yeniden başlatılır. Adres tek başına açmaz; açılış log'u sessizdir.
 4. Ayar: `PUT /api/admin/settings/patronCloud.syncEnabled` `{"value":"true"}` (admin:settings + ayar şifresi). Beklenen log: `tetikleyiciler açıldı (28; …)` + `eşitleme işi başladı`; psql `SELECT * FROM patron_sync_status()` → `enabled_triggers = 28`.
 5. İlk yüklemeyi izle: ilk tur 30 sn sonra koşar; başarı sessizdir (bulut log'unda `POST /v1/esitle 200`), hata tek satırdır: `UYARI [patron-bulut] eşitleme turu HATA (<kod>)` — iş aralık × 2^n geri çekilir (tavan 60 dk) ve kendiliğinden toparlanınca `eşitleme toparlandı` yazar.
