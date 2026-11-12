@@ -747,6 +747,8 @@ const CHECK_CONSTRAINTS: Array<{ table: string; name: string; notValid?: string;
   { table: "work_order_close_snapshots", name: "work_order_close_snapshots_version_pos" },
   { table: "work_order_close_snapshots", name: "work_order_close_snapshots_output_sum" },
   { table: "work_order_close_snapshot_lines", name: "work_order_close_snapshot_lines_bucket_known" },
+  // Patron bulutu gelen kutusu makbuzu: işlenen mesaj varlık taşır, reddedilen taşımaz (çift yüklem).
+  { table: "cloud_inbox_receipts", name: "cloud_inbox_receipts_outcome_entity_chk" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -833,6 +835,38 @@ const EXPRESSION_UNIQUES: Array<{ table: string; index: string; expr: string; pr
 //    partial index kaybolursa sorgu yavaşlar (sonuç doğru kalır), trigger
 //    kaybolursa kolon HİÇ yazılmaz ve tüm dönem raporları sessizce boşalır.
 // ─────────────────────────────────────────────────────────────────────────────
+// Patron eşitlemesinin kök tabloları (ana ürün `src/cloud-sync/projections.ts` SYNC_ROOT_TABLES,
+// `20260929152815_patron_bulut_esitleme` ile aynı sürüm; o dosya bu repoya D3'te gelir — gelince buradaki kopya onun importuna döner).
+const SYNC_ROOT_TABLES = [
+  "items", "colors", "warehouses", "stations", "customers", "customer_branches", "subcontractors",
+  "orders", "order_lines", "shipments", "direct_shipments", "sacks", "work_orders",
+  "cari_accounts", "cari_transactions", "cash_boxes", "bank_accounts", "cash_transactions",
+  "cheques", "cheque_events", "invoices", "invoice_lines", "payments", "item_prices",
+] as const;
+const SYNC_FUNCTION_NAMES = [
+  "sync_mark_deleted", "sync_mark_parent_dirty", "sync_mark_roll_old_parents",
+  "sync_mark_sack_old_shipment", "sync_mark_shipment_orders",
+] as const;
+// Hata sarmalının parmak izi: yut → işlem dışı sayaç → tx başına bir WARNING.
+const SYNC_SWALLOW_FRAGMENTS = [
+  "EXCEPTION WHEN OTHERS THEN",
+  "nextval('public.sync_mark_error_seq')",
+  "tekserp.sync_mark_warned",
+  "RAISE WARNING",
+];
+const SYNC_GUARD_FRAGMENTS_BY_FN: Array<[string, string[], string]> = [
+  ["sync_mark_deleted", ['INSERT INTO "sync_marks"', "TG_TABLE_NAME", "'DELETED'", "TG_NARGS = 2", "'DIRTY'"],
+    "patron bulutu silme işareti: kök satır SILINDI, verilen ebeveyn KIRLI"],
+  ["sync_mark_parent_dirty", ['INSERT INTO "sync_marks"', "TG_ARGV[0]", "'DIRTY'"],
+    "patron bulutu: kök olmayan çocuk silinince ebeveyn KIRLI"],
+  ["sync_mark_roll_old_parents", ['OLD."sackId"', 'OLD."shipmentId"', 'OLD."currentStepId"', 'OLD."producedInStepId"', "'work_orders'", "'DIRTY'"],
+    "patron bulutu ayrılma körlüğü: dört FK'nın ESKİ ebeveyni KIRLI"],
+  ["sync_mark_sack_old_shipment", ['OLD."shipmentId"', "'shipments'", "'DIRTY'"],
+    "patron bulutu: çuvalın ESKİ sevkiyatı KIRLI"],
+  ["sync_mark_shipment_orders", ["TG_OP IN ('UPDATE', 'DELETE')", "TG_OP IN ('INSERT', 'UPDATE')", "'shipments'", "'DIRTY'"],
+    "patron bulutu: sevkiyat ↔ sipariş kümesinin her yazımı sevkiyatı KIRLI yapar"],
+];
+
 const TRIGGERS: Array<{ table: string; trigger: string; timing: string[]; why: string }> = [
   {
     table: "rolls",
@@ -939,6 +973,40 @@ const TRIGGERS: Array<{ table: string; trigger: string; timing: string[]; why: s
     timing: ["BEFORE DELETE OR UPDATE", "FOR EACH ROW"],
     why: "defter mührü: UPDATE her zaman, doğrudan DELETE RED; üst top silinince FK kaskadı geçer (ortak fonksiyon defter_block_tamper)",
   },
+  // ── Patron bulutu eşitlemesi (20260929152815_patron_bulut_esitleme) ──────────
+  // Silme tespiti DB'ye bağlı; 24 katalog kök tablosunun HER BİRİ `sync_marks`a SILINDI yazar.
+  // Açık/kapalı durumu (`tgenabled`) burada ÖLÇÜLMEZ: varsayılan KAPALI, açmak
+  // `patron_sync_set_enabled(true)` ile bilinçli bir karardır.
+  ...SYNC_ROOT_TABLES.map((table) => ({
+    table,
+    trigger: `${table}_sync_deleted`,
+    timing: ["AFTER DELETE", "FOR EACH ROW", "sync_mark_deleted("],
+    why: "patron bulutu: silinen kök satır aynı tx'te SILINDI işareti yazar (kaskadla silinen de) — düşerse bulutta hayalet satır kalır",
+  })),
+  {
+    table: "work_order_steps",
+    trigger: "work_order_steps_sync_deleted",
+    timing: ["AFTER DELETE", "FOR EACH ROW", "sync_mark_parent_dirty('work_orders', 'workOrderId')"],
+    why: "patron bulutu: silinen bekleyen adım iş emrini KIRLI yapar",
+  },
+  {
+    table: "rolls",
+    trigger: "rolls_sync_parent_moved",
+    timing: ["AFTER UPDATE OF", "\"sackId\"", "\"producedInStepId\"", "FOR EACH ROW", "sync_mark_roll_old_parents()"],
+    why: "patron bulutu ayrılma körlüğü: top ESKİ çuval/sevkiyat/iş emrinden ayrılınca eski ebeveyn KIRLI",
+  },
+  {
+    table: "sacks",
+    trigger: "sacks_sync_parent_moved",
+    timing: ["AFTER UPDATE OF", "FOR EACH ROW", "sync_mark_sack_old_shipment()"],
+    why: "patron bulutu ayrılma körlüğü: çuval sevkiyattan çıkınca ESKİ sevkiyat KIRLI",
+  },
+  {
+    table: "shipment_orders",
+    trigger: "shipment_orders_sync_dirty",
+    timing: ["AFTER INSERT OR DELETE OR UPDATE", "FOR EACH ROW", "sync_mark_shipment_orders()"],
+    why: "patron bulutu filigransız küme: shipment_orders'ın her yazımı sevkiyatı KIRLI yapar",
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1024,6 +1092,27 @@ const EXPECTED_FUNCTIONS: Array<{ name: string; volatility: string; bodyFragment
     volatility: "i",
     bodyFragments: ["tr_fold(", "WITH ORDINALITY", "^[0-9]+$", "string_agg"],
     why: "renk ad seddi — JS `foldColorNameForCompare` ile birebir aynı çıktı",
+  },
+  // Patron eşitlemesi: beş tetikleyici gövdesi ana ürünle aynı, ÜSTÜNE hata sarmalı
+  // (Adnan şartı: tetikleyici hatası fabrikanın yazmasını durdurmaz). Sarmal parmak izi
+  // düşerse bir eşitleme arızası sipariş/sevk yazmasını geri alır.
+  ...SYNC_GUARD_FRAGMENTS_BY_FN.map(([name, fragments, why]) => ({
+    name,
+    volatility: "v",
+    bodyFragments: [...fragments, ...SYNC_SWALLOW_FRAGMENTS],
+    why,
+  })),
+  {
+    name: "patron_sync_set_enabled",
+    volatility: "v",
+    bodyFragments: ["ENABLE", "DISABLE", "t.tgenabled = 'D'", "NOWAIT", ...SYNC_FUNCTION_NAMES.map((n) => `'${n}'`)],
+    why: "patron eşitlemesinin TEK kapatma anahtarı: beş fonksiyonun bütün tetikleyicilerini birlikte açar/kapatır, yalnız farklı olana dokunur",
+  },
+  {
+    name: "patron_sync_status",
+    volatility: "s",
+    bodyFragments: ["tgenabled <> 'D'", "sync_mark_error_seq", ...SYNC_FUNCTION_NAMES.map((n) => `'${n}'`)],
+    why: "patron eşitlemesi durumu: açık/toplam tetikleyici + yutulan hata sayacı",
   },
 ];
 

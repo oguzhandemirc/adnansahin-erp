@@ -521,8 +521,15 @@ export const DEFTER_BEYANI: DefterBeyani[] = [
     gerekce: "kalıcı sayaç/rapor SystemLog'tan değil KALICI KOLONDAN okunur ⇒ audit satırı silindiğinde raporlanan hiçbir sayı değişmez",
     kararUfku: "6 ayda arşivlenir; iş kaynağı olarak okunmaz. ⚠️ ÇÜRÜTMENİN ZAYIF HALKASI ÖLÇÜLDÜ (2026-09-13): audit satırı BİR sayaçta okunuyor — backup-impact.service.ts:331 `systemLog.count`. Ama o satır \"İş kaybı DEĞİL — iz kaydı\" etiketiyle `system` grubunda duruyor (iş sayısı değil) ve kod arşivleme ufkunu ZATEN biliyor: :404 `_min(createdAt)` ile kapsamı ölçüp en eski log cutoff'tan sonraysa rollup'ı alt sınır saymıyor, \"ölçülemedi\" diyor — 0 demiyor. Panzehir yerinde olduğu için sınıf TELEMETRİ kalır. Audit'e uzanma ihtiyacı bir DEFTER EKSİKLİĞİNİN işaretidir (bkz. SackAllocation borcu)." },
 
+  // Patron bulutu (D2, ana ürünün `20260929152815_patron_bulut_esitleme` migration'ından): budayıcı `src/cloud-sync/marks-pruning.ts` D3'te gelir.
+  { model: "SyncMark", sinif: "TELEMETRI",
+    gerekce: "patron bulutu eşitleme işareti (SILINDI/KIRLI) — yalnız \"bu kökü buluta yeniden gönder\" der; tek okuyucusu eşitleme taramasıdır (D3), hiçbir rapor/ekran/karar okumaz ⇒ satır silindiğinde raporlanan hiçbir sayı değişmez; satırı uygulama değil DB tetikleyicisi yazar ve tetikleyiciler varsayılan KAPALIDIR",
+    kararUfku: "eşitleme onayı — bulutun onayladığı zincirin gerisinde kalan ve 7 günden eski işaret budanır; kaçan silmeyi günlük uzlaştırma TAM gönderimle onarır (ana ürün tasarım §4.4)" },
+
   // ── DURUM ──────────────────────────────────────────────────────────────────
   { model: "UserRecoveryCode", sinif: "DURUM", gerekce: "tek kullanımlık kurtarma kodu; tüketimi `usedAt` ile işaretlenir, defter değil" },
+  { model: "CloudInboxReceipt", sinif: "DURUM",
+    gerekce: "patron bulutu mesajının TEK KULLANIMLIK tüketim kaydı (idempotency makbuzu): iş sonucu varlığın KENDİ defterinde (sipariş/cari), ters yolu da onun ters yoludur (sipariş iptali · kart arşivi); makbuz silinmez, güncellenmez, geri alınmaz — silinse raporlanan sayı değişmez ama aynı mesaj ikinci varlık doğururdu" },
 ];
 
 // =============================================================================

@@ -774,6 +774,13 @@ export const ENUM_LABELS: Record<string, string> = {
   MOVED: "Taşındı",
   DELETED: "Silindi (çakışma)",
   FIELD_MERGED: "Alan birleşti",
+  // ── Patron bulutu eşitleme işareti (SyncMarkKind) — DELETED MergeRefKind ile ORTAK
+  DIRTY: "Kirli (buluta yeniden gönderilecek)",
+  // ── Patron bulutu gelen kutusu makbuzu (CloudInboxKind · CloudInboxOutcome)
+  SIPARIS: "Sipariş",
+  CARI: "Cari",
+  ISLENDI: "İşlendi",
+  REDDEDILDI: "Reddedildi",
   // ── Donmuş belge türü (PrintedDocType) — ticaret paketi
   TRANSFER_DISPATCH: "Depo transfer irsaliyesi",
   GOODS_RECEIPT: "Mal kabul fişi",
@@ -967,6 +974,9 @@ export const SHARED_ENUM_VALUES: Record<string, string> = {
     "ilki topun KAYNAĞI, ikincisi istasyonun TÜRÜ. STATION.kind override'ı ile ayrıldı (2026-09-14)",
   SUBCONTRACTOR: "istasyon/mükerrer-varlık/cari — üçü de aynı gerçek kişiyi işaret eder: 'Fason'",
   OTHER: "istasyon türü ve ödeme yöntemi — ikisi de 'Diğer'",
+  DELETED:
+    "MergeRefKind(birleştirmede çakışan satır silindi) ve SyncMarkKind(eşitleme işareti: kök satır silindi) — " +
+    "SyncMark hiçbir denetim kaydına girmez (tetikleyici yazar); ekranda yalnız birleştirme bağlamı görünür, ortak Türkçe orada doğru",
   YARN: "kalem türü, sayım satırı türü ve fason sevk kalemi türü (G1) — üçü de 'İplik'",
   SCRAP: "sapma türü / top statüsü / kalite rolü — üçünde de 'Fire'",
   SCALE: "tartı kaynağı ve çevre birimi türü — ikisi de 'Kantar'",
