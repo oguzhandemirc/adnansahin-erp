@@ -7,7 +7,7 @@
 //   §5 iç ad alanı (`IC_ONEKLER`) web'de de 404; önek sınırı kelime değil bölüm
 //   §6 eksik varlık · GET/HEAD dışı yöntem · noktalı bölüm → 404
 //   §7 web dizini verilmezse yalnız API (kök 404) · dizin boşsa açılış DURUR (fail-closed)
-//   §8 ⭐ Traefik kuralı (deploy/patron/docker-compose.yml) dışarıda tuttuğu önekler = IC_ONEKLER
+//   §8 ⭐ Caddy kenar kuralı (deploy/patron/Caddyfile.patron) 404 verdiği önekler = IC_ONEKLER
 //   §9 ⭐ fazla eğik çizgi (`//`, `\`) tek '/'ye 301 (expo-router "Invalid URL" boş sayfası); hedef aynı köken
 //   §10 tarayıcı dumanının beyanlı CSP istisnası (yalnız Cloudflare beacon'ı) öz sınaması
 // Koşum: npx tsx scripts/test_web_sunumu.ts
@@ -133,13 +133,13 @@ async function main(): Promise<void> {
     rmSync(bos, { recursive: true, force: true });
     kontrol("§7b giriş HTML'i olmayan dizin → açılış DURUR (fail-closed)", durdu);
 
-    console.log("\n§8 Traefik kuralı ↔ IC_ONEKLER");
-    const compose = readFileSync(path.join(PATRON_KOKU, "..", "..", "deploy", "patron", "docker-compose.yml"), "utf8");
-    const kurallar = [...compose.matchAll(/traefik\.http\.routers\.[^.]+\.rule=(.*)$/gm)].map((m) => m[1]!.replace(/"$/, ""));
-    const disarida = kurallar.map((k) => /!PathRegexp\(`\^\/\(([a-z|]+)\)\(\/\|\$\$?\)`\)/.exec(k)?.[1]?.split("|") ?? null);
-    kontrol("§8a tek yönlendirici, (birincil || kalıcı takma) Host kuralı + iç önek dışlaması taşır", kurallar.length === 1 && /^\(Host\(`\$\{PATRON_HOST[^}]*\}`\) \|\| Host\(`\$\{PATRON_TAKMA_HOST[^}]*\}`\)\) && /.test(kurallar[0]!) && disarida[0] !== null, kurallar.join(" | ") || "YOK");
-    const dis = [...(disarida[0] ?? [])].sort().join(",");
-    kontrol("§8b ⭐ Traefik'in dışarıda tuttuğu önekler = IC_ONEKLER (kod ↔ kenar tek liste)", dis === [...IC_ONEKLER].sort().join(","), `traefik: ${dis || "YOK"} · kod: ${[...IC_ONEKLER].join(",")}`);
+    console.log("\n§8 Caddy kenar kuralı ↔ IC_ONEKLER");
+    const caddy = readFileSync(path.join(PATRON_KOKU, "..", "..", "deploy", "patron", "Caddyfile.patron"), "utf8");
+    const eslesen = [...caddy.matchAll(/^\s*@(\w+) path_regexp \w+ \^\/\(([a-z|]+)\)\(\/\|\$\)\s*$/gm)];
+    const kapali = eslesen.filter((m) => new RegExp(`^\\s*respond @${m[1]} 404\\s*$`, "m").test(caddy));
+    kontrol("§8a tek site bloğu, iç önek eşleyicisi 404 verir ve kalan istek patron-api:4620'ye gider", kapali.length === 1 && /^\s*reverse_proxy patron-api:4620\s*$/m.test(caddy), `${eslesen.length} eşleyici · ${kapali.length} kapalı`);
+    const dis = (kapali[0]?.[2] ?? "").split("|").filter(Boolean).sort().join(",");
+    kontrol("§8b ⭐ Caddy'nin kapattığı önekler = IC_ONEKLER (kod ↔ kenar tek liste)", dis === [...IC_ONEKLER].sort().join(","), `caddy: ${dis || "YOK"} · kod: ${[...IC_ONEKLER].join(",")}`);
 
     console.log("\n§9 fazla eğik çizgi");
     for (const [yol, hedef] of [["//", "/"], ["///", "/"], ["//cariler//5f1c", "/cariler/5f1c"], ["//siparisler?a=1&b=%2F", "/siparisler?a=1&b=%2F"], ["//evil.example/x", "/evil.example/x"]] as const) {

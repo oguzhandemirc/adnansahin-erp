@@ -4,7 +4,7 @@
 //   §1 doğrudan kökene gelen istek sahte `cf-connecting-ip` ile adres seçemez (✓K: eski koşulsuz okuma ısırır)
 //   §2 Cloudflare'den (doğrudan ya da Traefik üzerinden) gelen istekte başlık okunur
 //   §3 başlık sahteciliğiyle giriş hız sınırı atlanamaz; gerçek ayrı istemciler ayrı kova
-//   §4 yapılandırma: biçimsiz CIDR açılışı durdurur · compose başlığı iç vekil ağıyla birlikte verir
+//   §4 yapılandırma: biçimsiz CIDR açılışı durdurur · Adnan compose iç vekil ağını verir, Cloudflare başlığına güvenmez
 // Koşum: npx tsx scripts/test_vekil_guveni.ts   (DB GEREKMEZ)
 // =============================================================================
 import { readFileSync } from "node:fs";
@@ -80,10 +80,12 @@ function bolum4(): void {
   }
   kontrol("§4a biçimsiz CIDR açılışı durdurur", hata.includes("IC_VEKIL_AGLARI"), hata.slice(0, 80));
   kontrol("§4b varsayılan: iç vekil yok, güvenilen kenar = Cloudflare", cfg({}).IC_VEKIL_AGLARI.length === 0 && cfg({}).GUVENILIR_VEKIL_AGLARI === undefined);
-  const compose = readFileSync(path.resolve(__dirname, "../../../deploy/patron/docker-compose.yml"), "utf8");
+  // Adnan VDS'i: Cloudflare yok, tek kenar Caddy (adnan-ag). Başlık güveni verilmez; iç vekil ağı verilmezse
+  // bütün istemciler Caddy'nin tek adresinde birleşir (hız sınırı tek kova).
+  const compose = readFileSync(path.resolve(__dirname, "../../../deploy/patron/compose.yaml"), "utf8");
   const baslik = /^\s*VEKIL_IP_BASLIGI:/m.test(compose);
-  const ic = /^\s*IC_VEKIL_AGLARI:\s*\$\{KENAR_AGI\}\s*$/m.test(compose);
-  kontrol("§4c compose vekil başlığını iç vekil ağıyla (KENAR_AGI) birlikte verir — yoksa herkes Traefik adresinde tek kova", !baslik || ic);
+  const ic = /^\s*IC_VEKIL_AGLARI:\s*\$\{ADNAN_AG_ALT_AGI[:?][^}]*\}\s*$/m.test(compose);
+  kontrol("§4c compose iç vekil ağını (ADNAN_AG_ALT_AGI) verir, Cloudflare başlığına güvenmez — yoksa herkes Caddy adresinde tek kova", !baslik && ic);
 }
 
 bolum1ve2();

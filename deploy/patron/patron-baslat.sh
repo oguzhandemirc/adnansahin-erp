@@ -6,7 +6,7 @@
 #   sunucu  → uygulama + eşitleme parolası · tesis rol anahtarı · iç API belirteci (boş = kapalı)
 #   goc     → göç + uygulama + eşitleme parolası · tesis rol anahtarı (migrate deploy · db-rolleri · tesis CLI'leri)
 #   hazirla → göç parolası · tesis rol anahtarı (tesis-db izle; uygulama parolasını ALMAZ)
-# ROL TABLOSU compose-denetle ⑩'un tek kaynağıdır: compose'un `secrets:` listesi bununla birebir eşleşmeli.
+# ROL TABLOSU test_compose_sirlari §2'nin tek kaynağıdır: compose'un `secrets:` listesi bununla birebir eşleşmeli.
 # Parolalar URL güvenli olmalı (onaltılık üretilir; runbook §3). Ortamda hazır verilen değer sırrın yerine geçer.
 set -eu
 

@@ -1,7 +1,7 @@
 // WEB SÜRÜMÜ STATİK SERVİSİ — patron uygulamasının `expo export --platform web` çıktısı API ile AYNI
 // kökenden (`/`) sunulur: CORS gerekmez, oturum belirteci başka kökene gitmez. `/api` ve `/v1` altı ASLA
 // HTML'e düşmez (bilinmeyen uç JSON 404 kalır); iç ad alanları (`IC_ONEKLER`) web'de de 404'tür ve
-// Traefik yönlendiricisi onları hiç almaz (deploy/patron/docker-compose.yml — bekçi iki listeyi eşler).
+// kenar (Caddy) onları 404le keser (deploy/patron/Caddyfile.patron — bekçi iki listeyi eşler).
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";

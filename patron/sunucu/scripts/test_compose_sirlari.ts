@@ -1,25 +1,22 @@
 // =============================================================================
-// PATRON COMPOSE SIRLARI ↔ GİRİŞ BETİĞİ BEKÇİSİ — DB'siz; docker compose yoksa §2/§3 ÖLÇÜLEMEDİ (kırmızı).
+// PATRON COMPOSE SIRLARI ↔ GİRİŞ BETİĞİ BEKÇİSİ — DB'siz ve docker'sız (compose metin olarak okunur).
 // Sınıf: compose bir servise sırrı vermez ama giriş betiği o sırrı ister → servis yeniden başlama döngüsü
 // (`patron-hazirla`, yerel duman 2026-10-09). Tersi (verilen ama okunmayan sır) en az yetkiyi bozar.
 //   §1 patron-baslat.sh GERÇEKTEN koşulur (sır dizini geçici kopyada): her rol yalnız kendi sırlarıyla açılır ve
 //      tablo dışı sırrı okumaz; hazırlayıcı uygulama parolasız açılır; eksik sır / tanınmayan rol → çıkış 1; güvenlik
 //      bildirimi sırları İSTEĞE BAĞLI (yoksa açılır, yol kurulmaz — eski betikle sonda ❌)
-//   §2 compose-denetle ⑩ gerçek compose + ornek.env ile beş servis ✅ (örnekte güvenlik bildirimi satırları yorumlu:
-//      isteğe bağlı sır yolu ölçülür — compose `:?`a dönerse §2 ÖLÇÜLEMEDİ ❌; 2026-10-12 sondası 12/24)
-//   §3 ⑩ negatif sondalar: hazırlayıcı rolü uygulama parolası ister (ilk arızanın aynısı) → EKSİK ❌ · compose
-//      hazırlayıcıdan tesis anahtarını düşürür → EKSİK ❌ · göç rolü eşitleme parolasını okumaz → FAZLA ❌ · tanınmayan
-//      PATRON_ROL ❌ · betik tablo dışı sır okur ❌ · yedek sırsız ❌
-//   §4 duman.sh davet belirteci deseni yeni belirteci (tesis ön ekli, noktalı) tam alır
-// NEGATİF SONDA (2026-10-09, dosya DIŞI, origin/main'deki patron-baslat.sh + duman.sh yerine konup geri alındı):
-//   eski betik → §1 hazırlayıcı/fazla/zorunlu/rol · §2 rol tablosu YOK · §3 sondalar · §4 desen 0/66 ❌ (10/23).
+//   §2 Adnan compose (deploy/patron/compose.yaml): her servis rolünün sırlarını eksiksiz/fazlasız alır (ortamda hazır
+//      URL o sırrın yerine geçer), hiçbir serviste `ports:` yok, api KURULUM_KAYNAGI=kayit, göç profilli ve elle
+//   §3 kalıcı negatif sondalar (sentetik): api'den tesis anahtarı düşer → EKSİK · göç rolü eşitleme parolasını okumaz
+//      → FAZLA · göç URL'i ortamdan düşer → EKSİK goc_parolasi · api'ye ports: → YASAK · tanınmayan PATRON_ROL
+// NEGATİF SONDA (2026-10-09, dosya DIŞI, origin/main'deki patron-baslat.sh yerine konup geri alındı): §1 sondaları ❌.
+// Ana ürünün Traefik compose'u, compose-denetle ⑩ ve duman.sh Adnan reposuna alınmadı (2026-11-12; §2–§4 yeniden).
 // Koşum: npx tsx scripts/test_compose_sirlari.ts   (DB GEREKMEZ)
 // =============================================================================
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { newToken } from "../src/auth/session.service";
 import { PATRON_KOKU, kontrol, sonuc } from "./lib/test-ortam";
 
 const D = path.resolve(PATRON_KOKU, "..", "..", "deploy", "patron");
@@ -71,76 +68,85 @@ kontrol("§1 sunucu iç API belirteci sırrı yoksa çıkış 1 (zorunlu, boş =
 kontrol("§1 hazırlayıcı tesis anahtarı yoksa çıkış 1", baslat("hazirla", ["goc_parolasi"]).status === 1);
 kontrol("§1 tanınmayan PATRON_ROL çıkış 1", baslat("yedek", DORT).status === 1);
 
-// §2–§3 compose-denetle ⑩
-function denetle(g: { dosyalar?: readonly string[]; baslat?: string; yedek?: string } = {}): string {
-  const varsayilan = g.dosyalar?.length ? [path.join(D, "docker-compose.yml"), ...g.dosyalar] : [];
-  const r = spawnSync(
-    process.execPath,
-    [
-      path.join(D, "compose-denetle.mjs"),
-      "--env-file",
-      path.join(D, "ornek.env"),
-      ...varsayilan.flatMap((f) => ["-f", f]),
-      ...(g.baslat ? ["--baslat-betigi", g.baslat] : []),
-      ...(g.yedek ? ["--yedek-betigi", g.yedek] : []),
-    ],
-    { encoding: "utf8", timeout: 60_000 },
-  );
-  return `${r.stdout ?? ""}${r.stderr ?? ""}`;
-}
-const satir = (cikti: string, parca: string): string => cikti.split("\n").find((l) => l.includes("⑩") && l.includes(parca)) ?? "";
-const dosya = (ad: string, icerik: string): string => {
-  const p = path.join(TMP, ad);
-  writeFileSync(p, icerik);
-  return p;
+// §2–§3 Adnan compose (deploy/patron/compose.yaml) ↔ rol tablosu. DB'siz ve docker'sız: compose akış listesiyle
+// (`secrets: [a, b]`) yazılır, servis blokları girintiden ayrılır. Ortamda hazır verilen URL sırrın yerine geçer
+// (betikteki `[ -z "${X:-}" ]` dalları) → o sır compose'da GEREKMEZ (göç rolü GOC_DATABASE_URL'i .env'den alır).
+const ISTEGE_BAGLI = new Set(["guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id"]);
+const ORTAM_KARSILIGI: Record<string, string> = {
+  uygulama_parolasi: "DATABASE_URL",
+  esitleme_parolasi: "ESITLEME_DATABASE_URL",
+  goc_parolasi: "GOC_DATABASE_URL",
+  tesis_rol_anahtari: "TESIS_ROL_ANAHTARI_DOSYASI",
+  ic_api_belirteci: "SATICI_IC_API_BELIRTECI",
 };
 
-const docker = spawnSync("docker", ["compose", "version"], { encoding: "utf8" });
-if (docker.status !== 0) {
-  kontrol("§2 docker compose ÖLÇÜLEMEDİ (yok) — ⑩ sondaları koşulamadı", false);
-} else {
-  const temiz = denetle();
-  for (const s of ["patron:", "patron-db:", "patron-goc:", "patron-hazirla:", "patron-yedek:"]) {
-    kontrol(`§2 ⑩ ${s.slice(0, -1)} ✅`, satir(temiz, ` ${s} `).startsWith("✅"), satir(temiz, ` ${s} `) || "satır YOK");
-  }
-  kontrol("§2 ⑩ rol tablosu çözüldü ✅", satir(temiz, "rol tablosu").startsWith("✅"), satir(temiz, "rol tablosu"));
-
-  const hazirlaUygulama = dosya("b1.sh", BASLAT.replace('hazirla) echo "goc_parolasi tesis_rol_anahtari"', 'hazirla) echo "goc_parolasi tesis_rol_anahtari uygulama_parolasi"'));
-  const c1 = denetle({ baslat: hazirlaUygulama });
-  kontrol("§3 ⑩ hazırlayıcı rolü uygulama parolası ister, compose vermez → patron-hazirla EKSİK ❌", /^❌ .*patron-hazirla:.*EKSİK.*uygulama_parolasi/m.test(c1), satir(c1, "patron-hazirla:"));
-
-  const anahtarsiz = dosya("o1.yml", "services:\n  patron-hazirla:\n    secrets: !override [goc_parolasi]\n");
-  const c2 = denetle({ dosyalar: [anahtarsiz] });
-  kontrol("§3 ⑩ compose hazırlayıcıdan tesis anahtarını düşürür → EKSİK ❌", /^❌ .*patron-hazirla:.*EKSİK.*tesis_rol_anahtari/m.test(c2), satir(c2, "patron-hazirla:"));
-
-  const gocEsitlemesiz = dosya("b2.sh", BASLAT.replace('goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi tesis_rol_anahtari"', 'goc) echo "goc_parolasi uygulama_parolasi tesis_rol_anahtari"'));
-  const c3 = denetle({ baslat: gocEsitlemesiz });
-  kontrol("§3 ⑩ göç rolü eşitleme parolasını okumaz, compose verir → patron-goc FAZLA ❌", /^❌ .*patron-goc:.*FAZLA.*esitleme_parolasi/m.test(c3), satir(c3, "patron-goc:"));
-
-  const yabanciRol = dosya("o2.yml", "services:\n  patron-hazirla:\n    environment:\n      PATRON_ROL: izle\n");
-  const c4 = denetle({ dosyalar: [yabanciRol] });
-  kontrol("§3 ⑩ tanınmayan PATRON_ROL ❌", /^❌ .*patron-hazirla: PATRON_ROL tanınır/m.test(c4), satir(c4, "patron-hazirla"));
-
-  const tabloDisi = dosya("b3.sh", BASLAT.replace(/^exec "\$@"$/m, 'X="$(parola destek_parolasi)"\nexec "$@"'));
-  const c5 = denetle({ baslat: tabloDisi });
-  kontrol("§3 ⑩ betik rol tablosu dışında sır okur ❌", /^❌ .*rol tablosu.*destek_parolasi/m.test(c5), satir(c5, "rol tablosu"));
-
-  const yedekSirsiz = dosya("y1.sh", "#!/bin/sh\nPGPASSWORD=x\n");
-  const c6 = denetle({ yedek: yedekSirsiz });
-  kontrol("§3 ⑩ yedek betiği sır okumaz, compose verir → patron-yedek FAZLA ❌", /^❌ .*patron-yedek:.*FAZLA.*goc_parolasi/m.test(c6), satir(c6, "patron-yedek:"));
+function rolTablosu(betik: string): Map<string, string[]> {
+  const blok = /rol_sirlari\(\) \{([\s\S]*?)\n\}/.exec(betik)?.[1] ?? "";
+  return new Map([...blok.matchAll(/^\s*(\w+)\) echo "([^"]*)"/gm)].map((m) => [m[1]!, m[2]!.split(/\s+/).filter(Boolean)]));
 }
 
-// §4 duman.sh davet belirteci deseni
-{
-  const duman = readFileSync(path.join(D, "duman.sh"), "utf8");
-  const ifade = /sed -n '(s\/\.\*: [^']*\/p)' > "\$D\/davet"/.exec(duman)?.[1];
-  kontrol("§4 duman.sh davet çıkarma ifadesi bulundu", !!ifade);
-  if (ifade) {
-    const { token } = newToken("4d980a36-460c-4aec-a1d8-70d30e3bda44");
-    const girdi = `✅ davet hazır — hesap x, bitiş y\n   Davet belirteci (BİR KEZ gösterilir; yöneticiye güvenli kanaldan iletin): ${token}\n`;
-    const r = spawnSync("sed", ["-n", ifade], { input: girdi, encoding: "utf8" });
-    kontrol("§4 yeni belirteç (ön ek + '.' + gövde) tam çıkarılır", r.stdout.trim() === token, `uzunluk ${r.stdout.trim().length}/${token.length}`);
+interface Servis { ad: string; rol: string | null; sirlar: string[]; ortam: Set<string>; portVar: boolean; metin: string }
+function servisler(compose: string): Servis[] {
+  const govde = compose.slice(compose.indexOf("\nservices:\n") + 11).split(/\n(?=\S)/)[0] ?? "";
+  return govde.split(/\n(?=  [\w-]+:\s*$)/m).filter((b) => /^  [\w-]+:/.test(b)).map((b) => ({
+    ad: /^  ([\w-]+):/.exec(b)![1]!,
+    rol: /^\s+PATRON_ROL:\s*(\w+)\s*$/m.exec(b)?.[1] ?? null,
+    sirlar: (/^\s+secrets:\s*\[([^\]]*)\]/m.exec(b)?.[1] ?? "").split(",").map((x) => x.trim()).filter(Boolean),
+    ortam: new Set([...b.matchAll(/^\s{6}([A-Z_]+):/gm)].map((m) => m[1]!)),
+    portVar: /^\s+ports:/m.test(b),
+    metin: b,
+  }));
+}
+
+/** Servis başına uyuşmazlık listesi (boş = uyumlu). */
+function denetle(compose: string, betik: string): string[] {
+  const tablo = rolTablosu(betik);
+  const out: string[] = [];
+  if (tablo.size === 0) out.push("rol tablosu çözülemedi");
+  for (const s of servisler(compose)) {
+    if (s.portVar) out.push(`${s.ad}: ports: YASAK (ufw'yi atlar)`);
+    if (!s.rol) {
+      if (s.sirlar.length > 0) out.push(`${s.ad}: rolsüz servise sır verilmiş`);
+      continue;
+    }
+    const istenen = tablo.get(s.rol);
+    if (!istenen) {
+      out.push(`${s.ad}: PATRON_ROL tanınmıyor (${s.rol})`);
+      continue;
+    }
+    const zorunlu = istenen.filter((x) => !ISTEGE_BAGLI.has(x) && !s.ortam.has(ORTAM_KARSILIGI[x] ?? "-"));
+    const eksik = zorunlu.filter((x) => !s.sirlar.includes(x));
+    const fazla = s.sirlar.filter((x) => !istenen.includes(x) || s.ortam.has(ORTAM_KARSILIGI[x] ?? "-"));
+    if (eksik.length) out.push(`${s.ad}: EKSİK ${eksik.join(",")}`);
+    if (fazla.length) out.push(`${s.ad}: FAZLA ${fazla.join(",")}`);
   }
+  return out;
+}
+
+const COMPOSE = readFileSync(path.join(D, "compose.yaml"), "utf8");
+{
+  const ss = servisler(COMPOSE);
+  kontrol("§2 compose servisleri çözüldü (db · api · goc)", ss.map((s) => s.ad).join(",") === "db,api,goc", ss.map((s) => s.ad).join(","));
+  const sorun = denetle(COMPOSE, BASLAT);
+  kontrol("§2 ⭐ her servis rolünün sırlarını eksiksiz ve fazlasız alır, hiçbir serviste ports: yok", sorun.length === 0, sorun.join(" | ") || "uyumlu");
+  const api = ss.find((s) => s.ad === "api");
+  kontrol("§2 api kurulum kaydı yerel (KURULUM_KAYNAGI=kayit), satıcı iç API adresi YOK", !!api && /^\s+KURULUM_KAYNAGI:\s*kayit\s*$/m.test(api.metin) && !api.ortam.has("SATICI_IC_API_URL"));
+  const goc = ss.find((s) => s.ad === "goc");
+  kontrol("§2 göç servisi profilli (elle, tek seferlik) ve sunucu göç URL'i ALMAZ", !!goc && /profiles:\s*\["goc"\]/.test(goc.metin) && !!api && !api.ortam.has("GOC_DATABASE_URL"));
+}
+
+// §3 kalıcı negatif sondalar (sentetik; her koşumda)
+{
+  const apiSirsiz = COMPOSE.replace("secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari, ic_api_belirteci]", "secrets: [uygulama_parolasi, esitleme_parolasi, ic_api_belirteci]");
+  kontrol("§3 api'den tesis anahtarı düşer → EKSİK ❌", apiSirsiz !== COMPOSE && denetle(apiSirsiz, BASLAT).some((x) => x === "api: EKSİK tesis_rol_anahtari"));
+  const gocEsitlemesiz = BASLAT.replace('goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi tesis_rol_anahtari"', 'goc) echo "goc_parolasi uygulama_parolasi tesis_rol_anahtari"');
+  kontrol("§3 göç rolü eşitleme parolasını okumaz, compose verir → FAZLA ❌", gocEsitlemesiz !== BASLAT && denetle(COMPOSE, gocEsitlemesiz).some((x) => x === "goc: FAZLA esitleme_parolasi"));
+  const gocUrlsuz = COMPOSE.replace(/^\s+GOC_DATABASE_URL:.*\n/m, "");
+  kontrol("§3 göç URL'i ortamdan düşerse göç parolası sırrı gerekir → EKSİK ❌", gocUrlsuz !== COMPOSE && denetle(gocUrlsuz, BASLAT).some((x) => x === "goc: EKSİK goc_parolasi"));
+  const portlu = COMPOSE.replace("    container_name: patron-api\n", '    container_name: patron-api\n    ports: ["4620:4620"]\n');
+  kontrol("§3 api'ye ports: eklenir → YASAK ❌", portlu !== COMPOSE && denetle(portlu, BASLAT).some((x) => x.startsWith("api: ports:")));
+  const yabanci = COMPOSE.replace("PATRON_ROL: sunucu", "PATRON_ROL: izle");
+  kontrol("§3 tanınmayan PATRON_ROL ❌", denetle(yabanci, BASLAT).some((x) => x.startsWith("api: PATRON_ROL tanınmıyor")));
 }
 
 rmSync(TMP, { recursive: true, force: true });

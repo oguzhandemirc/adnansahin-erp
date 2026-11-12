@@ -1,0 +1,141 @@
+# =============================================================================
+# ADNAN ŞAHİN PATRON BULUTU — VDS /opt/adnan/patron/compose.yaml bu dosyanın birebir kopyasıdır
+# =============================================================================
+# Değerler sunucudaki 0600 `.env`ten (repoya GİRMEZ): POSTGRES_USER · POSTGRES_DB · POSTGRES_PASSWORD (göç rolü =
+# DB'nin önyükleme süper kullanıcısı) · PATRON_IMAJ (adnan-patron:<sha>) · ADNAN_AG_ALT_AGI (Caddy'nin ortak ağı).
+# Sırlar `sirlar/` altında dosya (root:10001 0440): uygulama_parolasi · esitleme_parolasi (yalnız harf/rakam) ·
+# tesis_rol_anahtari (32 bayt base64url) · ic_api_belirteci (BOŞ = satıcı iç API'si kapalı, KURULUM_KAYNAGI=kayit).
+# TOTP sarma anahtarı `anahtarlar/patron-totp.key` (10001 0600) önceden üretilir; birim salt okunur bağlanır.
+#
+# PORT YAYINI YOK: Docker yayınlanan portta ufw'yi atlar. Dışa yalnız Caddy (proxy/ projesi, 80/443) açıktır;
+# Caddy `adnan-ag` ağından `patron-api:4620`e konuşur. DB yalnız `ic` (internal) ağda.
+#
+# Tek seferlik göç + rol hizası + tesis CLI'leri (elle, önce yedek):
+#   docker compose --profile goc run --rm goc
+#   docker compose --profile goc run --rm goc node dist-cli/scripts/tesis.js <komut> …
+#   docker compose --profile goc run --rm goc node dist-cli/scripts/tesis-db.js hazirla
+# =============================================================================
+name: patron
+
+x-sertlik: &sertlik
+  read_only: true
+  init: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: patron-db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Istanbul
+      PGTZ: UTC
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1536MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=50
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - timezone=UTC
+    shm_size: 256m
+    mem_limit: 1536m
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [ic]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    <<: *sertlik
+    image: ${PATRON_IMAJ:?PATRON_IMAJ gerekli (adnan-patron:<sha>)}
+    container_name: patron-api
+    restart: unless-stopped
+    user: "10001:10001"
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PATRON_ROL: sunucu
+      NODE_ENV: production
+      # Yığın cgroup tavanının altında: çöp toplayıcı OOM öldürmesinden ÖNCE devreye girer.
+      NODE_OPTIONS: --max-old-space-size=320
+      PORT: "4620"
+      BIND: 0.0.0.0
+      DB_ADI: ${POSTGRES_DB:?POSTGRES_DB gerekli}
+      KURULUM_KAYNAGI: kayit
+      # Cloudflare yok: Caddy (adnan-ag) iç vekildir; istemci adresi onun X-Forwarded-For son halkasından.
+      IC_VEKIL_AGLARI: ${ADNAN_AG_ALT_AGI:?ADNAN_AG_ALT_AGI gerekli (adnan-ag alt ağı)}
+      BILDIRIM_KIPI: kapali
+    secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari, ic_api_belirteci]
+    volumes:
+      - ./anahtarlar:/anahtarlar:ro
+    tmpfs:
+      - /tmp:mode=1777
+    networks: [ic, adnan-ag]
+    cpus: 1.0
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 200
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4620/saglik',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  goc:
+    <<: *sertlik
+    image: ${PATRON_IMAJ}
+    profiles: ["goc"]
+    restart: "no"
+    user: "10001:10001"
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PATRON_ROL: goc
+      DB_ADI: ${POSTGRES_DB}
+      GOC_DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER gerekli}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}@patron-db:5432/${POSTGRES_DB}?schema=public
+    command: ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node dist-cli/scripts/db-rolleri.js && node dist-cli/scripts/tesis-db.js goc"]
+    secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]
+    tmpfs:
+      - /tmp:mode=1777
+    networks: [ic]
+    mem_limit: 384m
+    memswap_limit: 384m
+    pids_limit: 100
+
+secrets:
+  uygulama_parolasi:
+    file: ./sirlar/uygulama_parolasi
+  esitleme_parolasi:
+    file: ./sirlar/esitleme_parolasi
+  tesis_rol_anahtari:
+    file: ./sirlar/tesis_rol_anahtari
+  ic_api_belirteci:
+    file: ./sirlar/ic_api_belirteci
+
+volumes:
+  pgdata:
+networks:
+  ic:
+    internal: true
+  adnan-ag:
+    external: true
