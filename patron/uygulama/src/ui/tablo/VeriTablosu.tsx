@@ -14,7 +14,9 @@ import type { Siralama, SutunTanimi } from "./model";
 
 /** Satır yüksekliği (tek satır, dokunma hedefi ≥ 44). */
 export const TABLO_SATIR = 44;
-const HUCRE_YATAY = space.m;
+/** Hücre iç boşluğu (iki yana); satır ve başlık şeridi ayrıca `KENAR` kadar içeriden başlar → ilk/son yazı kenardan 8. */
+const HUCRE_YATAY = space.s;
+const KENAR = space.xs;
 
 export function AracDugmesi(p: { icon: IconName; label: string; rozet?: number; etkin?: boolean; onPress: () => void; testID: string }) {
   const t = useTokens();
@@ -108,7 +110,7 @@ export function TabloSatiri<R>(p: { readonly sutunlar: readonly SutunTanimi<R>[]
       {p.sutunlar.map((c, i) => {
         const oge = c.ogeler?.(p.kayit);
         return (
-          <View key={c.key} style={[s.hucre, { flex: c.agirlik }, c.sayi && s.sagaYasli]}>
+          <View key={c.key} style={[s.hucre, { flex: c.agirlik }, c.sayi && s.hucreSag]}>
             {oge ?? (
               <Text style={[s.hucreYazi, i === 0 && s.ilkHucre, c.sayi && s.sayi]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>
                 {c.hucre(p.kayit)}
@@ -146,6 +148,7 @@ const useStyles = makeStyles((t) => ({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     minHeight: 34,
+    paddingHorizontal: KENAR,
     backgroundColor: t.color.band,
     borderWidth: 1,
     borderColor: t.separator,
@@ -156,7 +159,9 @@ const useStyles = makeStyles((t) => ({
   baslikIc: { flexDirection: "row" as const, alignItems: "center" as const, gap: 2, minWidth: 0 },
   baslikYazi: { ...typography.caption, fontWeight: "600" as const, color: t.textSecondary, flexShrink: 1 },
   sag: { textAlign: "right" as const },
-  sagaYasli: { justifyContent: "flex-end" as const, alignItems: "flex-end" as const },
+  // Başlık içi yatay (row) → sağa yaslama `justifyContent`; hücre dikey (column) → `alignItems` (yoksa dikeyde alta kayar).
+  sagaYasli: { justifyContent: "flex-end" as const },
+  hucreSag: { alignItems: "flex-end" as const },
   hucre: { minWidth: 0, paddingHorizontal: HUCRE_YATAY / 2, justifyContent: "center" as const, minHeight: 34 },
   govde: {
     backgroundColor: t.surface,
@@ -168,9 +173,10 @@ const useStyles = makeStyles((t) => ({
     overflow: "hidden" as const,
     marginBottom: space.m,
   },
-  satir: { flexDirection: "row" as const, alignItems: "center" as const, minHeight: TABLO_SATIR, paddingHorizontal: 0 },
+  satir: { flexDirection: "row" as const, alignItems: "center" as const, minHeight: TABLO_SATIR, paddingHorizontal: KENAR },
   ayrac: { borderTopWidth: 1, borderTopColor: t.separator },
-  hucreYazi: { ...typography.subhead, color: t.text },
+  // Yoğun tablo gövdesi 13 pt (telefonda 4 sütun sığsın); başlık 12 pt.
+  hucreYazi: { ...typography.footnote, color: t.text },
   ilkHucre: { fontWeight: "600" as const },
   sayi: { ...tabularNums, textAlign: "right" as const },
 }));

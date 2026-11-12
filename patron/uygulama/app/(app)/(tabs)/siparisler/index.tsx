@@ -2,7 +2,7 @@
 // Arama, süzgeç ve sıralama SUNUCUDA (`useVeriTablosu`); görünüm tercihi profilde (`tablo.siparis`). Termin/gecikme
 // sütunu ve süzgeci, para sütunu yok (kullanıcı kararı). "Yeni sipariş" yalnız yazma izniyle ve çevrimiçiyken.
 import { useRouter } from "expo-router";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import type { ProjectionRecord } from "../../../../src/api/wire";
 import { can } from "../../../../src/lib/access";
 import { formatDate, formatNumber } from "../../../../src/lib/format";
@@ -12,28 +12,36 @@ import { useRemote } from "../../../../src/state/useRemote";
 import { Screen } from "../../../../src/ui/Frame";
 import { MODULE_ICON } from "../../../../src/ui/icons";
 import { openRecord } from "../../../../src/ui/nav";
-import { OzetSeridi, Rozet } from "../../../../src/ui/ortak";
+import { OzetSeridi, rozetRenk } from "../../../../src/ui/ortak";
 import { ROZET_TONU, asObj, present, str } from "../../../../src/ui/siparis/OrderRow";
 import { CapsuleButton, StaleNote } from "../../../../src/ui/siparis/parts";
 import type { SutunTanimi } from "../../../../src/ui/tablo/model";
 import { TabloListesi, TabloUstu, useVeriTablosu } from "../../../../src/ui/tablo/useVeriTablosu";
-import { space } from "../../../../src/ui/tokens";
+import { useTokens } from "../../../../src/ui/theme-context";
+import { FONT_SCALE, space, typography } from "../../../../src/ui/tokens";
 
 const k = (r: ProjectionRecord) => asObj(r.kayit);
 const sayi = (v: unknown, birim = "") => (present(v) ? `${formatNumber(v, 0)}${birim}` : "—");
 const YON: Readonly<Record<string, string>> = { DOMESTIC: "Yurtiçi", EXPORT: "İhracat" };
 
+/** Dar sütunda hap rozet sığmaz: durum tonunun rengiyle kısa etiket (tam ad erişilebilirlik etiketinde). */
+function DurumHucresi({ durum }: { durum: unknown }) {
+  const t = useTokens();
+  const renk = rozetRenk(t, ROZET_TONU[orderStatus(durum).tone]).fg;
+  return <Text style={[typography.caption, { fontWeight: "600", color: renk }]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{orderStatusShort(durum)}</Text>;
+}
+
 const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
-  { key: "no", baslik: "No", ad: "Sipariş no", agirlik: 1, sirala: "siparisNo", hucre: (r) => str(k(r).siparisNo) ?? "—" },
-  { key: "musteri", baslik: "Müşteri", agirlik: 1.6, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
+  { key: "no", baslik: "No", ad: "Sipariş no", agirlik: 1.7, sirala: "siparisNo", hucre: (r) => str(k(r).siparisNo) ?? "—" },
+  { key: "musteri", baslik: "Müşteri", agirlik: 1.05, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
   { key: "tarih", baslik: "Tarih", ad: "Sipariş tarihi", agirlik: 1, sirala: "siparisTarihi", hucre: (r) => (str(k(r).siparisTarihi) ? formatDate(k(r).siparisTarihi) : "—") },
-  { key: "acik", baslik: "Açık m", ad: "Açık miktar (m)", agirlik: 1, sayi: true, sirala: "acikMiktar", hucre: (r) => sayi(k(r).acikMiktar) },
+  { key: "acik", baslik: "Açık m", ad: "Açık miktar (m)", agirlik: 0.9, sayi: true, sirala: "acikMiktar", hucre: (r) => sayi(k(r).acikMiktar) },
   { key: "sevk", baslik: "Sevk m", ad: "Sevk edilen (m)", agirlik: 1, sayi: true, sirala: "sevkMiktari", hucre: (r) => sayi(k(r).sevkMiktari) },
   { key: "kalem", baslik: "Kalem", ad: "Kalem sayısı", agirlik: 0.7, sayi: true, sirala: "kalemSayisi", hucre: (r) => sayi(k(r).kalemSayisi) },
   { key: "yon", baslik: "Yön", agirlik: 0.9, hucre: (r) => YON[str(k(r).yon) ?? ""] ?? "—" },
   {
-    key: "durum", baslik: "Durum", agirlik: 1, hucre: (r) => orderStatus(k(r).durum).label,
-    ogeler: (r) => <Rozet label={orderStatusShort(k(r).durum)} tone={ROZET_TONU[orderStatus(k(r).durum).tone]} />,
+    key: "durum", baslik: "Durum", agirlik: 1.35, hucre: (r) => orderStatus(k(r).durum).label,
+    ogeler: (r) => <DurumHucresi durum={k(r).durum} />,
   },
 ];
 

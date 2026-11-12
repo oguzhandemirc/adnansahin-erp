@@ -46,10 +46,12 @@ const useStyles = makeStyles((t) => ({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     alignSelf: "flex-start" as const,
+    // Dar kapta (tablo hücresi) taşmaz, yazı kesilir.
+    maxWidth: "100%" as const,
     gap: space.xs,
     minHeight: 20,
     paddingHorizontal: space.s,
     borderRadius: t.radius.badge,
   },
-  yazi: { ...typography.micro },
+  yazi: { ...typography.micro, flexShrink: 1 },
 }));

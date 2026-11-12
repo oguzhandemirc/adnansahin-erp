@@ -44,7 +44,7 @@ async function settle() {
 
 const memStore = () => {
   const m = new Map<string, string>();
-  return { m, get: jest.fn(async (k: string) => m.get(k) ?? null), set: jest.fn(async (k: string, v: string) => void m.set(k, v)), delete: jest.fn(async (k: string) => void m.delete(k)) };
+  return { m, get: jest.fn(async (k: string) => m.get(k) ?? null), set: jest.fn(async (k: string, v: string) => void m.set(k, v)), remove: jest.fn(async (k: string) => void m.delete(k)) };
 };
 
 beforeEach(() => {

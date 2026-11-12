@@ -24,10 +24,10 @@ type Satir = Readonly<Record<string, unknown>>;
 const sayiHucre = (v: unknown) => (num(v) === null ? "—" : qty(v));
 
 const STOK_SUTUNLARI: readonly SutunTanimi<Satir>[] = [
-  { key: "urun", baslik: "Ürün", agirlik: 2, hucre: (r) => str(r.etiket) ?? "—" },
-  { key: "miktar", baslik: "Miktar m", ad: "Miktar (m)", agirlik: 1.2, sayi: true, hucre: (r) => sayiHucre(r.miktar) },
-  { key: "top", baslik: "Top", ad: "Top sayısı", agirlik: 0.8, sayi: true, hucre: (r) => sayiHucre(r.adet) },
-  { key: "gun", baslik: "Gün", ad: "En eski (gün)", agirlik: 0.8, sayi: true, hucre: (r) => sayiHucre(r.enEskiGun) },
+  { key: "urun", baslik: "Ürün", agirlik: 2.4, hucre: (r) => str(r.etiket) ?? "—" },
+  { key: "miktar", baslik: "Miktar m", ad: "Miktar (m)", agirlik: 1.1, sayi: true, hucre: (r) => sayiHucre(r.miktar) },
+  { key: "top", baslik: "Top", ad: "Top sayısı", agirlik: 0.7, sayi: true, hucre: (r) => sayiHucre(r.adet) },
+  { key: "gun", baslik: "Gün", ad: "En eski (gün)", agirlik: 0.7, sayi: true, hucre: (r) => sayiHucre(r.enEskiGun) },
   { key: "siparissiz", baslik: "Siparişsiz", ad: "Siparişsiz (m)", agirlik: 1.2, sayi: true, hucre: (r) => sayiHucre(r.siparissizMiktar) },
 ];
 const STOK_VARSAYILAN: TabloTercihi = { surum: 1, sutunlar: ["urun", "miktar", "top", "gun"], siralama: null, suzgec: {} };
