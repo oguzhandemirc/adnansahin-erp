@@ -1,58 +1,38 @@
-// Gelen kutusu satırı: tür ikon çipi · üst satırda tür adı + durum rozeti, altında tam genişlikte gövde özeti, en altta
-// gönderen · yaş. 24 saati geçen bekleyen talep uyarı rengiyle (saat ikonu + metin; renk tek başına anlam taşımaz).
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, Text, View } from "react-native";
+// Gönderdiklerim satırı (tek satır ListeSatiri): içerik özeti · tür + yaş (+ gönderen). Kayıt onay beklemez: işlenen
+// kayıtta rozet YOK; yalnız hata alan kayıt "Hata" rozeti ve ikincil satırda ret nedeniyle öne çıkar.
 import type { InboxItem } from "../../api/wire";
 import { formatAgo } from "../../lib/format";
-import { statusEntry } from "../../lib/labels";
+import { resultText } from "../../lib/inbox";
 import { inboxKind } from "../../lib/labels/diger";
-import { IconTile } from "../ortak";
+import { ListeSatiri, Rozet } from "../ortak";
 import { DOMAIN_TONE } from "../tokens";
-import { StatusBadge } from "../StatusBadge";
-import { makeStyles, useTokens } from "../theme-context";
-import { space, typography } from "../tokens";
-import { inboxOverdue, inboxSummary } from "./inbox-format";
+import { inboxOverdue, inboxPending, inboxSummary } from "./inbox-format";
 
-export function InboxRow({ m, onPress, showAuthor }: { readonly m: InboxItem; readonly onPress: () => void; readonly showAuthor?: boolean }) {
-  const t = useTokens();
-  const s = useStyles();
+export function inboxRowText(m: InboxItem, showAuthor = false) {
   const kind = inboxKind(m.tur);
-  const late = inboxOverdue(m);
-  const age = formatAgo(m.olusturulma);
-  const summary = inboxSummary(m);
-  return (
-    <Pressable
-      onPress={onPress}
-      testID={`mesaj-${m.mesajId}`}
-      accessibilityRole="button"
-      accessibilityLabel={[kind.ad, summary, statusEntry(m.durum).label, age, late ? "24 saattir bekliyor" : null].filter(Boolean).join(", ")}
-      style={({ pressed }) => [s.row, pressed && { backgroundColor: t.surfaceAlt }]}
-    >
-      <IconTile icon={kind.icon} tone={DOMAIN_TONE[kind.domain]} size="md" />
-      <View style={s.text}>
-        <View style={s.head}>
-          <Text style={s.title} numberOfLines={1}>{kind.ad}</Text>
-          <StatusBadge value={m.durum} size="sm" />
-        </View>
-        <Text style={s.summary} numberOfLines={2}>{summary}</Text>
-        <View style={s.metaRow}>
-          {showAuthor ? <Text style={s.meta} numberOfLines={1}>{`${m.hesapAdi} · `}</Text> : null}
-          {late ? <Ionicons name="time" size={13} color={t.status.uyari.fill} /> : null}
-          <Text style={[s.meta, s.age, late && { color: t.status.uyari.fill, fontWeight: "600" }]} numberOfLines={1}>{age}</Text>
-        </View>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-    </Pressable>
-  );
+  const red = m.durum === "REDDEDILDI";
+  const neden = red ? (resultText(m.sonuc) ?? "Fabrika bu kaydı kabul etmedi") : null;
+  const ikincil = neden ?? [kind.ad, showAuthor ? m.hesapAdi : null, formatAgo(m.olusturulma)].filter(Boolean).join(" · ");
+  const rozet = red ? { label: "Hata", tone: "danger" as const }
+    : m.durum === "IPTAL" ? { label: "İptal", tone: "soft" as const }
+    : inboxPending(m.durum) ? { label: "Sırada", tone: inboxOverdue(m) ? ("warning" as const) : ("soft" as const) }
+    : null;
+  return { kind, birincil: inboxSummary(m), ikincil, rozet, neden };
 }
 
-const useStyles = makeStyles((t) => ({
-  row: { minHeight: 72, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.l, paddingVertical: space.m },
-  text: { flex: 1, minWidth: 0 },
-  head: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, gap: space.s },
-  title: { ...typography.headline, color: t.text, flexShrink: 1 },
-  summary: { ...typography.subhead, color: t.textSecondary, marginTop: 2 },
-  metaRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 3, marginTop: 3 },
-  meta: { ...typography.footnote, color: t.textMuted, flexShrink: 1 },
-  age: { flexShrink: 0 },
-}));
+export function InboxRow({ m, onPress, showAuthor, ayrac }: { readonly m: InboxItem; readonly onPress: () => void; readonly showAuthor?: boolean; readonly ayrac?: boolean }) {
+  const x = inboxRowText(m, showAuthor);
+  return (
+    <ListeSatiri
+      birincil={x.birincil}
+      ikincil={x.ikincil}
+      icon={x.kind.icon}
+      ton={x.neden ? "danger" : DOMAIN_TONE[x.kind.domain]}
+      rozet={x.rozet ? <Rozet label={x.rozet.label} tone={x.rozet.tone} /> : undefined}
+      ayrac={ayrac}
+      onPress={onPress}
+      testID={`mesaj-${m.mesajId}`}
+      accessibilityLabel={[x.kind.ad, x.birincil, x.rozet?.label, x.neden ? `Neden: ${x.neden}` : null, formatAgo(m.olusturulma)].filter(Boolean).join(", ")}
+    />
+  );
+}

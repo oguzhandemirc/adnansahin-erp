@@ -16,7 +16,7 @@ describe("ekran adları (P1, P3, P4)", () => {
     expect(moduleTitle("bildirimler")).toBe("Bildirim Ayarları");
     expect(moduleTitle("finans")).toBe("Ön Muhasebe");
     expect(moduleNavTitle("finans")).toBe("Finans");
-    expect(moduleTitle("gelen-kutusu")).toBe("Gelen Kutusu");
+    expect(moduleTitle("gelen-kutusu")).toBe("Gönderdiklerim");
   });
   it("sekme adı modülün gezinme adından türer", () => {
     for (const t of TABS) if (t.module) expect(t.title).toBe(moduleNavTitle(t.module));

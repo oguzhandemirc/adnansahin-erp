@@ -37,6 +37,7 @@ const Inbox = (require("../app/(app)/gelen-kutusu/index") as typeof import("../a
 const More = (require("../app/(app)/(tabs)/diger") as typeof import("../app/(app)/(tabs)/diger")).default;
 const { ThemeProvider, useTokens } = require("../src/ui/theme-context") as typeof import("../src/ui/theme-context");
 const { inboxBody, inboxOverdue, inboxSummary } = require("../src/ui/diger/inbox-format") as typeof import("../src/ui/diger/inbox-format");
+const { inboxRowText } = require("../src/ui/diger/InboxRow") as typeof import("../src/ui/diger/InboxRow");
 const { useSettlePoll } = require("../src/ui/diger/useSettlePoll") as typeof import("../src/ui/diger/useSettlePoll");
 
 beforeEach(() => {
@@ -96,9 +97,9 @@ describe("hesap ayrıntısı: izinler", () => {
 });
 
 describe("gelen kutusu", () => {
-  it("⭐ segment süzgeci sunucuya gider: anahtar ve istek `durum` taşır", async () => {
+  it("⭐ segment süzgeci sunucuya gider: anahtar ve istek `durum` taşır; varsayılan Tümü", async () => {
     render(<Inbox />);
-    expect(mockRemote.calls.at(-1)!.key).toBe("gelen-kutusu:BEKLIYOR");
+    expect(mockRemote.calls.at(-1)!.key).toBe("gelen-kutusu:HEPSI");
     fireEvent.press(screen.getByTestId("sekme-REDDEDILDI"));
     const last = mockRemote.calls.at(-1)!;
     expect(last.key).toBe("gelen-kutusu:REDDEDILDI");
@@ -108,14 +109,19 @@ describe("gelen kutusu", () => {
     await mockRemote.calls.at(-1)!.fetcher();
     expect(mockApi.inboxList).toHaveBeenLastCalledWith({ durum: undefined, limit: 50 });
   });
-  it("Diğer: bekleyen talep sayısı rozeti (sunucu sayfası; sonraki varsa +)", () => {
-    const m = { mesajId: "m1" } as InboxItem;
-    mockRemote.data = { "gelen-kutusu": { kayitlar: [m, { ...m, mesajId: "m2" }], sonraki: "x" } };
+  it("Diğer: Gönderdiklerim ikincil giriş — bekleyen sayacı yok, istek atılmaz", () => {
     render(<More />);
-    expect(mockRemote.calls[0]!.key).toBe("gelen-kutusu:BEKLIYOR");
-    expect(screen.getByTestId("gelen-rozet")).toBeTruthy();
-    expect(screen.getByText("2+")).toBeTruthy();
+    expect(mockRemote.calls.some((c) => String(c.key).startsWith("gelen-kutusu"))).toBe(false);
+    expect(screen.queryByTestId("gelen-rozet")).toBeNull();
+    expect(screen.getByTestId("menu-gelen-kutusu")).toBeTruthy();
     expect(screen.getByTestId("menu-hesaplar")).toBeTruthy();
+  });
+  it("hata alan kayıt: satırda Hata rozeti + ret nedeni; işlenen kayıtta rozet yok", () => {
+    const base = { mesajId: "m1", tur: "CARI" as const, govde: { ad: "Deneme Cari" }, hesapAdi: "A", olusturulma: new Date().toISOString(), islenme: null, iptal: null };
+    const red = inboxRowText({ ...base, durum: "REDDEDILDI", sonuc: { mesaj: "Vergi no geçersiz" } } as InboxItem);
+    expect(red.rozet).toEqual({ label: "Hata", tone: "danger" });
+    expect(red.ikincil).toBe("Vergi no geçersiz");
+    expect(inboxRowText({ ...base, durum: "ISLENDI", sonuc: { belgeNo: "C-1" } } as InboxItem).rozet).toBeNull();
   });
   it("gövde özeti ve ayrıntı: kimlik değil ad/sayı; 24 saat uyarısı yalnız bekleyende", () => {
     const order = { tur: "SIPARIS" as const, govde: { cariKartId: "c-uuid", doviz: "USD", termin: "2026-11-20", kalemler: [{ urunId: "u-uuid", miktar: "100.5", birim: "MT" }, { urunId: "u2", miktar: "50", birim: "MT", musteriUrunAdi: "Pamuklu", birimFiyat: "2.5" }] } };

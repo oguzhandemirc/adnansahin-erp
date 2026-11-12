@@ -39,8 +39,9 @@ export function visibleTabs(perms: readonly string[]): TabDef[] {
  *  sekme bölümlerinden sonraki grupları AYNI başlık ve sırayla bundan çizer. */
 export const NAV_GROUPS: readonly { readonly title: string; readonly modules: readonly ModuleKey[] }[] = [
   { title: "Operasyon", modules: ["uretim", "sevkiyat"] },
-  { title: "İş", modules: ["raporlar", "finans", "teklifler", "standart-maliyetler", "gelen-kutusu"] },
-  { title: "Hesap", modules: ["bildirimler", "hesaplar", "profil"] },
+  { title: "İş", modules: ["raporlar", "finans", "teklifler", "standart-maliyetler"] },
+  // Gönderdiklerim ikincil denetim listesidir (kayıt onay beklemez): hesap grubunda, öne çıkmaz.
+  { title: "Hesap", modules: ["bildirimler", "hesaplar", "gelen-kutusu", "profil"] },
 ];
 
 export const MORE_GROUPS = NAV_GROUPS;
