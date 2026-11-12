@@ -7,8 +7,7 @@ import { catalogEntries, requestable } from "../../lib/reports";
 import { useSession } from "../../state/session";
 import { useRemote } from "../../state/useRemote";
 import { ReportTile } from "../raporlar/parts";
-import { SectionHeader } from "../SectionHeader";
-import { Empty, LoadingSkeleton } from "../StateViews";
+import { BlokBasligi, BosDurum, Iskelet } from "../ortak";
 import { EMPTY_ICON } from "../icons";
 
 export const MACHINE_STOPS_REPORT_KEY = "production/makine-duruslari";
@@ -26,8 +25,8 @@ export function MachineStopsCard() {
 
   return (
     <>
-      <SectionHeader title="Makineler neden durdu?" domain="uretim" testID="bolum-makine-duruslari" />
-      {catalog.loading && !catalog.data ? <LoadingSkeleton rows={1} /> : null}
+      <BlokBasligi baslik="Makineler neden durdu?" testID="bolum-makine-duruslari" />
+      {catalog.loading && !catalog.data ? <Iskelet bicim="liste" satir={1} /> : null}
       {entry ? (
         <ReportTile
           anahtar={MACHINE_STOPS_REPORT_KEY}
@@ -36,18 +35,16 @@ export function MachineStopsCard() {
           onPress={() => router.push({ pathname: "/raporlar/yeni", params: { anahtar: MACHINE_STOPS_REPORT_KEY } } as never)}
         />
       ) : catalog.error && !catalog.data ? (
-        <Empty
-          text="Fabrikadan rapor kataloğu henüz gelmedi"
-          domain="uretim"
+        <BosDurum
+          baslik="Fabrikadan rapor kataloğu henüz gelmedi"
           icon={EMPTY_ICON.bekliyor}
-          actionLabel="Tekrar dene"
-          onAction={catalog.reload}
+          eylem="Tekrar dene"
+          onEylem={catalog.reload}
           testID="makine-duruslari-katalog-hata"
         />
       ) : catalog.data ? (
-        <Empty
-          text="Makine duruşları raporu bu fabrikada açık değil ya da fabrika güncellenince gelir"
-          domain="uretim"
+        <BosDurum
+          baslik="Makine duruşları raporu bu fabrikada açık değil ya da fabrika güncellenince gelir"
           icon={EMPTY_ICON.bekliyor}
           testID="makine-duruslari-yok"
         />

@@ -4,15 +4,12 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 import { consignedView, scorecardConsignedLines, serviceRevenueView, subcontractOpenView } from "../../lib/fason-summary";
 import { PERIODS, type PeriodKey } from "../../lib/labels/uretim";
-import { SegmentedControl } from "../SegmentedControl";
-import { Card } from "../kit";
-import { ListGroup, ListRow } from "../ListRow";
+import { AltSekmeler, BlokBasligi, BosDurum, ListeBlogu, ListeSatiri, SectionCard } from "../ortak";
 import { FactoryStamp, SnapshotGate } from "../pano/SnapshotGate";
 import { useSnapshot } from "../pano/useSnapshot";
-import { SectionHeader } from "../SectionHeader";
-import { StatusBadge } from "../StatusBadge";
-import { Empty } from "../StateViews";
 import { EMPTY_ICON } from "../icons";
+
+const DONEMLER = PERIODS.map((x) => ({ key: x.key, etiket: x.label }));
 import { makeStyles } from "../theme-context";
 import { space, typography } from "../tokens";
 
@@ -27,31 +24,33 @@ export function ConsignedSection({ scorecardOzet }: { readonly scorecardOzet: un
   const view = remote.data ? consignedView(remote.data.veri) : null;
   if (!lines && !view && !remote.loading) return null;
   return (
-    <View testID="emanet-bolumu">
-      <SectionHeader title="Müşteri malı (emanet)" domain="stok" testID="bolum-emanet" />
-      <Text style={s.note}>Yukarıdaki rakamlar bizim stoğumuz; müşterinin bize bıraktığı mal burada ayrı.</Text>
+    <View testID="emanet-bolumu" style={s.bolum}>
       {lines ? (
-        <Card domain="stok" testID="emanet-karne">
-          {lines.map((l) => (
-            <View key={l.label} style={s.kv}>
-              <Text style={s.k}>{l.label}</Text>
-              <Text style={s.v}>{l.value}</Text>
-            </View>
-          ))}
-        </Card>
-      ) : null}
+        <SectionCard baslik="Müşteri malı (emanet)" aciklama="Bizim stoğumuz değil; müşterinin bıraktığı mal" testID="bolum-emanet">
+          <View testID="emanet-karne">
+            {lines.map((l) => (
+              <View key={l.label} style={s.kv}>
+                <Text style={s.k}>{l.label}</Text>
+                <Text style={s.v}>{l.value}</Text>
+              </View>
+            ))}
+          </View>
+        </SectionCard>
+      ) : (
+        <BlokBasligi baslik="Müşteri malı (emanet)" testID="bolum-emanet" />
+      )}
       {view ? (
-        <>
-          <FactoryStamp snap={remote.data} offline={remote.offline} note="saatlik güncellenir" />
-          {view.rows.length === 0 ? (
-            <Empty text="İçeride müşteri malı yok" domain="stok" icon={EMPTY_ICON.bekliyor} testID="emanet-bos" />
-          ) : (
-            <ListGroup testID="emanet-cariler">
-              {view.rows.map((r) => <ListRow key={r.key} title={r.title} value={r.value} lines={r.lines} domain="stok" icon="person-outline" testID={`emanet-cari-${r.key}`} />)}
-            </ListGroup>
-          )}
-        </>
+        view.rows.length === 0 ? (
+          <BosDurum baslik="İçeride müşteri malı yok" icon={EMPTY_ICON.bekliyor} testID="emanet-bos" />
+        ) : (
+          <ListeBlogu baslik="Müşteri başına" sayi={view.rows.length} testID="emanet-cariler">
+            {view.rows.map((r, i) => (
+              <ListeSatiri key={r.key} birincil={r.title} ikincil={r.lines.join(" · ")} deger={r.value} ayrac={i > 0} testID={`emanet-cari-${r.key}`} />
+            ))}
+          </ListeBlogu>
+        )
       ) : null}
+      {view ? <FactoryStamp snap={remote.data} offline={remote.offline} note="saatlik güncellenir" /> : null}
     </View>
   );
 }
@@ -61,30 +60,30 @@ export function SubcontractOpenSection() {
   const s = useStyles();
   const remote = useSnapshot("fason-acik");
   return (
-    <View>
-      <SectionHeader title="Fasondaki işler" domain="fason" testID="bolum-fason-acik" />
-      <SnapshotGate remote={remote} domain="fason" variant="list" rows={2} empty="Fabrikadan fason bilgisi henüz gelmedi" testID="fason-acik">
+    <View style={s.bolum}>
+      <BlokBasligi baslik="Fasondaki işler" testID="bolum-fason-acik" />
+      <SnapshotGate remote={remote} variant="list" rows={2} empty="Fabrikadan fason bilgisi henüz gelmedi" testID="fason-acik">
         {(veri, snap) => {
           const v = subcontractOpenView(veri);
-          if (!v) return <Empty text="Fabrikadan fason bilgisi henüz gelmedi" domain="fason" icon={EMPTY_ICON.bekliyor} testID="fason-acik-bos" />;
+          if (!v) return <BosDurum baslik="Fabrikadan fason bilgisi henüz gelmedi" icon={EMPTY_ICON.bekliyor} testID="fason-acik-bos" />;
           return (
             <>
-              <FactoryStamp snap={snap} offline={remote.offline} note="saatlik güncellenir" />
-              <Card domain="fason" testID="fason-acik-ozet">
-                <View style={s.row}>
-                  <Text style={s.title}>{v.openText}</Text>
-                  <StatusBadge kind={v.late ? "kritik" : "iyi"} label={v.late ? "Gecikme var" : "Zamanında"} size="sm" testID="fason-acik-rozet" />
+              <SectionCard baslik={v.openText} testID="fason-acik-ozet">
+                <View>
+                  <Text style={s.line} testID="fason-acik-geciken">{v.lateText}</Text>
+                  {v.soonText ? <Text style={s.line} testID="fason-acik-yaklasan">{v.soonText}</Text> : null}
+                  <Text style={s.line} testID="fason-acik-kalan">{v.remainingText}</Text>
+                  {v.clipped ? <Text style={s.note}>Çok sayıda açık sevk var; firma listesi ilk sevklerden hazırlandı.</Text> : null}
                 </View>
-                <Text style={s.line} testID="fason-acik-geciken">{v.lateText}</Text>
-                {v.soonText ? <Text style={s.line} testID="fason-acik-yaklasan">{v.soonText}</Text> : null}
-                <Text style={s.line} testID="fason-acik-kalan">{v.remainingText}</Text>
-                {v.clipped ? <Text style={s.note}>Çok sayıda açık sevk var; firma listesi ilk sevklerden hazırlandı.</Text> : null}
-              </Card>
+              </SectionCard>
               {v.firms.length > 0 ? (
-                <ListGroup testID="fason-acik-firmalar">
-                  {v.firms.map((f) => <ListRow key={f.key} title={f.title} value={f.value} valueTone={f.late ? "kritik" : undefined} lines={f.lines} domain="fason" icon="business-outline" testID={`fason-firma-${f.key}`} />)}
-                </ListGroup>
+                <ListeBlogu baslik="Firma başına" sayi={v.firms.length} testID="fason-acik-firmalar">
+                  {v.firms.map((f, i) => (
+                    <ListeSatiri key={f.key} birincil={f.title} ikincil={f.lines.join(" · ")} deger={f.value} icon="business-outline" ton={f.late ? "warning" : "orange"} ayrac={i > 0} testID={`fason-firma-${f.key}`} />
+                  ))}
+                </ListeBlogu>
               ) : null}
+              <FactoryStamp snap={snap} offline={remote.offline} note="saatlik güncellenir" />
             </>
           );
         }}
@@ -99,28 +98,26 @@ export function ServiceRevenueSection() {
   const [period, setPeriod] = useState<PeriodKey>("buAy");
   const remote = useSnapshot("hizmet-geliri");
   return (
-    <View testID="hizmet-geliri-bolumu">
-      <SectionHeader title="Hizmet geliri" domain="finans" testID="bolum-hizmet-geliri" />
-      <View style={s.segment}>
-        <SegmentedControl items={PERIODS} value={period} onChange={setPeriod} testIDPrefix="gelir-donem-" accessibilityLabel="Gelir dönemi" />
-      </View>
-      <SnapshotGate remote={remote} domain="finans" variant="list" rows={3} empty="Fabrikadan hizmet geliri henüz gelmedi" testID="hizmet-geliri">
+    <View testID="hizmet-geliri-bolumu" style={s.bolum}>
+      <BlokBasligi baslik="Hizmet geliri" testID="bolum-hizmet-geliri" />
+      <AltSekmeler sekmeler={DONEMLER} secili={period} onSec={setPeriod} testID="gelir-donem" />
+      <View style={s.segment} />
+      <SnapshotGate remote={remote} variant="list" rows={3} empty="Fabrikadan hizmet geliri henüz gelmedi" testID="hizmet-geliri">
       {(veri, snap) => {
         const v = serviceRevenueView(veri, period);
-        if (!v) return <Empty text="Fabrikadan hizmet geliri henüz gelmedi" domain="finans" icon={EMPTY_ICON.bekliyor} testID="hizmet-geliri-bos" />;
+        if (!v) return <BosDurum baslik="Fabrikadan hizmet geliri henüz gelmedi" icon={EMPTY_ICON.bekliyor} testID="hizmet-geliri-bos" />;
         return (
           <>
             <FactoryStamp snap={snap} offline={remote.offline} note="saatlik güncellenir" />
-            <Card domain="finans" testID="hizmet-geliri-toplam">
-              <Text style={s.caption}>Hizmet geliri (onaylı faturalar, KDV hariç)</Text>
+            <SectionCard baslik="Onaylı faturalar, KDV hariç" testID="hizmet-geliri-toplam">
               <Text style={s.big} testID="hizmet-geliri-tutar">{v.totalText}</Text>
-            </Card>
+            </SectionCard>
             {v.rows.length === 0 ? (
-              <Empty text="Bu dönemde hizmet faturası yok" domain="finans" icon={EMPTY_ICON.bekliyor} testID="hizmet-geliri-yok" />
+              <BosDurum baslik="Bu dönemde hizmet faturası yok" icon={EMPTY_ICON.bekliyor} testID="hizmet-geliri-yok" />
             ) : (
-              <ListGroup testID="hizmet-geliri-kalemler">
-                {v.rows.map((r) => <ListRow key={r.key} title={r.title} value={r.value} lines={r.lines} domain="finans" icon="construct-outline" testID={`hizmet-${r.key}`} />)}
-              </ListGroup>
+              <ListeBlogu testID="hizmet-geliri-kalemler">
+                {v.rows.map((r, i) => <ListeSatiri key={r.key} birincil={r.title} ikincil={r.lines.join(" · ")} deger={r.value} icon="construct-outline" ton="sky" ayrac={i > 0} testID={`hizmet-${r.key}`} />)}
+              </ListeBlogu>
             )}
           </>
         );
@@ -131,14 +128,12 @@ export function ServiceRevenueSection() {
 }
 
 const useStyles = makeStyles((t) => ({
-  note: { ...typography.footnote, color: t.textSecondary, marginBottom: space.s },
+  bolum: { marginBottom: space.m },
+  note: { ...typography.footnote, color: t.color.textMuted, marginTop: space.s },
   kv: { flexDirection: "row" as const, justifyContent: "space-between" as const, paddingVertical: space.xs },
-  k: { ...typography.body, color: t.textSecondary },
-  v: { ...typography.body, color: t.text },
-  row: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const },
-  title: { ...typography.headline, color: t.text },
-  line: { ...typography.body, color: t.text, marginTop: space.xs },
-  caption: { ...typography.footnote, color: t.textSecondary },
-  big: { ...typography.display, color: t.text, marginTop: space.s },
-  segment: { marginBottom: space.m },
+  k: { ...typography.body, color: t.color.textMuted },
+  v: { ...typography.body, color: t.color.text, fontWeight: "600" as const },
+  line: { ...typography.body, color: t.color.text, marginTop: space.xs },
+  big: { ...typography.display, color: t.color.text },
+  segment: { height: space.m },
 }));

@@ -7,14 +7,15 @@ import { Text, View } from "react-native";
 import type { Snapshot } from "../../api/wire";
 import { formatFactory } from "../../lib/factory-time";
 import type { Remote } from "../../state/useRemote";
-import { Empty, ErrorState, LoadingSkeleton } from "../StateViews";
+import { BosDurum, HataDurumu, Iskelet } from "../ortak";
 import { makeStyles, useTokens } from "../theme-context";
 import { space, typography, type Domain } from "../tokens";
 import { EMPTY_ICON } from "../icons";
 
-export function SnapshotGate({ remote, domain, variant = "kpi", rows, empty, children, testID }: {
+export function SnapshotGate({ remote, variant = "kpi", rows, empty, children, testID }: {
   readonly remote: Remote<Snapshot>;
-  readonly domain: Domain;
+  /** Eski çağıranlar için; boş durum simgesi artık alan renginde değil. */
+  readonly domain?: Domain;
   readonly variant?: "kpi" | "list";
   readonly rows?: number;
   readonly empty?: string;
@@ -22,9 +23,9 @@ export function SnapshotGate({ remote, domain, variant = "kpi", rows, empty, chi
   readonly testID?: string;
 }) {
   if (remote.data) return <View testID={testID}>{children(remote.data.veri, remote.data)}</View>;
-  if (remote.loading) return <LoadingSkeleton variant={variant} rows={rows ?? (variant === "kpi" ? 2 : 3)} testID={testID ? `${testID}-yukleniyor` : undefined} />;
-  if (remote.error && !remote.notFound) return <ErrorState text={remote.error} onRetry={remote.reload} testID={testID ? `${testID}-hata` : undefined} />;
-  return <Empty text={empty ?? "Fabrikadan bu özet henüz gelmedi"} domain={domain} icon={EMPTY_ICON.bekliyor} testID={testID ? `${testID}-bos` : undefined} />;
+  if (remote.loading) return <Iskelet bicim={variant === "kpi" ? "kpi" : "liste"} satir={rows ?? (variant === "kpi" ? 2 : 3)} testID={testID ? `${testID}-yukleniyor` : undefined} />;
+  if (remote.error && !remote.notFound) return <HataDurumu mesaj={remote.error} onTekrar={remote.reload} testID={testID ? `${testID}-hata` : undefined} />;
+  return <BosDurum baslik={empty ?? "Fabrikadan bu özet henüz gelmedi"} icon={EMPTY_ICON.bekliyor} testID={testID ? `${testID}-bos` : undefined} />;
 }
 
 /** "Fabrika verisi 14:05" — anlığın sürümü (fabrikanın veri anı), tesis diliminde; çevrimdışıysa ayrıca söyler. */
@@ -37,7 +38,7 @@ export function FactoryStamp({ snap, offline, note, testID }: { readonly snap: S
   const text = `Fabrika verisi ${at}${note ? ` · ${note}` : ""}${offline ? " · çevrimdışı" : ""}`;
   return (
     <View style={s.row} testID={testID} accessible accessibilityLabel={text}>
-      <Ionicons name="time-outline" size={13} color={t.textSecondary} />
+      <Ionicons name="time-outline" size={13} color={t.color.textMuted} />
       <Text style={s.text}>{text}</Text>
     </View>
   );
@@ -45,5 +46,5 @@ export function FactoryStamp({ snap, offline, note, testID }: { readonly snap: S
 
 const useStyles = makeStyles((t) => ({
   row: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, marginBottom: space.s },
-  text: { ...typography.footnote, color: t.textSecondary },
+  text: { ...typography.footnote, color: t.color.textMuted },
 }));

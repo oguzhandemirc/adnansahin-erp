@@ -19,8 +19,8 @@ export function FlowStrip({ data, testID = "akis" }: { readonly data: unknown; r
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.flow} testID={testID}>
       {cols.map((c, i) => (
         <View key={String(c.anahtar)} style={s.stopWrap}>
-          {i > 0 ? <Ionicons name="chevron-forward" size={16} color={t.textMuted} /> : null}
-          <View style={s.stop} accessible accessibilityLabel={`${str(c.etiket) ?? String(c.anahtar)}: ${qty(c.adet)} ${UNIT.top}`} testID={`akis-${String(c.anahtar)}`}>
+          {i > 0 ? <Ionicons name="chevron-forward" size={14} color={t.color.textMuted} /> : null}
+          <View style={[s.stop, { borderTopColor: t.chart[i % t.chart.length] }]} accessible accessibilityLabel={`${str(c.etiket) ?? String(c.anahtar)}: ${qty(c.adet)} ${UNIT.top}`} testID={`akis-${String(c.anahtar)}`}>
             <Text style={s.stopLabel} numberOfLines={1}>{str(c.etiket) ?? String(c.anahtar)}</Text>
             <View style={s.stopValueRow}>
               <Text style={s.stopValue}>{qty(c.adet)}</Text>
@@ -64,15 +64,16 @@ export function StationBars({ data, testID = "istasyonlar" }: { readonly data: u
 }
 
 const useStyles = makeStyles((t) => ({
-  flow: { flexGrow: 1, gap: space.xs, paddingBottom: space.s, paddingRight: space.l },
+  flow: { flexGrow: 1, gap: space.xs },
   stopWrap: { flexGrow: 1, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
-  stop: { flexGrow: 1, minWidth: 92, backgroundColor: t.surface, borderRadius: t.radius.cardInner, paddingHorizontal: space.m, paddingVertical: space.s, borderTopWidth: 3, borderTopColor: t.station.ic.fg, ...t.cardShadow },
-  stopLabel: { ...typography.caption, color: t.textSecondary },
+  // Kart (SectionCard) içinde: zemin `secondary`, gölge yok; üst çizgi istasyon sırasına göre `chart[i]`.
+  stop: { flexGrow: 1, minWidth: 84, backgroundColor: t.color.secondary, borderRadius: t.radius.control, paddingHorizontal: space.m, paddingVertical: space.s, borderTopWidth: 3 },
+  stopLabel: { ...typography.caption, color: t.color.textMuted },
   stopValueRow: { flexDirection: "row" as const, alignItems: "baseline" as const, gap: 3, marginTop: 2 },
-  stopValue: { ...typography.title2, ...tabularNums, color: t.text },
-  stopUnit: { ...typography.footnote, color: t.textSecondary },
-  card: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, gap: space.xl, marginBottom: space.m, ...t.cardShadow },
+  stopValue: { ...typography.title2, ...tabularNums, color: t.color.text },
+  stopUnit: { ...typography.footnote, color: t.color.textMuted },
+  card: { gap: space.xl },
   station: { gap: 2 },
   // BarRow altındaki boşluğu geri al: dipnot kendi çubuğuna yapışsın, sonraki istasyonla karışmasın.
-  stationFoot: { ...typography.footnote, ...tabularNums, color: t.textSecondary, marginTop: space.xs - space.m },
+  stationFoot: { ...typography.footnote, ...tabularNums, color: t.color.textMuted, marginTop: space.xs - space.m },
 }));
