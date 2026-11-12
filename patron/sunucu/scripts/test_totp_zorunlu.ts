@@ -42,7 +42,7 @@ async function davetBolumu(o: Ortam, tesisId: string): Promise<void> {
   const sir = (kabul.json.data as { totpSirri?: string; otpauth?: string }) ?? {};
   kontrol("§2c kabul: TOTP sırrı + otpauth YALNIZ bu yanıtta", kabul.status === 200 && typeof sir.totpSirri === "string" && /^otpauth:\/\/totp\//.test(sir.otpauth ?? ""));
   // Görünen ad değişti (2026-10-16); doğrulama etikete bakmaz — yalnız yeni kayıtların authenticator etiketi.
-  kontrol("§2c' otpauth etiketi ve issuer \"TeksERP Yönetim\"", (sir.otpauth ?? "").startsWith("otpauth://totp/TeksERP%20Y%C3%B6netim%3A") && (sir.otpauth ?? "").includes("&issuer=TeksERP%20Y%C3%B6netim&"));
+  kontrol("§2c' otpauth etiketi ve issuer \"Adnan Şahin Yönetim\"", (sir.otpauth ?? "").startsWith("otpauth://totp/Adnan%20%C5%9Eahin%20Y%C3%B6netim%3A") && (sir.otpauth ?? "").includes("&issuer=Adnan%20%C5%9Eahin%20Y%C3%B6netim&"));
   o.saat.ilerlet(31_000);
   const onaysiz = await api(o, "POST", "/api/oturum/ac", { govde: { eposta, parola: TEST_PAROLASI, totp: totpKodu(sir.totpSirri!, o.saat.simdi()) } });
   kontrol("§2d onaysız (DAVETLI) hesap GİREMEZ → 401", onaysiz.status === 401 && onaysiz.json.details?.code === "GIRIS_BASARISIZ");

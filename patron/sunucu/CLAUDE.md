@@ -1,4 +1,4 @@
-# patron/sunucu — TeksERP patron bulutu sunucusu
+# patron/sunucu — Adnan Şahin patron bulutu sunucusu
 
 > Kök `CLAUDE.md` çekirdeği burada da AYNEN geçerlidir (defter, atomik claim, kilit tx'in ilk ifadesi, fail-closed, `details.code`, TR mesaj, sır hijyeni, audit yalnız ayak izi). Sözleşme ana ürün `design/PATRON-BULUTU-ESITLEME.md` (docs, TeksERP@19aa48a9; bu repoda yok); alan kuralları ana ürün `kurallar/patron-bulutu.md` (docs, TeksERP@19aa48a9; bu repoda yok); anlatım, tam ayrıntı (katman tablosu, DB rolleri, budama), komut ve ortam `patron/sunucu/MIMARI.md`; bekçiler `Teks-Erp/docs/BEKCI-HARITASI.md` § patron-bulutu.
 

@@ -9,7 +9,7 @@ export const TOTP_DIGITS = 6;
 export const TOTP_DRIFT_STEPS = 1;
 /** Yalnız authenticator'daki görünen etiket (2026-10-16 "TeksERP Patron" → "TeksERP Yönetim"); doğrulama sırdan
  *  ve saatten hesaplanır, etikete bakmaz — eski etiketle kurulmuş kayıtlar aynen çalışır. */
-export const TOTP_ISSUER = "TeksERP Yönetim";
+export const TOTP_ISSUER = "Adnan Şahin Yönetim";
 
 const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 

@@ -5,7 +5,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "TeksERP patron bulutu sunucusu — eşitleme alıcısı, gelen kutusu, rapor isteği, hesaplar (RLS çok kiracılı)",
+  "description": "Adnan Şahin patron bulutu sunucusu — eşitleme alıcısı, gelen kutusu, rapor isteği, hesaplar (RLS çok kiracılı)",
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
