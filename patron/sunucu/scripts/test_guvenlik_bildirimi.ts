@@ -1,6 +1,6 @@
 // =============================================================================
 // GÜVENLİK BİLDİRİMİ (patron, Bölge 7 B3) — olay → AYRI güvenlik Telegram sohbeti; Telegram SAHTE (yerel fetch; ağ yok).
-//   §1 ayna: alarm çekirdeği satıcınınkiyle BAYT-EŞİT (eşik · birleştirme · günlük özet tek kaynak davranır)
+//   §1 alarm çekirdeği yerinde (satıcı aynası Adnan reposunda YOK; çekirdek TeksERP@19aa48a9 kopyası, davranış §2+ ölçer)
 //   §2 teslim: eşikte TEK ileti, pencere içi olaylar pencere sonunda TEK iletide sayaçla; ileti sır/adres taşımaz
 //   §3 kanal kapalı: belirteç ya da sohbet kimliği yoksa gönderim YOK (sessiz), özet "güvenlik bildirimi: KAPALI"
 //   §4 yapılandırma: aynı belirteçle ayrı sohbet; biçimsiz değer / düz http (geri döngü dışı) KAPALI; sır dosyası
@@ -30,9 +30,10 @@ const TOKEN = `123456:${"A".repeat(35)}`;
 
 function ayna(): void {
   console.log("§1 ayna");
+  // Satıcı sunucusu Adnan reposuna taşınmaz (tek tesis, KURULUM_KAYNAGI=kayit): çekirdek TeksERP@19aa48a9'dan
+  // alındı ve burada tek kopyadır; ayna kıyası yok, davranış §2+ ile ölçülür.
   const a = readFileSync(path.join(__dirname, "../src/lib/guvenlik-alarm.ts"));
-  const b = readFileSync(path.join(__dirname, "../../../satici/sunucu/src/lib/guvenlik-alarm.ts"));
-  kontrol("§1a alarm çekirdeği satıcıyla bayt-eşit", a.equals(b), `${a.length} / ${b.length} bayt`);
+  kontrol("§1a alarm çekirdeği yerinde (satıcı aynası bu repoda yok)", a.length > 0, `${a.length} bayt`);
 }
 
 async function teslim(): Promise<void> {

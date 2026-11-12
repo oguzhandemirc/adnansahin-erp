@@ -11,13 +11,12 @@
 // Koşum: npx tsx scripts/test_liste_arama.ts
 // =============================================================================
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { Client } from "pg";
 import { ROLE_TEMPLATES } from "../src/catalog/permissions";
 import { FOLD_FROM, FOLD_TO, foldTerm, likePattern } from "../src/lib/search";
 import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_SEARCH, type FacilityStatus } from "../src/wire/api";
 import { api, girdi, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
+import { fabrikaDosyasi } from "./lib/fabrika-karsiligi";
 
 type Liste = { kayitlar: { id: string; kayit: Record<string, unknown> }[]; sonraki: string | null };
 
@@ -240,9 +239,10 @@ async function kimlikRls(o: Ortam, h: TestHesabi, h2: TestHesabi, id: SiparisIds
 }
 
 /** Fabrika kataloğunda `col("<anahtar>"` taşıyan projeksiyonlar (dosya METİN olarak okunur; içe aktarılmaz). */
-function katalogTasiyanlar(): Map<string, Set<string>> {
-  const kok = join(__dirname, "..", "..", "..", "Teks-Erp", "src", "cloud-sync");
-  const metin = ["catalog-facts.ts", "projections.ts"].map((f) => readFileSync(join(kok, f), "utf8")).join("\n");
+function katalogTasiyanlar(): Map<string, Set<string>> | null {
+  const parcalar = ["catalog-facts.ts", "projections.ts"].map((f) => fabrikaDosyasi(`Teks-Erp/src/cloud-sync/${f}`, "D3"));
+  if (parcalar.some((m) => m === null)) return null;
+  const metin = parcalar.join("\n");
   const out = new Map<string, Set<string>>(LIST_ID_FILTER_KEYS.map((k) => [k, new Set<string>()]));
   for (const blok of metin.split(/\bname: "/).slice(1)) {
     const ad = blok.slice(0, blok.indexOf('"'));
@@ -254,13 +254,15 @@ function katalogTasiyanlar(): Map<string, Set<string>> {
 async function beyanKatalog(o: Ortam, h: TestHesabi): Promise<void> {
   console.log("\n§8 beyan ↔ fabrika kataloğu · /oturum yeteneği");
   const tasiyan = katalogTasiyanlar();
-  kontrol("§8a tarayıcı körleşmedi (siparisId → siparis-kalemi bulundu)", tasiyan.get("siparisId")!.has("siparis-kalemi"));
-  const fark = LIST_ID_FILTER_KEYS.flatMap((k) => {
-    const beyan = new Set(LIST_ID_FILTERS[k]);
-    const kat = tasiyan.get(k)!;
-    return [...[...beyan].filter((p) => !kat.has(p)).map((p) => `${k}:${p} beyanlı ama kolon yok`), ...[...kat].filter((p) => !beyan.has(p)).map((p) => `${k}:${p} kolon var ama beyansız`)];
-  });
-  kontrol("§8b ⭐ LIST_ID_FILTERS ↔ fabrika kolonları iki yönlü eşit", fark.length === 0, fark.join(" | "));
+  if (tasiyan) {
+    kontrol("§8a tarayıcı körleşmedi (siparisId → siparis-kalemi bulundu)", tasiyan.get("siparisId")!.has("siparis-kalemi"));
+    const fark = LIST_ID_FILTER_KEYS.flatMap((k) => {
+      const beyan = new Set(LIST_ID_FILTERS[k]);
+      const kat = tasiyan.get(k)!;
+      return [...[...beyan].filter((p) => !kat.has(p)).map((p) => `${k}:${p} beyanlı ama kolon yok`), ...[...kat].filter((p) => !beyan.has(p)).map((p) => `${k}:${p} kolon var ama beyansız`)];
+    });
+    kontrol("§8b ⭐ LIST_ID_FILTERS ↔ fabrika kolonları iki yönlü eşit", fark.length === 0, fark.join(" | "));
+  }
   const r = await api(o, "GET", "/api/oturum", { belirtec: h.belirtec });
   const liste = (r.json.data as FacilityStatus | undefined)?.liste;
   kontrol("§8c `/oturum` liste yeteneği beyanın kendisi", r.status === 200 && JSON.stringify(liste?.kimlikSuzgecleri) === JSON.stringify(LIST_ID_FILTERS) && JSON.stringify(liste?.aranabilir) === JSON.stringify(Object.keys(LIST_SEARCH)), `${r.status}`);

@@ -18,6 +18,7 @@ import { CLOUD_PERMISSIONS } from "../src/catalog/permissions";
 import { PROJECTION_CATALOG, ROOT_PROJECTIONS } from "../src/catalog/projections";
 import { CLOUD_PERMISSIONS as IZINLER } from "../src/catalog/permissions";
 import { REPORT_KEY_PERMISSION, REPORTS_NOT_IN_CLOUD, allReportProjections, reportVerdict } from "../src/catalog/reports";
+import { fabrikaDosyasi } from "./lib/fabrika-karsiligi";
 
 const KOK = path.resolve(__dirname, "..", "..", "..");
 export const OZET = "patron/sunucu/src/catalog/katalog-ozeti.json";
@@ -96,6 +97,8 @@ kontrol("§2c her rapor anahtarı bulutta geçerli ve izni katalogda", gecersiz.
 console.log("\n§3 okuyucular özeti okur, kataloğu içe aktarmaz");
 for (const r of OKUYUCULAR) {
   const p = path.join(KOK, r);
+  // Fabrika okuyucusu (Teks-Erp) D1 dilimiyle gelir; o güne dek sesli ÖLÇÜLEMEDİ. Uygulama okuyucusu burada zorunlu.
+  if (r.startsWith("Teks-Erp/") && fabrikaDosyasi(r, "D1") === null) continue;
   const src = existsSync(p) ? readFileSync(p, "utf8") : "";
   kontrol(`§3a ${r} özeti okur`, src.includes("katalog-ozeti.json"));
   const ihlal = katalogIceAktarimi(src);

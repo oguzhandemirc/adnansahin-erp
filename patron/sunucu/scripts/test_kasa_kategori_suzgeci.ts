@@ -17,6 +17,7 @@ import { join, relative } from "node:path";
 import { ROLE_TEMPLATES } from "../src/catalog/permissions";
 import { ANAHTAR_SUZGEC_AZAMI, LIST_KEY_FILTER_KEYS, LIST_KEY_FILTERS, type FacilityStatus } from "../src/wire/api";
 import { api, girdi, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
+import { fabrikaDosyasi } from "./lib/fabrika-karsiligi";
 
 type Liste = { kayitlar: { id: string }[]; sonraki: string | null };
 const P = "kasa-hareketi";
@@ -115,7 +116,8 @@ function statik(): void {
   const izinli = new Set(["src/wire/api.ts", "src/services/data.service.ts"]);
   const disari = walk(join(SUNUCU, "src")).filter((f) => LIST_KEY_FILTER_KEYS.some((k) => readFileSync(f, "utf8").includes(k))).map((f) => relative(SUNUCU, f)).filter((f) => !izinli.has(f));
   kontrol("§4b anahtar adları patron/sunucu src'de yalnız tel + veri servisinde", disari.length === 0, disari.join(", ") || "temiz");
-  const fabrika = readFileSync(join(SUNUCU, "..", "..", "Teks-Erp", "src", "cloud-sync", "catalog-facts.ts"), "utf8");
+  const fabrika = fabrikaDosyasi("Teks-Erp/src/cloud-sync/catalog-facts.ts", "D3");
+  if (fabrika === null) return;
   const eksik = LIST_KEY_FILTER_KEYS.flatMap((k) => LIST_KEY_FILTERS[k].filter((p) => {
     const b = fabrika.split(/\bname: "/).find((x) => x.startsWith(`${p}"`)) ?? "";
     return !b.includes(`derived("${k}",`);

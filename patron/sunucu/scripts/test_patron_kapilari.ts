@@ -15,7 +15,7 @@
 //      eder, her okuma rotası OKUMA · muafiyet gerekçesi boş olamaz
 //   §6 katalog: izin kodları tekil · her okuma izni en az bir projeksiyon/rapor açar · yazma ve
 //      yönetim izinleri kodda kullanılır (ölü izin yok) · hata kodları tekil
-//   §7 protokol aynası: `src/lisans-protokol/` ↔ `Teks-Erp/src/lib/license/protocol/` bayt-eşit
+//   §7 protokol aynası: imza alt kümesi `src/lisans-protokol/` ↔ `Teks-Erp/src/lib/cloud-signing/` bayt-eşit (D1)
 //   §8 yaşa göre silinen ALAN beyanı (`AGED_FIELDS`, IP 30 gün): denetim satırı YALNIZ `maintenance.ts`te güncellenir
 //      ve güncellenen her alan beyanda, beyandaki her alanın silme yeri var (iki yönlü) · istemci adresi
 //      (`clientAddress(`) yalnız HTTP katmanında okunur · işlem makbuzu da YALNIZ `maintenance.ts`te (kimlik silmesi)
@@ -24,7 +24,7 @@
 // Koşum: npx tsx scripts/test_patron_kapilari.ts   (DB GEREKMEZ)
 // =============================================================================
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { CLOUD_PERMISSIONS } from "../src/catalog/permissions";
 import { PROJECTION_CATALOG } from "../src/catalog/projections";
@@ -35,6 +35,7 @@ import { APP_COLUMN_GRANTS, APP_GRANTS, MERKEZ_TABLES, ROUTING_TABLES, TESIS_TAB
 import { LOCK_NAMESPACES } from "../src/lib/locks";
 import { DESTRUCTION_STEPS, RETAINED_TABLES } from "../src/services/facility-destruction";
 import { AGED_FIELDS, PRUNED_TABLES } from "../src/services/maintenance";
+import { REPO_KOKU } from "./lib/fabrika-karsiligi";
 
 const KOK = path.resolve(__dirname, "..");
 let gecti = 0;
@@ -261,10 +262,18 @@ function ayna(): void {
         .sort()
         .map((f) => [f, createHash("sha256").update(readFileSync(path.join(d, f))).digest("hex")]),
     );
-  const kaynak = ozet(path.join(KOK, "..", "..", "Teks-Erp", "src", "lib", "license", "protocol"));
+  // Adnan fabrikasında lisans altyapısı yok: imza için protokolün 6 dosyalık alt kümesi D1 dilimiyle
+  // `Teks-Erp/src/lib/cloud-signing/`e BAYT-EŞİT gelir. O güne dek sesli ÖLÇÜLEMEDİ; gelince alt küme ölçülür.
+  const fabrikaRel = "Teks-Erp/src/lib/cloud-signing";
   const aynaDizin = ozet(path.join(SRC, "lisans-protokol"));
-  const esit = kaynak.size >= 5 && kaynak.size === aynaDizin.size && [...kaynak].every(([f, h]) => aynaDizin.get(f) === h);
-  kontrol("§7a src/lisans-protokol kaynakla BAYT-EŞİT", esit, `${kaynak.size} dosya`);
+  if (!existsSync(path.join(REPO_KOKU, fabrikaRel))) {
+    console.log(`  ⏭ ÖLÇÜLEMEDİ — fabrika karşılığı bu repoda henüz yok: ${fabrikaRel} (D1 dilimiyle gelir)`);
+    return;
+  }
+  const kaynak = ozet(path.join(REPO_KOKU, fabrikaRel));
+  const altKume = ["belge-turleri.ts", "belgeler.ts", "istek.ts", "jws.ts", "ortak.ts", "parmak-izi.ts"];
+  const farkli = altKume.filter((f) => !kaynak.has(f) || kaynak.get(f) !== aynaDizin.get(f));
+  kontrol("§7a imza alt kümesi (6 dosya) src/lisans-protokol ile BAYT-EŞİT", farkli.length === 0, farkli.join(", ") || `${altKume.length} dosya`);
 }
 
 envanter();
