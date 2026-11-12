@@ -26,6 +26,7 @@ import { CustomerItemAliasesPanel } from "./CustomerItemAliasesPanel";
 import { CustomerColorAliasesPanel } from "./CustomerColorAliasesPanel";
 import { CustomerTemplateRoutesPanel } from "./CustomerTemplateRoutesPanel";
 import { CustomerStandaloneLabelsPanel } from "./CustomerStandaloneLabelsPanel";
+import { CustomerSummaryTab } from "./summary/CustomerSummaryTab";
 import { ConfirmDialog } from "@/components/forms/ConfirmDialog";
 import { DocumentProfileSelect } from "@/components/forms/DocumentProfileSelect";
 import type { Customer } from "./types";
@@ -339,6 +340,7 @@ export function CustomerFormDialog({
                 <TabsTrigger value="item-aliases">Müşterideki Kumaş Adları</TabsTrigger>
                 <TabsTrigger value="color-aliases">Müşterideki Renk Adları</TabsTrigger>
                 <TabsTrigger value="label-templates">Etiket Şablonları</TabsTrigger>
+                <TabsTrigger value="summary">Özet</TabsTrigger>
               </TabsList>
 
               <TabsContent value="info">
@@ -377,6 +379,8 @@ export function CustomerFormDialog({
                   </>
                 )}
               </TabsContent>
+
+              <TabsContent value="summary">{initial && <CustomerSummaryTab customerId={initial.id} />}</TabsContent>
             </Tabs>
           ) : (
             <form onSubmit={submit} className="space-y-4">
