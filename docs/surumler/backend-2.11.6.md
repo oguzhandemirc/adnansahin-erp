@@ -21,7 +21,7 @@ ortam değişkeni **0** · yeni izin kodu **0** · yeni uç **0**.
 
 ## 2. Ne değişti
 
-- **`GET /api/work-orders?filter[asama]=<uuid,...>`** ve **`GET /api/work-orders/where-options`** (`stages`):
+- **`GET /api/work-orders?filter[asama]={uuid,...}`** ve **`GET /api/work-orders/where-options`** (`stages`):
   bir top şu an Y istasyonunda sayılır —
   - Y iç (INTERNAL) istasyonsa: top `IN_PRODUCTION` ve şu an durduğu adımın istasyonu Y (2.11.5 ile aynı);
   - Y fason (EXTERNAL) istasyonsa: top fasonda (`AT_SUBCONTRACTOR` ve açık bir sevk belgesinde dönmemiş
@@ -80,6 +80,6 @@ istasyonlar görünür.
 - `GET /api/work-orders/where-options` (yetkili oturumla) 200; `stages` içinde "Boyahane (Fason)" ve
   "Zımpara (Fason)" var (prova kopyasında ölçülen: Boyahane (Fason) 106 · Kurşun + KK2 58 · Tambur 19 ·
   Zımpara (Fason) 0 iş emri)
-- "Boyahane (Fason)" seçeneğinin `workOrderCount`u = `filter[asama]=<o id>` listesinin `total`ı;
+- "Boyahane (Fason)" seçeneğinin `workOrderCount`u = `filter[asama]={o id}` listesinin `total`ı;
   `GET /api/work-orders?filter[asama]=x` 400 `INVALID_FILTER_VALUE` (500 DEĞİL)
 - ölçülen kesinti

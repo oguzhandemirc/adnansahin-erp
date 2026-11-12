@@ -17,6 +17,10 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 // kırmızıyı keser; bayraksız (CI, elle `npm test`) 5 sn kalır — asıl sınır boş koşucuda.
 const KAPI_KIPI = process.env.TEKSERP_KAPI_ADIMI === "commit";
 
+// Saat dilimi makineden değil buradan: belge altın kopyaları (`toLocaleString("tr-TR")` basım anı)
+// fabrika saatine göre yazıldı; UTC koşucuda (CI) aynı an farklı metne döner. Çatallanan işçiler devralır.
+process.env.TZ = "Europe/Istanbul";
+
 // Testler derlemenin gördüğü kanalı görür: `TEKSERP_KANAL` (paketleme adımı) ya da dinlenme işaretçisi.
 const channel = panelChannel(buildChannelCode(process.env));
 
