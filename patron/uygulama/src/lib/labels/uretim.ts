@@ -67,6 +67,9 @@ export const DEAD_STOCK_STATUS: Readonly<Record<"var" | "yok", StatusEntry>> = {
   yok: { label: "Yok", tone: "iyi" },
 };
 
+/** Sevkiyat yönü (bulut `sevkiyat.yon`). */
+export const SHIPMENT_DIRECTION: Readonly<Record<string, string>> = { CIKIS: "Çıkış", GIRIS: "Giriş" };
+
 /** Sevkiyat varış kapsamı (`ShipmentDestination`). */
 export const SHIPMENT_DESTINATION: Readonly<Record<string, string>> = {
   DOMESTIC: "Yurtiçi",

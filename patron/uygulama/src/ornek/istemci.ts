@@ -1,7 +1,7 @@
 // Örnek veri istemcisi: `ApiClient`in yerine oturur (endpoints/kancalar aynen çalışır), ağa hiç çıkmaz.
 // Okumalar `veri.ts`ten gelir; yazmalar reddedilir. Kısa gecikme iskelet ve yenileme durumlarını gösterir.
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
-import { ORNEK_ANLIK, ORNEK_GELEN, ORNEK_HESAPLAR, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
+import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_GELEN, ORNEK_HESAPLAR, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
 
 const GECIKME_MS = 350;
 
@@ -56,6 +56,7 @@ function oku(path: string, q: Query | undefined): unknown {
     return m;
   }
   if (path === "/bildirimler") return BOS_SAYFA;
+  if (path === "/bildirim/ayarlar") return ORNEK_BILDIRIM();
   if (path === "/hesaplar") return ORNEK_HESAPLAR();
   if (path === "/cihazlar") return [];
   throw yok();

@@ -135,6 +135,24 @@ export function ORNEK_GELEN() {
   };
 }
 
+/** Bildirim ayarları (örnek): tesis varsayılanı; finans türü yok (bu fabrikada finans buluta gitmez). */
+export function ORNEK_BILDIRIM() {
+  const turler = [
+    ["gelen-kutusu-sonucu", "Gönderdiğim kayıt hata aldı", "Fabrika telefondan girilen kaydı kabul etmezse"],
+    ["stok-esigi", "Stok eşiği", "Ham ya da bitmiş stok eşiğin altına inince"],
+    ["gunluk-uretim", "Günlük üretim", "Günlük üretim eşiğin altında kalırsa"],
+    ["esitleme-gecikti", "Fabrikadan veri gelmiyor", "Eşitleme belirlenen süreyi aşınca"],
+    ["yedek-basarisiz", "Yedek alınamadı", "Fabrika yedeği başarısız olursa"],
+  ] as const;
+  const etkin = {
+    acik: true,
+    turler: Object.fromEntries(turler.map(([k]) => [k, k !== "gunluk-uretim"])),
+    sessiz: { acik: true, baslangic: "22:00", bitis: "07:00" },
+    esikler: { hamStokAlt: 50000, bitmisStokAlt: null, gecikenKalemUst: null, gunlukUretimAlt: null, gunlukUretimSaati: 17, esitlemeGecikmeDk: 60 },
+  };
+  return { etkin, kaynak: "TESIS", hesap: null, tesis: etkin, turler: turler.map(([tur, ad, aciklama]) => ({ tur, ad, aciklama, finans: false, izinli: true })), gonderim: "gercek", webPushAnahtari: null };
+}
+
 /** Hesaplar (örnek): yönetici + çalışan + davetli. */
 export function ORNEK_HESAPLAR() {
   return [

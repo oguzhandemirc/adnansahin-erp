@@ -75,3 +75,14 @@ describe("boş durumlar", () => {
     expect(new Set(v).size).toBe(v.length);
   });
 });
+
+describe("jenerik kayıt ayrıntısı: ham enum ekrana çıkmaz", () => {
+  it("sipariş/sevkiyat/iş emri durum ve yön alanları sözlükten", () => {
+    const { RECORD_ENUMS } = require("../src/lib/labels/finans") as typeof import("../src/lib/labels/finans");
+    expect(RECORD_ENUMS.sevkiyat!.durum!.DISPATCHED).toBe("Sevk edildi");
+    expect(RECORD_ENUMS.sevkiyat!.yon!.CIKIS).toBe("Çıkış");
+    expect(RECORD_ENUMS.siparis!.durum!.PARTIAL_SHIPPED).toBeTruthy();
+    expect(RECORD_ENUMS.siparis!.yon!.EXPORT).toBe("İhracat");
+    expect(RECORD_ENUMS["is-emri"]!.tur!.STOCK_PRODUCTION).toBe("Stoka üretim");
+  });
+});

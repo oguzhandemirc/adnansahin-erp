@@ -4,7 +4,9 @@ import { REPORT_STATUSES, type ReportStatus } from "../../api/wire";
 import type { IconName } from "../../ui/icons";
 import type { Domain } from "../../ui/tokens";
 import { STATUS_DICT, type StatusEntry, type StatusTone } from "./ortak";
+import { DESTINATION, ORDER_STATUS } from "./siparis";
 import { QUOTE_STATUS, STANDARD_COST_STATUS } from "./teklif";
+import { SHIPMENT_DIRECTION, SHIPMENT_STATUS, WORK_ORDER_TYPE } from "./uretim";
 
 /** Çek/senet yönü (`cek-senet.tur`, `ozet-finans.cekVade[].tur`). */
 export const CHEQUE_KIND: Readonly<Record<string, string>> = { RECEIVED: "Alınan", ISSUED: "Verilen" };
@@ -102,11 +104,14 @@ export const CASH_TXN_KIND: Readonly<Record<string, string>> = {
   OPENING: "Açılış",
 };
 
-const labelsOf = (d: Readonly<Record<string, StatusEntry>>): Readonly<Record<string, string>> =>
+const labelsOf = (d: Readonly<Record<string, { readonly label: string }>>): Readonly<Record<string, string>> =>
   Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v.label]));
 
 /** Jenerik kayıt ayrıntısında enum alanlarının Türkçe adı (projeksiyon → alan → değer → ad). */
 export const RECORD_ENUMS: Readonly<Record<string, Readonly<Record<string, Readonly<Record<string, string>>>>>> = {
+  siparis: { durum: labelsOf(ORDER_STATUS), yon: DESTINATION },
+  sevkiyat: { durum: labelsOf(SHIPMENT_STATUS), yon: SHIPMENT_DIRECTION },
+  "is-emri": { tur: WORK_ORDER_TYPE },
   teklif: { durum: labelsOf(QUOTE_STATUS) },
   "standart-maliyet": { durum: labelsOf(STANDARD_COST_STATUS) },
   fatura: { tur: INVOICE_TYPE, durum: labelsOf(INVOICE_STATUS) },

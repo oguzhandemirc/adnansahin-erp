@@ -23,7 +23,7 @@ const KEY_LABEL: Readonly<Record<string, string>> = {
 
 /** ASCII anahtar kelimesi → Türkçe yazımı (anahtarlar ASCII; ekranda "Doviz", "Siparis" yazılmaz). */
 const WORD: Readonly<Record<string, string>> = {
-  acik: "açık", adedi: "adedi", agirlik: "ağırlık", alici: "alıcı", baslangic: "başlangıç", bitis: "bitiş",
+  acik: "açık", adedi: "adedi", adi: "adı", agirlik: "ağırlık", alici: "alıcı", baslangic: "başlangıç", bitis: "bitiş",
   cari: "cari", cikis: "çıkış", degisim: "değişim", dis: "dış", donem: "dönem", doviz: "döviz", gecikme: "gecikme",
   gecikmis: "gecikmiş", gecti: "geçti", giris: "giriş", gun: "gün", guncelleme: "güncelleme", is: "iş", islem: "işlem",
   karsilama: "karşılama", kisi: "kişi", miktari: "miktarı", musteri: "müşteri", odeme: "ödeme", olcu: "ölçü",
