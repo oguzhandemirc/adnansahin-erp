@@ -29,13 +29,14 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 
 1. `.env`: `PATRON_CLOUD_URL=https://<bulut kökeni>` ve `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (dosya veri dizininde, repoda değil).
-2. `cd Teks-Erp && npx tsx scripts/patron-bulut-anahtar.ts` — dosya yoksa üretir (0600), varsa okur; `--kurulum=` ve `--acik-anahtar=` değerlerini basar, özel anahtarı basmaz. Bu iki değer bulutta `tesis.ts kurulum-kaydet`e verilir; `--bitis=yok` değil uzak bir tarih (adımlar, bitiş notu ve ölçümler: `docs/ops/PATRON-ESITLEME-KURULUM.md` § 5).
+2. `cd Teks-Erp && npx tsx scripts/patron-bulut-anahtar.ts` — dosya yoksa üretir (0600), varsa okur; `--kurulum=` ve `--acik-anahtar=` değerlerini basar, özel anahtarı basmaz. Bu iki değer bulutta `tesis.ts kurulum-kaydet --bitis=yok`a verilir (`yok` = süresiz hak; adımlar, bitiş notu ve ölçümler: `docs/ops/PATRON-ESITLEME-KURULUM.md` § 5).
 3. Ayar: `PUT /api/admin/settings/patronCloud.syncEnabled` `{"value":"true"}` (admin:settings + ayar şifresi); geri dönüş aynı ucu `"false"` ile çağırmaktır. Yoklama aralığı `patronCloud.syncIntervalMinutes` (1–60 dk, varsayılan 5; aralık dışı değer varsayılana düşer).
 
 ## Tuzaklar
 
 - Windows'ta dosya izin bitleri NTFS ACL'yi yansıtmaz; orada 0600 denetimi atlanır ve koruma anahtar dizininin ACL'sidir.
 - Üretim akışının "Depo" kolonu binadaki BÜTÜN `WAREHOUSE` topunu (çuvaldakiler dahil) sayar; stok karnesinin "Bitmiş"i yalnız çuvala/sevkiyata girmemiş serbest stoktur — iki ayrı kavramdır, birini ötekine eşitleme; ayrımı etiket taşır.
+- Bulutta `kurulum-kaydet --bitis=yok` süresiz haktır (uzak tarih yazılır); NULL bitiş "hak dondu" demektir ve CLI onu yazmaz (bulut bekçisi `patron/sunucu/scripts/test_hizmet_sonu.ts` §1j–o).
 - Kurulum kimliği keşif kimliğiyle aynıdır (`system.installationId`); boot işi üretir — araç onu yalnız okur, DB'ye yazmaz.
 
 ## Bekçiler

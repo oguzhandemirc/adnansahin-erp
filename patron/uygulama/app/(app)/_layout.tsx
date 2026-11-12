@@ -1,0 +1,34 @@
+// Oturum kapısı: oturum yoksa girişe. İçerik bir yığındır (sekmeler + Diğer'den açılan bölümler); geniş ekranda
+// (≥ 768) solda kalıcı ray. Bildirime dokunma oturum hazırken dinlenir.
+import { Redirect, Stack } from "expo-router";
+import { View } from "react-native";
+import { useNotificationTaps } from "../../src/push/taps";
+import { useSession } from "../../src/state/session";
+import { SideNav, useWide } from "../../src/ui/Frame";
+import { Loading } from "../../src/ui/kit";
+import { MODAL_EKRANLAR, useGezinme } from "../../src/ui/hareket/gezinme";
+import { useTokens } from "../../src/ui/theme-context";
+
+// Sekmeler ilk beyan edilir ki yığının ilk ekranı bir modal ("hesaplar/yeni") olmasın.
+export const unstable_settings = { initialRouteName: "(tabs)" };
+
+export default function AppLayout() {
+  const { phase } = useSession();
+  const wide = useWide();
+  const t = useTokens();
+  const g = useGezinme();
+  useNotificationTaps(phase === "hazir");
+  if (phase === "yukleniyor") return <Loading />;
+  if (phase !== "hazir") return <Redirect href="/giris" />;
+  return (
+    <View style={{ flex: 1, flexDirection: "row", backgroundColor: t.bg }}>
+      {wide ? <SideNav /> : null}
+      <View style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg }, ...g.yigin }}>
+          <Stack.Screen name="(tabs)" />
+          {MODAL_EKRANLAR.map((name) => <Stack.Screen key={name} name={name} options={g.modal} />)}
+        </Stack>
+      </View>
+    </View>
+  );
+}
