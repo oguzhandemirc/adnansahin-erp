@@ -22,6 +22,9 @@ export function syncText(state: SyncState, last: string | null | undefined, nowM
   return `${formatAgo(last, nowMs)} eşitlendi`;
 }
 
+// Görünen satır sıkı (başlığa yapışık); dokunma hedefi payla 44 pt kalır.
+const SATIR_PAYI = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+
 const TONE: Readonly<Record<SyncState, StatusKind>> = { canli: "iyi", gecikti: "uyari", cevrimdisi: "bilgi" };
 
 export function SyncIndicator({ last, offline = false, onPress, testID = "esitleme-gostergesi" }: {
@@ -58,7 +61,7 @@ export function SyncIndicator({ last, offline = false, onPress, testID = "esitle
   );
   if (!onPress) return <View testID={testID} accessible accessibilityLabel={`Eşitleme: ${text}`}>{body}</View>;
   return (
-    <Pressable onPress={onPress} testID={testID} accessibilityRole="button" accessibilityLabel={`Eşitleme: ${text}. Yenile`} style={s.press}>
+    <Pressable onPress={onPress} testID={testID} accessibilityRole="button" accessibilityLabel={`Eşitleme: ${text}. Yenile`} style={s.press} hitSlop={SATIR_PAYI}>
       {body}
     </Pressable>
   );
@@ -68,5 +71,5 @@ const useStyles = makeStyles((t) => ({
   row: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs + 2 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   text: { ...typography.footnote, color: t.textSecondary },
-  press: { minHeight: TOUCH, justifyContent: "center" as const },
+  press: { minHeight: TOUCH - 2 * SATIR_PAYI.top, justifyContent: "center" as const },
 }));

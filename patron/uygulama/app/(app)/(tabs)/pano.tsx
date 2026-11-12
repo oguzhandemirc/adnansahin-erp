@@ -173,7 +173,7 @@ function Reachable({ permissions, onOpen }: { readonly permissions: readonly str
 }
 
 const useStyles = makeStyles((t) => ({
-  header: { gap: space.xs, marginTop: space.xs },
+  header: { gap: space.xxs, marginTop: space.xxs },
   duzenle: { minHeight: TOUCH, paddingHorizontal: space.s, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
   duzenleYazi: { fontSize: 16, lineHeight: 21, fontWeight: "600" as const },
   kutular: { gap: space.m },

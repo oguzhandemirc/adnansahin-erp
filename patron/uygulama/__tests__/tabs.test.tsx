@@ -57,6 +57,18 @@ describe("sekme yolları sabit", () => {
     const hits = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "src"))].filter((f) => /expo-router\/(unstable-)?native-tabs/.test(readFileSync(f, "utf8")));
     expect(hits).toEqual([]);
   });
+  it("Stack.Screen beyan eden her yığın kökünü ilk beyan eder (yoksa sekmeye ilk dokunuş 'yeni' formunu açar)", () => {
+    const walk = (d: string): string[] => readdirSync(d).flatMap((n) => (statSync(join(d, n)).isDirectory() ? walk(join(d, n)) : [join(d, n)]));
+    const yiginlar = walk(join(ROOT, "app")).filter((f) => f.endsWith("_layout.tsx") && /<Stack\.Screen/.test(readFileSync(f, "utf8")));
+    expect(yiginlar.length).toBeGreaterThanOrEqual(3);
+    for (const f of yiginlar) {
+      const src = readFileSync(f, "utf8");
+      const kok = /initialRouteName:\s*"([^"]+)"/.exec(src)?.[1];
+      const ilk = /<Stack\.Screen[^>]*name="([^"]+)"/.exec(src)?.[1];
+      expect({ f, kok }).toEqual({ f, kok: expect.any(String) });
+      expect({ f, ilk }).toEqual({ f, ilk: kok });
+    }
+  });
 });
 
 describe("izinli sekmeler", () => {

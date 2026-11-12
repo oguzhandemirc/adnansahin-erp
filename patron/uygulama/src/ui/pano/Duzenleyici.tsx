@@ -5,6 +5,7 @@ import { Modal, ScrollView, Text, View } from "react-native";
 import Animated, { LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Basilabilir, SURE, useHareketAzalt } from "../hareket";
+import { OrnekVeriRozeti } from "../OrnekVeriRozeti";
 import { IconTile, Rozet } from "../ortak";
 import { makeStyles, useTokens } from "../theme-context";
 import { TOUCH, space, typography } from "../tokens";
@@ -138,6 +139,8 @@ export function KutuEkleSayfasi({ acik, katalog, ekli, onDegis, onKapat }: {
             );
           })}
         </ScrollView>
+        {/* Modal kök rozetin üstünü örter; sayfa kendi rozetini taşır. */}
+        <OrnekVeriRozeti alt={insets.bottom + space.s} />
       </View>
     </Modal>
   );

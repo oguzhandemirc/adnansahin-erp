@@ -9,6 +9,9 @@ import { Loading } from "../../src/ui/kit";
 import { MODAL_EKRANLAR, useGezinme } from "../../src/ui/hareket/gezinme";
 import { useTokens } from "../../src/ui/theme-context";
 
+// Sekmeler ilk beyan edilir ki yığının ilk ekranı bir modal ("hesaplar/yeni") olmasın.
+export const unstable_settings = { initialRouteName: "(tabs)" };
+
 export default function AppLayout() {
   const { phase } = useSession();
   const wide = useWide();
@@ -22,6 +25,7 @@ export default function AppLayout() {
       {wide ? <SideNav /> : null}
       <View style={{ flex: 1 }}>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg }, ...g.yigin }}>
+          <Stack.Screen name="(tabs)" />
           {MODAL_EKRANLAR.map((name) => <Stack.Screen key={name} name={name} options={g.modal} />)}
         </Stack>
       </View>
