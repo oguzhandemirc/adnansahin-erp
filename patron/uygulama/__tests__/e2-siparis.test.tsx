@@ -69,11 +69,11 @@ describe("§1 sipariş satırı", () => {
     ));
     render(<Orders />);
     await settle();
-    expect(screen.getByText("—")).toBeTruthy();
+    expect(screen.getByTestId(`siparis-satir-${ID1}`).props.accessibilityLabel).toContain("Müşteri: —");
     expect(screen.getByText("Deniz Tekstil")).toBeTruthy();
     expect(screen.getByText("SP-0002")).toBeTruthy(); // tek satır: müşteri · no · miktar · kısa rozet
     expect(screen.getAllByText("Gönderilmedi")).toHaveLength(2);
-    expect(screen.getByTestId(`siparis-${ID2}`).props.accessibilityLabel).toContain("Henüz gönderilmedi");
+    expect(screen.getByTestId(`siparis-satir-${ID2}`).props.accessibilityLabel).toContain("Henüz gönderilmedi");
   });
 
   it("açık miktar fabrikadan, birimli; tutar yalnız finans alt satırı geldiyse para birimiyle", () => {
@@ -107,7 +107,7 @@ describe("§2 durum rozeti sözlükten; termin/gecikme göstergesi yok", () => {
     await settle();
     expect(screen.queryByText(/PARTIAL_SHIPPED/)).toBeNull();
     expect(screen.getByText("Kısmen")).toBeTruthy();
-    expect(screen.getByTestId(`siparis-${ID1}`).props.accessibilityLabel).toContain("Bir kısmı gönderildi");
+    expect(screen.getByTestId(`siparis-satir-${ID1}`).props.accessibilityLabel).toContain("Bir kısmı gönderildi");
   });
 
   it("her durumun kısa rozet etiketi var; listede termin ve gecikme yazısı yok", async () => {
@@ -148,21 +148,15 @@ describe("§3 yazma kapısı", () => {
 });
 
 describe("§4 süzgeç ve arama SUNUCUDA", () => {
-  it("durum çipi sunucuya `durum` gönderir; dönen satır istemcide süzülmez", async () => {
+  it("liste yeteneği olmayan eski sunucu: arama ve süzgeç düğmesi yok, sorgu parametresiz; sütun seçimi kalır", async () => {
     mockList.mockResolvedValue(page(rec(ID1, { siparisNo: "SP-1", durum: "COMPLETED", musteriAdi: "Sunucunun döndüğü" })));
     render(<Orders />);
     await settle();
-    expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ durum: undefined, imlec: undefined }));
-    fireEvent.press(screen.getByTestId("suzgec-durum"));
-    fireEvent.press(screen.getByTestId("durum-PARTIAL_SHIPPED"));
-    await settle();
-    expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ durum: "PARTIAL_SHIPPED" }));
-    expect(screen.getByText("Sunucunun döndüğü")).toBeTruthy(); // COMPLETED satır yine görünür: süzme sunucunun işi
-    expect(screen.getByText("Durum: Bir kısmı gönderildi")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("suzgec-durum"));
-    fireEvent.press(screen.getByTestId("durum-tumu"));
-    await settle();
-    expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ durum: undefined }));
+    expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ ara: undefined, suzgec: undefined, sirala: undefined, imlec: undefined }));
+    expect(screen.queryByTestId("siparis-ara")).toBeNull();
+    expect(screen.queryByTestId("siparis-suzgec")).toBeNull();
+    expect(screen.getByTestId("siparis-sutunlar")).toBeTruthy();
+    expect(screen.getByText("Sunucunun döndüğü")).toBeTruthy();
   });
 
   it("özet şeridi fabrika anlığından (ozet:oku izniyle), sayı birimli", async () => {
@@ -290,14 +284,13 @@ describe("§7 P6 sipariş araması + görünüm süzgeci (modal)", () => {
       await act(async () => { jest.advanceTimersByTime(350); });
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ ara: "mavi", suzgec: undefined, durum: undefined }));
-      fireEvent.press(screen.getByTestId("suzgec-durum"));
-      fireEvent.press(screen.getByTestId("durum-KISMI_SEVK"));
+      fireEvent.press(screen.getByTestId("siparis-suzgec"));
+      fireEvent.press(screen.getByTestId("siparis-suzgec-secici-ana-KISMI_SEVK"));
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ ara: "mavi", suzgec: "KISMI_SEVK" }));
       expect(screen.getByText("Sunucunun döndüğü")).toBeTruthy(); // istemci süzmez
-      expect(screen.getByText("Görünüm: Bir kısmı gönderildi")).toBeTruthy();
-      fireEvent.press(screen.getByTestId("suzgec-durum"));
-      fireEvent.press(screen.getByTestId("durum-tumu"));
+      expect(screen.getByTestId("siparis-suzgec-rozet")).toBeTruthy();
+      fireEvent.press(screen.getByTestId("siparis-suzgec-secici-ana-tumu"));
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ suzgec: undefined }));
     } finally {
@@ -305,22 +298,23 @@ describe("§7 P6 sipariş araması + görünüm süzgeci (modal)", () => {
     }
   });
 
-  it("seçenekler sunucu beyanından (gecikme hariç); eski sunucuda arama yok, `durum` süzgeci kalır", async () => {
+  it("seçenekler sunucu beyanından (gecikme hariç); eski sunucuda arama ve süzgeç yok", async () => {
     mockSession.facility = YENI_SUNUCU;
     mockList.mockResolvedValue(page());
     const view = render(<Orders />);
     await settle();
-    fireEvent.press(screen.getByTestId("suzgec-durum"));
+    fireEvent.press(screen.getByTestId("siparis-suzgec"));
     for (const o of LIST_SEARCH.siparis!.suzgec!.secenekler) {
-      if (o.alan === "gecikmis") expect(screen.queryByTestId(`durum-${o.deger}`)).toBeNull(); // gecikme görünümü çizilmez
-      else expect(screen.getByTestId(`durum-${o.deger}`)).toBeTruthy();
+      const id = `siparis-suzgec-secici-ana-${o.deger}`;
+      if (o.alan === "gecikmis") expect(screen.queryByTestId(id)).toBeNull(); // gecikme görünümü çizilmez
+      else expect(screen.getByTestId(id)).toBeTruthy();
     }
     view.unmount();
     mockSession.facility = { liste: undefined };
     render(<Orders />);
     await settle();
     expect(screen.queryByTestId("siparis-ara")).toBeNull();
-    expect(screen.getByTestId("suzgec-durum")).toBeTruthy();
+    expect(screen.queryByTestId("siparis-suzgec")).toBeNull();
   });
 
   it("yetenek okuması: eski sunucu (alan yok) her şeyi kapatır; beyansız çift kapalı", () => {

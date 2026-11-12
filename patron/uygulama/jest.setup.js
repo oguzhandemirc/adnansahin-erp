@@ -9,3 +9,6 @@ jest.mock("@expo/vector-icons/Ionicons", () => {
   Icon.glyphMap = {};
   return { __esModule: true, default: Icon };
 });
+
+// Tablo tercihi gibi yerel depoya yazan kancalar ekran testlerinde de koşar; yerel modülsüz bellek-içi resmî mock.
+jest.mock("@react-native-async-storage/async-storage", () => require("@react-native-async-storage/async-storage/jest/async-storage-mock"));

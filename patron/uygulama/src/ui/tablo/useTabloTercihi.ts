@@ -38,7 +38,7 @@ const okuYerel = (metin: string | null): Yerel | null => {
 export function useTabloTercihi(anahtar: ViewPrefKey, temizle: (ham: unknown) => TabloTercihi, store: KeyValue = plainStore): TabloTercihiDurumu {
   const { api, facility, offline } = useSession();
   const profilde = !!facility?.liste?.siralama && !ornekVeriAcik();
-  const yerelAnahtar = `tablo-tercihi:${facility?.tesis.id ?? "-"}:${facility?.hesap.id ?? "-"}:${anahtar}`;
+  const yerelAnahtar = `tablo-tercihi:${facility?.tesis?.id ?? "-"}:${facility?.hesap?.id ?? "-"}:${anahtar}`;
   const [ham, setHam] = useState<unknown>(undefined);
   const kirli = useRef(false);
   const zamanlayici = useRef<ReturnType<typeof setTimeout> | null>(null);
