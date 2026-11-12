@@ -1,42 +1,27 @@
 // Yeni cari fabrikaya GELEN KUTUSU üzerinden gider; kod ve mükerrer denetimi fabrikada.
-// Gövde `buildCustomer` (forms.ts), gönderim `useWrite` (işlem kimliği kuralı) — yalnız görünüm yenilendi.
-import Ionicons from "@expo/vector-icons/Ionicons";
+// Gövde `buildCustomer` (forms.ts), gönderim `useWrite` (işlem kimliği kuralı; TEK örnek) — yalnız görünüm: iki sayfa
+// (şartname §4.11) Kimlik · İletişim.
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { buildCustomer } from "../../../../src/lib/forms";
 import { useSession } from "../../../../src/state/session";
 import { Screen } from "../../../../src/ui/Frame";
-import { haptic } from "../../../../src/ui/haptics";
-import { IconChip } from "../../../../src/ui/IconChip";
-import { Banner, Button, Field } from "../../../../src/ui/kit";
-import { SectionHeader } from "../../../../src/ui/SectionHeader";
-import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
-import { TOUCH, space, typography } from "../../../../src/ui/tokens";
+import { Banner, Field } from "../../../../src/ui/kit";
+import { AdimCubugu, AlanEtiketi, EylemCubugu, FormKarti, GonderimNotu, SecimCipi } from "../../../../src/ui/ortak";
+import { makeStyles } from "../../../../src/ui/theme-context";
+import { space } from "../../../../src/ui/tokens";
 import { useWrite } from "../../../../src/ui/useWrite";
 
-function RoleToggle(p: { label: string; on: boolean; onPress: () => void; testID: string }) {
-  const t = useTokens();
-  const s = useStyles();
-  return (
-    <Pressable
-      onPress={() => { haptic("selection"); p.onPress(); }} testID={p.testID}
-      accessibilityRole="checkbox" accessibilityState={{ checked: p.on }} accessibilityLabel={p.label}
-      style={({ pressed }) => [s.toggle, p.on && { backgroundColor: t.domain.cariler.chip, borderColor: t.domain.cariler.fg }, pressed && { opacity: 0.85 }]}
-    >
-      <Ionicons name={p.on ? "checkmark-circle" : "ellipse-outline"} size={20} color={p.on ? t.domain.cariler.fg : t.textMuted} />
-      <Text style={[s.toggleText, { color: p.on ? t.domain.cariler.fg : t.text }]}>{p.label}</Text>
-    </Pressable>
-  );
-}
+const ADIMLAR = ["Kimlik", "İletişim"] as const;
 
 export default function NewCustomer() {
   const { api } = useSession();
   const router = useRouter();
-  const t = useTokens();
   const s = useStyles();
   const [f, setF] = useState({ ad: "", musteri: true, tedarikci: false, il: "", vergiNo: "", telefon: "", eposta: "" });
   const [formError, setFormError] = useState<string | null>(null);
+  const [adim, setAdim] = useState(1);
   const built = buildCustomer(f);
   const send = useCallback((id: string) => (built.ok ? api.inboxCreate(id, "CARI", built.body) : Promise.reject(new Error(built.error))), [api, built]);
   const w = useWrite(send);
@@ -51,38 +36,46 @@ export default function NewCustomer() {
   const shown = formError ?? w.error;
 
   return (
-    <Screen title="Yeni cari" module="cariler" back>
-      <View style={s.intro}>
-        <IconChip domain="gelenKutusu" icon="paper-plane-outline" size={32} />
-        <Text style={s.introText}>Cari fabrikaya gelen kutusundan iletilir ve onay beklemeden doğrudan işlenir; kod ve mükerrer denetimi fabrikada yapılır, yalnız bir hata olursa bildirilir.</Text>
-      </View>
-      <View style={s.card}>
-        <Field label="Ad / unvan" value={f.ad} onChangeText={(v) => set({ ad: v })} testID="cari-ad" placeholder="Örn. Deniz Tekstil A.Ş." />
-        <Text style={s.label}>Rol</Text>
-        <View style={s.roles}>
-          <RoleToggle label="Müşteri" on={f.musteri} onPress={() => set({ musteri: !f.musteri })} testID="rol-musteri" />
-          <RoleToggle label="Tedarikçi" on={f.tedarikci} onPress={() => set({ tedarikci: !f.tedarikci })} testID="rol-tedarikci" />
-        </View>
-      </View>
-      <SectionHeader title="Ayrıntılar" />
-      <View style={s.card}>
-        <Field label="İl (isteğe bağlı)" value={f.il} onChangeText={(v) => set({ il: v })} />
-        <Field label="Vergi no (isteğe bağlı)" value={f.vergiNo} onChangeText={(v) => set({ vergiNo: v.replace(/\D/g, "") })} keyboardType="number-pad" />
-        <Field label="Telefon (isteğe bağlı)" value={f.telefon} onChangeText={(v) => set({ telefon: v })} keyboardType="phone-pad" />
-        <Field label="E-posta (isteğe bağlı)" value={f.eposta} onChangeText={(v) => set({ eposta: v })} autoCapitalize="none" keyboardType="email-address" />
-      </View>
-      {shown ? <Banner tone="error" text={shown} /> : null}
-      <Button label="Fabrikaya gönder" icon="paper-plane-outline" busy={w.busy} disabled={w.disabled} onPress={() => void submit()} testID="cari-gonder" />
+    <Screen
+      title="Yeni cari" module="cariler" back
+      footer={
+        <EylemCubugu
+          onGeri={adim > 1 ? () => setAdim(1) : undefined}
+          ileri={adim === 1 ? "Devam" : "Gönder"}
+          gonder={adim === 2}
+          onIleri={adim === 1 ? () => setAdim(2) : () => void submit()}
+          disabled={adim === 2 && w.disabled}
+          busy={adim === 2 && w.busy}
+          testID={adim === 2 ? "cari-gonder" : "cari-adim"}
+        />
+      }
+    >
+      <AdimCubugu adim={adim} toplam={2} etiket={ADIMLAR[adim - 1]!} />
+      {adim === 1 ? (
+        <FormKarti>
+          <Field label="Ad / unvan" value={f.ad} onChangeText={(v) => set({ ad: v })} testID="cari-ad" placeholder="Örn. Deniz Tekstil A.Ş." />
+          <AlanEtiketi>Rol</AlanEtiketi>
+          <View style={s.roles}>
+            <SecimCipi label="Müşteri" on={f.musteri} onPress={() => set({ musteri: !f.musteri })} testID="rol-musteri" />
+            <SecimCipi label="Tedarikçi" on={f.tedarikci} onPress={() => set({ tedarikci: !f.tedarikci })} testID="rol-tedarikci" />
+          </View>
+        </FormKarti>
+      ) : (
+        <>
+          <FormKarti>
+            <Field label="İl (isteğe bağlı)" value={f.il} onChangeText={(v) => set({ il: v })} />
+            <Field label="Vergi no (isteğe bağlı)" value={f.vergiNo} onChangeText={(v) => set({ vergiNo: v.replace(/\D/g, "") })} keyboardType="number-pad" />
+            <Field label="Telefon (isteğe bağlı)" value={f.telefon} onChangeText={(v) => set({ telefon: v })} keyboardType="phone-pad" />
+            <Field label="E-posta (isteğe bağlı)" value={f.eposta} onChangeText={(v) => set({ eposta: v })} autoCapitalize="none" keyboardType="email-address" />
+          </FormKarti>
+          <GonderimNotu metin="Kayıt fabrikaya gönderilir; kod ve mükerrer denetimi fabrikada yapılır, işlenince listede görünür. Bir hata olursa bildirilir." />
+          {shown ? <Banner tone="error" text={shown} /> : null}
+        </>
+      )}
     </Screen>
   );
 }
 
-const useStyles = makeStyles((t) => ({
-  intro: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, marginBottom: space.m },
-  introText: { ...typography.subhead, color: t.textSecondary, flex: 1 },
-  card: { backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, paddingLeft: space.l, marginBottom: space.m, overflow: "hidden" as const, ...t.cardShadow },
-  label: { ...typography.footnote, fontWeight: "600" as const, color: t.textSecondary, marginBottom: space.xs },
+const useStyles = makeStyles(() => ({
   roles: { flexDirection: "row" as const, gap: space.s, flexWrap: "wrap" as const },
-  toggle: { minHeight: TOUCH - 4, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingHorizontal: space.m, borderRadius: t.radius.chip, borderWidth: 1, borderColor: t.separator },
-  toggleText: { ...typography.callout, fontWeight: "600" as const },
 }));
