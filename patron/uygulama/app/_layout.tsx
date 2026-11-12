@@ -6,6 +6,7 @@ import { SessionProvider, useSession } from "../src/state/session";
 import { plainStore } from "../src/state/store";
 import { AcilisPerdesi } from "../src/ui/hareket/AcilisPerdesi";
 import { TemaGecisi } from "../src/ui/hareket/TemaGecisi";
+import { OrnekVeriRozeti } from "../src/ui/OrnekVeriRozeti";
 import { ThemeProvider, useAppearance, useTokens } from "../src/ui/theme-context";
 
 // Zemin ve durum çubuğu etkin temadan; içerik oturum kapısından geçer. Tema tercihi ve oturum okunana dek açılış
@@ -20,6 +21,7 @@ function Themed() {
       <Slot />
       <TemaGecisi anahtar={t.key} renk={t.bg} />
       <AcilisPerdesi hazir={ready && phase !== "yukleniyor"} />
+      <OrnekVeriRozeti />
     </View>
   );
 }

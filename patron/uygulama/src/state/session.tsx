@@ -15,6 +15,7 @@ import { useForeground } from "./useForeground";
 import { legacyPlainStore, plainStore, secretStore } from "./store";
 import { applyServerFactoryTimezone } from "../lib/factory-time";
 import { UYGULAMA_ADI } from "../lib/kimlik";
+import { ornekIstemci } from "../ornek/kapi";
 
 const TOKEN_KEY = "patron.belirtec";
 const SCOPE_KEY = "patron.kapsam";
@@ -86,6 +87,8 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
   const [offline, setOffline] = useState(false);
   const [offlineSince, setOfflineSince] = useState<string | null>(null);
   const base = apiBaseUrl();
+  // Örnek veri kipi (yalnız geliştirme; `ornek/kapi.ts`): istemci ağa çıkmaz, oturum doğrudan açılır.
+  const ornek = useMemo(() => ornekIstemci(), []);
 
   const reset = useCallback(async () => {
     token.current = null;
@@ -100,8 +103,8 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
   }, []);
 
   const api = useMemo(
-    () => createApi(createClient({ baseUrl: base ?? "http://yapilandirilmamis.invalid", getToken: () => token.current, onUnauthorized: () => { if (token.current) void reset(); } })),
-    [base, reset],
+    () => createApi(ornek ?? createClient({ baseUrl: base ?? "http://yapilandirilmamis.invalid", getToken: () => token.current, onUnauthorized: () => { if (token.current) void reset(); } })),
+    [base, reset, ornek],
   );
   const cache = useMemo(() => (scope ? createCache(plainStore, scope) : null), [scope]);
 
@@ -157,6 +160,11 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
       if (!alive) return;
       await openingCacheHygiene({ plain: plainStore, legacy: legacyPlainStore, hasSession: Boolean(t && s) });
       if (!alive) return;
+      if (ornek) {
+        await adopt(await api.login({ eposta: "", parola: "", totp: "" }));
+        if (alive) setPhase("hazir");
+        return;
+      }
       if (!t || !s) return setPhase("giris");
       token.current = t;
       setScope(s);
@@ -174,7 +182,7 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
     return () => {
       alive = false;
     };
-  }, [loadFacility, loadChoices]);
+  }, [loadFacility, loadChoices, ornek, adopt, api]);
 
   const login = useCallback(
     async (b: { eposta: string; parola: string; totp: string }) => {
@@ -250,8 +258,8 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
   });
 
   const feedFetch = useMemo(
-    () => (base ? createFeedFetcher({ baseUrl: base, getToken: () => token.current, onUnauthorized: () => { if (token.current) void reset(); } }) : null),
-    [base, reset],
+    () => (base && !ornek ? createFeedFetcher({ baseUrl: base, getToken: () => token.current, onUnauthorized: () => { if (token.current) void reset(); } }) : null),
+    [base, reset, ornek],
   );
   const feedMode = useChangeFeed({
     enabled: phase === "hazir",
@@ -275,7 +283,7 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
     offlineSince,
     factoryStamp: facility?.esitleme?.ufuk ?? null,
     feedMode,
-    configured: base !== null,
+    configured: base !== null || ornek !== null,
     markOnline,
     login,
     logout,
