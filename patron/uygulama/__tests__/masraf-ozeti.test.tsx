@@ -23,7 +23,7 @@ jest.mock("expo-router", () => ({
 }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
-const Finance = (require("../app/(app)/(tabs)/finans") as { default: () => React.ReactElement }).default;
+const Finance = (require("../app/(app)/finans") as { default: () => React.ReactElement }).default;
 const view = require("../src/lib/expense-summary") as typeof import("../src/lib/expense-summary");
 const { ApiError } = require("../src/api/client") as typeof import("../src/api/client");
 

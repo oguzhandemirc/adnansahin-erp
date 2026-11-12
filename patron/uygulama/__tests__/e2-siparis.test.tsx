@@ -24,8 +24,8 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 // mock'lar kurulduktan SONRA yüklenir.
 const Orders = (require("../app/(app)/(tabs)/siparisler/index") as { default: () => ReactElement }).default;
 const OrderDetail = (require("../app/(app)/(tabs)/siparisler/[id]") as { default: () => ReactElement }).default;
-const Customers = (require("../app/(app)/cariler/index") as { default: () => ReactElement }).default;
-const CustomerDetail = (require("../app/(app)/cariler/[id]") as { default: () => ReactElement }).default;
+const Customers = (require("../app/(app)/(tabs)/cariler/index") as { default: () => ReactElement }).default;
+const CustomerDetail = (require("../app/(app)/(tabs)/cariler/[id]") as { default: () => ReactElement }).default;
 const { listCapability } = require("../src/ui/siparis/capabilities") as typeof import("../src/ui/siparis/capabilities");
 const { lineRowText, movementRowText } = require("../src/ui/siparis/OrderLines") as typeof import("../src/ui/siparis/OrderLines");
 const { LIST_ID_FILTERS, LIST_SEARCH } = require("../src/api/wire") as typeof import("../src/api/wire");

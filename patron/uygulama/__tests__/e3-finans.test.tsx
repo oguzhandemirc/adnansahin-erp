@@ -35,7 +35,7 @@ jest.mock("expo-router", () => ({
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 // mock'lar kurulduktan SONRA yüklenir.
-const Finance = (require("../app/(app)/(tabs)/finans") as { default: () => React.ReactElement }).default;
+const Finance = (require("../app/(app)/finans") as { default: () => React.ReactElement }).default;
 const ReportDetail = (require("../app/(app)/raporlar/[id]") as { default: () => React.ReactElement }).default;
 const RecordDetail = (require("../app/(app)/kayit/[projeksiyon]/[id]") as { default: () => React.ReactElement }).default;
 const { ReceivableHero, ChequeDue } = require("../src/ui/finans/FinanceSummary") as typeof import("../src/ui/finans/FinanceSummary");
@@ -179,7 +179,7 @@ describe("§2 her tutar para birimli (fabrikanın değeri; uygulama hesaplamaz)"
 
   it("finans kaynağında aritmetik ve düz sayı biçimi yok", () => {
     const dir = join(__dirname, "../src/ui/finans");
-    const files = [...readdirSync(dir).map((f) => join(dir, f)), join(__dirname, "../app/(app)/(tabs)/finans.tsx")];
+    const files = [...readdirSync(dir).map((f) => join(dir, f)), join(__dirname, "../app/(app)/finans.tsx")];
     for (const f of files) {
       const src = readFileSync(f, "utf8");
       expect(src).not.toMatch(/toFixed|\* 100|\/ 100|formatNumber|\.reduce\(/);

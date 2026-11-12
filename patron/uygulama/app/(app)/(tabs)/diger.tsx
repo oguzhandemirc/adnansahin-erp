@@ -1,4 +1,4 @@
-// "Diğer" sekmesi: üstte hesap kartı (→ Profil), sonra sekmeye sığmayan bölümler gruplu liste (İş · Eylem · Hesap).
+// "Diğer" sekmesi: üstte hesap kartı (→ Profil), sonra sekmeye sığmayan bölümler gruplu liste (Operasyon · İş · Hesap).
 // İzinsiz bölüm/grup çizilmez. Gelen kutusu satırında bekleyen talep sayısı (sunucu `durum=BEKLIYOR` süzgeciyle).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";

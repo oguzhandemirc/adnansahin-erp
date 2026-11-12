@@ -4,16 +4,16 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { buildCustomer } from "../../../src/lib/forms";
-import { useSession } from "../../../src/state/session";
-import { Screen } from "../../../src/ui/Frame";
-import { haptic } from "../../../src/ui/haptics";
-import { IconChip } from "../../../src/ui/IconChip";
-import { Banner, Button, Field } from "../../../src/ui/kit";
-import { SectionHeader } from "../../../src/ui/SectionHeader";
-import { makeStyles, useTokens } from "../../../src/ui/theme-context";
-import { TOUCH, space, typography } from "../../../src/ui/tokens";
-import { useWrite } from "../../../src/ui/useWrite";
+import { buildCustomer } from "../../../../src/lib/forms";
+import { useSession } from "../../../../src/state/session";
+import { Screen } from "../../../../src/ui/Frame";
+import { haptic } from "../../../../src/ui/haptics";
+import { IconChip } from "../../../../src/ui/IconChip";
+import { Banner, Button, Field } from "../../../../src/ui/kit";
+import { SectionHeader } from "../../../../src/ui/SectionHeader";
+import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
+import { TOUCH, space, typography } from "../../../../src/ui/tokens";
+import { useWrite } from "../../../../src/ui/useWrite";
 
 function RoleToggle(p: { label: string; on: boolean; onPress: () => void; testID: string }) {
   const t = useTokens();

@@ -121,6 +121,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const { scrollY, onScroll } = useHeaderScroll();
   const allowed = module === undefined || moduleVisible(permissions, module);
   const showBack = !wide && (back ?? title !== "Pano");
+  const pad = wide ? space.xl : space.l;
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/pano"));
   return (
     <View style={s.screen}>
@@ -130,9 +131,9 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={t.tint} colors={[t.tint]} progressBackgroundColor={t.surface} /> : undefined}
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + space.xl, paddingHorizontal: wide ? space.xl : space.l }]}
+        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + space.xl, paddingHorizontal: pad }]}
       >
-        <LargeTitle title={title} scrollY={scrollY} subtitle={subtitle} />
+        <LargeTitle title={title} scrollY={scrollY} subtitle={subtitle} bleed={pad} />
         <StatusBands />
         {switchError ? <Banner tone="error" text={switchError} testID="bant-tesis-gecisi" /> : null}
         {allowed ? children : <Banner tone="error" icon="lock-closed-outline" text="Bu bölümü görme yetkiniz yok" />}
@@ -144,7 +145,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
 
 const useStyles = makeStyles((t) => ({
   screen: { flex: 1, backgroundColor: t.bg },
-  content: { paddingTop: space.xs, maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
+  content: { paddingTop: 0, maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },
   facilityPress: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
   facilitySwitch: { ...typography.footnote, color: t.tint },

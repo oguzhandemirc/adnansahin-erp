@@ -2,19 +2,19 @@
 // müşteri malı (emanet, PB1: `emanet-bakiye`) · kumaş bazında ilk satırlar. Tek kaynak `stok-karnesi` (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
-import { DEAD_STOCK_STATUS, STOCK_AGE_TONE, UNIT } from "../../src/lib/labels/uretim";
-import { AgingBar } from "../../src/ui/charts";
-import { Screen } from "../../src/ui/Frame";
-import { KpiCard, KpiGrid } from "../../src/ui/KpiCard";
-import { ListGroup, ListRow } from "../../src/ui/ListRow";
-import { arr, num, obj, pct, qty, str } from "../../src/ui/pano/read";
-import { FactoryStamp, SnapshotGate } from "../../src/ui/pano/SnapshotGate";
-import { useSnapshot } from "../../src/ui/pano/useSnapshot";
-import { ConsignedSection } from "../../src/ui/fason/FasonCards";
-import { SectionHeader } from "../../src/ui/SectionHeader";
-import { StatusBadge } from "../../src/ui/StatusBadge";
-import { makeStyles } from "../../src/ui/theme-context";
-import { space, typography } from "../../src/ui/tokens";
+import { DEAD_STOCK_STATUS, STOCK_AGE_TONE, UNIT } from "../../../src/lib/labels/uretim";
+import { AgingBar } from "../../../src/ui/charts";
+import { Screen } from "../../../src/ui/Frame";
+import { KpiCard, KpiGrid } from "../../../src/ui/KpiCard";
+import { ListGroup, ListRow } from "../../../src/ui/ListRow";
+import { arr, num, obj, pct, qty, str } from "../../../src/ui/pano/read";
+import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
+import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
+import { ConsignedSection } from "../../../src/ui/fason/FasonCards";
+import { SectionHeader } from "../../../src/ui/SectionHeader";
+import { StatusBadge } from "../../../src/ui/StatusBadge";
+import { makeStyles } from "../../../src/ui/theme-context";
+import { space, typography } from "../../../src/ui/tokens";
 
 const TOP_ITEMS = 8;
 

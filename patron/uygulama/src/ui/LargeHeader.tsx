@@ -54,29 +54,33 @@ export function LargeHeader({ title, scrollY, topInset, onBack, right }: {
 }
 
 /** İçerikteki büyük başlık (ekran okuyucu bunu başlık olarak duyar). */
-export function LargeTitle({ title, scrollY, subtitle }: { readonly title: string; readonly scrollY: SharedValue<number>; readonly subtitle?: ReactNode }) {
+export function LargeTitle({ title, scrollY, subtitle, bleed = 0 }: { readonly title: string; readonly scrollY: SharedValue<number>; readonly subtitle?: ReactNode; readonly bleed?: number }) {
   const s = useStyles();
   const fade = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [0, COLLAPSE_AT * 0.8], [1, 0], Extrapolation.CLAMP),
     transform: [{ scale: interpolate(scrollY.value, [-80, 0], [1.06, 1], Extrapolation.CLAMP) }],
   }));
   return (
+    <View style={[s.largeBlock, { marginHorizontal: -bleed, paddingHorizontal: bleed }]}>
     <Animated.View style={[s.large, fade]}>
       <Text style={s.largeText} accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
       {subtitle}
     </Animated.View>
+    </View>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  bar: { backgroundColor: t.bg },
+  bar: { backgroundColor: t.color.chrome },
   inner: { height: BAR_HEIGHT, flexDirection: "row" as const, alignItems: "center" as const, paddingHorizontal: space.s },
   side: { minWidth: 88, flexDirection: "row" as const, alignItems: "center" as const },
   right: { justifyContent: "flex-end" as const },
   back: { minHeight: TOUCH, minWidth: TOUCH, flexDirection: "row" as const, alignItems: "center" as const },
   backText: { ...typography.body, color: t.tint },
   small: { ...typography.headline, color: t.text, flex: 1, textAlign: "center" as const },
-  line: { height: 1, backgroundColor: t.separator },
-  large: { marginBottom: space.m, transformOrigin: "left" as const },
+  line: { height: 1, backgroundColor: t.color.chromeBorder },
+  // Büyük başlık bloğu üst çubukla aynı krom zeminde, altında 1 px krom çizgisi: kabuk içerikten ayrışır.
+  largeBlock: { backgroundColor: t.color.chrome, borderBottomWidth: 1, borderBottomColor: t.color.chromeBorder, marginBottom: space.l },
+  large: { paddingBottom: space.m, transformOrigin: "left" as const },
   largeText: { ...typography.largeTitle, color: t.text },
 }));

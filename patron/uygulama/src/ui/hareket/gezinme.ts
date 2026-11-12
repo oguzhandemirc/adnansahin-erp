@@ -25,8 +25,8 @@ export function gezinmeAyarlari(azalt: boolean): GezinmeAyarlari {
   };
 }
 
-/** `(app)` yığınında alttan açılan oluşturma formları (Siparişler sekmesinin kendi yığınında `yeni` aynı ayarı alır). */
-export const MODAL_EKRANLAR: readonly string[] = ["cariler/yeni", "hesaplar/yeni", "raporlar/yeni"];
+/** `(app)` yığınında alttan açılan oluşturma formları (Siparişler ve Cariler sekmelerinin kendi yığınında `yeni` aynı ayarı alır). */
+export const MODAL_EKRANLAR: readonly string[] = ["hesaplar/yeni", "raporlar/yeni"];
 
 export function useGezinme(): GezinmeAyarlari {
   return gezinmeAyarlari(useHareketAzalt());

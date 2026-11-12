@@ -23,9 +23,9 @@ jest.mock("expo-router", () => ({
 }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
-const Stock = (require("../app/(app)/stok") as { default: () => React.ReactElement }).default;
-const Production = (require("../app/(app)/(tabs)/uretim") as { default: () => React.ReactElement }).default;
-const Finance = (require("../app/(app)/(tabs)/finans") as { default: () => React.ReactElement }).default;
+const Stock = (require("../app/(app)/(tabs)/stok") as { default: () => React.ReactElement }).default;
+const Production = (require("../app/(app)/uretim") as { default: () => React.ReactElement }).default;
+const Finance = (require("../app/(app)/finans") as { default: () => React.ReactElement }).default;
 const view = require("../src/lib/fason-summary") as typeof import("../src/lib/fason-summary");
 const { areaSummary } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
 const { ApiError } = require("../src/api/client") as typeof import("../src/api/client");

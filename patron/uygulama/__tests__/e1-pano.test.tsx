@@ -56,7 +56,7 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 
 // mock'lar kurulduktan SONRA yüklenir.
 const Dashboard = (require("../app/(app)/(tabs)/pano") as { default: () => React.ReactElement }).default;
-const Production = (require("../app/(app)/(tabs)/uretim") as { default: () => React.ReactElement }).default;
+const Production = (require("../app/(app)/uretim") as { default: () => React.ReactElement }).default;
 const { attentionItems, areaSummary, dueRows } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
 const L = require("../src/lib/labels/uretim") as typeof import("../src/lib/labels/uretim");
 
