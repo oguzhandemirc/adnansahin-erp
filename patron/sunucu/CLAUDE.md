@@ -1,6 +1,6 @@
 # patron/sunucu — TeksERP patron bulutu sunucusu
 
-> Kök `CLAUDE.md` çekirdeği burada da AYNEN geçerlidir (defter, atomik claim, kilit tx'in ilk ifadesi, fail-closed, `details.code`, TR mesaj, sır hijyeni, audit yalnız ayak izi). Sözleşme `docs/design/PATRON-BULUTU-ESITLEME.md`; alan kuralları `docs/kurallar/patron-bulutu.md`; anlatım, tam ayrıntı (katman tablosu, DB rolleri, budama), komut ve ortam `patron/sunucu/MIMARI.md`; bekçiler `Teks-Erp/docs/BEKCI-HARITASI.md` § patron-bulutu.
+> Kök `CLAUDE.md` çekirdeği burada da AYNEN geçerlidir (defter, atomik claim, kilit tx'in ilk ifadesi, fail-closed, `details.code`, TR mesaj, sır hijyeni, audit yalnız ayak izi). Sözleşme ana ürün `design/PATRON-BULUTU-ESITLEME.md` (docs, TeksERP@19aa48a9; bu repoda yok); alan kuralları ana ürün `kurallar/patron-bulutu.md` (docs, TeksERP@19aa48a9; bu repoda yok); anlatım, tam ayrıntı (katman tablosu, DB rolleri, budama), komut ve ortam `patron/sunucu/MIMARI.md`; bekçiler `Teks-Erp/docs/BEKCI-HARITASI.md` § patron-bulutu.
 
 ## Amaç
 
@@ -22,7 +22,7 @@ Patronun buluttaki OKUMA KOPYASI ve TEK yazma kanalı. **Bulut hesap yapmaz, fab
 - Merkez DB yalnız yönlendirme ve yaşam döngüsü tablolarını, tesis DB'si (`lib/tesis-db-ad.ts`, ad kimlikten türetilir) kiracı verisini taşır; tek şema, tek göç zinciri; yönlendirici `lib/tesis-db.ts`.
 - Göç rolü tablo sahibidir; sunucu bu rolle BAĞLANMAZ. Tesis rolleri (`_uyg`, `_esit`) NOBYPASSRLS; yetkiler tek kaynak `src/lib/db-grants.ts` — yeni tablonun yetkisi AYNI dilimde girer. Rol parolası diskte tutulmaz, anahtardan türetilir. Sunucu RLS'i atlayabilen rolle KALKMAZ.
 - `app.tesis_id` ayarsız bağlantıda sorgu HATA verir (fail-closed); `*` projeksiyon YASAK. Sunucu hazırlayıcıyı import ETMEZ.
-- Destek rolüyle sunucu bağlanmaz; kapı `destek_ac(...)` ile açılır ve `support_access`e yazılır. İmha claim'li ve tutanaklıdır. Ayrıntı `docs/ops/PATRON-TESIS-DB-GECIS.md`, `docs/design/PATRON-TESIS-DB.md`.
+- Destek rolüyle sunucu bağlanmaz; kapı `destek_ac(...)` ile açılır ve `support_access`e yazılır. İmha claim'li ve tutanaklıdır. Ayrıntı ana ürün `ops/PATRON-TESIS-DB-GECIS.md` (docs, TeksERP@19aa48a9; bu repoda yok), ana ürün `design/PATRON-TESIS-DB.md` (docs, TeksERP@19aa48a9; bu repoda yok).
 
 ## Advisory kilit envanteri (patron DB'si — backend 80xx ve satıcı 91xx'ten bağımsız)
 
@@ -37,7 +37,7 @@ Kilit tx'in İLK ifadesidir ve kiracı ayarıyla AYNI SELECT'te alınır (`lib/t
 
 ## Alt-alan kuralları — dokunmadan önce oku
 
-`docs/kurallar/patron-bulutu.md` § Patron sunucusu — Kurulum kaydı · Hizmet aşaması · Hesaplar · Bildirimler (B5).
+ana ürün `kurallar/patron-bulutu.md` (docs, TeksERP@19aa48a9; bu repoda yok) § Patron sunucusu — Kurulum kaydı · Hizmet aşaması · Hesaplar · Bildirimler (B5).
 
 ## Budama beyanı (telemetri + okuma kopyası)
 

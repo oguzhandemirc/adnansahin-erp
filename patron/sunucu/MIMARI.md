@@ -1,6 +1,6 @@
 # patron/sunucu — mimari ve ayrıntı
 
-> `patron/sunucu/CLAUDE.md`'den 2026-10-03'te taşınan açıklayıcı metin: runbook atfı, komutlar, ortam değişkenleri. Oturum açılışında yüklenmez. Kurallar `patron/sunucu/CLAUDE.md`'de ve `docs/kurallar/patron-bulutu.md` § Bulut sunucusu (`patron/sunucu`), § Bildirimler (B5) ile § Patron sunucusu — alt-alan kuralları'nda kalır (Kurulum kaydı · Hizmet aşaması · Hesaplar · Bildirimler bölümlerinin eski metni uç, runbook ve bekçi atıflarıyla birlikte TAM hâliyle orada), burada tekrarlanmaz. Başlıklar eski CLAUDE.md bölüm başlıklarıyla aynıdır.
+> `patron/sunucu/CLAUDE.md`'den 2026-10-03'te taşınan açıklayıcı metin: runbook atfı, komutlar, ortam değişkenleri. Oturum açılışında yüklenmez. Kurallar `patron/sunucu/CLAUDE.md`'de ve ana ürün `kurallar/patron-bulutu.md` (docs, TeksERP@19aa48a9; bu repoda yok) § Bulut sunucusu (`patron/sunucu`), § Bildirimler (B5) ile § Patron sunucusu — alt-alan kuralları'nda kalır (Kurulum kaydı · Hizmet aşaması · Hesaplar · Bildirimler bölümlerinin eski metni uç, runbook ve bekçi atıflarıyla birlikte TAM hâliyle orada), burada tekrarlanmaz. Başlıklar eski CLAUDE.md bölüm başlıklarıyla aynıdır.
 
 ## Katmanlar
 
@@ -8,7 +8,7 @@
 
 ## Çok kiracılı tek DB — üç rol (+ destek rolü)
 
-- **Destek rolü:** Aç/kapa runbook'u `docs/ops/PATRON-BULUTU-DESTEK-ERISIMI.md`; bekçi `test_destek_rolu`.
+- **Destek rolü:** Aç/kapa runbook'u ana ürün `ops/PATRON-BULUTU-DESTEK-ERISIMI.md` (docs, TeksERP@19aa48a9; bu repoda yok); bekçi `test_destek_rolu`.
 
 ## Komutlar
 
@@ -34,7 +34,7 @@ node ../../scripts/agir-is.mjs -- npx tsx scripts/run-all-tests.ts [ad-parçası
 
 | Katman | Yer | Kural |
 |---|---|---|
-| Protokol | `src/lisans-protokol/` | `Teks-Erp/src/lib/license/protocol/` klasörünün **BAYT-EŞİT aynası**; burada düzenlenmez (bekçi `Teks-Erp/scripts/test_lisans_protokol_aynasi.ts` + `test_patron_kapilari` §7) |
+| Protokol | `src/lisans-protokol/` | `Teks-Erp/src/lib/license/protocol/` klasörünün **BAYT-EŞİT aynası**; burada düzenlenmez (bekçi ana ürün `scripts/test_lisans_protokol_aynasi.ts` (Teks-Erp, TeksERP@19aa48a9; bu repoda yok) + `test_patron_kapilari` §7) |
 | Tel şeması | `src/wire/esitleme.ts` | Paket zarfı, gelen kutusu/rapor istek-yanıtları, mesaj gövdeleri, satıcı iç API yanıtı — istek KATI, yanıt GEVŞEK. Sözleşme §6–§8 |
 | Katalog | `src/catalog/` | İzin kataloğu (`permissions.ts`, süper yetki YOK, `bulut:oturum` örtük) · projeksiyon → izin eşlemesi (`projections.ts`; alt satır `.finans`/`.kisisel`; kökte yasak alan; saklama tarihi alanı; ebeveyn) · rapor anahtarı → izin (`reports.ts`; rapor BAŞINA, fabrikanın `REMOTE_REPORTS`iyle birebir; sonuç RLS adı `rapor.<aile>-<ad>`; audit ve kişi adlı rapor buluttan istenemez). Eşlenmeyen ad RED |
 | Kiracı | `src/lib/tenant.ts` | `app.*` oturum ayarlarının TEK yazarı: her tx'in İLK ifadesi tek SELECT'te `set_config(tesis) + set_config(projeksiyonlar) + arama anahtarlarını sıfırla + (varsa) advisory kilit`. Kipler: `withTesis` · `withLookup` (giriş e-postası · oturum özeti · davet özeti · kurulum kimliği; kiracı = sıfır UUID) · `withMaintenanceList` |
@@ -50,7 +50,7 @@ node ../../scripts/agir-is.mjs -- npx tsx scripts/run-all-tests.ts [ad-parçası
 - **Hazırlık:** `patron-hazirla` servisi (`scripts/tesis-db.ts izle`, göç rolüyle, yalnız iç ağ) `ISTENDI` satırlarını yoklar: claim → rol → DB (`CONNECT` yalnız tesis rollerine) → göç → yetkiler → `HAZIR`. `tesis-db.ts hazirla --tesis=<uuid>` tek tesisi eşzamanlı kurar; `patron-goc` zinciri `migrate deploy && db-rolleri && tesis-db goc`. Sunucu hazırlayıcıyı import ETMEZ. Her DB'ye hazırlayıcı `app.veritabani_tesisi` yazar (merkezde `merkez`); tx'in ilk ifadesi bu işareti ölçer.
 - Tesis DB'sinde de `app.tesis_id` ayarsız/sıfırlanmış bağlantıda sorgu HATA verir (fail-closed) ve RLS + `app.projeksiyonlar` RESTRICTIVE politikası aynen geçerlidir ("sipariş görür, tutar görmez"); `*` projeksiyon YASAK. Yeni tablonun yetkisi `db-grants.ts`e AYNI dilimde girer — girmezse roller erişemez.
 - **Destek rolü** `<tesis DB>_destek` (merkezde `patron_destek`; Ek-6/B §3.2): sunucu bu rolle BAĞLANMAZ — Lisans Veren çalışanının doğrudan destek sorgusu içindir. Göç NOLOGIN kurar, `db-rolleri.ts` ve hazırlayıcı yetkisini `SUPPORT_GRANTS`ten verir (yalnız SELECT, sır kolonları hariç); çalıştırabildiği fonksiyonlar `SUPPORT_FUNCTIONS` beyanıdır. Kapı GUC DEĞİLDİR: okunabilir her tabloda RESTRICTIVE `destek_kapisi`; izin yalnız `destek_ac(...)` (SECURITY DEFINER, ≤ 480 dk) ile açılır ve silinemeyen `support_access` kaydına yazılır; `destek_kapat()` kapatır.
-- **İmha:** `HAZIR → IMHA_SURUYOR` claim → tesis rollerinin bağlantısı kesilir → sayım planı merkeze → `DROP DATABASE` + roller → tutanak; yedek tesis başına alınır. Ayrıntı: `docs/ops/PATRON-TESIS-DB-GECIS.md`, `docs/design/PATRON-TESIS-DB.md`.
+- **İmha:** `HAZIR → IMHA_SURUYOR` claim → tesis rollerinin bağlantısı kesilir → sayım planı merkeze → `DROP DATABASE` + roller → tutanak; yedek tesis başına alınır. Ayrıntı: ana ürün `ops/PATRON-TESIS-DB-GECIS.md` (docs, TeksERP@19aa48a9; bu repoda yok), ana ürün `design/PATRON-TESIS-DB.md` (docs, TeksERP@19aa48a9; bu repoda yok).
 
 ### Budama beyanı — tam metin
 
