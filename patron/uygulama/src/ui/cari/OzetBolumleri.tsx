@@ -65,10 +65,10 @@ export function toplamKartlari(ozet: CustomerSummary, d: CustomerSummaryPeriod) 
 }
 
 /** Bölüm başlığı + "henüz gelmedi" satırı (veri fabrikadan gerçekten gelmediyse). */
-function HenuzGelmedi({ baslik, testID }: { baslik: string; testID: string }) {
+function HenuzGelmedi({ baslik, neyi, testID }: { baslik: string; neyi: string; testID: string }) {
   return (
     <ListeBlogu baslik={baslik} testID={testID}>
-      <ListeSatiri birincil="Fabrikadan henüz gelmedi" rozet={<Rozet label="Henüz gelmedi" />} ayrac={false} accessibilityLabel={`${baslik}: fabrikadan henüz gelmedi`} />
+      <ListeSatiri birincil={neyi} rozet={<Rozet label="Henüz gelmedi" />} ayrac={false} accessibilityLabel={`${baslik}: fabrikadan henüz gelmedi`} />
     </ListeBlogu>
   );
 }
@@ -77,7 +77,7 @@ export function ToplamlarBolumu({ ozet, donem, onDonem }: { ozet: Remote<Custome
   const s = useStyles();
   if (ozet.forbidden) return null;
   if (ozet.loading && !ozet.data) return <View style={s.bolum}><Iskelet bicim="kpi" satir={4} testID="cari-toplamlar-yukleniyor" /></View>;
-  if (ozet.notFound) return <HenuzGelmedi baslik="Toplamlar" testID="cari-toplamlar-gelmedi" />;
+  if (ozet.notFound) return <HenuzGelmedi baslik="Toplamlar" neyi="Fabrika özeti" testID="cari-toplamlar-gelmedi" />;
   if (ozet.error && !ozet.data) return <View style={s.bolum}><HataDurumu mesaj={ozet.error} onTekrar={ozet.reload} testID="cari-toplamlar-hata" /></View>;
   const veri = ozet.data?.ozet;
   if (ozet.data && !veri) return <View style={s.bolum}><BosDurum baslik="Bu müşterinin henüz hareketi yok" icon={MODULE_ICON.siparisler.icon} testID="cari-toplamlar-bos" /></View>;
@@ -125,7 +125,7 @@ export function AcikSiparislerBolumu({ list, sayi: adet, onAc, onTumu }: { list:
   const s = useStyles();
   if (list.forbidden) return null;
   if (list.loading) return <View style={s.bolum}><Iskelet bicim="liste" satir={2} testID="cari-acik-yukleniyor" /></View>;
-  if (list.notFound) return <HenuzGelmedi baslik="Açık siparişler" testID="cari-acik-gelmedi" />;
+  if (list.notFound) return <HenuzGelmedi baslik="Açık siparişler" neyi="Açık sipariş listesi" testID="cari-acik-gelmedi" />;
   if (list.error && list.items.length === 0) return <View style={s.bolum}><HataDurumu mesaj={list.error} onTekrar={list.reload} testID="cari-acik-hata" /></View>;
   if (list.items.length === 0) {
     return (
@@ -166,7 +166,7 @@ export function IadelerBolumu({ cariKartId, destek, enabled, iade }: { cariKartI
   const [acik, setAcik] = useState(false);
   const ilk = useRemoteList("iade", { cariKartId }, { enabled: enabled && destek, limit: OZET_ILK });
   const hepsi = useRemoteList("iade", { cariKartId }, { enabled: enabled && destek && acik, limit: IADE_SAYFA });
-  if (!destek || ilk.notFound) return <HenuzGelmedi baslik="İadeler" testID="cari-iade-gelmedi" />;
+  if (!destek || ilk.notFound) return <HenuzGelmedi baslik="İadeler" neyi="İade listesi" testID="cari-iade-gelmedi" />;
   if (ilk.forbidden) return null;
   if (ilk.loading) return <View style={s.bolum}><Iskelet bicim="liste" satir={2} testID="cari-iade-yukleniyor" /></View>;
   if (ilk.error && ilk.items.length === 0) return <View style={s.bolum}><HataDurumu mesaj={ilk.error} onTekrar={ilk.reload} testID="cari-iade-hata" /></View>;
