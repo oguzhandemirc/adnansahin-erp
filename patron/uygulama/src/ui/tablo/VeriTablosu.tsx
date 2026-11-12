@@ -16,7 +16,7 @@ import type { Siralama, SutunTanimi } from "./model";
 export const TABLO_SATIR = 44;
 const HUCRE_YATAY = space.m;
 
-function AracDugmesi(p: { icon: IconName; label: string; rozet?: number; etkin?: boolean; onPress: () => void; testID: string }) {
+export function AracDugmesi(p: { icon: IconName; label: string; rozet?: number; etkin?: boolean; onPress: () => void; testID: string }) {
   const t = useTokens();
   const s = useStyles();
   return (

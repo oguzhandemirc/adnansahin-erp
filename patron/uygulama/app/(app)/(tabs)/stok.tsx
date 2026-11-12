@@ -1,20 +1,62 @@
 // Stok — "ne var, kaç gündür duruyor": ham · yarı mamul · bitmiş (metre + top) · ölü stok uyarısı · yaş dağılımı ·
-// müşteri malı (emanet, PB1: `emanet-bakiye`) · ürün bazında ilk satırlar. Renk/depo kırılımı veride yok → çizilmez. Tek kaynak `stok-karnesi` (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
-import type { ReactNode } from "react";
-import { Text, View } from "react-native";
+// müşteri malı (emanet, PB1: `emanet-bakiye`) · ürün bazında tablo. Renk/depo kırılımı veride yok → çizilmez. Tek kaynak `stok-karnesi` (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
+// Ürün tablosu tek belgenin içidir (sayfasız, bulut sıralamaz/süzmez) → başlık sıralamasız, süzgeç/arama yok; yalnız sütun
+// seçimi profilde (`tablo.stok`).
+import { useMemo, useState, type ReactNode } from "react";
+import { Text, useWindowDimensions, View } from "react-native";
 import { DEAD_STOCK_STATUS, FREE_STOCK_HINT, FREE_STOCK_LABEL, STOCK_AGE_TONE, UNIT } from "../../../src/lib/labels/uretim";
 import { AgingBar } from "../../../src/ui/charts";
 import { Screen } from "../../../src/ui/Frame";
 import { KademeliGiris } from "../../../src/ui/hareket";
-import { ListeBlogu, ListeSatiri, SectionCard, StatCard } from "../../../src/ui/ortak";
+import { BlokBasligi, SectionCard, StatCard } from "../../../src/ui/ortak";
 import { arr, num, obj, pct, qty, str } from "../../../src/ui/pano/read";
 import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { ConsignedSection } from "../../../src/ui/fason/FasonCards";
+import { azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
+import { SutunSecici } from "../../../src/ui/tablo/Seciciler";
+import { useTabloTercihi } from "../../../src/ui/tablo/useTabloTercihi";
+import { AracDugmesi, TabloBasligi, TabloGovdesi, TabloSatiri } from "../../../src/ui/tablo/VeriTablosu";
 import { makeStyles } from "../../../src/ui/theme-context";
 import { space, typography } from "../../../src/ui/tokens";
 
-const TOP_ITEMS = 8;
+type Satir = Readonly<Record<string, unknown>>;
+const sayiHucre = (v: unknown) => (num(v) === null ? "—" : qty(v));
+
+const STOK_SUTUNLARI: readonly SutunTanimi<Satir>[] = [
+  { key: "urun", baslik: "Ürün", agirlik: 2, hucre: (r) => str(r.etiket) ?? "—" },
+  { key: "miktar", baslik: "Miktar m", ad: "Miktar (m)", agirlik: 1.2, sayi: true, hucre: (r) => sayiHucre(r.miktar) },
+  { key: "top", baslik: "Top", ad: "Top sayısı", agirlik: 0.8, sayi: true, hucre: (r) => sayiHucre(r.adet) },
+  { key: "gun", baslik: "Gün", ad: "En eski (gün)", agirlik: 0.8, sayi: true, hucre: (r) => sayiHucre(r.enEskiGun) },
+  { key: "siparissiz", baslik: "Siparişsiz", ad: "Siparişsiz (m)", agirlik: 1.2, sayi: true, hucre: (r) => sayiHucre(r.siparissizMiktar) },
+];
+const STOK_VARSAYILAN: TabloTercihi = { surum: 1, sutunlar: ["urun", "miktar", "top", "gun"], siralama: null, suzgec: {} };
+const STOK_ANAHTARLAR = STOK_SUTUNLARI.map((c) => c.key);
+
+/** Ürün bazında tablo: fabrikanın sırasıyla (sıralama/süzme yok — tek belge); sütun seçimi profilde. */
+function UrunTablosu({ items }: { readonly items: readonly Satir[] }) {
+  const azami = azamiSutun(useWindowDimensions().width);
+  const temizle = useMemo(() => (ham: unknown) => tercihiTemizle(ham, { varsayilan: STOK_VARSAYILAN, sutunlar: STOK_ANAHTARLAR, azami }), [azami]);
+  const { tercih, degistir } = useTabloTercihi("tablo.stok", temizle);
+  const [acik, setAcik] = useState(false);
+  const gorunur = tercih.sutunlar.flatMap((k) => STOK_SUTUNLARI.filter((c) => c.key === k));
+  return (
+    <View testID="stok-kumaslar">
+      <BlokBasligi baslik="Ürün bazında" sayi={items.length} sag={<AracDugmesi icon="grid-outline" label="Sütunlar" onPress={() => setAcik(true)} testID="stok-sutunlar" />} />
+      <TabloBasligi testID="stok" sutunlar={gorunur} siralama={null} siralanabilir={[]} onSirala={() => undefined} />
+      <TabloGovdesi testID="stok-govde">
+        {items.map((r, n) => <TabloSatiri key={String(r.anahtar)} sutunlar={gorunur} kayit={r} ayrac={n > 0} testID={`stok-satir-${String(r.anahtar)}`} />)}
+      </TabloGovdesi>
+      <SutunSecici
+        visible={acik} testID="stok-sutun-secici" sutunlar={STOK_SUTUNLARI} gorunur={tercih.sutunlar} azami={azami}
+        onDegistir={(k) => degistir((t) => ({ ...t, sutunlar: sutunDegistir(t.sutunlar, k, azami) }))}
+        onTasi={(k, yon) => degistir((t) => ({ ...t, sutunlar: sutunTasi(t.sutunlar, k, yon) }))}
+        onVarsayilan={() => degistir((t) => ({ ...t, sutunlar: STOK_VARSAYILAN.sutunlar }))}
+        onClose={() => setAcik(false)}
+      />
+    </View>
+  );
+}
 
 export default function Stock() {
   const card = useSnapshot("stok-karnesi");
@@ -33,7 +75,7 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
   const dead = (num(o.oluMiktar) ?? 0) > 0;
   const deadSt = DEAD_STOCK_STATUS[dead ? "var" : "yok"];
   const ages = arr(obj(data).yasKovalari);
-  const items = arr(obj(data).urunler).slice(0, TOP_ITEMS);
+  const items = arr(obj(data).urunler);
   return (
     <View>
       {stamp}
@@ -80,21 +122,7 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
 
       {items.length > 0 ? (
         <KademeliGiris sira={3}>
-          <ListeBlogu baslik="Ürün bazında" sayi={items.length} testID="stok-kumaslar">
-            {items.map((i, n) => {
-              const open = (num(i.siparissizMiktar) ?? 0) > 0;
-              const oldest = num(i.enEskiGun);
-              return (
-                <ListeSatiri
-                  key={String(i.anahtar)}
-                  birincil={str(i.etiket) ?? "—"}
-                  ikincil={`${qty(i.adet)} ${UNIT.top}${oldest === null ? "" : ` · ${qty(oldest)} ${UNIT.gun}`}${open ? ` · siparişsiz ${qty(i.siparissizMiktar)}` : ""}`}
-                  deger={`${qty(i.miktar)} ${UNIT.metre}`}
-                  ayrac={n > 0}
-                />
-              );
-            })}
-          </ListeBlogu>
+          <UrunTablosu items={items} />
         </KademeliGiris>
       ) : null}
     </View>
