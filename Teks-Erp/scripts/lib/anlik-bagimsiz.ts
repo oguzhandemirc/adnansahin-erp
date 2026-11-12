@@ -10,6 +10,7 @@ import { getStockScorecard } from "../../src/services/reports/stock-scorecard.re
 import { getOpenOrderCoverage } from "../../src/services/reports/open-order-coverage.report.service";
 import { getShipmentScorecard } from "../../src/services/reports/shipment-scorecard.report.service";
 import { DashboardService } from "../../src/services/dashboard.service";
+import { DYE_HOUSE_CATEGORY_CODE } from "../../src/cloud-sync/snapshot-fason";
 
 export interface AccuracyRow {
   readonly soru: string;
@@ -105,5 +106,45 @@ export async function accuracyRows(now: Date): Promise<{ rows: AccuracyRow[]; sn
   const fa = get(s, "fason-acik");
   rows.push({ soru: "fason açık sevk sayısı", anlik: n(fa.acikSevk), sql: n(f?.disp), panel: null, tol: 0 });
   rows.push({ soru: "fasonda kalan top metresi", anlik: n(fa.kalanMiktar), sql: n(f?.qty), panel: null, tol: 0.001 });
+
+  // 6) Fasondaki top: aynı açık kalemlerin farklı topları; panel = üretim akışının "Fason'da" kolonu (AT_SUBCONTRACTOR).
+  //    Boyahane = firmanın kategori KODU (ad değil). Firma satırı: top sayısı + kategori adları birebir.
+  const firmRows = await prisma.$queryRaw<Array<{ id: string; top: number; boya: boolean; kat: string[] }>>(Prisma.sql`
+    WITH o AS (
+      SELECT DISTINCT d."subcontractorId" AS sid, i."rollId" AS rid
+      FROM subcontractor_dispatch_items i
+      JOIN subcontractor_dispatches d ON d.id = i."dispatchId"
+      JOIN rolls r ON r.id = i."rollId"
+      WHERE d."cancelledAt" IS NULL AND d."directShippedAt" IS NULL AND i."remainderClosedAt" IS NULL AND r."directShipmentId" IS NULL
+        AND NOT EXISTS (SELECT 1 FROM subcontractor_receipt_items ri JOIN subcontractor_receipts rc ON rc.id = ri."receiptId"
+                        WHERE ri."sourceDispatchItemId" = i.id AND ri."isPartial" = false AND rc."cancelledAt" IS NULL))
+    SELECT o.sid::text AS id, COUNT(*)::int AS top,
+      EXISTS (SELECT 1 FROM subcontractor_category_links l JOIN subcontractor_categories c ON c.id = l."categoryId"
+              WHERE l."subcontractorId" = o.sid AND c.code = ${DYE_HOUSE_CATEGORY_CODE}) AS boya,
+      ARRAY(SELECT c.name FROM subcontractor_category_links l JOIN subcontractor_categories c ON c.id = l."categoryId"
+            WHERE l."subcontractorId" = o.sid ORDER BY c.name) AS kat
+    FROM o GROUP BY o.sid`);
+  const [rt] = await prisma.$queryRaw<Array<{ top: number }>>(Prisma.sql`
+    SELECT COUNT(DISTINCT i."rollId")::int AS top
+    FROM subcontractor_dispatch_items i
+    JOIN subcontractor_dispatches d ON d.id = i."dispatchId"
+    JOIN rolls r ON r.id = i."rollId"
+    WHERE d."cancelledAt" IS NULL AND d."directShippedAt" IS NULL AND i."remainderClosedAt" IS NULL AND r."directShipmentId" IS NULL
+      AND NOT EXISTS (SELECT 1 FROM subcontractor_receipt_items ri JOIN subcontractor_receipts rc ON rc.id = ri."receiptId"
+                      WHERE ri."sourceDispatchItemId" = i.id AND ri."isPartial" = false AND rc."cancelledAt" IS NULL)`);
+  const flowCol = (get(s, "uretim-akisi").kolonlar as Obj[]).find((k) => k.anahtar === "fason");
+  rows.push({ soru: "fasonda bekleyen top sayısı", anlik: n(fa.acikTop), sql: n(rt?.top), panel: n(flowCol?.adet), tol: 0 });
+  const dyeSql = firmRows.filter((r) => r.boya).reduce((a, r) => a + r.top, 0);
+  rows.push({ soru: "boyahanedeki top sayısı (kategori kodu)", anlik: n(fa.boyahanedeTop), sql: dyeSql, panel: null, tol: 0 });
+  const firms = (fa.firmalar ?? []) as Obj[];
+  const bySql = new Map(firmRows.map((r) => [r.id, r]));
+  const firmMismatch = firms.filter((x) => {
+    const r = bySql.get(String(x.fasonFirmaId));
+    const want = r ? r.top : 0;
+    const kat = Array.isArray(x.kategoriler) ? (x.kategoriler as string[]) : null;
+    const sameCats = kat !== null && r !== undefined ? [...kat].sort().join("|") === [...r.kat].sort().join("|") : want === 0;
+    return n(x.acikTop) !== want || !sameCats;
+  }).length + firmRows.filter((r) => !firms.some((x) => String(x.fasonFirmaId) === r.id)).length;
+  rows.push({ soru: "firma başına top + kategori uyuşmazlığı", anlik: firmMismatch, sql: 0, panel: null, tol: 0 });
   return { rows, snapshots: s };
 }

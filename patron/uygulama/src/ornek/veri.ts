@@ -83,6 +83,16 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
         { id: "i4", kod: "FSN", ad: "Örnek Boyahane (fason)", tur: "DIS", kuyruk: 18, aktif: 0, bugunTamamlanan: 41, bugunSevk: 12 },
       ],
     },
+    "fason-acik": {
+      acikSevk: 4,
+      kalanMiktar: "4200.000",
+      acikTop: 18,
+      boyahanedeTop: 12,
+      firmalar: [
+        { fasonFirmaId: "00000000-0000-4000-8000-0000000000f1", etiket: "Örnek Boyahane", acikSevk: 2, kalanMiktar: "2800.000", acikTop: 12, kategoriler: ["Boyahane"] },
+        { fasonFirmaId: "00000000-0000-4000-8000-0000000000f2", etiket: "Deneme Zımpara", acikSevk: 2, kalanMiktar: "1400.000", acikTop: 6, kategoriler: ["Zımpara"] },
+      ],
+    },
     "stok-karnesi": {
       ozet: { hamMiktar: 126500, hamAdet: 512, yariMamulMiktar: 27600, yariMamulAdet: 126, bitmisMiktar: 84200, bitmisAdet: 340, oluMiktar: 3100, oluStokGun: 90, yasliMiktar: 9400 },
       yasKovalari: [

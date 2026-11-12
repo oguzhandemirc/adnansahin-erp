@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import type { Snapshot } from "../../api/wire";
 import { can } from "../../lib/access";
-import { formatDate, formatMoney } from "../../lib/format";
+import { formatCountPossessive, formatDate, formatMoney } from "../../lib/format";
 import { lookup } from "../../lib/labels";
 import { ORDER_STATUS } from "../../lib/labels/siparis";
 import { PERIOD_LABEL, SHIPMENT_STATUS, UNIT, type PeriodKey } from "../../lib/labels/uretim";
@@ -200,12 +200,21 @@ function sonSiparisler(r: RemoteList, router: Router) {
 export const KUTU_CIZICI: Readonly<Record<KutuAnahtari, (b: KutuBaglami) => ReactNode>> = {
   uretim: (b) => <Gosterge b={b} a="uretim" git="/uretim" degerler={(v) => [{ deger: qty(obj(v).bugunTamamlananToplam), birim: UNIT.top }]} ipucu={() => "bugün biten"} />,
   sevk: (b) => (
-    <Gosterge b={b} a="sevk" git="/sevkiyat" degerler={(v) => [{ deger: qty(period(v, b.donem).sevkMiktari), birim: UNIT.metre }]} ipucu={(v) => `${qty(period(v, b.donem).sevkTopSayisi)} ${UNIT.top} · ${PERIOD_LABEL[b.donem].toLocaleLowerCase("tr-TR")}`} />
+    <Gosterge b={b} a="sevk" git="/sevkiyat" degerler={(v) => [{ deger: qty(period(v, b.donem).sevkTopSayisi), birim: UNIT.top }]} ipucu={(v) => `${qty(period(v, b.donem).sevkMiktari)} ${UNIT.metre} · ${PERIOD_LABEL[b.donem].toLocaleLowerCase("tr-TR")}`} />
   ),
   siparis: (b) => <Gosterge b={b} a="siparis" git="/siparisler" degerler={(v) => [{ deger: qty(obj(v).acikKalem), birim: UNIT.kalem }]} ipucu={(v) => `${qty(obj(v).acikMiktar)} ${UNIT.metre} açık`} />,
   stok: (b) => <Gosterge b={b} a="stok" git="/stok" degerler={(v) => [{ deger: qty(obj(v).bitmisMiktar), birim: UNIT.metre }]} ipucu={(v) => `ölü stok ${qty(obj(v).oluMiktar)} ${UNIT.metre}`} />,
   fason: (b) => (
     <Gosterge b={b} a="fason" git="/uretim" degerler={(v) => [{ deger: qty(period(v, b.donem).acikMiktar), birim: UNIT.metre }]} ipucu={(v) => `${qty(period(v, b.donem).acikKalem)} açık ${UNIT.kalem}`} />
+  ),
+  fasonTop: (b) => (
+    <Gosterge
+      b={b}
+      a="fasonTop"
+      git="/uretim"
+      degerler={(v) => (num(obj(v).acikTop) === null ? [] : [{ deger: qty(obj(v).acikTop), birim: UNIT.top }])}
+      ipucu={(v) => (num(obj(v).boyahanedeTop) === null ? "şu an fasonda" : `${formatCountPossessive(obj(v).boyahanedeTop)} boyahanede`)}
+    />
   ),
   alacak: (b) => (
     <Gosterge

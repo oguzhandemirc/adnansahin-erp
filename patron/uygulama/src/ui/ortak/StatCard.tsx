@@ -10,7 +10,7 @@ import { SayiGecisi } from "../hareket/SayiGecisi";
 import type { IconName } from "../icons";
 import { makeStyles, useTokens } from "../theme-context";
 import { CARD_PAD, FONT_SCALE, space, tabularNums, typography } from "../tokens";
-import { IconTile, type IconTileTone } from "./IconTile";
+import { IconTile, tilePair, type IconTileTone } from "./IconTile";
 
 export interface StatDegisim {
   /** Sunucunun verdiği yüzde (ör. 12.5 → "%12,5"); işaret yönü belirler. */
@@ -46,9 +46,9 @@ const yuzdeYazi = (n: number) => `%${Math.abs(n).toLocaleString("tr-TR", { maxim
 
 /** Uzun değer kartı taşırmasın: karakter sayısına göre yazı boyu. */
 export function valueSize(text: string): number {
-  if (text.length > 14) return 16;
-  if (text.length > 10) return 19;
-  return 22;
+  if (text.length > 14) return 15;
+  if (text.length > 10) return 17;
+  return 19;
 }
 
 export function StatCard(p: StatCardProps) {
@@ -99,8 +99,10 @@ export function StatCard(p: StatCardProps) {
     </View>
   ) : (
     <>
+      <View style={s.arkaSimge} pointerEvents="none" importantForAccessibility="no-hide-descendants">
+        <Ionicons name={p.icon} size={76} color={tilePair(t, p.ton ?? "primary").fg} />
+      </View>
       <View style={s.ust}>
-        <IconTile icon={p.icon} tone={p.ton} size="sm" />
         <Text style={[s.etiket, s.esnek]} numberOfLines={1}>{p.etiket}</Text>
         {p.sag}
       </View>
@@ -122,11 +124,12 @@ export function StatCard(p: StatCardProps) {
 
 const useStyles = makeStyles((t) => ({
   kart: { backgroundColor: t.color.card, borderRadius: t.radius.card, borderWidth: 1, borderColor: t.color.cardBorder, ...t.shadow.card },
-  kartStacked: { flexGrow: 1, flexBasis: 150, minHeight: 104, padding: 14, gap: space.s },
+  kartStacked: { flexGrow: 1, flexBasis: 150, paddingVertical: 8, paddingHorizontal: 10, gap: 2, overflow: "hidden" as const },
+  arkaSimge: { position: "absolute" as const, right: -18, top: "50%" as const, marginTop: -38, opacity: 0.32 },
   kartRow: { width: "100%" as const, padding: CARD_PAD },
   rowIc: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
   ust: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
-  orta: { flex: 1, justifyContent: "center" as const },
+  orta: { justifyContent: "center" as const },
   esnek: { flex: 1, minWidth: 0 },
   etiket: { ...typography.label, fontWeight: "600" as const, color: t.color.textMuted },
   degerSatir: { flexDirection: "row" as const, alignItems: "baseline" as const, gap: space.xs },
