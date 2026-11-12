@@ -88,8 +88,8 @@ const PROJECT_ROOT = path.resolve(HERE, '..');
 const ANDROID_DIR = path.join(PROJECT_ROOT, 'android');
 const APK_PATH = path.join(ANDROID_DIR, 'app/build/outputs/apk/release/app-release.apk');
 const AAB_PATH = path.join(ANDROID_DIR, 'app/build/outputs/bundle/release/app-release.aab');
-/** Play'in yeni uygulama ve güncellemeler için istediği en düşük targetSdk (2025-08-31'den beri 35). */
-const PLAY_EN_DUSUK_HEDEF_SDK = 35;
+/** Play'in yeni uygulama ve güncellemeler için istediği en düşük targetSdk (Play Console 2026-11'de 36 istedi). */
+const PLAY_EN_DUSUK_HEDEF_SDK = 36;
 /** Release bundle'ın APK içindeki yolu — doğrulama bunu açar. */
 const BUNDLE_ENTRY = 'assets/index.android.bundle';
 
