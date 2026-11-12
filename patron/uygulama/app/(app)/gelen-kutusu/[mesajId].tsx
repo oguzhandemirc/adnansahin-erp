@@ -118,7 +118,7 @@ const useStyles = makeStyles((t) => ({
   title: { ...typography.headline, color: t.color.text },
   sub: { ...typography.subhead, color: t.color.textMuted },
   kv: { flexDirection: "row" as const, justifyContent: "space-between" as const, gap: space.m, paddingHorizontal: space.l, paddingVertical: space.m, minHeight: 48, alignItems: "center" as const },
-  ayrac: { borderTopWidth: 1, borderTopColor: t.color.border },
+  ayrac: { borderTopWidth: 1, borderTopColor: t.color.cardBorder },
   k: { ...typography.subhead, color: t.color.textMuted },
   v: { ...typography.callout, color: t.color.text, flexShrink: 1, textAlign: "right" as const },
   cancel: { marginTop: space.l },

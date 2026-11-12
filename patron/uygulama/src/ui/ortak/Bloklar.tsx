@@ -1,6 +1,6 @@
 // Tam genişlik katmanlar (şartname §3): liste bloğu (kart zemini, üst-alt 1 px ayraç, köşe yok) ve özet şeridi
 // (`band` zemini). İkisi de ekran oluğu kadar taşar; zemin farkıyla başlık/şerit/liste katmanları ayrışır.
-import type { ReactNode } from "react";
+import { Children, Fragment, type ReactNode } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
 import { SayiGecisi } from "../hareket";
 import { makeStyles } from "../theme-context";
@@ -31,19 +31,24 @@ export function BlokBasligi({ baslik, sayi, sag, testID }: { readonly baslik: st
   );
 }
 
-/** Tam genişlik liste bloğu: satırlar (`ListeSatiri`, ilkinde `ayrac={false}`) kart zemininde. */
-export function ListeBlogu({ baslik, sayi, sag, children, testID }: {
+/** Tam genişlik liste bloğu: satırlar (`ListeSatiri`, ilkinde `ayrac={false}`) kart zemininde. `ayracli`: kendi
+ *  ayracı olmayan özel satırların (onay kutusu, form alanı) arasına 1 px ayraç koyar. */
+export function ListeBlogu({ baslik, sayi, sag, ayracli = false, children, testID }: {
   readonly baslik?: string;
   readonly sayi?: number;
   readonly sag?: ReactNode;
+  readonly ayracli?: boolean;
   readonly children: ReactNode;
   readonly testID?: string;
 }) {
   const s = useStyles();
+  const icerik = ayracli
+    ? Children.toArray(children).filter(Boolean).map((c, i) => <Fragment key={i}>{i > 0 ? <View style={s.ayrac} /> : null}{c}</Fragment>)
+    : children;
   return (
     <View style={s.blok}>
       {baslik ? <BlokBasligi baslik={baslik} sayi={sayi} sag={sag} /> : null}
-      <TamGenislik style={s.liste} testID={testID}>{children}</TamGenislik>
+      <TamGenislik style={s.liste} testID={testID}>{icerik}</TamGenislik>
     </View>
   );
 }
@@ -85,6 +90,7 @@ const useStyles = makeStyles((t) => ({
   baslikSatir: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, minHeight: 32, marginBottom: space.xs },
   baslik: { ...typography.caption, fontWeight: "600" as const, color: t.color.textMuted, letterSpacing: 0.5 },
   sayi: { ...typography.caption, fontWeight: "600" as const, color: t.color.textMuted, ...tabularNums },
+  ayrac: { height: 1, backgroundColor: t.color.cardBorder },
   liste: { backgroundColor: t.color.card, borderTopWidth: 1, borderBottomWidth: 1, borderColor: t.color.cardBorder },
   serit: { flexDirection: "row" as const, backgroundColor: t.color.band, borderTopWidth: 1, borderBottomWidth: 1, borderColor: t.color.cardBorder, paddingVertical: space.s },
   ogeler: { flex: 1, minWidth: 0, paddingHorizontal: GUTTER, gap: 1 },

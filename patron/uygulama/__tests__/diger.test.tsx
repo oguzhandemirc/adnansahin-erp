@@ -80,7 +80,7 @@ describe("hesap ayrıntısı: izinler", () => {
     expect(screen.queryAllByText(/bulut:/)).toHaveLength(0);
     expect(screen.getByText("Siparişleri görme")).toBeTruthy();
     expect(screen.getAllByText("Hesap yönetimi").length).toBeGreaterThan(0);
-    expect(screen.getByText("Finans")).toBeTruthy();
+    expect(screen.getByText("FİNANS")).toBeTruthy(); // blok başlığı TR büyük harf
     expect(screen.getByTestId("hesap-rol").props.accessibilityLabel).toBe("Rol: Çalışan");
     fireEvent.press(screen.getByText("Kasa"));
     expect(screen.getByTestId("izin-degisti")).toBeTruthy();

@@ -2,21 +2,11 @@
 // Ham kod ekranda görünmez (sözlük `lib/labels/izin.ts`). Şablon çipleri kolaylıktır: kümeyi doldurur, kaydetmez.
 import { Pressable, Text, View } from "react-native";
 import { ACCOUNT_TEMPLATE, ACCOUNT_TEMPLATES, type AccountTemplate } from "../../lib/labels/diger";
-import { groupPermissions, permissionLabel, type PermissionGroup } from "../../lib/labels/izin";
-import type { IconName } from "../icons";
-import { ListGroup } from "../ListRow";
-import { SectionHeader } from "../SectionHeader";
+import { groupPermissions, permissionLabel } from "../../lib/labels/izin";
+import { ListeBlogu } from "../ortak";
 import { makeStyles, useTokens } from "../theme-context";
-import { TOUCH, space, typography, type Domain } from "../tokens";
+import { TOUCH, space, typography } from "../tokens";
 import { CheckRow } from "./parts";
-
-const GROUP_LOOK: Readonly<Record<PermissionGroup, { readonly domain: Domain; readonly icon: IconName }>> = {
-  siparis: { domain: "siparisler", icon: "receipt-outline" },
-  cari: { domain: "cariler", icon: "people-outline" },
-  finans: { domain: "finans", icon: "wallet-outline" },
-  rapor: { domain: "raporlar", icon: "document-text-outline" },
-  hesap: { domain: "genel", icon: "key-outline" },
-};
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((x) => b.includes(x));
@@ -54,17 +44,15 @@ export function PermissionChecklist(p: {
         </View>
       ) : null}
       {groupPermissions(p.codes).map((g) => {
-        const look = GROUP_LOOK[g.key];
         const on = g.codes.filter((c) => p.selected.includes(c)).length;
         return (
           <View key={g.key}>
-            <SectionHeader title={g.ad} icon={look.icon} domain={look.domain} count={`${on}/${g.codes.length}`} />
-            <ListGroup testID={`izin-grup-${g.key}`} iconSize={0}>
+            <ListeBlogu baslik={g.ad} sag={<Text style={s.custom}>{`${on}/${g.codes.length}`}</Text>} ayracli testID={`izin-grup-${g.key}`}>
               {g.codes.map((c) => {
                 const l = permissionLabel(c);
                 return <CheckRow key={c} title={l.ad} subtitle={l.aciklama || undefined} checked={p.selected.includes(c)} onPress={() => p.onToggle(c)} />;
               })}
-            </ListGroup>
+            </ListeBlogu>
           </View>
         );
       })}
@@ -76,5 +64,5 @@ const useStyles = makeStyles((t) => ({
   templates: { flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, gap: space.s, marginBottom: space.s },
   chip: { minHeight: TOUCH - 8, paddingHorizontal: space.l, borderRadius: t.radius.chip, borderWidth: 1, justifyContent: "center" as const },
   chipText: { ...typography.subhead, fontWeight: "600" as const },
-  custom: { ...typography.footnote, color: t.textMuted },
+  custom: { ...typography.footnote, color: t.color.textMuted },
 }));

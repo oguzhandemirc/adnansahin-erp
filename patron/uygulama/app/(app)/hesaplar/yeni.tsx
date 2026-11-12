@@ -6,11 +6,11 @@ import type { AccountInviteResult } from "../../../src/api/wire";
 import { ACCOUNT_TEMPLATE, ACCOUNT_TEMPLATES, type AccountTemplate } from "../../../src/lib/labels/diger";
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
-import { CheckRow, GroupCaption, GroupNote } from "../../../src/ui/diger/parts";
+import { CheckRow, GroupNote } from "../../../src/ui/diger/parts";
 import { Screen } from "../../../src/ui/Frame";
 import { InviteShown } from "../../../src/ui/InviteShown";
 import { Banner, Button, Field } from "../../../src/ui/kit";
-import { ListGroup } from "../../../src/ui/ListRow";
+import { ListeBlogu } from "../../../src/ui/ortak";
 import { space } from "../../../src/ui/tokens";
 import { useWrite } from "../../../src/ui/useWrite";
 
@@ -34,15 +34,13 @@ export default function NewAccount() {
   }
   return (
     <Screen title="Hesap davet et" module="hesaplar" back>
-      <GroupCaption>Kişi</GroupCaption>
-      <ListGroup>
+      <ListeBlogu baslik="Kişi">
         <View style={{ paddingHorizontal: space.l, paddingTop: space.l }}>
           <Field label="E-posta" value={eposta} onChangeText={setEposta} autoCapitalize="none" keyboardType="email-address" autoComplete="email" testID="hesap-eposta" />
           <Field label="Ad soyad" value={ad} onChangeText={setAd} testID="hesap-ad" />
         </View>
-      </ListGroup>
-      <GroupCaption>Yetki şablonu</GroupCaption>
-      <ListGroup testID="sablonlar" iconSize={32}>
+      </ListeBlogu>
+      <ListeBlogu baslik="Yetki şablonu" ayracli testID="sablonlar">
         {ACCOUNT_TEMPLATES.map((k) => {
           const n = catalog.data?.sablonlar[k]?.length;
           return (
@@ -51,7 +49,7 @@ export default function NewAccount() {
               icon={ACCOUNT_TEMPLATE[k].icon} domain={k === "PATRON" ? "genel" : k === "MUHASEBE" ? "finans" : "siparisler"} />
           );
         })}
-      </ListGroup>
+      </ListeBlogu>
       <GroupNote>İzinler sonra hesap ayrıntısından tek tek değiştirilebilir.</GroupNote>
       {w.error ? <Banner tone="error" text={w.error} /> : null}
       <Button label="Davet oluştur" icon="paper-plane-outline" busy={w.busy} disabled={w.disabled || body.eposta === "" || body.ad === ""}

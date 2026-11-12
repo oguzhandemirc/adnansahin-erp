@@ -16,8 +16,7 @@ import { Screen } from "../../../src/ui/Frame";
 import { IconTile } from "../../../src/ui/ortak";
 import { DOMAIN_TONE } from "../../../src/ui/tokens";
 import { Banner, Button } from "../../../src/ui/kit";
-import { ListGroup } from "../../../src/ui/ListRow";
-import { Empty, ErrorState, LoadingSkeleton } from "../../../src/ui/StateViews";
+import { BosDurum, HataDurumu, Iskelet, ListeBlogu } from "../../../src/ui/ortak";
 import { makeStyles } from "../../../src/ui/theme-context";
 import { space, tabularNums, typography } from "../../../src/ui/tokens";
 import { EMPTY_ICON } from "../../../src/ui/icons";
@@ -58,11 +57,11 @@ export default function ExportScreen() {
       {!web ? <Banner tone="off" testID="disa-aktar-web" text={`Dosya yalnız web sürümünden indirilir: aynı hesapla tarayıcıdan ${UYGULAMA_ADI} uygulamasına girip Hesaplar › Dışa aktar'ı açın.`} /> : null}
       <GroupNote>Tesisin bulut verisinin dökümü; her küme ayrı dosya. Liste hesabınızın okuyabildiği verilerle sınırlıdır.</GroupNote>
       {error ? <Banner tone="error" text={error} /> : null}
-      {r.loading && !r.data ? <LoadingSkeleton rows={4} /> : null}
-      {r.error && !r.data ? <ErrorState text={r.error} onRetry={r.reload} /> : null}
-      {r.data && r.data.kumeler.length === 0 ? <Empty icon={EMPTY_ICON.arsiv} text="Dışa aktarılacak veri yok" /> : null}
+      {r.loading && !r.data ? <Iskelet bicim="liste" satir={4} /> : null}
+      {r.error && !r.data ? <HataDurumu mesaj={r.error} onTekrar={r.reload} /> : null}
+      {r.data && r.data.kumeler.length === 0 ? <BosDurum icon={EMPTY_ICON.arsiv} baslik="Dışa aktarılacak veri yok" /> : null}
       {r.data && r.data.kumeler.length > 0 ? (
-        <ListGroup testID="kume-listesi">
+        <ListeBlogu ayracli testID="kume-listesi">
           {r.data.kumeler.map((d) => (
             <View key={d.ad} testID={`kume-${d.ad}`} style={s.row}>
               <View style={s.head}>
@@ -81,7 +80,7 @@ export default function ExportScreen() {
               </View>
             </View>
           ))}
-        </ListGroup>
+        </ListeBlogu>
       ) : null}
     </Screen>
   );
@@ -92,8 +91,8 @@ const useStyles = makeStyles((t) => ({
   row: { gap: space.s, paddingHorizontal: space.l, paddingVertical: space.m },
   head: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
   text: { flex: 1, minWidth: 0 },
-  title: { ...typography.headline, color: t.text },
-  count: { ...typography.footnote, ...tabularNums, color: t.textSecondary, marginTop: 1 },
+  title: { ...typography.headline, color: t.color.text },
+  count: { ...typography.footnote, ...tabularNums, color: t.color.textMuted, marginTop: 1 },
   formats: { flexDirection: "row" as const, gap: space.s, paddingLeft: 36 + space.m },
   format: { minWidth: 76 },
 }));
