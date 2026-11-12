@@ -85,6 +85,9 @@ const BEYAN: Record<string, { sinif: Sinif; kanal: Kanal[] }> = {
   "services/import/adapters/alias-pivot-exists.ts#aliasPivotExists": { sinif: "DISA_AKTARIM", kanal: ["model"] },
   "services/order.service.ts#promoteCustomerAliases": { sinif: "TERFI", kanal: ["model"] },
   "services/order.service.ts#kumasaOzelRenkCiftleri": { sinif: "TERFI", kanal: ["model"] },
+  // Telefondan sipariş (patron gelen kutusu) panelin yaratma adımının kopyası — aynı terfi kontrolü.
+  "services/patron-inbox/order-create.ts#kumasaOzelRenkCiftleri": { sinif: "TERFI", kanal: ["model"] },
+  "services/patron-inbox/order-create.ts#promoteCustomerAliases": { sinif: "TERFI", kanal: ["model"] },
   "services/helpers/merge-shadowing.helper.ts#describeItemColorShadowing": { sinif: "BIRLESTIRME", kanal: ["model"] },
   "constants/merge-map.customer.ts#<modül>": { sinif: "BIRLESTIRME", kanal: ["tablo"] },
   "constants/merge-map.color.ts#<modül>": { sinif: "BIRLESTIRME", kanal: ["tablo"] },
