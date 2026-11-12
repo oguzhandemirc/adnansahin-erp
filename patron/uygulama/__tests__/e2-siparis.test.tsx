@@ -340,7 +340,7 @@ describe("§8 P6 cari hareketleri (sunucu `cariHesapId` süzgeci)", () => {
     await settle();
     expect(mockList).toHaveBeenCalledWith("cari-hareket", expect.objectContaining({ cariHesapId: HESAP }));
     expect(mockList).not.toHaveBeenCalledWith("cari-hareket", expect.objectContaining({ cariKartId: expect.anything() }));
-    expect(screen.getByText("Son hareketler")).toBeTruthy();
+    expect(screen.getByText("SON HAREKETLER")).toBeTruthy();
     expect(screen.getByText("Fatura")).toBeTruthy();
     expect(screen.queryByText(/INVOICE/)).toBeNull();
   });

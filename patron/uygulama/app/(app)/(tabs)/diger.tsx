@@ -1,21 +1,21 @@
-// "Diğer" sekmesi: üstte hesap kartı (→ Profil), sonra sekmeye sığmayan bölümler gruplu liste (Operasyon · İş · Hesap).
-// İzinsiz bölüm/grup çizilmez. Gelen kutusu satırında bekleyen talep sayısı (sunucu `durum=BEKLIYOR` süzgeciyle).
+// "Diğer" sekmesi: üstte hesap kartı (→ Profil), sonra sekmeye sığmayan bölümler gruplu, tam genişlik TEK satırlık
+// liste (simge karesi + ad + ok). İzinsiz bölüm/grup çizilmez (`moduleVisible`; ör. finans izni yoksa Finans satırı da
+// yok). Gelen kutusu satırında bekleyen talep sayısı (sunucu `durum=BEKLIYOR` süzgeciyle).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { MODULES, moduleNavTitle, moduleVisible } from "../../../src/lib/access";
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
-import { Avatar, CountPill } from "../../../src/ui/diger/parts";
+import { Avatar } from "../../../src/ui/diger/parts";
 import { FacilityName, Screen } from "../../../src/ui/Frame";
+import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../src/ui/icons";
-import { ListGroup, ListRow } from "../../../src/ui/ListRow";
+import { ListeBlogu, ListeSatiri, Rozet } from "../../../src/ui/ortak";
 import { RoleBadge } from "../../../src/ui/RoleBadge";
-import { SectionHeader } from "../../../src/ui/SectionHeader";
 import { MORE_GROUPS } from "../../../src/ui/tabs";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
-import { space, typography } from "../../../src/ui/tokens";
-
+import { DOMAIN_TONE, FONT_SCALE, space, typography } from "../../../src/ui/tokens";
 
 const INBOX_BADGE_LIMIT = 50;
 
@@ -30,63 +30,67 @@ export default function More() {
   const count = pending.data ? pending.data.kayitlar.length : 0;
   const badge = count > 0 ? `${count}${pending.data?.sonraki ? "+" : ""}` : null;
   const hesap = facility?.hesap;
+  const gruplar = MORE_GROUPS.map((g) => ({ ...g, mods: g.modules.filter((k) => moduleVisible(permissions, k)).map((k) => MODULES.find((m) => m.key === k)!) })).filter((g) => g.mods.length > 0);
 
   return (
     <Screen title="Diğer" back={false} subtitle={<FacilityName />} onRefresh={inboxOn ? pending.reload : undefined} refreshing={pending.refreshing}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Profil: ${hesap?.ad ?? ""}`}
-        onPress={() => router.push("/profil" as never)}
-        style={({ pressed }) => [s.account, pressed && { backgroundColor: t.surfaceAlt }]}
-        testID="diger-hesap"
-      >
-        <Avatar name={hesap?.ad} permissions={permissions} size={52} />
-        <View style={s.flex}>
-          <Text style={s.name} numberOfLines={1}>{hesap?.ad ?? "Hesabım"}</Text>
-          {hesap?.eposta ? <Text style={s.mail} numberOfLines={1}>{hesap.eposta}</Text> : null}
-          <View style={s.badgeRow}><RoleBadge permissions={permissions} testID="diger-rol" /></View>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-      </Pressable>
-      {MORE_GROUPS.map((g) => {
-        const mods = g.modules.filter((k) => moduleVisible(permissions, k)).map((k) => MODULES.find((m) => m.key === k)!);
-        if (mods.length === 0) return null;
-        return [
-          <SectionHeader key={`${g.title}-h`} title={g.title} />,
-          <ListGroup key={g.title} testID={`grup-${g.title}`}>
-            {mods.map((m) => (
-              <ListRow
-                key={m.key}
-                title={moduleNavTitle(m.key)}
-                subtitle={m.hint}
-                domain={MODULE_ICON[m.key].domain}
-                icon={MODULE_ICON[m.key].icon}
-                accessory={m.key === "gelen-kutusu" && badge ? <CountPill value={badge} testID="gelen-rozet" /> : undefined}
-                accessibilityLabel={m.key === "gelen-kutusu" && badge ? `${moduleNavTitle(m.key)}, ${badge} bekleyen talep` : undefined}
-                onPress={() => router.push(m.route as never)}
-                testID={`menu-${m.key}`}
-              />
-            ))}
-          </ListGroup>,
-        ];
-      })}
+      <KademeliGiris sira={0}>
+        <Basilabilir
+          accessibilityLabel={`Profil: ${hesap?.ad ?? ""}`}
+          onPress={() => router.push("/profil" as never)}
+          style={s.hesap}
+          basiliZemin={t.color.pressed}
+          testID="diger-hesap"
+        >
+          <Avatar name={hesap?.ad} permissions={permissions} size={48} />
+          <View style={s.esnek}>
+            <Text style={s.ad} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{hesap?.ad ?? "Hesabım"}</Text>
+            {hesap?.eposta ? <Text style={s.eposta} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{hesap.eposta}</Text> : null}
+          </View>
+          <RoleBadge permissions={permissions} testID="diger-rol" />
+          <Ionicons name="chevron-forward" size={16} color={t.color.textMuted} />
+        </Basilabilir>
+      </KademeliGiris>
+      {gruplar.map((g, gi) => (
+        <KademeliGiris key={g.title} sira={gi + 1}>
+          <ListeBlogu baslik={g.title} testID={`grup-${g.title}`}>
+            {g.mods.map((m, i) => {
+              const gelen = m.key === "gelen-kutusu" && badge;
+              return (
+                <ListeSatiri
+                  key={m.key}
+                  birincil={moduleNavTitle(m.key)}
+                  icon={MODULE_ICON[m.key].icon}
+                  ton={DOMAIN_TONE[MODULE_ICON[m.key].domain]}
+                  ayrac={i > 0}
+                  rozet={gelen ? <View testID="gelen-rozet"><Rozet label={badge} tone="primary" /></View> : undefined}
+                  accessibilityLabel={gelen ? `${moduleNavTitle(m.key)}, ${badge} bekleyen talep` : moduleNavTitle(m.key)}
+                  onPress={() => router.push(m.route as never)}
+                  testID={`menu-${m.key}`}
+                />
+              );
+            })}
+          </ListeBlogu>
+        </KademeliGiris>
+      ))}
     </Screen>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  account: {
+  hesap: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: space.m,
     padding: space.l,
-    backgroundColor: t.surface,
+    backgroundColor: t.color.card,
     borderRadius: t.radius.card,
+    borderWidth: 1,
+    borderColor: t.color.cardBorder,
     marginTop: space.s,
-    ...t.cardShadow,
+    ...t.shadow.card,
   },
-  flex: { flex: 1 },
-  name: { ...typography.title3, color: t.text },
-  mail: { ...typography.subhead, color: t.textSecondary, marginTop: 1 },
-  badgeRow: { marginTop: space.xs },
+  esnek: { flex: 1, minWidth: 0 },
+  ad: { ...typography.title3, color: t.color.text },
+  eposta: { ...typography.label, color: t.color.textMuted, marginTop: 2 },
 }));

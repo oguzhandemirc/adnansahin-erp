@@ -7,5 +7,5 @@ export { SectionCard } from "./SectionCard";
 export { MetricList, ActivityList, type MetricItem, type ActivityItem } from "./Listeler";
 export { ListeSatiri, type ListeSatiriProps } from "./ListeSatiri";
 export { BosDurum, HataDurumu, Iskelet, type IskeletBicimi } from "./Durumlar";
-export { TamGenislik, BlokBasligi, ListeBlogu, OzetSeridi, type SeritOgesi } from "./Bloklar";
+export { TamGenislik, BlokBasligi, ListeBlogu, OzetSeridi, buyukHarf, type SeritOgesi } from "./Bloklar";
 export { AltSekmeler, type AltSekme } from "./AltSekmeler";

@@ -12,13 +12,18 @@ export function TamGenislik({ children, testID, style }: { readonly children: Re
   return <View style={[{ marginHorizontal: -oluk }, style]} testID={testID}>{children}</View>;
 }
 
+/** Türkçe büyük harf (CSS `uppercase` web'de "İş"i "iş" bırakıyor; Hermes yerel ayarına da güvenilmez). */
+export function buyukHarf(s: string): string {
+  return s.replace(/i/g, "İ").replace(/ı/g, "I").toUpperCase();
+}
+
 /** Bölüm başlığı (küçük, büyük harf, muted) + isteğe bağlı sayı; liste bloğunun üstünde. */
 export function BlokBasligi({ baslik, sayi, sag, testID }: { readonly baslik: string; readonly sayi?: number; readonly sag?: ReactNode; readonly testID?: string }) {
   const s = useStyles();
   return (
     <View style={s.baslikSatir} testID={testID}>
       <Text style={s.baslik} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>
-        {baslik}
+        {buyukHarf(baslik)}
         {sayi !== undefined ? <Text style={s.sayi}>{`  ${sayi}`}</Text> : null}
       </Text>
       {sag}
@@ -78,7 +83,7 @@ export function OzetSeridi({ items, testID }: { readonly items: readonly SeritOg
 const useStyles = makeStyles((t) => ({
   blok: { marginTop: space.l },
   baslikSatir: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, minHeight: 32, marginBottom: space.xs },
-  baslik: { ...typography.caption, fontWeight: "600" as const, color: t.color.textMuted, textTransform: "uppercase" as const, letterSpacing: 0.5 },
+  baslik: { ...typography.caption, fontWeight: "600" as const, color: t.color.textMuted, letterSpacing: 0.5 },
   sayi: { ...typography.caption, fontWeight: "600" as const, color: t.color.textMuted, ...tabularNums },
   liste: { backgroundColor: t.color.card, borderTopWidth: 1, borderBottomWidth: 1, borderColor: t.color.cardBorder },
   serit: { flexDirection: "row" as const, backgroundColor: t.color.band, borderTopWidth: 1, borderBottomWidth: 1, borderColor: t.color.cardBorder, paddingVertical: space.s },

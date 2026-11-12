@@ -5,7 +5,7 @@ import type { ReactElement } from "react";
 import { StyleSheet, Text } from "react-native";
 import { DEFAULT_APPEARANCE, TILE_TONES, buildTheme, type Appearance } from "../src/ui/tokens";
 import { ThemeProvider } from "../src/ui/theme-context";
-import { ActivityList, BosDurum, HataDurumu, ICON_TILE_SIZE, IconTile, Iskelet, ListeBlogu, ListeSatiri, MetricList, OzetSeridi, Rozet, SectionCard, StatCard } from "../src/ui/ortak";
+import { ActivityList, BosDurum, buyukHarf, HataDurumu, ICON_TILE_SIZE, IconTile, Iskelet, ListeBlogu, ListeSatiri, MetricList, OzetSeridi, Rozet, SectionCard, StatCard } from "../src/ui/ortak";
 
 const KOYU: Appearance = { ...DEFAULT_APPEARANCE, mode: "koyu", preset: "rose", radius: "small", surface: "neutral" };
 const T = buildTheme("dark", KOYU);
@@ -157,7 +157,7 @@ describe("Bloklar (tam genişlik katmanlar)", () => {
     const st = StyleSheet.flatten(screen.getByTestId("b").props.style);
     expect(st.marginHorizontal).toBe(-16);
     expect(st.backgroundColor).toBe(buildTheme("dark", KOYU).color.card);
-    expect(screen.getByText(/Kalemler/)).toBeTruthy();
+    expect(screen.getByText(/KALEMLER/)).toBeTruthy();
   });
   it("özet şeridi band zemininde; her öğe değer + birim + etiketle okunur; boşsa çizilmez", async () => {
     await withTheme(<OzetSeridi testID="o" items={[{ key: "a", deger: "24", birim: "kalem", etiket: "Açık" }]} />);
@@ -170,5 +170,12 @@ describe("Bloklar (tam genişlik katmanlar)", () => {
   it("ok={false} basılabilir satırda oku gizler", async () => {
     await withTheme(<ListeSatiri birincil="A" onPress={() => undefined} ok={false} testID="s" />);
     expect(screen.UNSAFE_queryAllByProps({ name: "chevron-forward" })).toHaveLength(0);
+  });
+});
+
+describe("buyukHarf (blok başlığı)", () => {
+  it("Türkçe i/ı doğru büyür (CSS uppercase web'de 'İş'i 'iş' bırakıyordu)", () => {
+    expect(buyukHarf("İş")).toBe("İŞ");
+    expect(buyukHarf("Sipariş ılık")).toBe("SİPARİŞ ILIK");
   });
 });
