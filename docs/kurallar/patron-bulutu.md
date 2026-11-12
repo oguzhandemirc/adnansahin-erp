@@ -57,6 +57,14 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Tel sözleşmesi yalnız EKLEYEREK genişler: var olan uç, alan, projeksiyon adı değişmez; yeni alan katalog sürümünü artırır. [inceleme]
 - Sözleşme genişletmesinde kurulum sırası önce bulut, sonra fabrikadır; eski bulut bilinmeyen projeksiyonu yalnız o girdide reddeder (tur KISMI, düşmez) ama reddedilen kayıt her turda baştan, anlık her aralıkta yeniden gönderilir. [inceleme]
 
+### Patron girişi · doğrulama kodu (bulut `patron/sunucu`)
+
+- Doğrulama kodu (TOTP) isteğe bağlıdır ve hesap başına Profil › Güvenlik'ten açılır; açık hesapta giriş, parola değişimi, hesap silme ve cihaz bağlama kodsuz geçmez. [bekçi: patron/sunucu test_dogrulama_kodu]
+- Yanlış parolada doğrulama durumu sızmaz: `DOGRULAMA_KODU_GEREKLI` yalnız doğru paroladan sonra döner, yanlış parola her hesapta aynı 401'dir. [bekçi: patron/sunucu test_dogrulama_kodu]
+- Kodunu kaybeden hesabın doğrulaması yalnız satıcı CLI'siyle kapatılır (`tesis.ts dogrulama-kapat --eposta --talep --gerekce`, denetim `DOGRULAMA_KAPATILDI`); uygulamada kurtarma yolu yoktur. [bekçi: patron/sunucu test_dogrulama_kodu]
+- Parola asgari 12 karakterdir ve yaygın parola listesindeki parola reddedilir. [bekçi: patron/sunucu test_dogrulama_kodu]
+- Giriş sözleşmesi değişince kurulum sırası önce bulut, sonra uygulamadır: yeni uygulama eski bulutta kodsuz giremez. [inceleme]
+
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 
 1. `.env`: `PATRON_CLOUD_URL=https://<bulut kökeni>` ve `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (dosya veri dizininde, repoda değil).
@@ -74,6 +82,8 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 ## Bekçiler
 
 Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
+
+Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_dogrulama_kodu` (doğrulama kodu isteğe bağlı · açıkken zorunlu · sızıntı yok · CLI kapatma) · `test_cari_ozeti` · `test_hizmet_sonu` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 

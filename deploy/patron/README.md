@@ -25,7 +25,27 @@ Kapsayıcılar: `caddy` (80/443, ağ `adnan-ag`) · `patron-api` (4620, ağlar `
    görünmez), `docker exec caddy caddy validate --config /etc/caddy/Caddyfile` → `docker exec caddy caddy reload --config /etc/caddy/Caddyfile`.
 6. Tesis: `docker compose --profile goc run --rm goc node dist-cli/scripts/tesis.js tesis-ac --tesis=<uuid> --ad="Adnan Şahin"`.
 7. İlk yönetici: `… tesis.js yonetici-davet --tesis=<uuid> --eposta=<e-posta> --ad="…"` — belirteç BİR KEZ basılır, ekrana
-   değil 0600 dosyaya yönlendir; davet `/api/davet/incele → kabul (parola) → onay (TOTP)` ile tamamlanır.
+   değil 0600 dosyaya yönlendir; davet `/api/davet/incele → kabul (parola)` ile tamamlanır ve hesap hemen AKTİF olur
+   (`/api/davet/onay` yalnız eski uygulamanın TOTP adımı için durur).
+
+## Giriş akışı
+
+- `POST /api/oturum/ac` `{eposta, parola}`: doğrulama kodu kapalı hesapta oturum hemen açılır.
+- Kodu AÇIK hesapta kod yoksa YALNIZ doğru paroladan sonra 401 `DOGRULAMA_KODU_GEREKLI` döner; uygulama kod alanını
+  açar ve `{eposta, parola, totp}` ile yeniden dener. Yanlış parola her hesapta aynı 401'dir (durum sızmaz).
+- Kullanıcı kodu Profil › Güvenlik › İki adımlı doğrulama'dan açar/kapatır (`/api/oturum/dogrulama{,/baslat,/onay,/kapat}`).
+- Kilit: hesap + kaynak başına 5 yanlış denemede 15 dk (süreç belleğinde; yeniden başlatma sıfırlar).
+
+## Doğrulama kodunu kapatma (kodunu kaybeden hesap)
+
+Uygulamada kurtarma yolu YOK; satıcı CLI'si kapatır (talep + gerekçe zorunlu, denetim `DOGRULAMA_KAPATILDI`):
+
+```bash
+cd /opt/adnan/patron && docker compose --profile goc run --rm goc node dist-cli/scripts/tesis.js dogrulama-kapat \
+  --eposta=<e-posta> --talep=<talep no> --gerekce="<neden>"
+```
+
+E-postayı komut satırına elle yaz ya da 0600 dosyadan oku; çıktıyı paylaşma.
 
 ## Fabrika kaydı (`kurulum-kaydet`) — fabrikanın açık anahtarı gelince
 

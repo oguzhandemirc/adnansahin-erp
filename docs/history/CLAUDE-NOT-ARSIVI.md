@@ -13206,3 +13206,11 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 
 **Ölçüm.** Fabrika bekçisi `test_patron_bulut_cari_ozeti` 26/0 (dört negatif sonda kırmızı), bulut `test_cari_ozeti` 15/0 (iki sonda kırmızı), bulut paketi 41/41, uygulama tsc 0 + jest 436/436; anlık 26 müşteride ~97 KB ham / ~7,4 KB gzip, kurucu ~0,2–0,7 sn.
 
+
+## 2026-11-12 — Patron girişi: doğrulama kodu (TOTP) isteğe bağlı [ÇEKİRDEK + PROFİL]
+
+**Karar (kullanıcı, 2026-11-12).** "Doğrulama kodunu tamamen kaldıralım, profilde isteğe bağlı çalıştırırız." [ÇEKİRDEK] Girişte kod zorunlu değil; hesap Profil › Güvenlik › İki adımlı doğrulama'dan açar (parola → karekod/anahtar → ilk kod), kapatır (parola + kod). Açık hesapta giriş, parola değişimi, hesap silme, cihaz bağlama kod ister. Davet kabulü hesabı parolayla hemen AKTİF eder. [PROFİL] Adnan Şahin ilk yöneticisi kod uygulaması kurmayacak; hesabın doğrulaması CLI ile kapatıldı.
+
+**Nasıl.** Bulut göçü `20261112120000_dogrulama_istege_bagli` (`identities.totp_enabled_at`; kurulu sırrı ve son adımı olan kimlik AÇIK kalır; CHECK'ler AKTİF ⇒ parola, açık ⇒ sır). Kod gerekli yanıtı (`DOGRULAMA_KODU_GEREKLI`) yalnız doğru paroladan sonra döner — durum yanlış parolada sızmaz. Kurtarma yalnız satıcı CLI'si `tesis.ts dogrulama-kapat` (talep + gerekçe zorunlu, denetim `DOGRULAMA_KAPATILDI`). Yaygın parola listesi eklendi (asgari 12 aynı). Kurulum sırası önce bulut: yeni uygulama eski bulutta kodsuz giremez; eski uygulamanın TOTP adımlı daveti yeni bulutta hesabı yine AKTİF eder.
+
+**Ölçüm.** Bulut bekçisi `test_dogrulama_kodu` (eski `test_totp_zorunlu`un yerine; üç negatif sonda kırmızı), bulut paketi yeşil; uygulama tsc 0 + jest 465/465.
