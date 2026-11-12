@@ -55,6 +55,11 @@
  *   npm run build:apk:check -- --musteri=<kod>              # yalnız ön kontrol, derleme YOK
  *   npm run build:apk:verify -- --musteri=<kod>             # mevcut APK'yı kanala karşı denetle
  *   … --yoklama-yok                                         # /health yoklamasını atla (ağa çıkma)
+ *   npm run build:apk -- --musteri=<kod> --aab              # aynı derlemeden Play paketi (AAB) de üret
+ *
+ * --aab: Gradle aynı koşumda `assembleRelease bundleRelease` çalıştırır; APK'nın bütün kapıları
+ * aynen koşar, AAB ise APK'ya karşı ölçülür (aynı JS bundle · aynı app.config · paket adı · mühür)
+ * ve hedef SDK Play'in asgarisinin altındaysa paket reddedilir (`PLAY_EN_DUSUK_HEDEF_SDK`).
  */
 
 import { spawnSync } from 'node:child_process';
@@ -64,6 +69,7 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { Buffer } from 'node:buffer';
 import { fileURLToPath } from 'node:url';
 import {
   adresiCoz as adresiCozPaylasilan,
@@ -73,7 +79,7 @@ import {
   bundleAdresOlcumu,
 } from './lib/adres.mjs';
 import { zipGirdisiOku } from './lib/zip.mjs';
-import { ApkOlculemedi, apkKimligi, sertifikaParmakIzi } from './lib/apk-kimlik.mjs';
+import { ApkOlculemedi, apkKimligi, axmlOgeleri, sertifikaParmakIzi } from './lib/apk-kimlik.mjs';
 import { KANAL_ORTAM, tabletYapilandirmaFarki } from './lib/kanal.cjs';
 import { KAYIT_REL, Olculemedi, erpAdresiEsit, kanalCoz } from '../../scripts/lib/kanallar.mjs';
 
@@ -81,6 +87,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(HERE, '..');
 const ANDROID_DIR = path.join(PROJECT_ROOT, 'android');
 const APK_PATH = path.join(ANDROID_DIR, 'app/build/outputs/apk/release/app-release.apk');
+const AAB_PATH = path.join(ANDROID_DIR, 'app/build/outputs/bundle/release/app-release.aab');
+/** Play'in yeni uygulama ve güncellemeler için istediği en düşük targetSdk (2025-08-31'den beri 35). */
+const PLAY_EN_DUSUK_HEDEF_SDK = 35;
 /** Release bundle'ın APK içindeki yolu — doğrulama bunu açar. */
 const BUNDLE_ENTRY = 'assets/index.android.bundle';
 
@@ -130,6 +139,8 @@ const SURUM_KAPISI_ATLA =
   argv.includes('--sürüm-farkını-biliyorum') || argv.includes('--surum-farkini-biliyorum');
 /** `/health` yoklaması UYARIDIR, kapı değil; derleyen makinenin ağa çıkmaması gerekiyorsa atlanır. */
 const YOKLAMA_YOK = argv.includes('--yoklama-yok');
+/** Play paketi (AAB) de üret — aynı Gradle koşumu, APK'ya karşı ölçülür. */
+const AAB_DE = argv.includes('--aab');
 
 /* ------------------------------------------------------------------ *
  * KANAL KAPISI (K2) — hangi kanalın kimliğiyle derleniyor?
@@ -530,7 +541,8 @@ function onbellekleriTemizle() {
 
 function gradleKos(adres) {
   const ortam = derlemeOrtami();
-  baslik('(2/4) DERLEME — ./gradlew assembleRelease');
+  const gorevler = AAB_DE ? ['assembleRelease', 'bundleRelease'] : ['assembleRelease'];
+  baslik(`(2/4) DERLEME — ./gradlew ${gorevler.join(' ')}`);
   bilgi(`Gömülecek adres: ${adres}`);
   bilgi('(Bu adım birkaç dakika sürer; önbellek silindiği için bundle sıfırdan üretilir.)\n');
 
@@ -544,7 +556,7 @@ function gradleKos(adres) {
   // ⚠️ shell:true komutu cmd'ye METİN olarak geçirir: yol TIRNAKLANMAK ZORUNDA, yoksa
   // boşluk içeren bir kurulum dizini ("C:\Program Files\...") sessizce bölünür.
   const komut = win ? `"${gradlew}"` : gradlew;
-  const sonuc = spawnSync(komut, ['assembleRelease'], {
+  const sonuc = spawnSync(komut, gorevler, {
     cwd: ANDROID_DIR,
     stdio: 'inherit',
     shell: win,
@@ -1005,6 +1017,53 @@ function imzaKapisi(apkYolu) {
     );
   }
   bilgi('✔ APK bizim mührümüzle imzalanmış.');
+  return { muhur: beklenen, javaOrtam };
+}
+
+/**
+ * PLAY PAKETİ (AAB) KAPISI — AAB'nin protobuf manifesti yerel araçsız çözülemez; bu yüzden AAB,
+ * aynı koşumda üretilip bütün kapılardan geçmiş APK'ya karşı ÖLÇÜLÜR: aynı JS bundle (adres),
+ * aynı gömülü yapılandırma (kanal kimliği), manifestte paket adı, aynı mühür (v1/jar imzası).
+ * Hedef SDK APK manifestinden okunur (iki paket aynı Gradle yapılandırmasından çıkar).
+ */
+function playPaketKapisi(kanal, { muhur, javaOrtam }, derlemeBaslangici) {
+  baslik('PLAY PAKETİ (AAB) DOĞRULAMASI');
+  const red = (...satirlar) => {
+    const hedef = fs.existsSync(AAB_PATH) ? AAB_PATH.replace(/\.aab$/, '.DOGRULANMADI.aab') : null;
+    if (hedef) fs.renameSync(AAB_PATH, hedef);
+    dur('PLAY PAKETİ REDDEDİLDİ', ...satirlar, hedef ? `Paket taşındı: ${hedef}` : 'AAB üretilmedi.');
+  };
+  if (!fs.existsSync(AAB_PATH)) red(`Beklenen: ${AAB_PATH}`);
+  if (fs.statSync(AAB_PATH).mtimeMs < derlemeBaslangici) red('AAB bu derlemeden ESKİ (bayat paket).');
+
+  const oku = (zip, girdi) => {
+    const r = zipGirdisiOku(zip, girdi);
+    if (r.hata || !r.veri) red(`${path.basename(zip)} içinde ${girdi} okunamadı: ${r.hata ?? 'boş'}`);
+    return r.veri;
+  };
+  const ozetle = (b) => crypto.createHash('sha256').update(b).digest('hex');
+  if (ozetle(oku(AAB_PATH, `base/${BUNDLE_ENTRY}`)) !== ozetle(oku(APK_PATH, BUNDLE_ENTRY))) {
+    red("AAB'deki JS bundle APK'dakiyle aynı değil (adres/kod ölçülemez).");
+  }
+  if (!oku(AAB_PATH, 'base/assets/app.config').equals(oku(APK_PATH, 'assets/app.config'))) {
+    red("AAB'deki gömülü yapılandırma (app.config) APK'dakiyle aynı değil.");
+  }
+  if (!oku(AAB_PATH, 'base/manifest/AndroidManifest.xml').includes(Buffer.from(kanal.tablet.androidPaket))) {
+    red(`AAB manifesti "${kanal.tablet.androidPaket}" paket adını taşımıyor.`);
+  }
+  const usesSdk = axmlOgeleri(oku(APK_PATH, 'AndroidManifest.xml')).find((e) => e.ad === 'uses-sdk');
+  const hedefSdk = Number(usesSdk?.oznitelik?.targetSdkVersion);
+  if (!Number.isFinite(hedefSdk)) red('targetSdkVersion okunamadı — Play asgarisi ÖLÇÜLEMEDİ.');
+  if (hedefSdk < PLAY_EN_DUSUK_HEDEF_SDK) {
+    red(`targetSdk ${hedefSdk} < Play asgarisi ${PLAY_EN_DUSUK_HEDEF_SDK} — Play Console yüklemeyi reddeder.`);
+  }
+  const r = spawnSync('keytool', ['-printcert', '-jarfile', AAB_PATH], { encoding: 'utf8', env: javaOrtam });
+  const aabMuhur = (/SHA256:\s*([0-9A-F:]+)/i.exec(r.stdout ?? '')?.[1] ?? '').replace(/:/g, '').toLowerCase();
+  if (!aabMuhur) red('AAB imzası okunamadı (keytool -printcert -jarfile).');
+  if (aabMuhur !== muhur) red('AAB yükleme mührüyle imzalanmamış.');
+  bilgi(`targetSdk : ${hedefSdk} (Play asgarisi ${PLAY_EN_DUSUK_HEDEF_SDK})`);
+  bilgi(`AAB       : ${AAB_PATH} (${(fs.statSync(AAB_PATH).size / 1048576).toFixed(1)} MB)`);
+  bilgi('✔ AAB, doğrulanmış APK ile aynı bundle/yapılandırma/paket/mühür.');
 }
 
 /**
@@ -1185,7 +1244,8 @@ async function main() {
   gradleKos(adres);
   const stat = apkDogrula(adres, { derlemeBaslangici });
   apkKanalKapisi(APK_PATH, kod, kanal);
-  imzaKapisi(APK_PATH);
+  const imza = imzaKapisi(APK_PATH);
+  if (AAB_DE) playPaketKapisi(kanal, imza, derlemeBaslangici);
   ozet(adres, s, stat, APK_PATH, { kod, kanal });
 }
 
