@@ -1,6 +1,6 @@
 // ÖRNEK VERİ — yalnız geliştirme önizlemesi (`kapi.ts`). Bütün adlar açıkça uydurmadır ("Örnek", "Deneme",
 // "Numune"…); gerçek müşteri/kişi adı YOKTUR. Tel şekli uygulamanın okuyucularıyla aynı (savunmalı okunur).
-import type { CustomerSummary, CustomerSummaryPeriod, CustomerSummaryResponse, FacilityStatus, LoginResponse, ProjectionRecord } from "../api/wire";
+import { LIST_SORT, type CustomerSummary, type CustomerSummaryPeriod, type CustomerSummaryResponse, type FacilityStatus, type LoginResponse, type ProjectionRecord } from "../api/wire";
 
 const GUN = 86_400_000;
 const once = (gun: number, saat = 0): string => new Date(Date.now() - gun * GUN - saat * 3_600_000).toISOString();
@@ -32,7 +32,7 @@ export function ornekOturum(): FacilityStatus {
     projeksiyonlar: Object.keys(ORNEK_ANLIK()),
     esitleme: { sonEsitleme: once(0, 0.05), ufuk: once(0, 0.05), ufukTakildi: false, sozlesmeUyarisi: null, fabrikaSurumu: "örnek" },
     hizmet: { asama: "ACIK", bitis: null, saltOkunurBitis: null },
-    liste: { kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "cari-hesap", "iade"], siparisId: ["siparis-kalemi"] }, aranabilir: ["cari-kart", "siparis"] },
+    liste: { kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "cari-hesap", "iade"], siparisId: ["siparis-kalemi"] }, aranabilir: ["cari-kart", "siparis", "sevkiyat"], siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])) },
   };
 }
 

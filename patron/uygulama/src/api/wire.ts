@@ -113,11 +113,35 @@ export interface ListFilterOption {
   readonly esit: string | boolean;
 }
 
-/** Sunucuda aranabilir liste: `?ara=` `alanlar`da Türkçe katlamalı parça eşleşme; en çok BİR açılır süzgeç. */
+/** Ek süzgeç grubu (veri tablosu): grupta en çok BİR seçim; gruplar ve ana süzgeç VE ile birleşir. */
+export interface ListFilterGroup {
+  readonly anahtar: string;
+  readonly etiket: string;
+  readonly secenekler: readonly ListFilterOption[];
+}
+
+/**
+ * Sunucuda aranabilir liste: `?ara=` `alanlar`da Türkçe katlamalı parça eşleşme; ana süzgeç (seçiciler) + isteğe bağlı
+ * ek gruplar. `?suzgec=` virgüllü değer listesi alır (grup başına en çok bir değer; `deger` projeksiyonda TEKİLDİR);
+ * çoklu değeri yalnız `ListCapabilities.siralama` beyan eden sunucu kabul eder (eski sunucu tek değer bilir).
+ */
 export interface ListSearchSpec {
   readonly alanlar: readonly string[];
   readonly suzgec: { readonly etiket: string; readonly varsayilan: string | null; readonly secenekler: readonly ListFilterOption[] } | null;
+  readonly ekSuzgecler?: readonly ListFilterGroup[];
 }
+
+/** `?suzgec=` virgüllü listede en çok bu kadar değer (ana süzgeç + ek gruplar). */
+export const SUZGEC_AZAMI = 6;
+
+const YON_SUZGECI: ListFilterGroup = {
+  anahtar: "yon",
+  etiket: "Yön",
+  secenekler: [
+    { deger: "YURTICI", etiket: "Yurtiçi", alan: "yon", esit: "DOMESTIC" },
+    { deger: "IHRACAT", etiket: "İhracat", alan: "yon", esit: "EXPORT" },
+  ],
+};
 
 export const ARAMA_AZAMI = 60;
 
@@ -134,6 +158,16 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
         { deger: "FASON", etiket: "Fason", alan: "fasonRolu", esit: true },
       ],
     },
+    ekSuzgecler: [
+      {
+        anahtar: "aktiflik",
+        etiket: "Durum",
+        secenekler: [
+          { deger: "AKTIF", etiket: "Aktif", alan: "aktif", esit: true },
+          { deger: "PASIF", etiket: "Pasif", alan: "aktif", esit: false },
+        ],
+      },
+    ],
   },
   urun: {
     alanlar: ["ad", "kod"],
@@ -177,6 +211,21 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
         { deger: "IPTAL", etiket: "Sipariş iptal edildi", alan: "durum", esit: "CANCELLED" },
       ],
     },
+    ekSuzgecler: [YON_SUZGECI],
+  },
+  // Veri tablosu (Sevkiyat): no + müşteri araması, durum ve yön süzgeci; sıra `LIST_SORT.sevkiyat`.
+  sevkiyat: {
+    alanlar: ["sevkNo", "musteriAdi"],
+    suzgec: {
+      etiket: "Durum",
+      varsayilan: null,
+      secenekler: [
+        { deger: "PLANLI", etiket: "Onay bekliyor", alan: "durum", esit: "PLANNED" },
+        { deger: "SEVK_EDILDI", etiket: "Sevk edildi", alan: "durum", esit: "DISPATCHED" },
+        { deger: "IPTAL", etiket: "İptal", alan: "durum", esit: "CANCELLED" },
+      ],
+    },
+    ekSuzgecler: [YON_SUZGECI],
   },
   // Taslak teklif buluta gelmez. `suresiDoldu`yu fabrika türetir; geçerlilik günü dönünce satırı yeniden gönderir.
   teklif: {
@@ -195,6 +244,37 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
     },
   },
 };
+
+// ---------------------------------------------------------------- liste sıralaması (veri tablosu)
+/** Sıralama anahtarının türü: metin Türkçe katlamalı (arama ile aynı katlama), sayı sayısal, tarih ISO metni. */
+export type ListSortKind = "metin" | "sayi" | "tarih";
+export type ListSortDir = "artan" | "azalan";
+export const LIST_SORT_DIRS: readonly ListSortDir[] = ["artan", "azalan"];
+
+/**
+ * `GET /veri/:projeksiyon?sirala=<alan>&yon=artan|azalan` — yalnız burada beyanlı alan sıralanır (diğerinde 400);
+ * boş değer her iki yönde SONDA; eşitlik kayıt kimliğiyle bozulur, imleç sıralamayla devam eder. Bulut hesap yapmaz:
+ * alan fabrikanın gönderdiği hâliyle karşılaştırılır. Beyansız istek eski sırayı (`sort_at` azalan) korur.
+ */
+export const LIST_SORT: Readonly<Record<string, Readonly<Record<string, ListSortKind>>>> = {
+  siparis: { siparisNo: "metin", musteriAdi: "metin", siparisTarihi: "tarih", acikMiktar: "sayi", sevkMiktari: "sayi", kalemSayisi: "sayi" },
+  "cari-kart": { ad: "metin", kod: "metin", il: "metin", ilce: "metin", ulke: "metin" },
+  sevkiyat: { sevkNo: "metin", musteriAdi: "metin", cikisTarihi: "tarih", toplamMetre: "sayi", topSayisi: "sayi", cuvalSayisi: "sayi", toplamKg: "sayi" },
+};
+
+// ---------------------------------------------------------------- görünüm tercihleri (veri tablosu)
+/** `GET|POST /oturum/tercihler/:anahtar` — hesabın KENDİ görünüm tercihi; beyaz listeli anahtar, değer boyut sınırlı JSON. */
+export const VIEW_PREF_KEYS = ["tablo.siparis", "tablo.cari-kart", "tablo.sevkiyat", "tablo.stok"] as const;
+export type ViewPrefKey = (typeof VIEW_PREF_KEYS)[number];
+/** Değerin JSON metni en çok bu kadar bayt (UTF-8). */
+export const VIEW_PREF_MAX_BYTES = 4096;
+
+/** `GET` yanıtı (hiç yazılmadıysa `deger` null) ve `POST` (`{ deger: nesne }`, tam yerine koyma) yanıtı. */
+export interface ViewPreference {
+  readonly anahtar: ViewPrefKey;
+  readonly deger: unknown;
+  readonly guncelleme: string | null;
+}
 
 // ---------------------------------------------------------------- liste kimlik süzgeçleri
 export const LIST_ID_FILTER_KEYS = ["cariKartId", "cariHesapId", "siparisId", "teklifId", "urunId"] as const;
@@ -231,6 +311,11 @@ export interface ListCapabilities {
   readonly aranabilir: readonly string[];
   /** D4-KUC3c; eski sunucu göndermez ⇒ istemci anahtar süzgecini (kasa kategori çipleri) gizler. */
   readonly anahtarSuzgecleri?: Readonly<Partial<Record<ListKeyFilterKey, readonly string[]>>>;
+  /**
+   * Veri tablosu: projeksiyon → sıralanabilir alanlar (`LIST_SORT`); varlığı aynı zamanda çoklu `suzgec` ve görünüm
+   * tercihi ucunun beyanıdır. Eski sunucu göndermez ⇒ istemci sıralamayı kapatır, tek süzgeç gönderir, tercihi yerelde tutar.
+   */
+  readonly siralama?: Readonly<Record<string, readonly string[]>>;
 }
 
 // ---------------------------------------------------------------- cari kilidi (D4-I6)

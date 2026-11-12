@@ -1,7 +1,7 @@
 // Örnek veri istemcisi: `ApiClient`in yerine oturur (endpoints/kancalar aynen çalışır), ağa hiç çıkmaz.
 // Okumalar `veri.ts`ten gelir; yazmalar reddedilir. Kısa gecikme iskelet ve yenileme durumlarını gösterir.
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
-import { LIST_SEARCH } from "../api/wire";
+import { LIST_SEARCH, LIST_SORT } from "../api/wire";
 import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_HESAPLAR, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
 
 const GECIKME_MS = 350;
@@ -24,11 +24,32 @@ function listele(projeksiyon: string, q: Query | undefined) {
   const hepsi = ORNEK_LISTE()[projeksiyon] ?? [];
   const suz = (alan: string) => (q?.[alan] ? hepsi.filter((r) => (r.kayit as Record<string, unknown>)[alan] === q[alan]) : null);
   let kayitlar = suz("cariKartId") ?? suz("siparisId") ?? hepsi;
-  const ara = typeof q?.ara === "string" ? q.ara.toLowerCase() : "";
-  // Süzgeç sunucudaki gibi `LIST_SEARCH` beyanından (alan = değer); ekran süzmez, sahte sunucu süzer.
-  const opt = typeof q?.suzgec === "string" ? LIST_SEARCH[projeksiyon]?.suzgec?.secenekler.find((o) => o.deger === q.suzgec) : undefined;
-  if (opt) kayitlar = kayitlar.filter((r) => (r.kayit as Record<string, unknown>)[opt.alan] === opt.esit);
-  if (ara) kayitlar = kayitlar.filter((r) => String((r.kayit as { ad?: unknown }).ad ?? "").toLowerCase().includes(ara));
+  const ara = typeof q?.ara === "string" ? q.ara.toLocaleLowerCase("tr") : "";
+  // Süzgeç sunucudaki gibi `LIST_SEARCH` beyanından (virgüllü değerler, alan = değer); ekran süzmez, sahte sunucu süzer.
+  const spec = LIST_SEARCH[projeksiyon];
+  const secenekler = [...(spec?.suzgec?.secenekler ?? []), ...(spec?.ekSuzgecler ?? []).flatMap((g) => g.secenekler)];
+  for (const d of typeof q?.suzgec === "string" ? q.suzgec.split(",") : []) {
+    const opt = secenekler.find((o) => o.deger === d);
+    if (opt) kayitlar = kayitlar.filter((r) => (r.kayit as Record<string, unknown>)[opt.alan] === opt.esit);
+  }
+  const alanlar = spec?.alanlar ?? ["ad"];
+  if (ara) kayitlar = kayitlar.filter((r) => alanlar.some((a) => String((r.kayit as Record<string, unknown>)[a] ?? "").toLocaleLowerCase("tr").includes(ara)));
+  const sirala = typeof q?.sirala === "string" ? q.sirala : null;
+  const tur = sirala ? LIST_SORT[projeksiyon]?.[sirala] : undefined;
+  if (sirala && tur) {
+    const yon = q?.yon === "azalan" ? -1 : 1;
+    const deger = (r: (typeof kayitlar)[number]) => {
+      const v = (r.kayit as Record<string, unknown>)[sirala];
+      if (v === null || v === undefined || v === "") return null;
+      return tur === "sayi" ? Number(v) : String(v);
+    };
+    kayitlar = [...kayitlar].sort((a, b) => {
+      const x = deger(a);
+      const y = deger(b);
+      if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+      return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "tr")) * yon;
+    });
+  }
   return { kayitlar, sonraki: null };
 }
 

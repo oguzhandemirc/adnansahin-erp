@@ -33,6 +33,9 @@ import type {
   Snapshot,
   SnapshotRefresh,
   TestNotificationResult,
+  ListSortDir,
+  ViewPrefKey,
+  ViewPreference,
 } from "./wire";
 
 export const ENDPOINTS = {
@@ -83,6 +86,9 @@ export const ENDPOINTS = {
   exportDownload: ["get", "/disa-aktar/:kume"],
   /** Değişim akışı (uzun yoklama `?since=&bekle=`); istemcisi `state/changes.ts`, eski sunucu 404 → 60 sn yoklama. */
   changes: ["get", "/degisim"],
+  /** Görünüm tercihi (veri tablosu); yalnız `liste.siralama` beyan eden sunucuda var. */
+  viewPref: ["get", "/oturum/tercihler/:anahtar"],
+  viewPrefSet: ["post", "/oturum/tercihler/:anahtar"],
 } as const satisfies Record<string, readonly ["get" | "post" | "patch", string]>;
 
 type Name = keyof typeof ENDPOINTS;
@@ -109,10 +115,13 @@ export interface ListParams {
   readonly suzgec?: string;
   /** Fabrika anahtarı süzgeci (`LIST_KEY_FILTERS`); yalnız sunucu `liste.anahtarSuzgecleri`nde beyanlıysa gönderilir. */
   readonly kategoriAnahtari?: string;
+  /** Sunucu sıralaması (`LIST_SORT`); yalnız sunucu `liste.siralama`da beyan ettiyse gönderilir. */
+  readonly sirala?: string;
+  readonly yon?: ListSortDir;
 }
 
 export function createApi(c: ApiClient) {
-  const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, cariHesapId: p.cariHesapId, siparisId: p.siparisId, teklifId: p.teklifId, ara: p.ara, suzgec: p.suzgec, kategoriAnahtari: p.kategoriAnahtari });
+  const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, cariHesapId: p.cariHesapId, siparisId: p.siparisId, teklifId: p.teklifId, ara: p.ara, suzgec: p.suzgec, kategoriAnahtari: p.kategoriAnahtari, sirala: p.sirala, yon: p.yon });
   return {
     login: (b: { eposta: string; parola: string; totp?: string; istemci?: "mobil" | "web"; tesisId?: string }) => c.post<LoginResponse>(pathOf("login"), b),
     inviteInspect: (davet: string) => c.post<InviteInfo>(pathOf("inviteInspect"), { davet }),
@@ -163,6 +172,8 @@ export function createApi(c: ApiClient) {
     notificationFacilityDefaults: (ayarlar: NotificationSettings) => c.post<NotificationSettingsView>(pathOf("notificationFacilityDefaults"), { ayarlar }),
     notificationHistory: (p: { imlec?: string; limit?: number } = {}) => c.get<Page<NotificationItem>>(pathOf("notificationHistory"), p),
     notificationTest: () => c.post<TestNotificationResult>(pathOf("notificationTest"), {}),
+    viewPref: (anahtar: ViewPrefKey) => c.get<ViewPreference>(pathOf("viewPref", { anahtar })),
+    viewPrefSet: (anahtar: ViewPrefKey, deger: Record<string, unknown>) => c.post<ViewPreference>(pathOf("viewPrefSet", { anahtar }), { deger }),
     exportManifest: () => c.get<ExportManifest>(pathOf("exportManifest")),
     exportDownload: (kume: string, bicim: ExportFormat): Promise<DownloadedFile> => c.download(pathOf("exportDownload", { kume }), { bicim }),
   };

@@ -32,6 +32,7 @@ export const DESTRUCTION_STEPS: readonly { readonly table: string }[] = [
   "push_devices",
   "notifications",
   "notification_preferences",
+  "view_preferences",
   "notification_defaults",
   "account_audit",
   "operation_receipts",

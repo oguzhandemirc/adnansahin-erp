@@ -136,8 +136,8 @@ async function imlec(o: Ortam, h: TestHesabi, ids: Ids): Promise<void> {
 
 async function kapilar(o: Ortam, h: TestHesabi, yabanci: Ids): Promise<void> {
   console.log("\n§5 kapılar");
-  const sev = await ara(o, h, "sevkiyat", { ara: "x" });
-  kontrol("§5a aranmayan liste (sevkiyat) → 400", sev.status === 400, `${sev.status}`);
+  const sev = await ara(o, h, "is-emri", { ara: "x" });
+  kontrol("§5a aranmayan liste (is-emri) → 400", sev.status === 400, `${sev.status}`);
   const uzun = await ara(o, h, "cari-kart", { ara: "a".repeat(ARAMA_AZAMI + 1) });
   kontrol("§5b azamiden uzun terim → 400", uzun.status === 400, `${uzun.status}`);
   const sinir = await ara(o, h, "cari-kart", { ara: "a".repeat(ARAMA_AZAMI) });
