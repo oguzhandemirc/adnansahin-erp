@@ -550,3 +550,58 @@ html[data-density="compact"] {
   }
 }
 
+/* ── Pano kutuları ────────────────────────────────────────────────────────────
+   Yalnız yeni bileşenlerin okuduğu belirteçler (kart çerçevesi, gölge, simge karesi
+   tonları, boşluk ölçüsü); mevcut ekranların sınıflarına dokunmaz. */
+@theme {
+  --color-card-border: hsl(var(--card-border));
+  --shadow-card: var(--pano-shadow);
+}
+
+:root {
+  --card-border: 245 30% 92%;
+  --pano-shadow: 0 1px 2px hsl(245 30% 30% / 0.04), 0 6px 20px -8px hsl(245 40% 40% / 0.12);
+  --space-card: 1rem;
+  --space-gap: 1rem;
+  --space-section: 1.25rem;
+  --space-page: 1.5rem;
+  --kpi-px: 1rem;
+  --kpi-py: 0.875rem;
+  --tile-violet: 258 72% 56%; --tile-violet-bg: 258 90% 95%;
+  --tile-blue: 217 85% 50%; --tile-blue-bg: 214 100% 94%;
+  --tile-sky: 195 85% 38%; --tile-sky-bg: 192 80% 92%;
+  --tile-teal: 170 72% 30%; --tile-teal-bg: 166 60% 91%;
+  --tile-green: 145 60% 34%; --tile-green-bg: 140 55% 92%;
+  --tile-amber: 35 92% 40%; --tile-amber-bg: 45 100% 90%;
+  --tile-orange: 20 88% 48%; --tile-orange-bg: 25 100% 93%;
+  --tile-rose: 345 78% 50%; --tile-rose-bg: 345 100% 95%;
+}
+
+.dark {
+  --card-border: 235 18% 18%;
+  --pano-shadow: 0 1px 2px hsl(235 40% 2% / 0.5), 0 8px 24px -10px hsl(235 40% 2% / 0.6);
+  --tile-violet: 258 85% 76%; --tile-violet-bg: 258 35% 22%;
+  --tile-blue: 214 90% 72%; --tile-blue-bg: 217 40% 21%;
+  --tile-sky: 192 80% 64%; --tile-sky-bg: 195 45% 18%;
+  --tile-teal: 166 60% 58%; --tile-teal-bg: 170 40% 17%;
+  --tile-green: 142 55% 62%; --tile-green-bg: 145 35% 18%;
+  --tile-amber: 42 92% 64%; --tile-amber-bg: 38 45% 18%;
+  --tile-orange: 25 92% 66%; --tile-orange-bg: 20 45% 19%;
+  --tile-rose: 345 88% 74%; --tile-rose-bg: 345 40% 21%;
+}
+
+.icon-tile {
+  background-color: hsl(var(--tile-bg));
+  color: hsl(var(--tile-fg));
+}
+.tile-violet { --tile-fg: var(--tile-violet); --tile-bg: var(--tile-violet-bg); }
+.tile-blue { --tile-fg: var(--tile-blue); --tile-bg: var(--tile-blue-bg); }
+.tile-sky { --tile-fg: var(--tile-sky); --tile-bg: var(--tile-sky-bg); }
+.tile-teal { --tile-fg: var(--tile-teal); --tile-bg: var(--tile-teal-bg); }
+.tile-green { --tile-fg: var(--tile-green); --tile-bg: var(--tile-green-bg); }
+.tile-amber { --tile-fg: var(--tile-amber); --tile-bg: var(--tile-amber-bg); }
+.tile-orange { --tile-fg: var(--tile-orange); --tile-bg: var(--tile-orange-bg); }
+.tile-rose { --tile-fg: var(--tile-rose); --tile-bg: var(--tile-rose-bg); }
+/* Birincil ton vurgu rengini izler (kişiselleştirme). */
+.tile-primary { background-color: hsl(var(--primary) / 0.12); color: hsl(var(--primary)); }
+

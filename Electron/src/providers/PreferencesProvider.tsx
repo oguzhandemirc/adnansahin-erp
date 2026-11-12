@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth";
 import { fetchPreferences, savePreferences } from "@/services/preferencesService";
 import { DEFAULT_PREFERENCES, type AppPreferences } from "@/types/preferences";
+import { clearPanoTercih } from "@/pages/Dashboard/pano/usePanoTercih";
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -125,6 +126,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.removeItem("sidebar.collapsed");
       localStorage.removeItem("dashboard.layout.v2");
+      if (user) clearPanoTercih(user.userId);
       localStorage.removeItem("notifications.lastSeen");
     } catch {
       /* sessiz geç */
