@@ -3,7 +3,7 @@
 //   (paylaşımlı kimlik 409) · §7 satıcı kimlik sıfırlaması (zorlama + denetim + yabancı davet yeniden sırlayamaz) ·
 //   §8 cihaz kaydı bütün üyeliklerde + push yükü tesisi · §9 merkez kimliğinin kapanışı ve 30 gün sonra silinmesi.
 import { createHash, randomUUID } from "node:crypto";
-import { acceptInvite, confirmInvite } from "../../src/auth/invite.service";
+import { acceptInvite } from "../../src/auth/invite.service";
 import { LOGIN_FAILURE_FLOOR_MS, newToken } from "../../src/auth/session.service";
 import { CloudError } from "../../src/lib/errors";
 import { withCentral, withTesis } from "../../src/lib/tenant";
@@ -126,15 +126,11 @@ export async function saticiZorlama(o: Ortam, s: Kurgu): Promise<void> {
   );
   kontrol("§7c bütün tesislerde oturum kapanır ve giriş durur (401)", (await oturumTesisi(o, acB)) === 401 && (await giris(o, kH(s), { parola: s.parola })).status === 401);
   const yabanci = await inviteFacilityAdmin(o.goc, { tesisId: s.d, email: s.k.eposta, name: "Yabancı", validHours: 24, zorla: { talep: "BEKCI", gerekce: "bekçi: yabancı davet sondası" } }, o.saat.simdi());
-  const yk = await acceptInvite(o.ctx, { token: yabanci.token, password: "saldirgan-parolasi-2026" });
-  o.saat.ilerlet(31_000);
-  const yo = await confirmInvite(o.ctx, { token: yabanci.token, totp: totpKodu(yk.totpSirri, o.saat.simdi()) }).then(() => null, (e: unknown) => e);
-  kontrol("§7d ⭐ başka tesisin daveti sıfırlanmış kimliği yeniden SIRLAYAMAZ (onay 409 DAVET_ETKINLESTIRILEMEDI)", yo instanceof CloudError && yo.code === "DAVET_ETKINLESTIRILEMEDI", yo instanceof CloudError ? yo.code : String(yo));
-  const kabul = await acceptInvite(o.ctx, { token: r.token, password: "bekci-kurtarilan-parola-2026" });
-  o.saat.ilerlet(31_000);
-  await confirmInvite(o.ctx, { token: r.token, totp: totpKodu(kabul.totpSirri, o.saat.simdi()) });
+  const yo = await acceptInvite(o.ctx, { token: yabanci.token, password: "saldirgan-parolasi-2026" }).then(() => null, (e: unknown) => e);
+  kontrol("§7d ⭐ başka tesisin daveti sıfırlanmış kimliği yeniden PAROLALAYAMAZ (kabul 409 DAVET_ETKINLESTIRILEMEDI)", yo instanceof CloudError && yo.code === "DAVET_ETKINLESTIRILEMEDI", yo instanceof CloudError ? yo.code : String(yo));
+  await acceptInvite(o.ctx, { token: r.token, password: "bekci-kurtarilan-parola-2026" });
   s.parola = "bekci-kurtarilan-parola-2026";
-  s.sir = kabul.totpSirri;
+  s.sir = "";
   const g = await giris(o, kH(s), { parola: s.parola });
   kontrol("§7e satıcı davetini kişi kabul edince kimlik yeniden sırlanır: tek girişte A, B, E yine listelenir", g.status === 200 && idler(veri(g).tesisler) === [s.a, s.b, s.e].join(","), idler(veri(g).tesisler));
 }

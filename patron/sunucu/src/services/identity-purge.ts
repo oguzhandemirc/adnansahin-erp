@@ -70,7 +70,7 @@ export async function closeAndPurgeIdentities(ctx: CloudContext, nowMs: number, 
     purged += await withCentral(ctx.app, { lock: { name: "LOGIN_ROUTE", key: i.emailDigest } }, async (central) => {
       const r = await central.identity.updateMany({
         where: { ...due, id: i.id },
-        data: { passwordHash: null, totpSecretSealed: null, totpLastStep: null, emailDigest: tombstoneDigest(i.id), identityPurgedAt: new Date(nowMs) },
+        data: { passwordHash: null, totpSecretSealed: null, totpLastStep: null, totpEnabledAt: null, emailDigest: tombstoneDigest(i.id), identityPurgedAt: new Date(nowMs) },
       });
       if (r.count === 0) return 0;
       await dropMemberships(central, i.id);

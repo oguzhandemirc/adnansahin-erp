@@ -24,18 +24,15 @@ async function davet(o: Ortam, yonetici: TestHesabi, eposta: string): Promise<Ya
   return api(o, "POST", "/api/hesaplar", { belirtec: yonetici.belirtec, govde: { clientToken: randomUUID(), eposta, ad: "Ortak Kişi", sablon: "SATIS" } });
 }
 
-/** Davet kabul + onay; onay yanıtı ve TOTP sırrı. */
-async function etkinlestir(o: Ortam, token: string): Promise<{ onay: Yanit; sir: string }> {
-  const kabul = await api(o, "POST", "/api/davet/kabul", { govde: { davet: token, parola: TEST_PAROLASI } });
-  const sir = (kabul.json.data as { totpSirri: string }).totpSirri;
-  o.saat.ilerlet(31_000);
-  const onay = await api(o, "POST", "/api/davet/onay", { govde: { davet: token, totp: totpKodu(sir, o.saat.simdi()) } });
-  return { onay, sir };
+/** Davet kabulü hesabı etkinleştirir (doğrulama kodu kapalı doğar); kabul yanıtı = etkinleşme sonucu. */
+async function etkinlestir(o: Ortam, token: string, parola: string = TEST_PAROLASI): Promise<{ onay: Yanit; sir: string; parola: string }> {
+  const onay = await api(o, "POST", "/api/davet/kabul", { govde: { davet: token, parola } });
+  return { onay, sir: "", parola };
 }
 
-async function giris(o: Ortam, eposta: string, sir: string): Promise<Yanit> {
+async function giris(o: Ortam, eposta: string, sir: string, parola: string = TEST_PAROLASI): Promise<Yanit> {
   o.saat.ilerlet(31_000);
-  return api(o, "POST", "/api/oturum/ac", { govde: { eposta, parola: TEST_PAROLASI, totp: totpKodu(sir, o.saat.simdi()) } });
+  return api(o, "POST", "/api/oturum/ac", { govde: { eposta, parola, ...(sir ? { totp: totpKodu(sir, o.saat.simdi()) } : {}) } });
 }
 
 const hesapDurumu = async (o: Ortam, tesisId: string, id: string) => withTesis(o.goc, { tesisId }, async (tx) => (await tx.account.findUniqueOrThrow({ where: { id } })).status);
@@ -74,15 +71,15 @@ async function main(): Promise<void> {
     console.log("\n§3 arşiv e-postayı tutmaz");
     const arsiv = await api(o, "POST", `/api/hesaplar/${ortak.accountId}/durum`, { belirtec: ya.belirtec, govde: { clientToken: randomUUID(), durum: "PASIF" } });
     o.saat.ilerlet(31_000);
-    const eskiOnay = await api(o, "POST", "/api/davet/onay", { govde: { davet: tokenB, totp: totpKodu(r2.sir, o.saat.simdi()) } });
-    const r3 = await etkinlestir(o, tokenB);
+    const eskiOnay = await api(o, "POST", "/api/davet/onay", { govde: { davet: tokenB, totp: "123456" } });
+    const r3 = await etkinlestir(o, tokenB, "bekci-yeni-kimlik-parolasi-2026");
     const onay2 = r3.onay;
     kontrol(
       "§3a ⭐ A'daki hesap PASİF → B'deki aynı davet yeniden kabulle onaylanır (AKTİF); kimlik etkinken alınan kabul onaylanmaz",
       arsiv.status === 200 && eskiOnay.status === 409 && onay2.status === 200 && (onay2.json.data as { durum?: string }).durum === "AKTIF",
       `${arsiv.status}/${eskiOnay.status}/${onay2.status}`,
     );
-    const girisB = await giris(o, ortak.eposta, r3.sir);
+    const girisB = await giris(o, ortak.eposta, r3.sir, r3.parola);
     kontrol("§3b giriş artık B'deki hesaba çözülür", girisB.status === 200 && (girisB.json.data as { tesisId?: string }).tesisId === b.tesisId);
 
     console.log("\n§4 davet e-postayı tutmaz; giriş yalnız etkin hesaba çözülür");
@@ -94,7 +91,7 @@ async function main(): Promise<void> {
     const gA = await giris(o, yeni, rA.sir);
     kontrol("§4b giriş DAVETLİ (C) satırını aday saymaz → A'ya çözülür", gA.status === 200 && (gA.json.data as { tesisId?: string }).tesisId === a.tesisId);
     const gPasif = await giris(o, ortak.eposta, ortak.sir);
-    kontrol("§4c PASİF (A) satırın eski sırrı girmez (aday değil) — 401", gPasif.status === 401);
+    kontrol("§4c PASİF (A) satırın eski parolası + sırrı girmez (aday değil) — 401", gPasif.status === 401);
 
     console.log("\n§5 tesis içi tekillik + DB seddi");
     const ikinci = await davet(o, yb, ortak.eposta);

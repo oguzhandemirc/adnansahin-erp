@@ -21,10 +21,38 @@ const KEY_LENGTH = 32;
 const MAXMEM = 128 * 1024 * 1024;
 const FORMAT = /^scrypt\$(\d{2})\$(\d{1,2})\$(\d{1,2})\$([A-Za-z0-9_-]{22})\$([A-Za-z0-9_-]{43})$/;
 
+/** Yaygın zayıf parolalar (küçük harf; gömülü kısa liste — yeni paket yok). Yalnız YENİ belirlenen parolaya uygulanır. */
+const COMMON_PASSWORDS: ReadonlySet<string> = new Set([
+  "123456789012", "1234567890123", "12345678901234", "123456789123", "098765432109", "123123123123", "123321123321",
+  "qwertyuiopas", "qwertyuiop12", "qwertyuiop123", "qwerty123456", "qwerty1234567", "1q2w3e4r5t6y", "1qaz2wsx3edc",
+  "qazwsxedcrfv", "asdfghjkl123", "zxcvbnm12345", "password1234", "password12345", "passwordpassword", "password2026",
+  "parola123456", "parola1234567", "parolaparola", "sifre1234567", "şifre1234567", "sifresifre12", "iloveyou1234",
+  "abcdefghijkl", "abc123abc123", "abcd1234abcd", "welcome12345", "admin1234567", "administrator", "yonetici1234",
+  "adnansahin12", "adnansahin123", "adnansahin2026", "adnanşahin123", "galatasaray1", "fenerbahce12", "besiktas1903",
+]);
+
+/** Tekrarlı (aaaa…, abcabc…, 1212…) ya da düz artan/azalan rakam dizisi. */
+function trivialPattern(p: string): boolean {
+  for (let size = 1; size <= 4; size++) {
+    const unit = p.slice(0, size);
+    if (p.length % size === 0 && unit.repeat(p.length / size) === p) return true;
+  }
+  if (/^\d+$/.test(p)) {
+    const steps = new Set([...p].slice(1).map((d, i) => (Number(d) - Number(p[i]) + 10) % 10));
+    if (steps.size === 1 && (steps.has(1) || steps.has(9))) return true;
+  }
+  return false;
+}
+
 export function assertPasswordStrength(password: string): void {
-  const length = [...password.normalize("NFC")].length;
+  const normalized = password.normalize("NFC");
+  const length = [...normalized].length;
   if (length < MIN_PASSWORD_LENGTH || length > 200) {
     throw new CloudError(400, "PAROLA_ZAYIF", `Parola ${MIN_PASSWORD_LENGTH}–200 karakter olmalı`);
+  }
+  const folded = normalized.toLowerCase();
+  if (COMMON_PASSWORDS.has(folded) || trivialPattern(folded)) {
+    throw new CloudError(400, "PAROLA_ZAYIF", "Bu parola çok yaygın ya da tahmin edilebilir; başka bir parola seçin");
   }
 }
 

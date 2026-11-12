@@ -1,10 +1,10 @@
 // DAVET — hesap kimliksiz DOĞAR (durum DAVETLI); davetli kendi cihazında etkinleşir. İki yol:
-//   · Yeni hesap: ① kabul (parola belirler → merkez KİMLİK DAVETLI doğar, TOTP sırrı BİR KEZ gösterilir) ② onay (ilk
-//     TOTP kodu → kimlik + hesap AKTİF, üyelik yazılır). E-posta başka tesiste ETKİN bir kimliğe bağlıysa onay genel
-//     409 ile reddedilir (kimliğin varlığı söylenmez).
-//   · Mevcut hesabımla bağlan (`linkInvite`): e-posta + parola + TOTP girişle AYNI doğrulamadan geçer; her ret girişle
-//     AYNI 401'dir (davet yok/süresi geçmiş, e-posta uyuşmazlığı, kimlik yok, yanlış faktör ayırt edilmez).
-// Onaysız hesap giriş YAPAMAZ (DB CHECK: AKTİF kimlik ⇒ parola + TOTP; AKTİF hesap ⇒ kimlik). Davet belirteci düz
+//   · Yeni hesap: kabul (parola belirler → merkez KİMLİK + hesap AKTİF, üyelik yazılır; doğrulama kodu KAPALI doğar,
+//     kişi profilden açar). E-posta başka tesiste ETKİN bir kimliğe bağlıysa kabul genel 409 ile reddedilir (kimliğin
+//     varlığı söylenmez). `confirmInvite` yalnız eski akışta (kabulde TOTP sırrı almış, onayı bekleyen) davet içindir.
+//   · Mevcut hesabımla bağlan (`linkInvite`): e-posta + parola (+ açıksa kod) girişle AYNI doğrulamadan geçer; her ret
+//     girişle AYNI 401'dir (davet yok/süresi geçmiş, e-posta uyuşmazlığı, kimlik yok, yanlış faktör ayırt edilmez).
+// DB CHECK: AKTİF kimlik ⇒ parola; açık doğrulama ⇒ sır + son adım; AKTİF hesap ⇒ kimlik. Davet belirteci düz
 // saklanmaz (sha256), süreli ve tek kullanımlık. İlk tesis yöneticisini satıcı CLI'si davet eder; sonrakileri tesis
 // yöneticisi (kurtarma kodu YOK — kayıpta yönetici sıfırlar, paylaşımlı kimlikte satıcı CLI'si).
 import { randomUUID } from "node:crypto";
@@ -19,8 +19,8 @@ import type { CloudContext } from "../services/context";
 import { loginThrottleFor } from "./login-throttle";
 import { bindMembership, identityByEmail, identityEngagedOutside } from "./membership";
 import { assertPasswordStrength, burnPasswordCheck, hashPassword, verifyPassword } from "./password";
-import { failAfterFloor, ipSummary, newToken, normalizeEmail, tokenDigest, tokenTesis } from "./session.service";
-import { generateTotpSecret, otpauthUri, verifyTotp } from "./totp";
+import { codeRequired, failAfterFloor, ipSummary, newToken, normalizeEmail, tokenDigest, tokenTesis, totpStepClaim, twoFactorOn } from "./session.service";
+import { verifyTotp } from "./totp";
 
 export function createInvite(tesisId: string, nowMs: number, validHours: number): { token: string; digest: string; expiresAt: Date } {
   const { token, digest } = newToken(tesisId);
@@ -64,30 +64,35 @@ export async function inspectInvite(ctx: CloudContext, token: string): Promise<I
 }
 
 /**
- * ① Kabul: kimlik DAVETLI doğar (ya da bu hesap dışında etkin üyeliği olmayan kimlik yeniden sırlanır); TOTP sırrı
- * YALNIZ bu yanıtta döner (tekrar kabul yeni sır üretir). Kimlik başka tesiste etkinse sırrına DOKUNULMAZ: hesap ona
- * bağlanır, onay genel 409 verir (yanıt şekli aynı — varlık söylenmez). Kilit sırası: merkez LOGIN_ROUTE → tesis ACCOUNT_ADMIN.
+ * Kabul: kimlik DAVETLI doğar (ya da bu hesap dışında etkin üyeliği olmayan kimlik yeniden parolalanır, doğrulaması
+ * KAPANIR) ve hemen etkinleşir (`activateInvited`). Kimlik başka tesiste etkinse parolasına DOKUNULMAZ: hesap ona bağlanır,
+ * etkinleştirme genel 409 verir (varlık söylenmez). Kilit sırası: merkez LOGIN_ROUTE → tesis ACCOUNT_ADMIN.
  */
 export async function acceptInvite(ctx: CloudContext, g: { token: string; password: string }): Promise<InviteAccepted> {
   assertPasswordStrength(g.password);
   const nowMs = ctx.now();
   const { account, digest } = await findInvited(ctx, g.token, nowMs);
   const passwordHash = await hashPassword(g.password);
-  const secret = generateTotpSecret();
   const emailDigest = ctx.app.key.emailDigest(account.email);
+  // Bu kabul kimliği kendisi mi parolaladı: değilse (kimlik başka yerde bağlı) etkinleştirme genel 409'dur.
+  let owned = false;
   try {
     await withCentral(ctx.app, { lock: { name: "LOGIN_ROUTE", key: emailDigest } }, async (central) => {
       const existing = await central.identity.findUnique({ where: { emailDigest } });
       let identityId = existing?.id ?? randomUUID();
+      owned = true;
       if (!existing) {
-        await central.identity.create({ data: { id: identityId, emailDigest, passwordHash, totpSecretSealed: ctx.secrets.seal(secret, identityId), status: "DAVETLI" } });
+        await central.identity.create({ data: { id: identityId, emailDigest, passwordHash, status: "DAVETLI" } });
       } else if (await identityReclaimable(ctx, central, existing, account)) {
         const r = await central.identity.updateMany({
           where: { id: existing.id, status: existing.status, updatedAt: existing.updatedAt },
-          data: { status: "DAVETLI", passwordHash, totpSecretSealed: ctx.secrets.seal(secret, existing.id), totpLastStep: null, closedAt: null, identityPurgedAt: null },
+          data: { status: "DAVETLI", passwordHash, totpSecretSealed: null, totpLastStep: null, totpEnabledAt: null, closedAt: null, identityPurgedAt: null },
         });
         if (r.count === 0) throw new InviteClaimLost();
-      } else identityId = existing.id;
+      } else {
+        identityId = existing.id;
+        owned = false;
+      }
       const claimed = await withTesis(ctx.app, { tesisId: account.tesisId, lock: { name: "ACCOUNT_ADMIN", key: account.tesisId } }, (tx) =>
         tx.account.updateMany({ where: { id: account.id, status: "DAVETLI", inviteTokenHash: digest, inviteExpiresAt: { gt: new Date(nowMs) } }, data: { identityId } }),
       );
@@ -98,29 +103,46 @@ export async function acceptInvite(ctx: CloudContext, g: { token: string; passwo
     throw err;
   }
   await recordAudit(ctx.app, { tesisId: account.tesisId, actor: accountActor(account.id), event: "DAVET_KABUL", entity: "Account", entityId: account.id });
-  return { eposta: account.email, totpSirri: secret, otpauth: otpauthUri(account.email, secret) };
+  const bound = await findInvited(ctx, g.token, nowMs);
+  const identityId = bound.account.identityId;
+  const identity = identityId ? await withCentral(ctx.app, {}, (tx) => tx.identity.findUnique({ where: { id: identityId } })) : null;
+  if (!identity) throw invalidInvite();
+  return activateInvited(ctx, bound, owned ? identity : null, null);
 }
 
-/** ② Onay: ilk TOTP kodu doğrulanır → kimlik + hesap AKTİF, üyelik yazılır; davet belirteci düşer (tek kullanımlık). */
+/** Eski akışın onayı: kabulde TOTP sırrı almış davetlinin ilk kodu doğrulanır → AKTİF, doğrulama AÇIK doğar. */
 export async function confirmInvite(ctx: CloudContext, g: { token: string; totp: string }): Promise<InviteConfirmed> {
   const nowMs = ctx.now();
   const { account, digest } = await findInvited(ctx, g.token, nowMs);
   const identityId = account.identityId;
   const identity = identityId ? await withCentral(ctx.app, {}, (tx) => tx.identity.findUnique({ where: { id: identityId } })) : null;
   if (!identity) throw new CloudError(409, "DURUM_CAKISMASI", "Önce daveti kabul edip parola belirleyin");
+  if (identity.status !== "DAVETLI") return activateInvited(ctx, { account, digest }, identity, null);
+  if (!identity.totpSecretSealed) throw new CloudError(409, "DURUM_CAKISMASI", "Daveti parolanızla yeniden kabul edin");
+  const secret = ctx.secrets.open(identity.totpSecretSealed, identity.id);
+  const totp = secret ? verifyTotp(secret, g.totp, { atMs: nowMs, lastUsedStep: null }) : null;
+  if (!totp?.ok) throw new CloudError(400, "GIRIS_BASARISIZ", "Doğrulama kodu hatalı; kimlik doğrulayıcı uygulamadaki güncel kodu girin");
+  return activateInvited(ctx, { account, digest }, identity, totp.step);
+}
+
+/**
+ * Davetli hesabı etkinleştirir: kimlik DAVETLI → AKTİF (`step` verilirse doğrulama AÇIK doğar), üyelik yazılır, hesap
+ * AKTİF, davet belirteci düşer (tek kullanımlık). Kimlik verilmediyse ya da DAVETLİ değilse (başka yerde etkin) genel 409.
+ */
+async function activateInvited(ctx: CloudContext, invited: { account: { id: string; tesisId: string; email: string }; digest: string }, identity: Identity | null, step: number | null): Promise<InviteConfirmed> {
+  const { account, digest } = invited;
+  const nowMs = ctx.now();
   const notActivated = async (): Promise<never> => {
     // E-posta başka bir ETKİN kimlikte: hangi tesiste olduğu (ve var olduğu) söylenmez, ayak izi sebepsiz.
     await recordAudit(ctx.app, { tesisId: account.tesisId, actor: accountActor(account.id), event: "DAVET_ETKINLESTIRILEMEDI", entity: "Account", entityId: account.id });
     throw new CloudError(409, "DAVET_ETKINLESTIRILEMEDI", "Davet etkinleştirilemedi; tesis yöneticinize başvurun (farklı bir e-posta adresiyle yeniden davet gerekebilir)");
   };
-  if (identity.status !== "DAVETLI" || !identity.totpSecretSealed) return notActivated();
-  const secret = ctx.secrets.open(identity.totpSecretSealed, identity.id);
-  const totp = secret ? verifyTotp(secret, g.totp, { atMs: nowMs, lastUsedStep: null }) : null;
-  if (!totp?.ok) throw new CloudError(400, "GIRIS_BASARISIZ", "Doğrulama kodu hatalı; kimlik doğrulayıcı uygulamadaki güncel kodu girin");
+  if (identity?.status !== "DAVETLI" || !identity.passwordHash) return notActivated();
+  const twoFactor = step === null ? { totpSecretSealed: null, totpLastStep: null, totpEnabledAt: null } : { totpLastStep: step, totpEnabledAt: new Date(nowMs) };
   try {
     // Merkez (kimlik + üyelik) önce, tesis claim'i İÇİNDE: claim tutmazsa merkez tx'i geri alınır, üyelik kalmaz.
     await withCentral(ctx.app, { lock: { name: "LOGIN_ROUTE", key: identity.emailDigest } }, async (central) => {
-      const ir = await central.identity.updateMany({ where: { id: identity.id, status: "DAVETLI", totpSecretSealed: identity.totpSecretSealed }, data: { status: "AKTIF", totpLastStep: totp.step } });
+      const ir = await central.identity.updateMany({ where: { id: identity.id, status: "DAVETLI", totpSecretSealed: identity.totpSecretSealed }, data: { status: "AKTIF", ...twoFactor } });
       if (ir.count === 0) throw new InviteClaimLost();
       // Bu hesabın ya da bu kimliğin bu tesisteki bayat üyeliği (tesis içi e-posta tekilliği: o hesap PASİF) devredilir.
       await bindMembership(central, { identityId: identity.id, tesisId: account.tesisId, accountId: account.id });
@@ -144,7 +166,7 @@ export async function confirmInvite(ctx: CloudContext, g: { token: string; totp:
  * kaynak kısması, TOTP adımı merkezde atomik claim, her ret aynı 401 + süre tabanı. Ret ayak izi tek tiptir (sebepsiz):
  * davetin tesis yöneticisi denetimden kimliğin varlığını okuyamaz. Kilit sırası: merkez LOGIN_ROUTE → tesis ACCOUNT_ADMIN.
  */
-export async function linkInvite(ctx: CloudContext, g: { token: string; email: string; password: string; totp: string; ip: string | null }): Promise<InviteConfirmed> {
+export async function linkInvite(ctx: CloudContext, g: { token: string; email: string; password: string; totp?: string | undefined; ip: string | null }): Promise<InviteConfirmed> {
   const startedMs = Date.now();
   const nowMs = ctx.now();
   let invited: Awaited<ReturnType<typeof findInvited>> | null = null;
@@ -160,7 +182,7 @@ export async function linkInvite(ctx: CloudContext, g: { token: string; email: s
   };
   const email = normalizeEmail(g.email);
   const found = account && email === account.email ? await identityByEmail(ctx, email) : null;
-  const identity = found?.status === "AKTIF" && found.passwordHash && found.totpSecretSealed ? { ...found, passwordHash: found.passwordHash, totpSecretSealed: found.totpSecretSealed } : null;
+  const identity = found?.status === "AKTIF" && found.passwordHash ? { ...found, passwordHash: found.passwordHash } : null;
   if (!account || !invited || !identity) {
     await burnPasswordCheck(g.password);
     return fail();
@@ -169,12 +191,11 @@ export async function linkInvite(ctx: CloudContext, g: { token: string; email: s
   const sourceLocked = throttle.isLocked(identity.id, g.ip, nowMs);
   const passwordOk = await verifyPassword(g.password, identity.passwordHash);
   if (sourceLocked) return fail();
-  const secret = ctx.secrets.open(identity.totpSecretSealed, identity.id);
-  const totp = secret ? verifyTotp(secret, g.totp, { atMs: nowMs, lastUsedStep: identity.totpLastStep }) : null;
-  const claimed =
-    passwordOk && totp?.ok
-      ? await withCentral(ctx.app, {}, (tx) => tx.identity.updateMany({ where: { id: identity.id, status: "AKTIF", OR: [{ totpLastStep: null }, { totpLastStep: { lt: totp.step } }] }, data: { totpLastStep: totp.step } }))
-      : { count: 0 };
+  const on = twoFactorOn(identity);
+  if (on && passwordOk && !g.totp) throw codeRequired(401);
+  const secret = on ? ctx.secrets.open(identity.totpSecretSealed, identity.id) : null;
+  const totp = on ? (secret && g.totp ? verifyTotp(secret, g.totp, { atMs: nowMs, lastUsedStep: identity.totpLastStep }) : null) : ({ ok: true, step: null } as const);
+  const claimed = passwordOk && totp?.ok ? await withCentral(ctx.app, {}, (tx) => tx.identity.updateMany(totpStepClaim(identity.id, totp.step))) : { count: 0 };
   if (claimed.count === 0) {
     throttle.registerFailure(identity.id, g.ip, nowMs);
     return fail();

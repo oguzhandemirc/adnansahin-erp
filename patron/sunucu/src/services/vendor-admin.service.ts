@@ -191,7 +191,7 @@ export async function resetIdentity(db: TesisDbRouter, g: { tesisId: string; ema
     if (!route) throw notFound("Kimliğin bu tesisteki üyeliği");
     const ir = await central.identity.updateMany({
       where: { id: identity.id, status: identity.status, updatedAt: identity.updatedAt },
-      data: { status: "DAVETLI", passwordHash: null, totpSecretSealed: null, totpLastStep: null, closedAt: null },
+      data: { status: "DAVETLI", passwordHash: null, totpSecretSealed: null, totpLastStep: null, totpEnabledAt: null, closedAt: null },
     });
     if (ir.count === 0) throw stateConflict("Kimlik bu arada değişti; tekrar deneyin");
     await withTesis(db, { tesisId: g.tesisId, lock: { name: "ACCOUNT_ADMIN", key: g.tesisId } }, async (tx) => {
@@ -211,4 +211,28 @@ export async function resetIdentity(db: TesisDbRouter, g: { tesisId: string; ema
     await recordAudit(db, { tesisId: r.tesisId, actor: VENDOR_ACTOR, event: "KIMLIK_SIFIRLANDI", entity: "Account", entityId: r.accountId, summary: own ? { ...summary, oturum } : { zorla: true, talep: zorla.talep, oturum } });
   }
   return { accountId, token: invite.token, expiresAt: invite.expiresAt };
+}
+
+/**
+ * Doğrulama kodunu (TOTP) kapatma (satıcı; telefonunu kaybeden kişinin TEK kurtarma yolu): talep + gerekçe ZORUNLU.
+ * Kimliğin sırrı silinir, parola ve oturumlar kalır; her üyelik tesisinin denetimine yazılır. Zaten kapalıysa değişiklik yok.
+ */
+export async function disableIdentityTwoFactor(db: TesisDbRouter, g: { email: string; zorla?: VendorOverride }): Promise<{ changed: boolean; facilities: number }> {
+  const zorla = g.zorla;
+  if (!zorla) throw new CloudError(400, "GOVDE_GECERSIZ", "Doğrulama kapatma yalnız --talep=<talep no> --gerekce=\"…\" ile yapılır (denetime yazılır)");
+  const emailDigest = db.key.emailDigest(normalizeEmail(g.email));
+  const identity = await withCentral(db, { lock: { name: "LOGIN_ROUTE", key: emailDigest } }, async (central) => {
+    const found = await central.identity.findUnique({ where: { emailDigest } });
+    if (!found || found.identityPurgedAt) throw notFound("Kimlik");
+    if (found.totpEnabledAt === null && found.totpSecretSealed === null) return null;
+    const r = await central.identity.updateMany({ where: { id: found.id, updatedAt: found.updatedAt }, data: { totpSecretSealed: null, totpLastStep: null, totpEnabledAt: null } });
+    if (r.count === 0) throw stateConflict("Kimlik bu arada değişti; tekrar deneyin");
+    return found;
+  });
+  if (!identity) return { changed: false, facilities: 0 };
+  const routes = await membershipRoutes({ app: db }, identity.id);
+  for (const r of routes) {
+    await recordAudit(db, { tesisId: r.tesisId, actor: VENDOR_ACTOR, event: "DOGRULAMA_KAPATILDI", entity: "Account", entityId: r.accountId, summary: { zorla: true, talep: zorla.talep, gerekce: zorla.gerekce } });
+  }
+  return { changed: true, facilities: routes.length };
 }

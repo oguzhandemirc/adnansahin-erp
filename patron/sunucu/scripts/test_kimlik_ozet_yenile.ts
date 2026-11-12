@@ -18,12 +18,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { FacilityDbKey } from "../src/auth/facility-db-key";
-import { acceptInvite } from "../src/auth/invite.service";
 import { withCentral, withTesis } from "../src/lib/tenant";
 import { REKEY_AUDIT_EVENT, applyDigestRekey, planDigestRekey, type RekeyPlan } from "../src/services/identity-rekey";
-import { inviteFacilityAdmin } from "../src/services/vendor-admin.service";
 import { giris, idler, veri } from "./lib/coklu-tesis-ek";
-import { PATRON_KOKU, TEST_PAROLASI, hesapKur, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi } from "./lib/test-ortam";
+import { PATRON_KOKU, hesapKur, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi } from "./lib/test-ortam";
 
 const IZINLER = ["bulut:siparis:oku"];
 const dizin = mkdtempSync(path.join(os.tmpdir(), "patron-ozet-"));
@@ -70,8 +68,8 @@ async function kur(o: Ortam): Promise<Kurgu> {
   const p = await hesapKur(o, c, IZINLER);
   await withTesis(o.goc, { tesisId: c }, (tx) => tx.account.update({ where: { id: p.accountId }, data: { status: "PASIF", closedAt: new Date(o.saat.simdi()) } }));
   const dEposta = `bekci-d-${randomUUID().slice(0, 8)}@ornek.test`;
-  const davet = await inviteFacilityAdmin(o.goc, { tesisId: c, email: dEposta, name: "Bekleyen", validHours: 24, zorla: { talep: "BEKCI", gerekce: "bekçi fikstürü" } }, o.saat.simdi());
-  await acceptInvite(o.ctx, { token: davet.token, password: TEST_PAROLASI });
+  // Bağsız DAVETLİ kimlik (eski akışta kabul edilmiş, onaylanmamış davetin bıraktığı biçim; bugün kabul hemen etkinleştirir).
+  await withCentral(o.goc, {}, (tx) => tx.identity.create({ data: { emailDigest: o.anahtar.emailDigest(dEposta), passwordHash: "scrypt$bekci", status: "DAVETLI" } }));
   const ids = { k: kId, l: await kimlikId(o, l.eposta), p: await kimlikId(o, p.eposta), d: await kimlikId(o, dEposta) };
   return { a, b, c, k, kB, l, p, dEposta, ids };
 }

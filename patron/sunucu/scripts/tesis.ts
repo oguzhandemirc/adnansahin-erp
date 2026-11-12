@@ -13,6 +13,9 @@
 //   npx tsx scripts/tesis.ts kimlik-sifirla --tesis=<uuid> --eposta=<e-posta> --zorla --talep=<talep no> --gerekce="…" [--saat=72]
 //        (paylaşımlı bulut kimliğinin parola + TOTP sırrını siler; bütün tesislerde oturum kapanır, giriş durur;
 //        `--tesis`teki üyelik hesabı yeni davet alır ve kabulü kimliği yeniden sırlar. Zorlamasız RED; denetime yazılır)
+//   npx tsx scripts/tesis.ts dogrulama-kapat --eposta=<e-posta> --talep=<talep no> --gerekce="…"
+//        (kimliğin doğrulama kodunu (TOTP) kapatır — telefon kaybında TEK kurtarma yolu; parola ve oturumlar kalır;
+//        her üyelik tesisinin denetimine talep + gerekçeyle yazılır; e-posta çıktıya basılmaz)
 //   npx tsx scripts/tesis.ts imha --tesis=<uuid> --isleyen="Ad Soyad" [--erken-talep=<talep no>] [--uygula]
 //        (Ek-6/A §4.3: KURU KOŞUM varsayılan — tablo başına silinecek satır; `--uygula` tesisin veritabanını düşürür,
 //        destek erişim kayıtlarını merkeze kopyalar ve imha kaydını merkeze yazar; yarıda kalan aynı komutla tamamlanır.
@@ -31,7 +34,7 @@ import { expectedSchemaVersion } from "../src/lib/tesis-goc";
 import { cliDeps } from "./tesis-db";
 import { destroyFacility } from "../src/services/facility-destruction";
 import { parseCloudUntilArg } from "../src/services/service-lifecycle";
-import { inviteFacilityAdmin, openFacility, overrideFromArgs, registerInstallation, reinviteAdmin, resetIdentity, setFacilityStatus } from "../src/services/vendor-admin.service";
+import { disableIdentityTwoFactor, inviteFacilityAdmin, openFacility, overrideFromArgs, registerInstallation, reinviteAdmin, resetIdentity, setFacilityStatus } from "../src/services/vendor-admin.service";
 
 function args(argv: readonly string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -109,6 +112,12 @@ async function main(): Promise<void> {
         console.log(`   Davet belirteci (BİR KEZ gösterilir; kişiye güvenli kanaldan iletin): ${r.token}`);
         break;
       }
+      case "dogrulama-kapat": {
+        const zorla = overrideFromArgs({ ...a, zorla: "true" });
+        const r = await disableIdentityTwoFactor(db, { email: need(a, "eposta"), ...(zorla ? { zorla } : {}) });
+        console.log(r.changed ? `✅ doğrulama kodu kapatıldı — ${r.facilities} tesis denetimine yazıldı; giriş: e-posta + parola` : "ℹ️  doğrulama kodu zaten kapalı — değişiklik yok");
+        break;
+      }
       case "imha": {
         const tesisId = uuidArg(a, "tesis");
         const erken = a["erken-talep"];
@@ -125,7 +134,7 @@ async function main(): Promise<void> {
         break;
       }
       default:
-        throw new Error("Komut: tesis-ac | tesis-durum | kurulum-kaydet | yonetici-davet | yonetici-yeniden-davet | kimlik-sifirla | imha");
+        throw new Error("Komut: tesis-ac | tesis-durum | kurulum-kaydet | yonetici-davet | yonetici-yeniden-davet | kimlik-sifirla | dogrulama-kapat | imha");
     }
   } finally {
     await db.close();

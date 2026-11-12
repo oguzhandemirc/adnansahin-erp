@@ -29,7 +29,7 @@ import type { Doorbell, DoorbellTopic } from "../../src/services/doorbell";
 import { InstallationDirectory } from "../../src/services/installation-directory";
 import { createNotificationRuntime } from "../../src/services/notification-scheduler";
 import { inviteFacilityAdmin, openFacility, registerInstallation } from "../../src/services/vendor-admin.service";
-import { acceptInvite, confirmInvite } from "../../src/auth/invite.service";
+import { acceptInvite } from "../../src/auth/invite.service";
 import { applyRoles } from "../db-rolleri";
 import { dropTestFacilityDb } from "./tesis-db-temizlik";
 
@@ -216,24 +216,38 @@ export function totpKodu(sir: string, ms: number): string {
   return hotp(sir, totpStep(ms));
 }
 
-/** Hesap: satıcı daveti → kabul → onay → giriş (gerçek servis yolu). İzinler sonradan GÖÇ rolüyle ayarlanır. */
-export async function hesapKur(o: Ortam, tesisId: string, izinler: readonly string[]): Promise<TestHesabi> {
+/** İki adımlı doğrulamayı oturumdan açar (gerçek HTTP: başlat → ilk kodla onay); sırrı döner. */
+export async function dogrulamaAc(o: Ortam, belirtec: string, parola: string = TEST_PAROLASI): Promise<string> {
+  const b = await api(o, "POST", "/api/oturum/dogrulama/baslat", { belirtec, govde: { parola } });
+  if (b.status !== 200) throw new Error(`doğrulama başlatılamadı: ${b.status} ${JSON.stringify(b.json)}`);
+  const sir = (b.json.data as { totpSirri: string }).totpSirri;
+  o.saat.ilerlet(31_000);
+  const k = await api(o, "POST", "/api/oturum/dogrulama/onay", { belirtec, govde: { totp: totpKodu(sir, o.saat.simdi()) } });
+  if (k.status !== 200) throw new Error(`doğrulama onaylanamadı: ${k.status} ${JSON.stringify(k.json)}`);
+  return sir;
+}
+
+/**
+ * Hesap: satıcı daveti → kabul (hesap AKTİF) → giriş → (varsayılan) doğrulama AÇ (gerçek servis yolu). İzinler sonradan
+ * GÖÇ rolüyle ayarlanır. `dogrulama: false` ⇒ kodsuz hesap (`sir` boş; giriş yalnız parola).
+ */
+export async function hesapKur(o: Ortam, tesisId: string, izinler: readonly string[], g: { dogrulama?: boolean } = {}): Promise<TestHesabi> {
   const eposta = `bekci-${randomUUID().slice(0, 12)}@ornek.test`;
   // Fikstür hesabı satıcı yolundan doğar; tesiste aktif yönetici olabileceği için açık zorlamayla (denetime yazılır).
   const zorla = { talep: "BEKCI-FIKSTUR", gerekce: "bekçi fikstürü: test hesabı" };
   const davet = await inviteFacilityAdmin(o.goc, { tesisId, email: eposta, name: "Bekçi Hesabı", validHours: 24, zorla }, o.saat.simdi());
-  const kabul = await acceptInvite(o.ctx, { token: davet.token, password: TEST_PAROLASI });
-  o.saat.ilerlet(31_000);
-  await confirmInvite(o.ctx, { token: davet.token, totp: totpKodu(kabul.totpSirri, o.saat.simdi()) });
+  await acceptInvite(o.ctx, { token: davet.token, password: TEST_PAROLASI });
   await withTesis(o.goc, { tesisId }, (tx) => tx.account.update({ where: { id: davet.accountId }, data: { permissions: [...izinler] } }));
-  const hesap: TestHesabi = { accountId: davet.accountId, eposta, sir: kabul.totpSirri, belirtec: "" };
+  const hesap: TestHesabi = { accountId: davet.accountId, eposta, sir: "", belirtec: "" };
   hesap.belirtec = await girisYap(o, hesap);
-  return hesap;
+  if (g.dogrulama === false) return hesap;
+  const sir = await dogrulamaAc(o, hesap.belirtec);
+  return { ...hesap, sir };
 }
 
 export async function girisYap(o: Ortam, h: Pick<TestHesabi, "eposta" | "sir">): Promise<string> {
   o.saat.ilerlet(31_000);
-  const r = await api(o, "POST", "/api/oturum/ac", { govde: { eposta: h.eposta, parola: TEST_PAROLASI, totp: totpKodu(h.sir, o.saat.simdi()) } });
+  const r = await api(o, "POST", "/api/oturum/ac", { govde: { eposta: h.eposta, parola: TEST_PAROLASI, ...(h.sir ? { totp: totpKodu(h.sir, o.saat.simdi()) } : {}) } });
   if (r.status !== 200) throw new Error(`giriş başarısız: ${r.status} ${JSON.stringify(r.json)}`);
   return (r.json.data as { belirtec: string }).belirtec;
 }

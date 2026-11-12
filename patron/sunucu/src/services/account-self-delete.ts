@@ -1,7 +1,7 @@
 // KENDİ HESABINI SİLME (Google Play hesap silme politikası) — oturumdaki merkez kimlik ve BÜTÜN tesis üyelikleri MEVCUT
 // arşiv yolundan kapanır: üyelik hesabı `archiveAccountTx` (PASİF + kapanış anı, oturumlar, cihazlar), kimlik
 // `closeIdentityClaim` (PASİF + kapanış anı). Kişisel veri kapanıştan IDENTITY_PURGE_DAYS sonra bakımın mevcut silmesiyle
-// gider — burada silme YOK. Onay: parola + güncel TOTP (`verifyOwnFactors`, parola değişimiyle aynı kapı). Kimliğin son
+// gider — burada silme YOK. Onay: parola + (açıksa) güncel TOTP (`verifyOwnFactors`, parola değişimiyle aynı kapı). Kimliğin son
 // AKTİF yöneticisi olduğu tesis varsa hiçbir şey değişmez: 409 SON_YONETICI (`details.tesisler`). Kilit sırası: merkez
 // LOGIN_ROUTE (İLK ifade) → tesis başına ACCOUNT_ADMIN (her tesis kendi DB'sinde, kendi tx'inde). Tesisler ayrı DB olduğundan
 // kilit altındaki yarış reddi önceki tesislerin arşivini geri almaz; bağsız kalan kimliği bakım tiki kapatır (yakınsar).
@@ -81,7 +81,7 @@ async function closePendingInvites(ctx: CloudContext, identityId: string, nowMs:
   return out;
 }
 
-export async function deleteOwnAccount(ctx: CloudContext, s: SessionContext, g: { password: string; totp: string; ip: string | null }): Promise<AccountDeletion> {
+export async function deleteOwnAccount(ctx: CloudContext, s: SessionContext, g: { password: string; totp?: string | undefined; ip: string | null }): Promise<AccountDeletion> {
   const { identity, step, nowMs } = await verifyOwnFactors(ctx, s, g);
   const routes = await withCentral(ctx.app, {}, (tx) => tx.loginRoute.findMany({ where: { identityId: identity.id }, select: { tesisId: true, accountId: true }, orderBy: { tesisId: "asc" } }));
   const blocked = await lastAdminFacilities(ctx, identity.id, routes);

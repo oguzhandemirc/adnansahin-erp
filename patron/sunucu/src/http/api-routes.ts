@@ -5,11 +5,10 @@
 import express, { type NextFunction, type Request, type Response, type Router } from "express";
 import { z } from "zod";
 import { acceptInvite, confirmInvite, inspectInvite, linkInvite } from "../auth/invite.service";
-import { changeOwnPassword, listFacilities, login, logout, resolveSession, switchFacility, type OpenedSession, type SessionContext } from "../auth/session.service";
+import { listFacilities, login, logout, resolveSession, switchFacility, type OpenedSession, type SessionContext } from "../auth/session.service";
 import { ASSIGNABLE_PERMISSIONS, ROLE_TEMPLATES } from "../catalog/permissions";
 import { CloudError, badRequest } from "../lib/errors";
 import { createAccount, listAccountAudit, listAccounts, resetAccount, setAccountStatus, updateAccount } from "../services/account.service";
-import { deleteOwnAccount } from "../services/account-self-delete";
 import type { CloudContext } from "../services/context";
 import { ANAHTAR_SUZGEC_AZAMI, LIST_ID_FILTER_KEYS, LIST_KEY_FILTER_KEYS, type LoginResponse, type PermissionCatalog } from "../wire/api";
 import { facilityStatus, getCustomerSummary, getProjectionRecord, getSnapshot, listProjection } from "../services/data.service";
@@ -20,6 +19,7 @@ import { cancelReportRequest, createReportRequest, getReportRequest, listReportR
 import { PermissionList, Template, Token, Uuid, body, page, param, s, sendFile, text, uuidCursor, written, type ApiCall, type ApiRouteDef } from "./api-route-kit";
 import { CHANGE_ROUTES } from "./change-routes";
 import { EXPORT_ROUTES } from "./export-routes";
+import { OptionalCode, OWN_FACTOR_ROUTES } from "./own-factor-routes";
 import { NOTIFICATION_ROUTES } from "./notification-routes";
 import { clientAddress, rateLimit } from "./rate-limit";
 
@@ -43,7 +43,7 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
     auth: "ACIK",
     kimlik: { muaf: "oturum doğumu; tekrar yeni oturum açar (eski oturum süresiyle kapanır)" },
     handler: async (c) => {
-      const b = body(c, z.strictObject({ eposta: z.string().min(3).max(254), parola: z.string().min(1).max(200), totp: z.string().min(1).max(12), istemci: z.enum(["mobil", "web"]).optional(), tesisId: Uuid.optional() }));
+      const b = body(c, z.strictObject({ eposta: z.string().min(3).max(254), parola: z.string().min(1).max(200), totp: OptionalCode, istemci: z.enum(["mobil", "web"]).optional(), tesisId: Uuid.optional() }));
       const r = await login(c.ctx, { email: b.eposta, password: b.parola, totp: b.totp, client: b.istemci ?? null, ip: clientAddress(c.req, c.ctx.config), ...(b.tesisId ? { tesisId: b.tesisId } : {}) });
       return { data: loginResponse(r) };
     },
@@ -59,7 +59,7 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
     method: "post",
     path: "/davet/kabul",
     auth: "ACIK",
-    kimlik: { muaf: "davet belirteci tek kullanımlık kimliktir; tekrar kabul yeni TOTP sırrı üretir (onaydan önce)" },
+    kimlik: { muaf: "davet belirteci tek kullanımlık kimliktir; kabul hesabı etkinleştirir ve belirteci düşürür (tekrar 404)" },
     handler: async (c) => {
       const b = body(c, z.strictObject({ davet: z.string().max(100), parola: z.string().min(1).max(200) }));
       return { data: await acceptInvite(c.ctx, { token: b.davet, password: b.parola }) };
@@ -81,7 +81,7 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
     auth: "ACIK",
     kimlik: { muaf: "davet belirteci tek kullanımlık kimliktir; bağlama atomik claim (DAVETLI → AKTİF), her ret girişle aynı 401" },
     handler: async (c) => {
-      const b = body(c, z.strictObject({ davet: z.string().max(100), eposta: z.string().min(3).max(254), parola: z.string().min(1).max(200), totp: z.string().min(1).max(12) }));
+      const b = body(c, z.strictObject({ davet: z.string().max(100), eposta: z.string().min(3).max(254), parola: z.string().min(1).max(200), totp: OptionalCode }));
       return { data: await linkInvite(c.ctx, { token: b.davet, email: b.eposta, password: b.parola, totp: b.totp, ip: clientAddress(c.req, c.ctx.config) }) };
     },
   },
@@ -109,27 +109,7 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
       return { data: loginResponse(await switchFacility(c.ctx, s(c), b.tesisId)) };
     },
   },
-  {
-    method: "post",
-    path: "/oturum/parola",
-    auth: "OTURUM",
-    kimlik: { muaf: "TOTP adımı tekrar oynatmayı keser (aynı kod ikinci kez geçmez)" },
-    handler: async (c) => {
-      const b = body(c, z.strictObject({ mevcutParola: z.string().min(1).max(200), yeniParola: z.string().min(1).max(200), totp: z.string().min(1).max(12) }));
-      await changeOwnPassword(c.ctx, s(c), { current: b.mevcutParola, next: b.yeniParola, totp: b.totp, ip: clientAddress(c.req, c.ctx.config) });
-      return { data: null };
-    },
-  },
-  {
-    method: "post",
-    path: "/oturum/hesap-sil",
-    auth: "OTURUM",
-    kimlik: { muaf: "parola + TOTP adımı tekrar oynatmayı keser; başarıdan sonra bütün oturumlar kapalı, tekrar 401 (etkisiz)" },
-    handler: async (c) => {
-      const b = body(c, z.strictObject({ parola: z.string().min(1).max(200), totp: z.string().min(1).max(12) }));
-      return { data: await deleteOwnAccount(c.ctx, s(c), { password: b.parola, totp: b.totp, ip: clientAddress(c.req, c.ctx.config) }) };
-    },
-  },
+  ...OWN_FACTOR_ROUTES,
   { method: "get", path: "/izinler", auth: "OTURUM", kimlik: "OKUMA", handler: async () => ({ data: { izinler: ASSIGNABLE_PERMISSIONS, sablonlar: ROLE_TEMPLATES } satisfies PermissionCatalog }) },
   // ---- veri ----
   {

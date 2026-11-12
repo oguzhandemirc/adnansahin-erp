@@ -1,10 +1,11 @@
-// BULUT GİRİŞİ — tek adım: e-posta + parola + TOTP (TOTP ZORUNLU; TOTP'siz oturum YOKTUR — DB CHECK da AKTİF
-// kimliği TOTP'siz doğurmaz). Faktörler merkez KİMLİKTE (`identities`), oturum TESİS başına (belirteç öneki tesis).
-// Hata yanıtı TEK (401, aynı ileti) — bilinmeyen kimlik, etkin üyeliği olmayan kimlik, yanlış faktör ve kilit ayırt
-// edilmez; her başarısız dal tek scrypt işi harcar ve yanıt süre tabanına bekletilir. Kilit kimlik + kaynak ikilisine
-// bağlıdır (`login-throttle.ts`). Tesis değişimi (`switchFacility`) mevcut oturumla, TOTP sormadan, ömrü UZATMADAN.
+// BULUT GİRİŞİ — e-posta + parola; doğrulama kodu (TOTP) İSTEĞE BAĞLIDIR, kimlikte AÇIKSA her girişte zorunludur.
+// Kod eksikse 401 `DOGRULAMA_KODU_GEREKLI` YALNIZ doğru paroladan sonra döner (yanlış parolada durum sızmaz).
+// Faktörler merkez KİMLİKTE (`identities`), oturum TESİS başına (belirteç öneki tesis). Hata yanıtı TEK (401, aynı ileti)
+// — bilinmeyen kimlik, etkin üyeliği olmayan kimlik, yanlış faktör ve kilit ayırt edilmez; her başarısız dal tek scrypt
+// işi harcar ve yanıt süre tabanına bekletilir. Kilit kimlik + kaynak ikilisine bağlıdır (`login-throttle.ts`). Tesis
+// değişimi (`switchFacility`) mevcut oturumla, TOTP sormadan, ömrü UZATMADAN.
 import { createHash, randomBytes } from "node:crypto";
-import type { Account } from "@prisma/client";
+import type { Account, Identity, Prisma } from "@prisma/client";
 import type { FacilityChoice } from "../wire/api";
 import { effectivePermissions, type CloudPermission } from "../catalog/permissions";
 import { readableProjections } from "../catalog/projections";
@@ -66,6 +67,13 @@ export function sessionProjections(permissions: ReadonlySet<CloudPermission>): s
   return [...readableProjections(permissions), ...readableReportProjections(permissions)];
 }
 
+/** Doğrulama kodu AÇIK mı (tek kaynak): onaylanmış kurulum; onay bekleyen sır açık SAYILMAZ. */
+export const twoFactorOn = (i: Pick<Identity, "totpEnabledAt" | "totpSecretSealed" | "totpLastStep">): i is typeof i & { totpSecretSealed: string } =>
+  i.totpEnabledAt !== null && i.totpSecretSealed !== null && i.totpLastStep !== null;
+
+/** Açık hesapta kod eksik — YALNIZ doğru paroladan sonra (ve kaynak kilitli değilken) döner. */
+export const codeRequired = (status: 400 | 401): CloudError => new CloudError(status, "DOGRULAMA_KODU_GEREKLI", "Doğrulama kodu gerekli");
+
 const loginFailed = (): CloudError => new CloudError(401, "GIRIS_BASARISIZ", "E-posta, parola ya da doğrulama kodu hatalı");
 const serviceClosed = (): CloudError => new CloudError(403, "HIZMET_KAPANDI", "Adnan Şahin Yönetim hizmeti sona erdi ve salt okuma süresi doldu; veriler imha sürecinde");
 const switchDenied = (): CloudError => new CloudError(403, "TESIS_GECISI_YOK", "Bu tesise geçiş yapılamıyor");
@@ -94,7 +102,8 @@ async function registerFailure(ctx: CloudContext, identityId: string, target: Me
 export interface LoginInput {
   readonly email: string;
   readonly password: string;
-  readonly totp: string;
+  /** Yalnız doğrulaması AÇIK kimlikte denetlenir; kapalıyken gelirse yok sayılır (eski istemci her zaman gönderir). */
+  readonly totp?: string;
   readonly client: "mobil" | "web" | null;
   /** İstemci adresi (vekil başlığı ya da soket); güvenlik kaydına 30 gün girer. */
   readonly ip: string | null;
@@ -157,7 +166,7 @@ export async function login(ctx: CloudContext, g: LoginInput): Promise<OpenedSes
   const identity = email ? await identityByEmail(ctx, email) : null;
   const members = identity?.status === "AKTIF" ? await activeMemberships(ctx, identity.id, nowMs) : [];
   const target = openable(members, g.tesisId) ?? members[0];
-  if (!identity || identity.status !== "AKTIF" || !identity.passwordHash || !identity.totpSecretSealed || !target) {
+  if (!identity || identity.status !== "AKTIF" || !identity.passwordHash || !target) {
     await burnPasswordCheck(g.password);
     const locked = identity && !target ? await lockedMembership(ctx, identity.id) : null;
     if (locked) await recordAudit(ctx.app, { tesisId: locked.tesisId, actor: "giris", event: "GIRIS_REDDEDILDI", entity: "Account", entityId: locked.accountId, summary: { durum: "KILITLI", ...ipSummary(g.ip) } });
@@ -171,17 +180,8 @@ export async function login(ctx: CloudContext, g: LoginInput): Promise<OpenedSes
     await recordAudit(ctx.app, { tesisId: target.tesisId, actor: "giris", event: "GIRIS_REDDEDILDI", entity: "Account", entityId: target.accountId, summary: { sebep: "KAYNAK_KILITLI", ...ipSummary(g.ip) } });
     return failAfterFloor(startedMs);
   }
-  const secret = ctx.secrets.open(identity.totpSecretSealed, identity.id);
-  if (secret === null) {
-    console.error(`[patron] kimlik ${identity.id}: TOTP sırrı çözülemedi (sır anahtarı değişmiş olabilir — kimlik sıfırlanmalı)`);
-    throw new CloudError(500, "SUNUCU_HATASI", "Doğrulama kodu denetlenemedi; tesis yöneticinize başvurun");
-  }
-  const totp = verifyTotp(secret, g.totp, { atMs: nowMs, lastUsedStep: identity.totpLastStep });
-  // Adım iddiası MERKEZDE atomik: aynı kod iki tesiste (ya da eşzamanlı iki girişte) ikinci kez geçemez.
-  const claimed =
-    passwordOk && totp.ok
-      ? await withCentral(ctx.app, {}, (tx) => tx.identity.updateMany({ where: { id: identity.id, status: "AKTIF", OR: [{ totpLastStep: null }, { totpLastStep: { lt: totp.step } }] }, data: { totpLastStep: totp.step } }))
-      : { count: 0 };
+  const claimed = passwordOk ? await claimSecondFactor(ctx, identity, g.totp, nowMs) : { count: 0 };
+  if (claimed === "KOD_GEREKLI") throw codeRequired(401);
   if (claimed.count === 0) {
     await registerFailure(ctx, identity.id, target, { nowMs, ip: g.ip });
     return failAfterFloor(startedMs);
@@ -197,6 +197,26 @@ export async function login(ctx: CloudContext, g: LoginInput): Promise<OpenedSes
   throttle.clear(identity.id, g.ip);
   await recordAudit(ctx.app, { tesisId: target.tesisId, actor: accountActor(target.accountId), event: "GIRIS", entity: "Account", entityId: target.accountId, summary: { oturumId: opened.session.sessionId, istemci: g.client, ...ipSummary(g.ip) } });
   return { ...opened, expiresAt, facilities: choices(members) };
+}
+
+/**
+ * Parola doğruysa ikinci adım: doğrulama AÇIKSA kod zorunlu ve adım iddiası MERKEZDE atomik (aynı kod iki tesiste ya da
+ * eşzamanlı iki girişte ikinci kez geçemez); KAPALIYSA kimliğin hâlâ AKTİF ve kapalı olduğu taze okunur (bu arada açıldıysa
+ * kodsuz geçilmez). Kod eksikse "KOD_GEREKLI" — sayaç ARTMAZ (parola doğruydu).
+ */
+async function claimSecondFactor(ctx: CloudContext, identity: Identity, code: string | undefined, nowMs: number): Promise<{ count: number } | "KOD_GEREKLI"> {
+  if (!twoFactorOn(identity)) {
+    return { count: await withCentral(ctx.app, {}, (tx) => tx.identity.count({ where: { id: identity.id, status: "AKTIF", totpEnabledAt: null } })) };
+  }
+  if (!code) return "KOD_GEREKLI";
+  const secret = ctx.secrets.open(identity.totpSecretSealed, identity.id);
+  if (secret === null) {
+    console.error(`[patron] kimlik ${identity.id}: TOTP sırrı çözülemedi (sır anahtarı değişmiş olabilir — doğrulama CLI ile kapatılmalı)`);
+    throw new CloudError(500, "SUNUCU_HATASI", "Doğrulama kodu denetlenemedi; tesis yöneticinize başvurun");
+  }
+  const totp = verifyTotp(secret, code, { atMs: nowMs, lastUsedStep: identity.totpLastStep });
+  if (!totp.ok) return { count: 0 };
+  return withCentral(ctx.app, {}, (tx) => tx.identity.updateMany(totpStepClaim(identity.id, totp.step)));
 }
 
 /** Bearer belirtecinden oturum: kapalı · süresi dolmuş · hesap AKTİF değil · hizmet KAPALI (90 gün doldu) → null. */
@@ -268,19 +288,22 @@ export async function logout(ctx: CloudContext, s: SessionContext, g: { all?: bo
 }
 
 /**
- * Hassas işlem kapısı (tek kaynak — parola değişimi · kendi hesabını silme): oturumun merkez kimliği AKTİF, parola + güncel
- * TOTP doğru ve kaynak kilitli değil. Yanlışta girişle aynı sayaç + ayak izi, 400 `GIRIS_BASARISIZ`. Adım iddiası ÇAĞIRANDA
- * atomik claim'dir (`totpStepClaim`): aynı kod ikinci kez geçmez.
+ * Hassas işlem kapısı (tek kaynak — parola değişimi · kendi hesabını silme · doğrulamayı açma/kapama): oturumun merkez
+ * kimliği AKTİF, parola doğru, doğrulama AÇIKSA güncel kod da doğru ve kaynak kilitli değil. Yanlışta girişle aynı sayaç +
+ * ayak izi, 400 `GIRIS_BASARISIZ`; açık hesapta kod eksikse (parola doğruyken) 400 `DOGRULAMA_KODU_GEREKLI`, sayaçsız.
+ * Adım iddiası ÇAĞIRANDA atomik claim'dir (`totpStepClaim`; kapalıyken `step` null ve claim kimliğin kapalı kaldığını ister).
  */
-export async function verifyOwnFactors(ctx: CloudContext, s: SessionContext, g: { password: string; totp: string; ip: string | null }) {
+export async function verifyOwnFactors(ctx: CloudContext, s: SessionContext, g: { password: string; totp?: string | undefined; ip: string | null }) {
   const nowMs = ctx.now();
   const identityId = s.identityId;
   const identity = identityId ? await withCentral(ctx.app, {}, (tx) => tx.identity.findUnique({ where: { id: identityId } })) : null;
-  if (!identity?.passwordHash || !identity.totpSecretSealed || identity.status !== "AKTIF") throw new CloudError(401, "OTURUM_YOK", "Oturum geçersiz");
+  if (!identity?.passwordHash || identity.status !== "AKTIF") throw new CloudError(401, "OTURUM_YOK", "Oturum geçersiz");
   const sourceLocked = loginThrottleFor(ctx).isLocked(identity.id, g.ip, nowMs);
-  const secret = ctx.secrets.open(identity.totpSecretSealed, identity.id);
-  const totp = secret ? verifyTotp(secret, g.totp, { atMs: nowMs, lastUsedStep: identity.totpLastStep }) : null;
   const passwordOk = await verifyPassword(g.password, identity.passwordHash);
+  const on = twoFactorOn(identity);
+  if (on && !sourceLocked && passwordOk && !g.totp) throw codeRequired(400);
+  const secret = on ? ctx.secrets.open(identity.totpSecretSealed, identity.id) : null;
+  const totp = on ? (secret && g.totp ? verifyTotp(secret, g.totp, { atMs: nowMs, lastUsedStep: identity.totpLastStep }) : null) : ({ ok: true, step: null } as const);
   if (sourceLocked || !passwordOk || !totp?.ok) {
     if (!sourceLocked) await registerFailure(ctx, identity.id, { tesisId: s.tesisId, accountId: s.accountId }, { nowMs, ip: g.ip });
     throw wrongFactors();
@@ -290,11 +313,17 @@ export async function verifyOwnFactors(ctx: CloudContext, s: SessionContext, g: 
 
 export const wrongFactors = (): CloudError => new CloudError(400, "GIRIS_BASARISIZ", "Mevcut parola ya da doğrulama kodu hatalı");
 
-/** TOTP adım iddiası (merkez, atomik): kimlik AKTİF ∧ adım ileri. */
-export const totpStepClaim = (identityId: string, step: number) => ({ where: { id: identityId, status: "AKTIF" as const, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] }, data: { totpLastStep: step } });
+/**
+ * İkinci faktör iddiası (merkez, atomik): kimlik AKTİF ∧ (açıksa) adım ileri — aynı kod ikinci kez geçmez; `step` null
+ * (doğrulama kapalı) ⇒ kimlik hâlâ AKTİF ve kapalı (bu arada açıldıysa kodsuz işlem geçmez).
+ */
+export const totpStepClaim = (identityId: string, step: number | null): { where: Prisma.IdentityWhereInput; data: Prisma.IdentityUpdateManyMutationInput } =>
+  step === null
+    ? { where: { id: identityId, status: "AKTIF" as const, totpEnabledAt: null }, data: {} }
+    : { where: { id: identityId, status: "AKTIF" as const, totpEnabledAt: { not: null }, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] }, data: { totpLastStep: step } };
 
-/** Kendi parolasını değiştirme (KİMLİKTE): mevcut parola + TOTP; kimliğin bütün tesislerindeki öteki oturumlar kapanır. */
-export async function changeOwnPassword(ctx: CloudContext, s: SessionContext, g: { current: string; next: string; totp: string; ip: string | null }): Promise<void> {
+/** Kendi parolasını değiştirme (KİMLİKTE): mevcut parola + (açıksa) kod; kimliğin bütün tesislerindeki öteki oturumlar kapanır. */
+export async function changeOwnPassword(ctx: CloudContext, s: SessionContext, g: { current: string; next: string; totp?: string | undefined; ip: string | null }): Promise<void> {
   assertPasswordStrength(g.next);
   const { identity, step, nowMs } = await verifyOwnFactors(ctx, s, { password: g.current, totp: g.totp, ip: g.ip });
   const hash = await hashPassword(g.next);

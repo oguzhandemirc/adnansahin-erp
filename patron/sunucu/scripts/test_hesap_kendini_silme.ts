@@ -166,7 +166,7 @@ async function bekleyenDavet(o: Ortam, t: { a: string; e: string }): Promise<voi
   const iy = await kimlik(o, y.eposta);
   const ex = await hesap(o, t.e, dx.hesapId);
   const uyelik = await withCentral(o.goc, {}, (tx) => tx.loginRoute.count({ where: { accountId: { in: [dx.hesapId, dy.hesapId] } } }));
-  kontrol("§8a ön koşul: iki davet kabul edildi, hesap DAVETLİ + kimliğe bağlı, üyelik satırı yok", dx.kabul === 200 && dy.kabul === 200 && ex?.status === "DAVETLI" && ex.identityId === ix?.id && uyelik === 0, `${dx.kabul} ${dy.kabul} ${ex?.status} ${uyelik}`);
+  kontrol("§8a ön koşul: etkin kimliğin e-postasına davet kabulü 409 (etkinleşmez), hesap DAVETLİ + kimliğe bağlı, üyelik satırı yok", dx.kabul === 409 && dy.kabul === 409 && ex?.status === "DAVETLI" && ex.identityId === ix?.id && uyelik === 0, `${dx.kabul} ${dy.kabul} ${ex?.status} ${uyelik}`);
   const r = await sil(o, x);
   const kapanis = o.saat.simdi();
   const sonra = await hesap(o, t.e, dx.hesapId);
