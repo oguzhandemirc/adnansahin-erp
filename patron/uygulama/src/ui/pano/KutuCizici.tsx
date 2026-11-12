@@ -200,12 +200,15 @@ function sonSiparisler(r: RemoteList, router: Router) {
 export const KUTU_CIZICI: Readonly<Record<KutuAnahtari, (b: KutuBaglami) => ReactNode>> = {
   uretim: (b) => <Gosterge b={b} a="uretim" git="/uretim" degerler={(v) => [{ deger: qty(obj(v).bugunTamamlananToplam), birim: UNIT.top }]} ipucu={() => "bugün biten"} />,
   sevk: (b) => (
-    <Gosterge b={b} a="sevk" git="/sevkiyat" degerler={(v) => [{ deger: qty(period(v, b.donem).sevkMiktari), birim: UNIT.metre }]} ipucu={(v) => `${qty(period(v, b.donem).sevkTopSayisi)} ${UNIT.top} · ${PERIOD_LABEL[b.donem].toLocaleLowerCase("tr-TR")}`} />
+    <Gosterge b={b} a="sevk" git="/sevkiyat" degerler={(v) => [{ deger: qty(period(v, b.donem).sevkTopSayisi), birim: UNIT.top }]} ipucu={(v) => `${qty(period(v, b.donem).sevkMiktari)} ${UNIT.metre} · ${PERIOD_LABEL[b.donem].toLocaleLowerCase("tr-TR")}`} />
   ),
   siparis: (b) => <Gosterge b={b} a="siparis" git="/siparisler" degerler={(v) => [{ deger: qty(obj(v).acikKalem), birim: UNIT.kalem }]} ipucu={(v) => `${qty(obj(v).acikMiktar)} ${UNIT.metre} açık`} />,
   stok: (b) => <Gosterge b={b} a="stok" git="/stok" degerler={(v) => [{ deger: qty(obj(v).bitmisMiktar), birim: UNIT.metre }]} ipucu={(v) => `ölü stok ${qty(obj(v).oluMiktar)} ${UNIT.metre}`} />,
   fason: (b) => (
     <Gosterge b={b} a="fason" git="/uretim" degerler={(v) => [{ deger: qty(period(v, b.donem).acikMiktar), birim: UNIT.metre }]} ipucu={(v) => `${qty(period(v, b.donem).acikKalem)} açık ${UNIT.kalem}`} />
+  ),
+  fasonTop: (b) => (
+    <Gosterge b={b} a="fasonTop" git="/uretim" degerler={(v) => { const k = arr(obj(v).kolonlar).find((c) => c.anahtar === "fason"); return k ? [{ deger: qty(k.adet), birim: UNIT.top }] : []; }} ipucu={() => "şu an fasonda"} />
   ),
   alacak: (b) => (
     <Gosterge

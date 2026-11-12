@@ -86,7 +86,7 @@ describe("düzen işlemleri (saf)", () => {
 
   it("katalogda termin/gecikme kutusu yok; varsayılan düzen şartnamedeki sırada", () => {
     expect(K.KUTULAR.some((k) => /termin|gecik|vade/i.test(`${k.anahtar} ${k.baslik} ${k.aciklama}`))).toBe(false);
-    expect(K.VARSAYILAN_DUZEN).toEqual(["uretim", "sevk", "siparis", "stok", "hizliIslemler", "uretimIstasyon", "stokDagilim", "sonSevkler", "sonSiparisler"]);
+    expect(K.VARSAYILAN_DUZEN).toEqual(["uretim", "sevk", "siparis", "fasonTop", "hizliIslemler", "uretimIstasyon", "stokDagilim", "sonSevkler", "sonSiparisler"]);
   });
 });
 

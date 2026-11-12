@@ -52,7 +52,7 @@ describe("StatCard", () => {
     await withTheme(<StatCard etiket="Bugünkü üretim" icon="layers-outline" ton="violet" degerler={[{ deger: "12.480", birim: "m" }]} degisim={{ yuzde: -4.5, kiyas: "düne göre" }} onPress={onPress} testID="kpi" />);
     expect(screen.getByText("12.480")).toBeTruthy();
     expect(screen.getByText("%4,5")).toBeTruthy();
-    expect(flat("kpi")).toMatchObject({ backgroundColor: T.color.card, borderColor: T.color.cardBorder, minHeight: 104, borderRadius: T.radius.card });
+    expect(flat("kpi")).toMatchObject({ backgroundColor: T.color.card, borderColor: T.color.cardBorder, borderRadius: T.radius.card, overflow: "hidden" });
     expect(screen.getByTestId("kpi").props.accessibilityLabel).toBe("Bugünkü üretim, 12.480 m, azalış %4,5 düne göre");
     fireEvent.press(screen.getByTestId("kpi"));
     expect(onPress).toHaveBeenCalled();
