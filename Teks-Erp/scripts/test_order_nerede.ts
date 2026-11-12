@@ -43,14 +43,16 @@ async function errorCode(fn: () => Promise<unknown>): Promise<string> {
 
 // pg sorgu sayacı: Prisma adapter'ı her sorguyu `Client.prototype.query`den geçirir.
 let queryCount = 0;
+// `query` aşırı yüklü; tip zorlaması yerine defineProperty + Reflect.apply (tip mandalı B kümesi).
 const origQuery = Client.prototype.query;
-(Client.prototype as unknown as { query: (...a: unknown[]) => unknown }).query = function (
-  this: Client,
-  ...args: unknown[]
-) {
-  queryCount++;
-  return (origQuery as unknown as (...a: unknown[]) => unknown).apply(this, args);
-};
+Object.defineProperty(Client.prototype, "query", {
+  configurable: true,
+  writable: true,
+  value: function (this: Client, ...args: unknown[]) {
+    queryCount++;
+    return Reflect.apply(origQuery, this, args);
+  },
+});
 async function countQueries(fn: () => Promise<unknown>): Promise<number> {
   const start = queryCount;
   await fn();
