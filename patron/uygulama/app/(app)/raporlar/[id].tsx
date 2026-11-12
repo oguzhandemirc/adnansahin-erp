@@ -14,12 +14,11 @@ import { ErrorBox, SnapshotView } from "../../../src/ui/data";
 import { Screen } from "../../../src/ui/Frame";
 import { IconTile } from "../../../src/ui/ortak";
 import { DOMAIN_TONE } from "../../../src/ui/tokens";
-import { Banner, Card, ConfirmButton } from "../../../src/ui/kit";
+import { Banner, ConfirmButton } from "../../../src/ui/kit";
 import { ParamRows, ReportStatusBadge } from "../../../src/ui/raporlar/parts";
 import { SunumGorunumu } from "../../../src/ui/raporlar/SunumGorunumu";
 import { usePendingPoll } from "../../../src/ui/raporlar/usePendingPoll";
-import { SectionHeader } from "../../../src/ui/SectionHeader";
-import { LoadingSkeleton } from "../../../src/ui/StateViews";
+import { BlokBasligi, Iskelet } from "../../../src/ui/ortak";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
 import { FONT_SCALE, space, typography } from "../../../src/ui/tokens";
 
@@ -53,11 +52,11 @@ export default function ReportDetail() {
 
   return (
     <Screen title={title} module="raporlar" back onRefresh={r.reload} refreshing={r.refreshing}>
-      {r.loading && !d ? <LoadingSkeleton rows={4} /> : null}
+      {r.loading && !d ? <Iskelet bicim="metin" satir={4} /> : null}
       {r.error && !d ? <ErrorBox text={r.error} onRetry={r.reload} /> : null}
       {d && dom ? (
         <>
-          <Card domain={dom.domain} testID="rapor-ozet">
+          <View style={s.kart} testID="rapor-ozet">
             <View style={s.head}>
               <IconTile icon={dom.icon} tone={DOMAIN_TONE[dom.domain]} size="md" />
               <Text style={s.title} maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
@@ -72,12 +71,12 @@ export default function ReportDetail() {
             <View style={s.params}>
               <ParamRows params={d.parametreler} />
             </View>
-          </Card>
+          </View>
 
           {reportPending(d.durum) ? (
-            <View style={[s.pending, { backgroundColor: t.status.bilgi.bg }]} testID="rapor-bekliyor" accessibilityRole="progressbar">
-              <ActivityIndicator color={t.status.bilgi.fill} />
-              <Text style={[s.pendingText, { color: t.status.bilgi.text }]}>
+            <View style={[s.pending, { backgroundColor: t.color.info.bg }]} testID="rapor-bekliyor" accessibilityRole="progressbar">
+              <ActivityIndicator color={t.color.info.fg} />
+              <Text style={[s.pendingText, { color: t.color.info.fg }]}>
                 {d.durum === "BEKLIYOR" ? "İstek fabrikaya iletildi; sıra gelince hesaplanacak. Bu ekran kendiliğinden güncellenir." : "Fabrika raporu hesaplıyor; hazır olunca sonuç burada görünür."}
               </Text>
             </View>
@@ -86,19 +85,19 @@ export default function ReportDetail() {
 
           {d.sonuc && isPresentationKey(d.raporAnahtari) && isPresentation(d.sonuc.veri) ? (
             <>
-              <SectionHeader title="Sonuç" />
+              <BlokBasligi baslik="Sonuç" />
               <Text style={[s.metaText, s.computed]}>{`Fabrikada hesaplandı: ${formatDateTime(d.sonuc.hesaplandi)}`}</Text>
               <SunumGorunumu sunum={d.sonuc.veri} domain={dom.domain} />
             </>
           ) : d.sonuc ? (
             <>
-              <SectionHeader title="Sonuç" />
-              <Card domain={dom.domain} testID="rapor-sonuc">
+              <BlokBasligi baslik="Sonuç" />
+              <View style={s.kart} testID="rapor-sonuc">
                 <Text style={s.metaText}>{`Hesaplandı: ${formatDateTime(d.sonuc.hesaplandi)}`}</Text>
                 <View style={{ marginTop: space.m }}>
                   <SnapshotView value={d.sonuc.veri} />
                 </View>
-              </Card>
+              </View>
             </>
           ) : null}
           {error ? <Banner tone="error" text={error} /> : null}
@@ -112,13 +111,14 @@ export default function ReportDetail() {
 }
 
 const useStyles = makeStyles((t) => ({
+  kart: { backgroundColor: t.color.card, borderRadius: t.radius.card, borderWidth: 1, borderColor: t.color.cardBorder, padding: space.l, marginTop: space.xs, ...t.shadow.card },
   head: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
-  title: { ...typography.title2, color: t.text, flex: 1 },
+  title: { ...typography.title2, color: t.color.text, flex: 1 },
   badgeRow: { flexDirection: "row" as const, marginTop: space.m },
   meta: { marginTop: space.s, gap: 2 },
-  metaText: { ...typography.footnote, color: t.textSecondary },
+  metaText: { ...typography.footnote, color: t.color.textMuted },
   computed: { marginBottom: space.s },
-  params: { marginTop: space.m, backgroundColor: t.surfaceAlt, borderRadius: t.radius.cardInner, paddingHorizontal: space.m, paddingVertical: space.xs },
-  pending: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, padding: space.m, borderRadius: t.radius.cardInner, marginBottom: space.m },
+  params: { marginTop: space.m, backgroundColor: t.color.secondary, borderRadius: t.radius.control, paddingHorizontal: space.m, paddingVertical: space.xs },
+  pending: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, padding: space.m, borderRadius: t.radius.card, marginTop: space.m },
   pendingText: { ...typography.subhead, flex: 1 },
 }));

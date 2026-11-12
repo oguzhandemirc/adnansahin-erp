@@ -10,12 +10,10 @@ import { buildReportParams, catalogEntries, extraParamNames, isPresentationKey, 
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { Screen } from "../../../src/ui/Frame";
-import { IconTile } from "../../../src/ui/ortak";
+import { AltSekmeler, BlokBasligi, FormKarti, IconTile } from "../../../src/ui/ortak";
 import { DOMAIN_TONE } from "../../../src/ui/tokens";
-import { Banner, Button, Card, Field } from "../../../src/ui/kit";
+import { Banner, Button, Field } from "../../../src/ui/kit";
 import { AS_OF_CHOICES, REPORT_PERIODS, asOfDayText, asOfIso, periodText, type AsOfChoice, type ReportPeriod } from "../../../src/ui/raporlar/periods";
-import { SectionHeader } from "../../../src/ui/SectionHeader";
-import { SegmentedControl } from "../../../src/ui/SegmentedControl";
 import { makeStyles } from "../../../src/ui/theme-context";
 import { FONT_SCALE, space, typography } from "../../../src/ui/tokens";
 import { useWrite } from "../../../src/ui/useWrite";
@@ -77,21 +75,20 @@ export default function NewReport() {
 
   return (
     <Screen title="Rapor iste" module="raporlar" back>
-      <Card domain={dom.domain}>
+      <View style={s.kart}>
         <View style={s.head}>
           <IconTile icon={dom.icon} tone={DOMAIN_TONE[dom.domain]} size="md" />
           <Text style={s.title} maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
         </View>
         {typeof soru === "string" && soru !== "" ? <Text style={s.sub}>{soru}</Text> : null}
-      </Card>
+      </View>
       {!allowed ? <Banner tone="error" icon="lock-closed-outline" text="Bu raporu isteme yetkiniz yok" /> : null}
 
       {takesRange ? (
         <>
-          <SectionHeader title="Dönem" />
-          <View style={{ marginBottom: space.m }}>
-            <SegmentedControl items={REPORT_PERIODS} value={period} onChange={pick} testIDPrefix="donem-" accessibilityLabel="Dönem kısayolu" />
-          </View>
+          <BlokBasligi baslik="Dönem" />
+          <AltSekmeler sekmeler={REPORT_PERIODS.map((x) => ({ key: x.key, etiket: x.label }))} secili={period} onSec={pick} testID="donem" />
+          <FormKarti>
           <Field
             label="Başlangıç (GG.AA.YYYY)"
             value={from}
@@ -115,15 +112,15 @@ export default function NewReport() {
             hint="Boş bırakılan aralıkta raporun kendi varsayılan dönemi kullanılır."
             testID="rapor-bitis"
           />
+          </FormKarti>
         </>
       ) : null}
       {takesAsOf ? (
         <>
-          <SectionHeader title={REPORT_PARAM[AS_OF] ?? "Kesit"} />
-          <View style={{ marginBottom: space.m }}>
-            <SegmentedControl items={AS_OF_CHOICES} value={asOfChoice} onChange={setAsOfChoice} testIDPrefix="kesit-" accessibilityLabel="Kesit günü" />
-          </View>
+          <BlokBasligi baslik={REPORT_PARAM[AS_OF] ?? "Kesit"} />
+          <AltSekmeler sekmeler={AS_OF_CHOICES.map((x) => ({ key: x.key, etiket: x.label }))} secili={asOfChoice} onSec={setAsOfChoice} testID="kesit" />
           {asOfChoice === "ozel" ? (
+            <FormKarti>
             <Field
               label="Tarih (GG.AA.YYYY)"
               value={asOfText}
@@ -133,13 +130,14 @@ export default function NewReport() {
               hint="O günün sonundaki durum hesaplanır."
               testID={`rapor-param-${AS_OF}`}
             />
+            </FormKarti>
           ) : (
             <Text style={s.hint} testID="kesit-gunu">{asOfChoice === "bugun" ? `Şu anki durum (${asOfDay ?? "bugün"})` : `${asOfDay ?? ""} günü sonundaki durum`}</Text>
           )}
         </>
       ) : null}
-      {others.length > 0 ? <SectionHeader title="Parametreler" /> : null}
-      {others.map((n) => (
+      {others.length > 0 ? <BlokBasligi baslik="Parametreler" /> : null}
+      {others.length > 0 ? <FormKarti>{others.map((n) => (
         <Field
           key={n}
           label={REPORT_PARAM[n] ?? humanize(n)}
@@ -148,7 +146,7 @@ export default function NewReport() {
           autoCapitalize="none"
           testID={`rapor-param-${n}`}
         />
-      ))}
+      ))}</FormKarti> : null}
       {w.error ? <Banner tone="error" text={w.error} /> : null}
       <Button label="Raporu iste" icon="paper-plane-outline" busy={w.busy} disabled={w.disabled || !allowed} onPress={() => void submit()} testID="rapor-iste" />
     </Screen>
@@ -161,8 +159,9 @@ function withoutAsOf(o: Readonly<Record<string, string>>): Record<string, string
 }
 
 const useStyles = makeStyles((t) => ({
+  kart: { backgroundColor: t.color.card, borderRadius: t.radius.card, borderWidth: 1, borderColor: t.color.cardBorder, padding: space.l, marginTop: space.xs, ...t.shadow.card },
   head: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
-  title: { ...typography.title2, color: t.text, flex: 1 },
-  sub: { ...typography.subhead, color: t.textSecondary, marginTop: space.s },
-  hint: { ...typography.footnote, color: t.textSecondary, marginBottom: space.m },
+  title: { ...typography.title2, color: t.color.text, flex: 1 },
+  sub: { ...typography.subhead, color: t.color.textMuted, marginTop: space.s },
+  hint: { ...typography.footnote, color: t.color.textMuted, marginTop: space.m },
 }));
