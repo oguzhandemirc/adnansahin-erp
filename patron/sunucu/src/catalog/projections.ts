@@ -93,6 +93,8 @@ export const ROOT_PROJECTIONS: readonly RootProjection[] = [
   { name: "dogrudan-sevk", kind: "OLGU", permissions: ["bulut:sevkiyat:oku"], retentionFields: ["cikisTarihi", "olusturulma"], sortFields: ["cikisTarihi", "olusturulma"] },
   { name: "cuval", kind: "OLGU", permissions: ["bulut:sevkiyat:oku"], retentionFields: ["olusturulma"], sortFields: ["olusturulma"] },
   { name: "is-emri", kind: "OLGU", permissions: ["bulut:uretim:oku"], retentionFields: ["olusturulma"], sortFields: ["olusturulma"] },
+  // M2a (Adnan'a özgü): iade satırı (top başına); sevkten düşülmez, ayrı belge.
+  { name: "iade", kind: "OLGU", permissions: ["bulut:sevkiyat:oku"], retentionFields: ["olusturulma"], sortFields: ["olusturulma"] },
   {
     name: "cari-hesap",
     kind: "OLGU",
@@ -209,6 +211,8 @@ export const ROOT_PROJECTIONS: readonly RootProjection[] = [
   { name: "uretim-akisi", kind: "ANLIK", permissions: ["bulut:uretim:oku"] },
   { name: "saglik", kind: "ANLIK", permissions: ["bulut:ozet:oku"] },
   { name: "tesis", kind: "ANLIK", permissions: OTURUM },
+  // M2a (Adnan'a özgü): müşteri → özet haritası; uygulama tek müşteriyi `GET /api/cari-ozeti/:cariKartId` ile okur.
+  { name: "cari-ozeti", kind: "ANLIK", permissions: ["bulut:siparis:oku"] },
 ];
 
 export interface ProjectionDef {

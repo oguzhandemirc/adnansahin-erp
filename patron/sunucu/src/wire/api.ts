@@ -164,6 +164,8 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
       varsayilan: null,
       secenekler: [
         { deger: "GECIKMIS", etiket: "Gecikmiş", alan: "gecikmis", esit: true },
+        // M2a: `acik`ı fabrika türetir (açık durum kümesi fabrikada); eski satır alanı taşımaz, katalog sürümü 2 TAM gönderir.
+        { deger: "ACIK", etiket: "Açık (gönderilmeyi bekleyen)", alan: "acik", esit: true },
         // Etiket sevk dilinde (panel `orderStatusLabels`); `deger` kodları sözleşmedir, değişmez.
         { deger: "BEKLEMEDE", etiket: "Henüz onaylanmadı", alan: "durum", esit: "PENDING" },
         { deger: "ONAYLANDI", etiket: "Henüz gönderilmedi", alan: "durum", esit: "APPROVED" },
@@ -200,11 +202,11 @@ export type ListIdFilterKey = (typeof LIST_ID_FILTER_KEYS)[number];
  * TAŞIYAN projeksiyonlarda (fabrika kataloğu kolonları) kabul edilir, diğerinde 400.
  */
 export const LIST_ID_FILTERS: Readonly<Record<ListIdFilterKey, readonly string[]>> = {
-  cariKartId: ["sube", "fason-firma", "siparis", "sevkiyat", "dogrudan-sevk", "cuval", "cari-hesap", "fiyat", "teklif"],
+  cariKartId: ["sube", "fason-firma", "siparis", "sevkiyat", "dogrudan-sevk", "cuval", "cari-hesap", "fiyat", "teklif", "iade"],
   cariHesapId: ["cari-hareket", "cek-senet", "fatura", "tahsilat-odeme"],
-  siparisId: ["siparis-kalemi", "teklif"],
+  siparisId: ["siparis-kalemi", "teklif", "iade"],
   teklifId: ["teklif-kalemi"],
-  urunId: ["siparis-kalemi", "is-emri", "fatura-kalemi", "fiyat", "teklif-kalemi", "standart-maliyet"],
+  urunId: ["siparis-kalemi", "is-emri", "fatura-kalemi", "fiyat", "teklif-kalemi", "standart-maliyet", "iade"],
 };
 
 // ---------------------------------------------------------------- liste anahtar süzgeçleri (D4-KUC3c)
@@ -424,6 +426,50 @@ export interface ServiceRevenueSnapshot {
 export interface Snapshot {
   readonly projeksiyon: string;
   readonly veri: unknown;
+  readonly surum: string;
+}
+
+// ---------------------------------------------------------------- cari özeti (M2a — Adnan'a özgü genişletme)
+/** Birim başına miktar: farklı birim TOPLANMAZ (fabrika birim kodu: `MT` · `KG` · …). */
+export interface UnitQuantity {
+  readonly birim: string;
+  readonly miktar: number;
+}
+
+/** Dönem özeti — sevk BRÜT (iade düşülmez), iade ayrı toplam; para alanı YOK. */
+export interface CustomerSummaryPeriod {
+  readonly siparisSayisi: number;
+  readonly kalemSayisi: number;
+  readonly siparisMiktari: readonly UnitQuantity[];
+  readonly sevk: { readonly metre: number; readonly top: number; readonly kg: number; readonly tartiliCuval: number; readonly cuval: number };
+  readonly iade: { readonly adet: number; readonly metre: number };
+  readonly enCokUrun: readonly {
+    readonly urunId: string;
+    readonly urunAdi: string;
+    readonly renkId: string | null;
+    readonly renkAdi: string | null;
+    readonly birim: string;
+    readonly miktar: number;
+    readonly siparisSayisi: number;
+  }[];
+}
+
+export interface CustomerSummary {
+  readonly tumZamanlar: CustomerSummaryPeriod;
+  readonly son12Ay: CustomerSummaryPeriod;
+  readonly acik: { readonly siparisSayisi: number; readonly kalemSayisi: number; readonly acikMiktar: readonly UnitQuantity[] };
+  readonly sonSiparisTarihi: string | null;
+  readonly sonSevkTarihi: string | null;
+}
+
+/**
+ * `GET /api/cari-ozeti/:cariKartId` — `cari-ozeti` anlığından TEK müşterinin girdisi (bulut süzer, hesaplamaz).
+ * `ozet: null` = bu müşterinin hiç siparişi/sevki/iadesi yok; anlık hiç gelmediyse 404.
+ */
+export interface CustomerSummaryResponse {
+  readonly cariKartId: string;
+  readonly son12AyBaslangic: string | null;
+  readonly ozet: CustomerSummary | null;
   readonly surum: string;
 }
 

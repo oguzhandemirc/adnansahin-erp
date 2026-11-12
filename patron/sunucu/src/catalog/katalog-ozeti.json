@@ -185,6 +185,19 @@
       ]
     },
     {
+      "name": "iade",
+      "kind": "OLGU",
+      "permissions": [
+        "bulut:sevkiyat:oku"
+      ],
+      "retentionFields": [
+        "olusturulma"
+      ],
+      "sortFields": [
+        "olusturulma"
+      ]
+    },
+    {
       "name": "cari-hesap",
       "kind": "OLGU",
       "permissions": [
@@ -588,6 +601,13 @@
       "permissions": [
         "bulut:oturum"
       ]
+    },
+    {
+      "name": "cari-ozeti",
+      "kind": "ANLIK",
+      "permissions": [
+        "bulut:siparis:oku"
+      ]
     }
   ],
   "PROJECTION_PERMISSIONS": {
@@ -644,6 +664,9 @@
     ],
     "is-emri": [
       "bulut:uretim:oku"
+    ],
+    "iade": [
+      "bulut:sevkiyat:oku"
     ],
     "cari-hesap": [
       "bulut:cari-bakiye:oku"
@@ -788,6 +811,9 @@
     ],
     "tesis": [
       "bulut:oturum"
+    ],
+    "cari-ozeti": [
+      "bulut:siparis:oku"
     ]
   },
   "REPORT_KEY_PERMISSION": {

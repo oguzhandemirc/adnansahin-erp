@@ -8,7 +8,7 @@ import { projectionDef, type ProjectionDef } from "../catalog/projections";
 import { badRequest, forbidden, notFound } from "../lib/errors";
 import { searchCondition } from "../lib/search";
 import { NO_TENANT, withTesis } from "../lib/tenant";
-import { ANAHTAR_SUZGEC_AZAMI, ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_KEY_FILTER_KEYS, LIST_KEY_FILTERS, LIST_SEARCH, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListKeyFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
+import { ANAHTAR_SUZGEC_AZAMI, ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_KEY_FILTER_KEYS, LIST_KEY_FILTERS, LIST_SEARCH, type CustomerSummary, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListKeyFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
 import type { CloudContext } from "./context";
 import { loadServiceFacts, serviceState } from "./service-lifecycle";
 
@@ -182,6 +182,25 @@ export async function getSnapshot(ctx: CloudContext, s: SessionContext, name: st
   );
   if (!row || row.deletedAt) throw notFound("Anlık görüntü");
   return { projeksiyon: def.name, veri: row.data, surum: row.versionAt.toISOString() };
+}
+
+/**
+ * Cari özeti (M2a): `cari-ozeti` anlığından TEK müşterinin girdisi. Bulut hesap yapmaz — jsonb yolundan yalnız
+ * o anahtarı seçer; girdi yoksa `ozet: null` (müşterinin hareketi yok), anlık hiç gelmediyse 404.
+ */
+export async function getCustomerSummary(ctx: CloudContext, s: SessionContext, cariKartId: string): Promise<CustomerSummaryResponse> {
+  const def = readableDef(s, "cari-ozeti", "ANLIK");
+  if (!UUID.test(cariKartId)) throw badRequest("cariKartId biçimsiz");
+  const id = cariKartId.toLowerCase();
+  const rows = await withTesis(ctx.app, { tesisId: s.tesisId, projections: s.projections }, (tx) =>
+    tx.$queryRaw<{ ozet: unknown; baslangic: string | null; version_at: Date }[]>(Prisma.sql`
+      SELECT r.data->'cariler'->${id} AS ozet, r.data->>'son12AyBaslangic' AS baslangic, r.version_at
+        FROM projection_rows r
+       WHERE r.tesis_id = ${s.tesisId}::uuid AND r.projection = ${def.name} AND r.record_id = ${NO_TENANT}::uuid AND r.deleted_at IS NULL`),
+  );
+  const row = rows[0];
+  if (!row) throw notFound("Anlık görüntü");
+  return { cariKartId: id, son12AyBaslangic: row.baslangic, ozet: (row.ozet ?? null) as CustomerSummary | null, surum: row.version_at.toISOString() };
 }
 
 /** Ekranın üst şeridi: tesis adı · son eşitleme · sözleşme uyarısı · takılan ufuk · görülebilir projeksiyonlar · hizmet aşaması. */

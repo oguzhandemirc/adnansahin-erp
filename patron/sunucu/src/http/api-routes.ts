@@ -12,7 +12,7 @@ import { createAccount, listAccountAudit, listAccounts, resetAccount, setAccount
 import { deleteOwnAccount } from "../services/account-self-delete";
 import type { CloudContext } from "../services/context";
 import { ANAHTAR_SUZGEC_AZAMI, LIST_ID_FILTER_KEYS, LIST_KEY_FILTER_KEYS, type LoginResponse, type PermissionCatalog } from "../wire/api";
-import { facilityStatus, getProjectionRecord, getSnapshot, listProjection } from "../services/data.service";
+import { facilityStatus, getCustomerSummary, getProjectionRecord, getSnapshot, listProjection } from "../services/data.service";
 import { deactivateDevice, listDevices, registerDevice } from "../services/device.service";
 import { requestSnapshotRefresh } from "../services/doorbell";
 import { cancelInbox, createInboxMessage, getInbox, listInbox } from "../services/inbox.service";
@@ -146,6 +146,8 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
   // Ekran açıkken tazeleme: `ozet` zili (§14 S47); içerik taşımaz, tesis başına 30 sn'de bir.
   { method: "post", path: "/tazele", auth: "OTURUM", kimlik: { muaf: "zil içerik taşımaz; tekrar yalnız fazladan anlık tur yaptırır (§6.5)" }, handler: async (c) => ({ data: requestSnapshotRefresh(c.ctx.doorbell, s(c).tesisId, c.ctx.now()) }) },
   { method: "get", path: `/anlik/:${PROJECTION}`, auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await getSnapshot(c.ctx, s(c), String(c.req.params[PROJECTION])) }) },
+  // M2a: cari özeti — `cari-ozeti` anlığından tek müşteri (izin anlığınkiyle aynı: `bulut:siparis:oku`).
+  { method: "get", path: "/cari-ozeti/:cariKartId", auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await getCustomerSummary(c.ctx, s(c), String(c.req.params.cariKartId)) }) },
   ...CHANGE_ROUTES,
   // ---- gelen kutusu ----
   {

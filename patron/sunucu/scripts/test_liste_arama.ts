@@ -203,8 +203,8 @@ async function siparisArama(o: Ortam, h: TestHesabi, id: SiparisIds): Promise<vo
   kontrol("§6e durum çipi + arama birlikte", ayni(bek.ids, [id.siparis.yeni]), `${bek.ids.size}`);
   const yok = await ara(o, h, "siparis", { suzgec: "BU_HAFTA" });
   kontrol("§6f tanınmayan çip → 400", yok.status === 400 && yok.kod !== undefined, `${yok.status}`);
-  const zaman = (LIST_SEARCH.siparis?.suzgec?.secenekler ?? []).filter((x) => !["gecikmis", "durum"].includes(x.alan));
-  kontrol("§6g sipariş çipleri yalnız fabrika eşitlik alanları (gecikmis · durum; zaman kovası yok)", zaman.length === 0, zaman.map((x) => x.alan).join(","));
+  const zaman = (LIST_SEARCH.siparis?.suzgec?.secenekler ?? []).filter((x) => !["gecikmis", "durum", "acik"].includes(x.alan));
+  kontrol("§6g sipariş çipleri yalnız fabrika eşitlik alanları (gecikmis · durum · acik; zaman kovası yok)", zaman.length === 0, zaman.map((x) => x.alan).join(","));
 }
 
 async function kimlikSuzgecleri(o: Ortam, h: TestHesabi, id: SiparisIds): Promise<void> {
