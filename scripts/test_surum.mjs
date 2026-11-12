@@ -25,7 +25,6 @@ import {
   ayristir,
   etiketDefteriKiyasla,
   karsilastir,
-  manifestGovdesindenSurum,
   sonrakiSurumEtiketten,
   yamaArtir,
 } from './lib/surum.mjs';
@@ -141,29 +140,6 @@ try {
 } finally {
   fs.rmSync(depo, { recursive: true, force: true });
 }
-
-console.log('\n§4 — Expo manifest gövdesinden sürüm');
-// ⚠️ Gövde İKİ parça taşır; "ilk { ile son } arası" kestirmesi ayrıştırma
-// hatası verir (ölçüldü).
-const govde = [
-  '--sinir',
-  'content-disposition: form-data; name="manifest"',
-  'content-type: application/json',
-  '',
-  JSON.stringify({ id: 'x', extra: { expoClient: { version: '1.0.3', sdkVersion: '54.0.0' } } }),
-  '--sinir',
-  'content-disposition: form-data; name="extensions"',
-  'content-type: application/json',
-  '',
-  '{"assetRequestHeaders":{}}',
-  '--sinir--',
-  '',
-].join('\r\n');
-ol('iki parçalı gövdeden doğru sürüm', () =>
-  assert.equal(manifestGovdesindenSurum(govde), '1.0.3'));
-ol('sdkVersion ile karışmaz', () =>
-  assert.notEqual(manifestGovdesindenSurum(govde), '54.0.0'));
-ol('bozuk gövde null', () => assert.equal(manifestGovdesindenSurum('merhaba'), null));
 
 console.log(`\n${'='.repeat(60)}`);
 if (kaldi.length) {

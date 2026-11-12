@@ -1,13 +1,12 @@
 {
   "_aciklama": [
     "DAĞITIM KANALLARININ KAYIT DEFTERİ — her kanalın bütün dağıtım kimlikleri tek yerde.",
-    "Kanal kodu = güncelleme sunucusundaki yol segmenti (/<kod>/electron/ · /<kod>/mobil/); kodlar birbirinin öneki olamaz.",
+    "Kanal kodu = güncelleme sunucusundaki yol segmenti (/<kod>/electron/); kodlar birbirinin öneki olamaz. Tablet yalnız Google Play'den dağıtılır (OTA yok, kullanıcı kararı 2026-11-12): kayıt tablet için yayın adresi taşımaz.",
     "DAVRANIŞ TAŞIMAZ: bayrak/ayar anahtarı buraya giremez — şema KAPALI anahtar kümesidir. 'adnansahin'de yok' hâlâ 'bayrağı kapalı' demektir.",
-    "'yayin' bloğu koddan TÜRER (yayın kökü · VDS kökü · runtimeVersion); elle düzeltilmez, bekçi türetimle birebir ölçer.",
+    "'yayin' bloğu koddan TÜRER (yayın kökü · VDS kökü); elle düzeltilmez, bekçi türetimle birebir ölçer.",
     "Üretim kanalının kimliği DONMUŞTUR: değişimi sahadaki kurulumlar için bir GÖÇTÜR (yeni uygulama · kayıp userData · kopan güncelleme kanalı).",
     "Commit edilen işaretçiler (Electron/shared/musteri.json · mobil/musteri.json · Electron/package.json · mobil/app.json) 'varsayilan' kanalı gösterir.",
     "Panel kimliği ağaca YAZILMAZ: electron-paketle.sh <kod> onu derleme ANINDA enjekte eder (electron-builder -c.* + Vite sanal modülü, Electron/build-channel.ts); panel.erpAdresi = keşif sonuç vermezse panelin bağlandığı varsayılan sunucu.",
-    "runtimeVersion kanal kimliği DEĞİLDİR (JS↔native uyum kimliği): çakışma denetimine girmez, mobil/app.json ile eşit olmak zorundadır.",
     "Bekçi: node scripts/check-kanallar.mjs (+ --sonda) · yayın kapıları: node scripts/test_kanal_yayin_kapisi.mjs. Kural: docs/kurallar/surum-yayin.md."
   ],
   "varsayilan": "adnansahin",
@@ -19,11 +18,7 @@
       "yayin": {
         "panelFeed": "https://guncelleme.etkiliyazilim.com/adnansahin/electron/",
         "panelManifest": "https://guncelleme.etkiliyazilim.com/adnansahin/electron/latest.yml",
-        "mobilFeed": "https://guncelleme.etkiliyazilim.com/adnansahin/mobil/",
-        "otaManifest": "https://guncelleme.etkiliyazilim.com/adnansahin/mobil/ota/54.4/manifest",
-        "apkKunye": "https://guncelleme.etkiliyazilim.com/adnansahin/mobil/apk/surum.json",
         "vdsPanel": "/opt/stack/apps/tekserp-guncelleme/html/adnansahin/electron",
-        "vdsMobil": "/opt/stack/apps/tekserp-guncelleme/html/adnansahin/mobil",
         "panelDefter": "/opt/stack/apps/tekserp-guncelleme/defter/adnansahin-YAYIN-DEFTERI.tsv"
       },
       "panel": {
@@ -36,9 +31,7 @@
       "tablet": {
         "androidPaket": "com.etkiliyazilim.adnansahin.saha",
         "gorunenAd": "Adnan Şahin TeksERP Saha",
-        "erpAdresi": "http://192.168.1.250:4000/api",
-        "runtimeVersion": "54.4",
-        "otaSertifika": "keystore/ota-certs/certificate.pem"
+        "erpAdresi": "http://192.168.1.250:4000/api"
       }
     }
   }

@@ -72,7 +72,6 @@ const DONMUS = {
     'panel.erpAdresi': 'http://192.168.1.250:4000',
     'tablet.androidPaket': 'com.etkiliyazilim.adnansahin.saha', // kimlik göçü, kullanıcı kararı 2026-11-12 (eski: com.teks.erp.mobil — sahada elle kaldırılır)
     'tablet.erpAdresi': 'http://192.168.1.250:4000/api',
-    'tablet.otaSertifika': 'keystore/ota-certs/certificate.pem',
   },
 };
 
@@ -87,8 +86,6 @@ const DONMUS = {
 const YAYIN_YOLLARI = {
   'deploy/electron-paketle.sh': { sinif: 'kapili' },
   'deploy/electron-yayinla.sh': { sinif: 'kapili' },
-  'deploy/mobil-yayinla.mjs': { sinif: 'kapili' },
-  'mobil/scripts/yayinla-ota.mjs': { sinif: 'kapili' },
   'mobil/scripts/build-apk.mjs': { sinif: 'kapili' },
   'deploy/play-yukle.mjs': { sinif: 'kapili' },
   'deploy/electron-yayinla.ps1': { sinif: 'saplama' },
@@ -104,10 +101,8 @@ const KAPI_CLI = 'scripts/kanal-kapisi.mjs';
 
 const KOD_KAYNAKLARI = [
   'Electron/shared/update-feed.ts',
-  'mobil/scripts/lib/feed.cjs',
   'deploy/electron-paketle.sh',
   'deploy/electron-yayinla.sh',
-  'deploy/mobil-yayinla.mjs',
 ];
 const KAPI_KANCASI = 'scripts/hooks/pre-commit.mjs';
 const OKUNAN = [...new Set([KAYIT_REL, KAPI_CLI, KAPI_KANCASI, ...PANEL_SABIT_DOSYALAR, ...TABLET_SABIT_DOSYALAR, ...KOD_KAYNAKLARI, ...Object.keys(YAYIN_YOLLARI)])];
@@ -139,10 +134,6 @@ function sabitleriOlc(d, kirmizi) {
   // Panelin çalışma anı adresi kaydın kendisidir (derleme anında); biçimini aşağıdaki türetim ölçer.
   yakala(d, 'Electron/shared/update-feed.ts',
     /export const DEFAULT_UPDATE_FEED_URL: string = UPDATE_FEED_URL;/, 'panel feed kayıttan (UPDATE_FEED_URL)');
-  const kokFeed = yakala(d, 'mobil/scripts/lib/feed.cjs', /const YAYIN_KOKU = '([^']+)';/, 'YAYIN_KOKU');
-  yakala(d, 'mobil/scripts/lib/feed.cjs', /return `\$\{YAYIN_KOKU\}\$\{musteriKodu\}\/mobil\/`;/, 'feedUrl biçimi');
-  yakala(d, 'mobil/scripts/lib/feed.cjs', /return `\$\{normalizeFeed\(feed\)\}ota\/\$\{runtimeVersion\}\/manifest`;/, 'manifestUrl biçimi');
-  yakala(d, 'mobil/scripts/lib/feed.cjs', /return `\$\{normalizeFeed\(feed\)\}apk\/surum\.json`;/, 'apkKunyeUrl biçimi');
   const kokPaketle = yakala(d, 'deploy/electron-paketle.sh', /^BASE_URL="([^"]+)"$/m, 'BASE_URL');
   yakala(d, 'deploy/electron-paketle.sh', /^beklenen_url="\$\{BASE_URL\}\$\{musteri\}\/electron\/"$/m, 'beklenen adres türetimi');
   const kokYayinla = yakala(d, 'deploy/electron-yayinla.sh', /^BASE_URL="\$\{BASE_URL:-([^}]+)\}"$/m, 'BASE_URL');
@@ -151,31 +142,22 @@ function sabitleriOlc(d, kirmizi) {
   yakala(d, 'deploy/electron-yayinla.sh', /YAYIN_URL="\$\{YAYIN_URL:-\$BASE_URL\/\$musteri\/electron\}"/, 'YAYIN_URL biçimi');
   yakala(d, 'deploy/electron-yayinla.sh', /DEFTER_DIZIN="\$\(dirname "\$YAYIN_KOK"\)\/defter"/, 'DEFTER_DIZIN biçimi');
   yakala(d, 'deploy/electron-yayinla.sh', /\$DEFTER_DIZIN\/\$musteri-YAYIN-DEFTERI\.tsv/, 'defter dosya adı biçimi');
-  const vdsMobil = yakala(d, 'deploy/mobil-yayinla.mjs', /`([^`$]+)\/\$\{MUSTERI\}\/mobil`/, 'mobil uzak kök biçimi');
 
-  const koklar = { 'update-feed.ts UPDATE_BASE_URL': kokUF, 'feed.cjs YAYIN_KOKU': kokFeed,
+  const koklar = { 'update-feed.ts UPDATE_BASE_URL': kokUF,
     'electron-paketle.sh BASE_URL': kokPaketle, 'electron-yayinla.sh BASE_URL + "/"': `${kokYayinla}/` };
   if (new Set(Object.values(koklar)).size !== 1) {
     kirmizi.push(`yayın kökü kaynaklar arasında AYRIŞMIŞ: ${Object.entries(koklar).map(([k, v]) => `${k}="${v}"`).join(' · ')}`);
   }
-  if (vdsYayinla !== vdsMobil) {
-    kirmizi.push(`VDS kökü AYRIŞMIŞ: electron-yayinla.sh "${vdsYayinla}" · mobil-yayinla.mjs "${vdsMobil}"`);
-  }
   return { yayinKoku: kokUF, vdsKok: vdsYayinla, defterKok: `${path.posix.dirname(vdsYayinla)}/defter` };
 }
 
-/** Bir kanalın `yayin` bloğu koddan böyle TÜRER (feed.cjs · update-feed.ts · iki yayıncı). */
-function turet(kod, rv, s) {
+/** Bir kanalın `yayin` bloğu koddan böyle TÜRER (update-feed.ts · panel yayıncıları). Tablet yalnız Play'den: yayın adresi yok. */
+function turet(kod, s) {
   const panelFeed = `${s.yayinKoku}${kod}/electron/`;
-  const mobilFeed = `${s.yayinKoku}${kod}/mobil/`;
   return {
     panelFeed,
     panelManifest: `${panelFeed}latest.yml`,
-    mobilFeed,
-    otaManifest: `${mobilFeed}ota/${rv}/manifest`,
-    apkKunye: `${mobilFeed}apk/surum.json`,
     vdsPanel: `${s.vdsKok}/${kod}/electron`,
-    vdsMobil: `${s.vdsKok}/${kod}/mobil`,
     panelDefter: `${s.defterKok}/${kod}-YAYIN-DEFTERI.tsv`,
   };
 }
@@ -228,18 +210,9 @@ function olc(d, yayinDosyalari, yayinYollari = YAYIN_YOLLARI) {
   // §3
   dene(() => {
     const s = sabitleriOlc(d, kirmizi);
-    let rv = null;
-    try {
-      rv = String(JSON.parse(d['mobil/app.json']).expo?.runtimeVersion ?? '');
-    } catch {
-      throw new Olculemedi('mobil/app.json okunamadı/ayrıştırılamadı');
-    }
     for (const [kod, k] of Object.entries(kanallar)) {
-      if (!k?.yayin || !k?.tablet) continue;
-      if (k.tablet.runtimeVersion !== rv) {
-        kirmizi.push(`§3 ${kod}.tablet.runtimeVersion "${k.tablet.runtimeVersion}" ↔ mobil/app.json "${rv}" — rv ortak çizgidir, kayıt app.json'la birlikte değişir`);
-      }
-      const bek = turet(kod, k.tablet.runtimeVersion, s);
+      if (!k?.yayin) continue;
+      const bek = turet(kod, s);
       for (const a of YAYIN_ANAHTARLARI) {
         if (k.yayin[a] !== bek[a]) kirmizi.push(`§3 ${kod}.yayin.${a} = "${k.yayin[a]}" — koddan türeyen "${bek[a]}" (elle düzeltme, türet)`);
       }
@@ -349,7 +322,7 @@ function sondalar(taban, tabanYollar) {
     for (const a of Object.keys(k.yayin)) k.yayin[a] = k.yayin[a].replaceAll('/adnansahin', `/${kod}`);
     k.panel = { appId: `com.ornek.${kod}`, urunAdi: `Urun ${kod}`, paketAdi: `urun-${kod}`, erpDisAdresi: '', erpAdresi: `http://10.9.8.${kod.length}:4000` };
     k.tablet = { ...k.tablet, androidPaket: `com.ornek.${kod}`, gorunenAd: `Tablet ${kod}`,
-      erpAdresi: `http://10.9.9.${kod.length}:4000/api`, otaSertifika: `keystore/ota-certs-${kod}/certificate.pem` };
+      erpAdresi: `http://10.9.9.${kod.length}:4000/api` };
     o.kanallar[kod] = k;
   };
   /** Çakışma sondaları için benzersiz kimlikli ikinci bir kanal (kayıtta tek kanal var). */
@@ -363,15 +336,7 @@ function sondalar(taban, tabanYollar) {
     // [ad, beklenen, mutasyon(d, yollar, beyanlar), iz?]
     ['P0 gerçek ağaç YEŞİL', 'yesil', () => {}],
     ['P1 ikinci üretim kanalı benzersiz kimliklerle YEŞİL (kapı aşırı sert değil)', 'yesil', kayitta((o) => yeniKanal(o, 'yenifabrika'))],
-    ['P2 runtimeVersion doğru yükseltme (app.json + her kanalın rv + otaManifest) YEŞİL', 'yesil', (d) => {
-      jd(d, 'mobil/app.json', (o) => { o.expo.runtimeVersion = '99.9'; });
-      jd(d, KAYIT_REL, (o) => {
-        for (const k of Object.values(o.kanallar)) {
-          k.yayin.otaManifest = k.yayin.otaManifest.replace(`/ota/${k.tablet.runtimeVersion}/`, '/ota/99.9/');
-          k.tablet.runtimeVersion = '99.9';
-        }
-      });
-    }],
+    ['P2 app.json sürüm/versionCode yükseltme (Play turu) YEŞİL', 'yesil', (d) => jd(d, 'mobil/app.json', (o) => { o.expo.version = '9.9.9'; o.expo.android.versionCode = 999; })],
     ['P3 uzak erişimsiz kanal (erpDisAdresi boş) YEŞİL', 'yesil', kayitta((o) => { tf(o).panel.erpDisAdresi = ''; })],
     ['N1 iki kanal aynı androidPaket → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).tablet.androidPaket = 'com.etkiliyazilim.adnansahin.saha'; })],
     ['N2 iki kanal aynı tablet erpAdresi → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).tablet.erpAdresi = 'http://192.168.1.250:4000/api'; })],
@@ -388,13 +353,16 @@ function sondalar(taban, tabanYollar) {
     ['N8 mobil/musteri.json işaretçisi kayıtlı ikinci kanal commit edildi → KIRMIZI', 'kirmizi', (d) => { kayitta(tf)(d); jd(d, 'mobil/musteri.json', (o) => { o.kod = IKINCI; }); }],
     ['N9 Electron/shared/musteri.json bilinmeyen kod (adnansahn) → KIRMIZI', 'kirmizi', (d) => jd(d, 'Electron/shared/musteri.json', (o) => { o.kod = 'adnansahn'; })],
     ['N10 varsayilan bilinmeyen kanal → KIRMIZI', 'kirmizi', kayitta((o) => { o.varsayilan = 'yok'; })],
-    ['N11 app.json runtimeVersion yükseldi, kayıt yükselmedi → KIRMIZI', 'kirmizi', (d) => jd(d, 'mobil/app.json', (o) => { o.expo.runtimeVersion = '99.9'; })],
-    ['N12 türetilmiş alan bayat (ikinci kanal otaManifest rv ≠ runtimeVersion) → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).yayin.otaManifest = tf(o).yayin.otaManifest.replace(`/ota/${tf(o).tablet.runtimeVersion}/`, '/ota/0.1/'); })],
+    ['N11 app.json\'a OTA geri döndü (runtimeVersion + updates) → KIRMIZI (yalnız Play)', 'kirmizi', (d) => jd(d, 'mobil/app.json', (o) => { o.expo.runtimeVersion = '54.4'; o.expo.updates = { enabled: true }; }), 'OTA yok'],
+    ['N12 türetilmiş alan bayat (ikinci kanal panelManifest elle) → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).yayin.panelManifest = 'https://guncelleme.etkiliyazilim.com/x/electron/latest.yml'; })],
+    ['N12b kayda tablet OTA alanı geri döndü (yayin.otaManifest) → KIRMIZI (şema kapalı)', 'kirmizi', kayitta((o) => { as(o).yayin.otaManifest = 'https://guncelleme.etkiliyazilim.com/adnansahin/mobil/ota/54.4/manifest'; }), 'tanınmayan anahtar'],
+    ['N12c mobil/package.json\'a expo-updates geri döndü → KIRMIZI', 'kirmizi', (d) => jd(d, 'mobil/package.json', (o) => { o.dependencies['expo-updates'] = '~29.0.20'; }), 'expo-updates'],
     ['N13 ps1 saplamasına scp geri döndü → KIRMIZI', 'kirmizi', (d) => { d['deploy/electron-yayinla.ps1'] += '\n& scp $setup "x:/y"\n'; }],
     ['N14 üretim kanalında görünür etiket → KIRMIZI', 'kirmizi', kayitta((o) => { as(o).gorunurEtiket = 'TEST'; }), 'görünür etiket'],
     ['N15 package.json publish adresi ikinci kanalınki commit edildi → KIRMIZI', 'kirmizi', (d) => { kayitta(tf)(d); jd(d, 'Electron/package.json', (o) => { o.build.publish[0].url = `https://guncelleme.etkiliyazilim.com/${IKINCI}/electron/`; }); }],
     ['N16 beyansız yeni yayıncı (deploy/tablet-yayinla.sh) → KIRMIZI', 'kirmizi', (d, y) => { y.push('deploy/tablet-yayinla.sh'); }],
-    ['N17 kapılı yayıncıdan kanal kapısı silindi (yayinla-ota.mjs) → KIRMIZI', 'kirmizi', (d) => { d['mobil/scripts/yayinla-ota.mjs'] = d['mobil/scripts/yayinla-ota.mjs'].replaceAll(KAPI_IZI, 'scripts/lib/baska.mjs'); }],
+    ['N17 kapılı yayıncıdan kanal kapısı silindi (play-yukle.mjs) → KIRMIZI', 'kirmizi', (d) => { d['deploy/play-yukle.mjs'] = d['deploy/play-yukle.mjs'].replaceAll(KAPI_IZI, 'scripts/lib/baska.mjs'); }],
+    ['N17b silinen OTA yayıncısı geri döndü (mobil/scripts/yayinla-ota.mjs, beyansız) → KIRMIZI', 'kirmizi', (d, y) => { y.push('mobil/scripts/yayinla-ota.mjs'); }, 'BEYANSIZ'],
     ['N18 app.json android.package değişti (ağaç ↔ kayıt) → KIRMIZI', 'kirmizi', (d) => jd(d, 'mobil/app.json', (o) => { o.expo.android.package = 'com.teks.erp.mobil2'; })],
     ['N19 yayın kökü kaynaklar arasında ayrıştı (paketle BASE_URL) → KIRMIZI', 'kirmizi', (d) => { d['deploy/electron-paketle.sh'] = d['deploy/electron-paketle.sh'].replace('BASE_URL="https://guncelleme.etkiliyazilim.com/"', 'BASE_URL="https://guncelleme2.etkiliyazilim.com/"'); }],
     ['N20 kapısı olan yayıncı hâlâ borç beyanlı (build-apk) → KIRMIZI (iki yönlü)', 'kirmizi', (d, y, b) => {

@@ -225,56 +225,10 @@ async function getir(url, basliklar = {}) {
   }
 }
 
-/**
- * Expo manifest gövdesinden (`multipart/mixed`) sürümü çıkarır.
- *
- * ⚠️ "İlk `{` ile son `}` arası" kestirmesi ÇALIŞMAZ: gövde İKİ parça taşır
- * (`manifest` + `extensions`) ve ikisini tek JSON sanıp ayrıştırma hatası
- * verir (ölçüldü). Ham gövdede regex ile "version" aramak da yanlış olurdu —
- * `expoClient` içinde `sdkVersion` ve `runtimeVersion` de var.
- */
-export function manifestGovdesindenSurum(govde) {
-  if (!govde) return null;
-  const parcalar = govde.split(/\r?\n?--[A-Za-z0-9'()+_,./:=?-]+(?:--)?\r?\n/);
-  const manifestParcasi = parcalar.find((p) => /name="manifest"/.test(p)) ?? parcalar[0];
-  if (!manifestParcasi) return null;
-  const bas = manifestParcasi.indexOf('{');
-  if (bas < 0) return null;
-  try {
-    const manifest = JSON.parse(manifestParcasi.slice(bas).trim());
-    const v = manifest?.extra?.expoClient?.version;
-    return typeof v === 'string' ? v : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Panelin yayındaki sürümü — `latest.yml` içindeki `version:` satırı. */
 export async function yayindakiPanelSurumu(kanalKoku) {
   const govde = await getir(kanalKoku.replace(/\/?$/, '/') + 'latest.yml');
   if (!govde) return null;
   const m = /^version:\s*(\S+)\s*$/m.exec(govde);
   return m ? m[1].replace(/^['"]|['"]$/g, '') : null;
-}
-
-/** Tabletin yayındaki paket sürümü — OTA manifestinin `extra.expoClient`i. */
-export async function yayindakiTabletSurumu(manifestUrl, runtimeVersion) {
-  return manifestGovdesindenSurum(
-    await getir(manifestUrl, {
-      'expo-runtime-version': String(runtimeVersion),
-      'expo-platform': 'android',
-      accept: 'multipart/mixed',
-    }),
-  );
-}
-
-/** Yayındaki KURULUM DOSYASININ (APK) künyesi. Hiç yayınlanmadıysa null. */
-export async function yayindakiApkKunyesi(kanalKoku) {
-  const govde = await getir(kanalKoku.replace(/\/?$/, '/') + 'apk/surum.json');
-  if (!govde) return null;
-  try {
-    return JSON.parse(govde);
-  } catch {
-    return null;
-  }
 }

@@ -36,22 +36,21 @@ const KANAL_ANAHTARLARI = {
   uretim: ['tur', 'ad', 'gorunurEtiket', 'yayin', 'panel', 'tablet'],
 };
 export const YAYIN_ANAHTARLARI = [
-  'panelFeed', 'panelManifest', 'mobilFeed', 'otaManifest', 'apkKunye', 'vdsPanel', 'vdsMobil', 'panelDefter',
+  'panelFeed', 'panelManifest', 'vdsPanel', 'panelDefter',
 ];
 export const PANEL_ANAHTARLARI = ['appId', 'urunAdi', 'paketAdi', 'erpDisAdresi', 'erpAdresi'];
-export const TABLET_ANAHTARLARI = ['androidPaket', 'gorunenAd', 'erpAdresi', 'runtimeVersion', 'otaSertifika'];
+/** Tablet yalnız Google Play'den dağıtılır: kayıt tablet için OTA/APK yayın alanı TAŞIMAZ (şema kapalı). */
+export const TABLET_ANAHTARLARI = ['androidPaket', 'gorunenAd', 'erpAdresi'];
 
 /**
- * İki kanal arasında AYNI OLAMAYAN alanlar. `runtimeVersion` bilerek YOK: uyum
- * kimliğidir, kanal kimliği değil (iki kanal aynı native'i taşır ki OTA↔APK
- * kararı birebir prova edilsin). Boş/null değer karşılaştırılmaz (ör. uzak
- * erişimi olmayan kanalın dış adresi).
+ * İki kanal arasında AYNI OLAMAYAN alanlar. Boş/null değer karşılaştırılmaz
+ * (ör. uzak erişimi olmayan kanalın dış adresi).
  */
 export const AYRIK_ALANLAR = [
   'ad', 'gorunurEtiket',
   ...YAYIN_ANAHTARLARI.map((a) => `yayin.${a}`),
   'panel.appId', 'panel.urunAdi', 'panel.paketAdi', 'panel.erpDisAdresi', 'panel.erpAdresi',
-  'tablet.androidPaket', 'tablet.gorunenAd', 'tablet.erpAdresi', 'tablet.otaSertifika',
+  'tablet.androidPaket', 'tablet.gorunenAd', 'tablet.erpAdresi',
 ];
 
 const al = (nesne, yol) => yol.split('.').reduce((o, k) => (o == null ? undefined : o[k]), nesne);
@@ -360,12 +359,10 @@ export function panelDerlemeAyarlari(kod, kanal) {
 export const panelDerlemeArgumanlari = (kod, kanal) =>
   Object.entries(panelDerlemeAyarlari(kod, kanal)).map(([k, v]) => `-c.${k}=${v}`);
 
-export const TABLET_SABIT_DOSYALAR = ['mobil/app.json', 'mobil/musteri.json'];
+export const TABLET_SABIT_DOSYALAR = ['mobil/app.json', 'mobil/musteri.json', 'mobil/package.json'];
 /**
- * Tablet kimliği: app.json'daki paket adı/görünen ad/OTA sertifikası + müşteri adı.
- * `runtimeVersion` burada YOK: paketin gideceği rv app.json'dan okunur (gerçeğin
- * kaynağı o); kaydın rv'si ile eşitliği dinlenmede bekçi ölçer — rv yükseltme turunu
- * çalışma anında ikinci kez durdurmak güvenlik kazandırmaz, yalnız sürtünme ekler.
+ * Tablet kimliği: app.json'daki paket adı/görünen ad + müşteri adı; ve OTA'nın YOKLUĞU
+ * (tablet yalnız Google Play'den güncellenir — `updates`/`runtimeVersion` geri gelirse KIRMIZI).
  */
 export function tabletSabitKimlikFarki(kanal, dosyalar) {
   const f = [];
@@ -373,8 +370,15 @@ export function tabletSabitKimlikFarki(kanal, dosyalar) {
   const m = json(dosyalar, 'mobil/musteri.json');
   fark(f, 'mobil/app.json expo.name', e.name, kanal.tablet.gorunenAd);
   fark(f, 'mobil/app.json expo.android.package', e.android?.package, kanal.tablet.androidPaket);
-  fark(f, 'mobil/app.json expo.updates.codeSigningCertificate',
-    String(e.updates?.codeSigningCertificate ?? '').replace(/^\.\//, ''), kanal.tablet.otaSertifika);
+  if (e.updates !== undefined) f.push('mobil/app.json expo.updates var — tablet yalnız Google Play\'den güncellenir (OTA yok)');
+  if (e.runtimeVersion !== undefined) f.push('mobil/app.json expo.runtimeVersion var — OTA yok, alan doğamaz');
+  if ((e.plugins ?? []).some((p) => (Array.isArray(p) ? p[0] : p) === 'expo-updates')) {
+    f.push('mobil/app.json expo-updates eklentisi var — OTA yok');
+  }
+  const p = json(dosyalar, 'mobil/package.json');
+  if (p.dependencies?.['expo-updates'] || p.devDependencies?.['expo-updates']) {
+    f.push('mobil/package.json expo-updates bağımlılığı var — tablet yalnız Google Play\'den güncellenir');
+  }
   fark(f, 'mobil/musteri.json ad', m.ad, kanal.ad);
   return f;
 }
@@ -394,7 +398,7 @@ export function tabletIsaretciFarki(kod, dosyalar) {
  * Commit kapısı tetiği — kanal bekçilerinin OKUDUĞU küme (elle sayılmaz, sabitlerden türer)
  * ------------------------------------------------------------------ */
 
-/** Yayın yolu keşfi (check-kanallar §5): deploy/ kökünde yayinla|paketle · mobil/scripts'te yayinla|apk. */
+/** Yayın yolu keşfi (check-kanallar §5): deploy/ kökünde yayinla|paketle|yukle · mobil/scripts'te yayinla|apk. */
 export const YAYIN_YOLU_DESENLERI = [
   { dizin: 'deploy', ad: /(yayinla|paketle|yukle)/i },
   { dizin: 'mobil/scripts', ad: /(yayinla|apk)/i },
@@ -408,8 +412,8 @@ export const KANAL_BEKCI_DOSYALARI = [...new Set([
   'scripts/test_kanal_yayin_kapisi.mjs', 'scripts/lib/surum.mjs', 'scripts/lib/surum-notu-tavan.mjs',
   'scripts/check-surum-notlari.mjs', 'scripts/hooks/pre-commit.mjs',
   ...PANEL_SABIT_DOSYALAR, ...TABLET_SABIT_DOSYALAR,
-  'Electron/shared/update-feed.ts', 'mobil/scripts/lib/feed.cjs', 'mobil/scripts/lib/adres.mjs', 'mobil/scripts/lib/zip.mjs',
-  'mobil/scripts/lib/manifest.mjs', 'mobil/scripts/lib/apk-kimlik.mjs', 'mobil/scripts/lib/kanal.cjs', 'mobil/app.config.js',
+  'Electron/shared/update-feed.ts', 'mobil/scripts/lib/adres.mjs', 'mobil/scripts/lib/zip.mjs',
+  'mobil/scripts/lib/apk-kimlik.mjs', 'mobil/scripts/lib/kanal.cjs', 'mobil/app.config.js',
 ])];
 /** Bu yola dokunan commit kanal bekçilerini koşar (`scripts/hooks/pre-commit.mjs`). */
 export function kanalBekcisiTetigi(rel) {
