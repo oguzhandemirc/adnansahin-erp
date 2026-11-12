@@ -23,6 +23,10 @@ export interface RemoteList {
   readonly loading: boolean;
   readonly refreshing: boolean;
   readonly error: string | null;
+  /** İlk sayfa 404 (projeksiyon bulutta henüz yok) — "henüz gelmedi", "boş" değil. */
+  readonly notFound: boolean;
+  /** İlk sayfa 403 (izin yok) — bölüm çizilmez. */
+  readonly forbidden: boolean;
   readonly stale: boolean;
   readonly offline: boolean;
   readonly savedAt: string | null;
@@ -115,6 +119,8 @@ export function useRemoteList(projection: string, query: ListQuery = {}, options
     loading: enabled && loading,
     refreshing: ara ? !!search?.loading && !!search.page : first.refreshing,
     error: error ?? moreError,
+    notFound: !ara && !!first.notFound,
+    forbidden: !ara && !!first.forbidden,
     stale: ara ? false : first.stale,
     offline,
     savedAt: ara ? null : first.savedAt,

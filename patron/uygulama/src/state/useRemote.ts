@@ -15,6 +15,8 @@ export interface Remote<T> {
   readonly error: string | null;
   /** Son çekim 404 (kayıt/anlık yok; ör. fabrika anlığı henüz yayınlamadı) — ekran hata yerine boş durum çizebilir. */
   readonly notFound?: boolean;
+  /** Son çekim 403 (izin yok) — bölüm hiç çizilmez. */
+  readonly forbidden?: boolean;
   /** Bir çekim sürüyor (ilk yükleme ya da arkadan tazeleme); ekranlar `loading && !data` ile iskelet basar. */
   readonly loading: boolean;
   /** Ekranda veri varken arkadan tazeleniyor (aşağı çek göstergesi). */
@@ -43,6 +45,7 @@ interface State<T> {
   data: T | null;
   error: string | null;
   notFound: boolean;
+  forbidden: boolean;
   loading: boolean;
   refreshing: boolean;
   stale: boolean;
@@ -50,7 +53,7 @@ interface State<T> {
   savedAt: string | null;
 }
 
-const blank = <T,>(loading: boolean): State<T> => ({ data: null, error: null, notFound: false, loading, refreshing: false, stale: false, offline: false, savedAt: null });
+const blank = <T,>(loading: boolean): State<T> => ({ data: null, error: null, notFound: false, forbidden: false, loading, refreshing: false, stale: false, offline: false, savedAt: null });
 
 export function useRemote<T>(key: string | null, fetcher: () => Promise<T>, options: RemoteOptions = {}): Remote<T> {
   const { cache, markOnline } = useSession();
@@ -75,7 +78,7 @@ export function useRemote<T>(key: string | null, fetcher: () => Promise<T>, opti
     lastFetchAt.current = Date.now();
     dirty.current = false;
     // Anahtar/kapsam değişti: önceki ekranın verisi yeni anahtarın üstünde gösterilmez.
-    setState((s) => (same ? { ...s, loading: true, refreshing: s.data !== null, error: null, notFound: false } : blank<T>(true)));
+    setState((s) => (same ? { ...s, loading: true, refreshing: s.data !== null, error: null, notFound: false, forbidden: false } : blank<T>(true)));
     if (!same) {
       cache
         .peek<T>(key)
@@ -91,7 +94,7 @@ export function useRemote<T>(key: string | null, fetcher: () => Promise<T>, opti
         settled = true;
         if (!alive) return;
         markOnline(!r.offline, r.savedAt);
-        setState({ data: r.data, error: null, notFound: false, loading: false, refreshing: false, stale: r.offline, offline: r.offline, savedAt: r.savedAt });
+        setState({ data: r.data, error: null, notFound: false, forbidden: false, loading: false, refreshing: false, stale: r.offline, offline: r.offline, savedAt: r.savedAt });
       })
       .catch((err: unknown) => {
         settled = true;
@@ -103,6 +106,7 @@ export function useRemote<T>(key: string | null, fetcher: () => Promise<T>, opti
           ...(drop ? { data: null, savedAt: null, stale: false } : null),
           error: errorMessage(err),
           notFound: err instanceof ApiError && err.kind === "BULUNAMADI",
+          forbidden: err instanceof ApiError && err.kind === "YETKI",
           loading: false,
           refreshing: false,
         }));

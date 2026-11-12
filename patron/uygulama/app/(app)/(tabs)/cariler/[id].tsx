@@ -16,6 +16,7 @@ import { useRemote } from "../../../../src/state/useRemote";
 import { Screen } from "../../../../src/ui/Frame";
 import { KademeliGiris } from "../../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../../src/ui/icons";
+import { AcikSiparislerBolumu, EnCokUrunBolumu, IadelerBolumu, ToplamlarBolumu, useCariOzeti, type Donem } from "../../../../src/ui/cari/OzetBolumleri";
 import { Button } from "../../../../src/ui/kit";
 import { openRecord } from "../../../../src/ui/nav";
 import { AltSekmeler, HataDurumu, IconTile, Iskelet, ListeBlogu, ListeSatiri, Rozet, SectionCard } from "../../../../src/ui/ortak";
@@ -24,11 +25,14 @@ import { ShipmentRow, cariRowText } from "../../../../src/ui/siparis/CustomerRow
 import { CustomerMovements } from "../../../../src/ui/siparis/OrderLines";
 import { OrderRow, asObj, str } from "../../../../src/ui/siparis/OrderRow";
 import { ListStates, StaleNote } from "../../../../src/ui/siparis/parts";
+import { SegmentedControl } from "../../../../src/ui/SegmentedControl";
 import { useRemoteList } from "../../../../src/ui/siparis/useRemoteList";
 import { makeStyles } from "../../../../src/ui/theme-context";
 import { FONT_SCALE, space, tabularNums, typography } from "../../../../src/ui/tokens";
 
 type Sekme = "ozet" | "siparisler" | "sevkiyatlar" | "bilgi";
+type SiparisGorunum = "tumu" | "ACIK";
+const SIPARIS_GORUNUMLERI = [{ key: "tumu" as const, label: "Tümü" }, { key: "ACIK" as const, label: "Açık" }];
 const OZET_SATIR = 5;
 
 interface Amount { doviz: string; value: unknown }
@@ -88,11 +92,20 @@ export default function CustomerDetail() {
   const movements = cap.idFilter("cari-hareket", "cariHesapId") && balance;
   const [sekme, setSekme] = useState<Sekme>("ozet");
   const [tick, setTick] = useState(0);
+  const [donem, setDonem] = useState<Donem>("tumZamanlar");
+  const [gorunum, setGorunum] = useState<SiparisGorunum>("tumu");
   // Listeler kartla AYNI ANDA istenir: kart gelince sırayla istenen bloklar "Fabrikadan beklenen"i aşağı itiyordu.
   const hazir = !!cariId;
   const accounts = useRemoteList("cari-hesap", { cariKartId: cariId ?? undefined }, { enabled: balance && hazir });
   const recent = useRemoteList("siparis", { cariKartId: cariId ?? undefined }, { enabled: orders && hazir, limit: 10 });
   const sevk = useRemoteList("sevkiyat", { cariKartId: cariId ?? undefined }, { enabled: shipments && hazir, limit: 10 });
+  // M2: yeni bölümler yalnız görünür sekmede istenir. "Açık" süzgeci sunucuda (`suzgec=ACIK`); eski bulut beyan etmez.
+  const ozetGorunur = sekme === "ozet";
+  const acikDestek = orders && !!cap.search("siparis")?.suzgec?.secenekler.some((o) => o.deger === "ACIK");
+  const acikGorunum = sekme === "siparisler" && gorunum === "ACIK";
+  const ozet = useCariOzeti(cariId, orders && hazir && ozetGorunur);
+  const acik = useRemoteList("siparis", { cariKartId: cariId ?? undefined, suzgec: "ACIK" }, { enabled: acikDestek && hazir && (ozetGorunur || acikGorunum), limit: 25 });
+  const iadeIzni = can(permissions, "bulut:sevkiyat:oku");
   const k = asObj(r.data?.kayit);
   const kisisel = r.data?.kisisel === undefined || r.data.kisisel === null ? null : asObj(r.data.kisisel);
   const kimlik = r.data ? cariRowText(r.data) : null;
@@ -102,6 +115,8 @@ export default function CustomerDetail() {
     accounts.reload();
     recent.reload();
     sevk.reload();
+    ozet.reload();
+    acik.reload();
     setTick((n) => n + 1);
   };
   const sekmeler = [
@@ -153,6 +168,13 @@ export default function CustomerDetail() {
                   {movements ? <CustomerMovements accounts={accounts.items} tick={tick} /> : null}
                 </View>
               ) : null}
+              {orders ? <ToplamlarBolumu ozet={ozet} donem={donem} onDonem={setDonem} /> : null}
+              {acikDestek ? (
+                <AcikSiparislerBolumu list={acik} sayi={ozet.data?.ozet?.acik.siparisSayisi} onAc={(x) => openRecord(router, "siparis", x)}
+                  onTumu={() => { setGorunum("ACIK"); setSekme("siparisler"); }} />
+              ) : null}
+              {orders ? <EnCokUrunBolumu ozet={ozet} donem={donem} /> : null}
+              {iadeIzni && cariId ? <IadelerBolumu cariKartId={cariId} destek={cap.idFilter("iade", "cariKartId")} enabled={ozetGorunur} iade={ozet.data?.ozet?.tumZamanlar.iade} /> : null}
               {orders && recent.loading && recent.items.length === 0 ? <Iskelet bicim="liste" satir={2} testID="cari-siparisler-yukleniyor" /> : null}
               {orders && recent.items.length > 0 ? (
                 <ListeBlogu baslik="Son siparişler" sag={<Text style={s.tumu} onPress={() => setSekme("siparisler")} accessibilityRole="link">Tümü</Text>} testID="cari-siparisler">
@@ -165,18 +187,31 @@ export default function CustomerDetail() {
                   {sevkSatirlari(OZET_SATIR)}
                 </ListeBlogu>
               ) : null}
-              <ListeBlogu baslik="Fabrikadan beklenen" testID="cari-gelmedi">
-                {["İadeler", "Toplamlar", "En çok alınan ürünler"].map((x, i) => (
-                  <ListeSatiri key={x} birincil={x} rozet={<Rozet label="Henüz gelmedi" />} ayrac={i > 0} accessibilityLabel={`${x}: fabrikadan henüz gelmedi`} />
-                ))}
-              </ListeBlogu>
             </KademeliGiris>
           ) : null}
 
           {sekme === "siparisler" ? (
             <KademeliGiris sira={2}>
-              {recent.items.length > 0 ? <ListeBlogu baslik="Siparişler" testID="cari-siparis-tumu">{siparisSatirlari(recent.items.length)}</ListeBlogu> : null}
-              <ListStates list={recent} empty="Bu cariye ait sipariş yok" icon={MODULE_ICON.siparisler.icon} testID="cari-siparis" />
+              {acikDestek ? (
+                <View style={s.gorunum}>
+                  <SegmentedControl items={SIPARIS_GORUNUMLERI} value={gorunum} onChange={setGorunum} testIDPrefix="cari-siparis-gorunum-" accessibilityLabel="Sipariş görünümü" />
+                </View>
+              ) : null}
+              {acikGorunum ? (
+                <>
+                  {acik.items.length > 0 ? (
+                    <ListeBlogu baslik="Açık siparişler" sayi={ozet.data?.ozet?.acik.siparisSayisi} testID="cari-siparis-acik">
+                      {acik.items.map((o, i) => <OrderRow key={o.id} r={o} showCustomer={false} ayrac={i > 0} onPress={() => openRecord(router, "siparis", o.id)} />)}
+                    </ListeBlogu>
+                  ) : null}
+                  <ListStates list={acik} empty="Açık sipariş yok" icon={MODULE_ICON.siparisler.icon} testID="cari-siparis-acik" />
+                </>
+              ) : (
+                <>
+                  {recent.items.length > 0 ? <ListeBlogu baslik="Siparişler" testID="cari-siparis-tumu">{siparisSatirlari(recent.items.length)}</ListeBlogu> : null}
+                  <ListStates list={recent} empty="Bu cariye ait sipariş yok" icon={MODULE_ICON.siparisler.icon} testID="cari-siparis" />
+                </>
+              )}
             </KademeliGiris>
           ) : null}
 
@@ -213,6 +248,7 @@ const useStyles = makeStyles((t) => ({
   kimlikMetin: { flex: 1, minWidth: 0, gap: space.xs },
   kod: { ...typography.subhead, ...tabularNums, color: t.color.textMuted },
   rozetler: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.xs },
+  gorunum: { marginTop: space.m },
   finans: { gap: space.m, marginTop: space.l },
   meta: { ...typography.footnote, color: t.color.textMuted },
   bakiye: { ...typography.kpi, color: t.color.text },

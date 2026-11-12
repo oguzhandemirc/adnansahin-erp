@@ -8,9 +8,10 @@ import type { ReactElement } from "react";
 const mockList = jest.fn();
 const mockRecord = jest.fn();
 const mockSnapshot = jest.fn();
+const mockSummary = jest.fn();
 const mockCache = { load: jest.fn(async (_k: string, f: () => Promise<unknown>) => ({ data: await f(), offline: false, savedAt: "" })), peek: jest.fn(async () => null) };
 const mockSession = {
-  api: { list: mockList, record: mockRecord, snapshot: mockSnapshot },
+  api: { list: mockList, record: mockRecord, snapshot: mockSnapshot, customerSummary: mockSummary },
   cache: mockCache, markOnline: jest.fn(),
   permissions: [] as string[], offline: false, offlineSince: null as string | null, facility: null as unknown, switchError: null as string | null,
 };
@@ -52,6 +53,8 @@ beforeEach(() => {
   mockList.mockReset();
   mockRecord.mockReset();
   mockSnapshot.mockReset();
+  mockSummary.mockReset();
+  mockSummary.mockRejectedValue(new (require("../src/api/client") as typeof import("../src/api/client")).ApiError(404, "BULUNAMADI", "yok"));
   mockRouter.push.mockReset();
   mockSession.permissions = ["bulut:oturum", "bulut:siparis:oku", "bulut:cari:oku"];
   mockSession.offline = false;
@@ -429,7 +432,9 @@ describe("§10 D7b cari kartı: finans kapalı fabrikada bölüm hiç yok; gelme
     expect(screen.queryByText(/izniniz yok/)).toBeNull();
     expect(screen.queryByTestId("ekstre-iste")).toBeNull();
     expect(screen.getByTestId("cari-sekme-ozet")).toBeTruthy();
-    expect(screen.getAllByText("Henüz gelmedi")).toHaveLength(3);
+    // M2: özet anlığı bulutta yok (404) → Toplamlar "henüz gelmedi"; sevkiyat izni yok → İadeler bölümü yok.
+    expect(screen.getAllByText("Henüz gelmedi")).toHaveLength(1);
+    expect(mockSummary).toHaveBeenCalledWith(ID1);
     fireEvent.press(screen.getByTestId("cari-sekme-bilgi"));
     expect(screen.getByText("C-1")).toBeTruthy();
   });

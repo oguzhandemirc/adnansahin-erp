@@ -27,6 +27,7 @@ import type {
   ProjectionRecord,
   ReportRequest,
   ReportRequestDetail,
+  CustomerSummaryResponse,
   Snapshot,
   SnapshotRefresh,
   TestNotificationResult,
@@ -48,6 +49,8 @@ export const ENDPOINTS = {
   list: ["get", "/veri/:projeksiyon"],
   record: ["get", "/veri/:projeksiyon/:id"],
   snapshot: ["get", "/anlik/:projeksiyon"],
+  /** M2a: `cari-ozeti` anlığından tek müşteri; anlık hiç gelmediyse 404. */
+  customerSummary: ["get", "/cari-ozeti/:cariKartId"],
   refresh: ["post", "/tazele"],
   inboxCreate: ["post", "/gelen-kutusu"],
   inboxList: ["get", "/gelen-kutusu"],
@@ -123,6 +126,7 @@ export function createApi(c: ApiClient) {
     list: (projeksiyon: string, p: ListParams = {}) => c.get<Page<ProjectionRecord>>(pathOf("list", { projeksiyon }), q(p)),
     record: (projeksiyon: string, id: string) => c.get<ProjectionRecord>(pathOf("record", { projeksiyon, id })),
     snapshot: (projeksiyon: string) => c.get<Snapshot>(pathOf("snapshot", { projeksiyon })),
+    customerSummary: (cariKartId: string) => c.get<CustomerSummaryResponse>(pathOf("customerSummary", { cariKartId })),
     /** Ekran açılınca `ozet` zili (S47) — içerik taşımaz; aralığa saygı `lib/refresh.ts`te. */
     refresh: () => c.post<SnapshotRefresh>(pathOf("refresh"), {}),
     inboxCreate: (mesajId: string, tur: InboxItemKind, govde: OrderMessageBody | CustomerMessageBody) =>
