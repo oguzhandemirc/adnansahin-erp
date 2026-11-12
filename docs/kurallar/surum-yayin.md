@@ -45,6 +45,7 @@ Backend paketinin üretilip fabrika sunucusuna kurulması, panelin (Electron) ve
 - Her yeni `DateTime` `@db.Timestamptz`, her UUID kolon `@db.Uuid`; `PG_SESSION_OPTIONS` (`-c timezone=UTC`) silinmez. [bekçi: test_timestamptz_contract]
 - Elle migration `npx tsx scripts/apply-migration.ts <ad> [--apply]` ile uygulanır; hedef `DATABASE_URL`den alınır ve adıyla basılır. [bekçi: test_script_guards]
 - Büyük tabloya index ekleyen migration vardiya dışında deploy edilir ve başında `SET statement_timeout = 0;` taşır (DB'de 50 sn sınırı var). [inceleme]
+- Patron eşitleme migration'ı backend durmuşken uygulanır ve eşitlemeyi AÇMAZ (tetikleyiciler KAPALI doğar, açmak `patron_sync_set_enabled(true)`); kurulum ve doğrulama `docs/ops/PATRON-ESITLEME-KURULUM.md`. [inceleme]
 - Şema değişikliğinden sonra `npm run prisma:generate` koşulur; pull sonrası sıra `npm install` → `prisma:generate` → `prisma:migrate` (= `migrate deploy`). [inceleme]
 - Toplu veri düzeltme betiği dry-run varsayılandır, `--apply` öncesi etkilenen her kaydı ve hedef DB'yi adıyla listeler. [inceleme]
 - `statement_timeout=50s` DB düzeyinde ELLE kurulur (migration taşımaz); yeni kurulumda ve her geri yüklemeden sonra yeniden uygulanır. [inceleme]

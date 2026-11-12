@@ -11,7 +11,10 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - `src/lib/cloud-signing/` altındaki altı protokol dosyası ve `cloud-sync/wire/esitleme.ts` bulutla BAYT-EŞİTTİR; elle değiştirilmez, iki uç birlikte güncellenir ve mühür yenilenir. [bekçi: test_patron_bulut_imza]
 - Özel anahtar yalnız 0600 dosyada durur; repoya, log'a, hata mesajına, audit yüküne girmez; izni geniş dosya açılmaz, var olan dosya ezilmez. [bekçi: test_patron_bulut_imza]
 - Bulut hesap yapmaz: her türev sayıyı fabrika hesaplar, bulut yalnız saklar ve gösterir. [inceleme]
-- Tetikleyici ya da eşitleme hatası fabrikanın yazmasını ASLA durdurmaz; hata eşitlemede kalır, fabrika işlemine yükselmez. [inceleme]
+- Tetikleyici ya da eşitleme hatası fabrikanın yazmasını ASLA durdurmaz; her tetikleyici fonksiyonu `EXCEPTION WHEN OTHERS` ile sarılır ve yutulan hata `sync_mark_error_seq` sayacına düşer (`patron_sync_status().swallowed_errors`). [bekçi: test_db_invariants]
+- Eşitleme migration'ı (`20260929152815_patron_bulut_esitleme`) backend DURMUŞKEN uygulanır; reçete `docs/ops/PATRON-ESITLEME-KURULUM.md`. [inceleme]
+- Tetikleyiciler KAPALI doğar; açma/kapama yalnız `SELECT patron_sync_set_enabled(true|false)` ile yapılır, elle `ALTER TABLE … ENABLE TRIGGER` yazılmaz. [inceleme]
+- Anahtar `LOCK TABLE … NOWAIT` kullanır; açık yazma ya da autovacuum varken 55P03 döner ve çağıran yeniden dener, `NOWAIT` kaldırılmaz. [bekçi: test_db_invariants]
 
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 
@@ -26,6 +29,8 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ## Bekçiler
 
-Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_feature_flag_contract`
+Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_feature_flag_contract` · `test_db_invariants`
+
+Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 
 Kaynak (ana ürün `lib/license/protocol/`, `cloud-sync/`, `lib/http-egress.ts`), kaynak commit kimliği ve ana üründen farklar: arşiv notu 2026-11-12 "Patron bulutu D1".
