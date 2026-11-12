@@ -157,8 +157,8 @@ describe("§4 bozuk / eksik şekil çökmez", () => {
     expect(view.stockConsignedText({ bitmisMiktar: 1 })).toBeNull();
   });
   it("pano stok satırı: emanet varsa ek, yoksa eski metin aynen", () => {
-    expect(areaSummary("ozet.stok", { bitmisMiktar: 100, oluMiktar: 0 })).toBe("Bitmiş 100 m · ölü 0 m");
-    expect(areaSummary("ozet.stok", { bitmisMiktar: 100, oluMiktar: 0, emanet: { adet: 3, miktar: 250 } })).toBe("Bitmiş 100 m · ölü 0 m · müşteri malı 250 m");
+    expect(areaSummary("ozet.stok", { bitmisMiktar: 100, oluMiktar: 0 })).toBe("Serbest stok 100 m · ölü 0 m");
+    expect(areaSummary("ozet.stok", { bitmisMiktar: 100, oluMiktar: 0, emanet: { adet: 3, miktar: 250 } })).toBe("Serbest stok 100 m · ölü 0 m · müşteri malı 250 m");
   });
 });
 
@@ -168,5 +168,22 @@ describe("§5 görünüm hesap yapmaz", () => {
     expect(v.totalLine).toBe("2 top");
     expect(v.totalValue).toBe("10 m");
     expect(view.subcontractOpenView({ ...FASON, geciken: 0 })!.late).toBe(false);
+  });
+});
+
+describe("stok ↔ akış etiketleri", () => {
+  const { FlowStrip } = require("../src/ui/pano/production") as typeof import("../src/ui/pano/production");
+  it("akıştaki depo çuvaldakileri de saydığını söyler; diğer kolonlar not taşımaz", () => {
+    render(<FlowStrip data={{ kolonlar: [{ anahtar: "hamStok", etiket: "Ham stok", adet: 10 }, { anahtar: "depo", etiket: "Depo", adet: 2359 }] }} />);
+    expect(screen.getByTestId("akis-not-depo")).toHaveTextContent("çuvaldakiler dahil");
+    expect(screen.queryByTestId("akis-not-hamStok")).toBeNull();
+  });
+  it("stoktaki bitmiş sayı serbest stok olarak adlanır", async () => {
+    mockSession.permissions = ["bulut:stok:oku"];
+    serve([]);
+    render(<Stock />);
+    await flush();
+    expect(screen.getByText("Serbest stok")).toBeTruthy();
+    expect(screen.getByText("50 top · çuvalsız")).toBeTruthy();
   });
 });

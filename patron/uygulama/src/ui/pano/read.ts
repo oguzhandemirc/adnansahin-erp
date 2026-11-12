@@ -2,7 +2,7 @@
 // "—" olur, ekran çökmez. Uygulama ARİTMETİK YAPMAZ: toplam/yüzde fabrikadan gelir; burada yalnız seçme, sıralama
 // ve "sıfırdan büyük mü" karşılaştırması var.
 import { formatAgo, formatMoney, formatNumber, syncIsLate } from "../../lib/format";
-import { CHEQUE_BUCKET, CHEQUE_KIND, CHEQUE_KIND_SHORT, PERIOD_LABEL, UNIT, type PeriodKey } from "../../lib/labels/uretim";
+import { CHEQUE_BUCKET, CHEQUE_KIND, CHEQUE_KIND_SHORT, FREE_STOCK_LABEL, PERIOD_LABEL, UNIT, type PeriodKey } from "../../lib/labels/uretim";
 import { lookup } from "../../lib/labels";
 import { stockConsignedText } from "../../lib/fason-summary";
 import type { StatusKind } from "../tokens";
@@ -163,7 +163,7 @@ export function areaSummary(projection: string, data: unknown): string {
     case "ozet.stok": {
       // PB1: emanet açıkken bitmiş/ölü BİZİM stoktur; müşteri malı ayrı ek (eski fabrika göndermez → ek yok).
       const consigned = stockConsignedText(d);
-      return `Bitmiş ${qty(d.bitmisMiktar)} ${UNIT.metre} · ölü ${qty(d.oluMiktar)} ${UNIT.metre}${consigned ? ` · ${consigned}` : ""}`;
+      return `${FREE_STOCK_LABEL} ${qty(d.bitmisMiktar)} ${UNIT.metre} · ölü ${qty(d.oluMiktar)} ${UNIT.metre}${consigned ? ` · ${consigned}` : ""}`;
     }
     case "ozet.fason": {
       const m = period(d, "buAy");

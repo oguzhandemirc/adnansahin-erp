@@ -4,9 +4,10 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import type { NotificationSettingsView } from "../../src/api/wire";
 import { can } from "../../src/lib/access";
-import { fromForm, toForm, type NotificationForm } from "../../src/lib/notification-form";
+import { fromForm, sendsDueDateDerivatives, toForm, type NotificationForm } from "../../src/lib/notification-form";
 import { useSession } from "../../src/state/session";
 import { useRemote } from "../../src/state/useRemote";
+import { useSnapshot } from "../../src/ui/pano/useSnapshot";
 import { GroupNote } from "../../src/ui/diger/parts";
 import { Screen } from "../../src/ui/Frame";
 import { Banner, Button, ConfirmButton } from "../../src/ui/kit";
@@ -26,6 +27,9 @@ const SOURCE: Readonly<Record<NotificationSettingsView["kaynak"], string>> = {
 export default function Notifications() {
   const { api, permissions } = useSession();
   const remote = useRemote("bildirim-ayarlar", () => api.notificationSettings());
+  // Termin türevi fabrikanın sipariş özetinden okunur; gelmiyorsa geciken kalem seçeneği çizilmez.
+  const orders = useSnapshot("ozet.siparis", can(permissions, "bulut:ozet:oku") && can(permissions, "bulut:siparis:oku"));
+  const dueDates = sendsDueDateDerivatives(orders.data?.veri);
   const [view, setView] = useState<NotificationSettingsView | null>(null);
   const [form, setForm] = useState<NotificationForm | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -69,7 +73,7 @@ export default function Notifications() {
       <NotificationDevices vapidKey={view.webPushAnahtari} />
       <BlokBasligi baslik="Ayarlar" />
       <GroupNote>{SOURCE[view.kaynak]}</GroupNote>
-      <NotificationSettingsForm form={form} kinds={view.turler} onChange={(f) => { setForm(f); setSaved(null); }} />
+      <NotificationSettingsForm form={form} kinds={view.turler} dueDates={dueDates} onChange={(f) => { setForm(f); setSaved(null); }} />
       {error ? <Banner tone="error" text={error} testID="bildirim-hata" /> : null}
       {saved ? <Banner tone="off" icon="checkmark-circle" text={saved} /> : null}
       <Button label="Kaydet" icon="checkmark" busy={saveOwn.busy} disabled={saveOwn.disabled} onPress={() => void submit(saveOwn, "Ayarlarınız kaydedildi")} testID="bildirim-kaydet" />
