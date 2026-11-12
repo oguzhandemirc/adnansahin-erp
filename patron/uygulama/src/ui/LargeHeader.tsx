@@ -2,22 +2,38 @@
 // ve ince alt çizgi belirir. Kaydırma değeri `useHeaderScroll` ile ekranın kaydırıcısından gelir (UI iş parçacığı).
 import { BASMA } from "./hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { ReactNode } from "react";
+import { useCallback, useRef, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
-import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated";
+import Animated, { Extrapolation, interpolate, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated";
 import { makeStyles, useTokens } from "./theme-context";
 import { BAR_HEIGHT, FONT_SCALE, TOUCH, space, typography } from "./tokens";
 
 /** Başlığın tamamen küçüldüğü kaydırma mesafesi (büyük başlık satır yüksekliği). */
 export const COLLAPSE_AT = 41;
 
-export function useHeaderScroll(): { scrollY: SharedValue<number>; onScroll: ReturnType<typeof useAnimatedScrollHandler> } {
+/** Sona bu kadar kala `onEndReached` çağrılır (sonsuz kaydırma). */
+export const END_THRESHOLD = 600;
+
+export function useHeaderScroll(onEndReached?: () => void): { scrollY: SharedValue<number>; onScroll: ReturnType<typeof useAnimatedScrollHandler> } {
   const scrollY = useSharedValue(0);
-  const onScroll = useAnimatedScrollHandler({
-    onScroll: (e) => {
-      scrollY.value = e.contentOffset.y;
+  const nearEnd = useSharedValue(false);
+  const endRef = useRef(onEndReached);
+  endRef.current = onEndReached;
+  const fireEnd = useCallback(() => endRef.current?.(), []);
+  const wantsEnd = !!onEndReached;
+  const onScroll = useAnimatedScrollHandler(
+    {
+      onScroll: (e) => {
+        scrollY.value = e.contentOffset.y;
+        if (!wantsEnd) return;
+        // Eşiği GEÇİŞTE bir kez tetikler: her karede çağrı yok.
+        const near = e.contentOffset.y + e.layoutMeasurement.height >= e.contentSize.height - END_THRESHOLD;
+        if (near && !nearEnd.value) runOnJS(fireEnd)();
+        nearEnd.value = near;
+      },
     },
-  });
+    [wantsEnd],
+  );
   return { scrollY, onScroll };
 }
 
@@ -54,8 +70,11 @@ export function LargeHeader({ title, scrollY, topInset, onBack, right }: {
   );
 }
 
-/** İçerikteki büyük başlık (ekran okuyucu bunu başlık olarak duyar). */
-export function LargeTitle({ title, scrollY, subtitle, bleed = 0 }: { readonly title: string; readonly scrollY: SharedValue<number>; readonly subtitle?: ReactNode; readonly bleed?: number }) {
+/**
+ * İçerikteki büyük başlık (ekran okuyucu bunu başlık olarak duyar). Eylem (ör. "Yeni sipariş") başlıkla AYNI satırda,
+ * dikey ortalı ve sağa yaslıdır; uzun başlık kısalır/sarılır, eylem sarılmaz (`flexShrink: 0`).
+ */
+export function LargeTitle({ title, scrollY, subtitle, bleed = 0, action }: { readonly title: string; readonly scrollY: SharedValue<number>; readonly subtitle?: ReactNode; readonly bleed?: number; readonly action?: ReactNode }) {
   const s = useStyles();
   const fade = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [0, COLLAPSE_AT * 0.8], [1, 0], Extrapolation.CLAMP),
@@ -63,10 +82,15 @@ export function LargeTitle({ title, scrollY, subtitle, bleed = 0 }: { readonly t
   }));
   return (
     <View style={[s.largeBlock, { marginHorizontal: -bleed, paddingHorizontal: bleed }]}>
-    <Animated.View style={[s.large, fade]}>
-      <Text style={s.largeText} accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
-      {subtitle}
-    </Animated.View>
+      <View style={s.large}>
+        <View style={s.titleRow} testID="baslik-satiri">
+          <Animated.View style={[s.titleBox, fade]}>
+            <Text style={s.largeText} accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
+          </Animated.View>
+          {action ? <View style={s.action} testID="baslik-eylemi">{action}</View> : null}
+        </View>
+        {subtitle}
+      </View>
     </View>
   );
 }
@@ -82,6 +106,9 @@ const useStyles = makeStyles((t) => ({
   line: { height: 1, backgroundColor: t.color.chromeBorder },
   // Büyük başlık bloğu üst çubukla aynı krom zeminde, altında 1 px krom çizgisi: kabuk içerikten ayrışır.
   largeBlock: { backgroundColor: t.color.chrome, borderBottomWidth: 1, borderBottomColor: t.color.chromeBorder, marginBottom: space.l },
-  large: { paddingBottom: space.m, transformOrigin: "left" as const },
+  large: { paddingBottom: space.m },
+  titleRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, minHeight: TOUCH },
+  titleBox: { flex: 1, minWidth: 0, transformOrigin: "left" as const },
+  action: { flexShrink: 0, flexDirection: "row" as const, alignItems: "center" as const },
   largeText: { ...typography.largeTitle, color: t.text },
 }));

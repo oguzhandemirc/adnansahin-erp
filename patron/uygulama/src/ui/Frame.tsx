@@ -103,8 +103,12 @@ export interface ScreenProps {
   /** Aşağı çekip yenileme (verilirse). */
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
-  /** Üst barın sağ yuvası (ör. eşitleme göstergesi, ikon düğmesi). */
+  /** Başlık eylemi (ör. "Yeni sipariş"): büyük başlıkla AYNI satırda, dikey ortalı, sağa yaslı. */
   readonly headerRight?: ReactNode;
+  /** Kaydırınca üstte yapışık kalan şerit (ör. veri tablosunun araç + sütun başlığı şeridi). */
+  readonly sticky?: ReactNode;
+  /** Kaydırma sona yaklaşınca (sonsuz kaydırma). */
+  readonly onEndReached?: () => void;
   /** Büyük başlığın altındaki satır (ör. tesis adı + SyncIndicator). */
   readonly subtitle?: ReactNode;
   /** Kaydırmanın altında sabit kalan çubuk (ör. düzenleme kipinin eylemleri). */
@@ -134,7 +138,7 @@ export function useUserPull(refreshing: boolean | undefined, onRefresh: (() => v
   };
 }
 
-export function Screen({ title: titleProp, module, children, back, onRefresh, refreshing, headerRight, subtitle, footer }: ScreenProps) {
+export function Screen({ title: titleProp, module, children, back, onRefresh, refreshing, headerRight, subtitle, footer, sticky, onEndReached }: ScreenProps) {
   const title = titleProp ?? (module ? moduleTitle(module) : "");
   const t = useTokens();
   const s = useStyles();
@@ -142,7 +146,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { permissions, switchError } = useSession();
-  const { scrollY, onScroll } = useHeaderScroll();
+  const { scrollY, onScroll } = useHeaderScroll(onEndReached);
   const allowed = module === undefined || moduleVisible(permissions, module);
   const path = usePathname();
   const showBack = !wide && (back ?? !TABS.some((tab) => tab.route === path));
@@ -151,20 +155,25 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const pull = useUserPull(refreshing, onRefresh);
   return (
     <View style={s.screen}>
-      <LargeHeader title={title} scrollY={scrollY} topInset={wide ? space.s : insets.top} onBack={showBack ? goBack : undefined} right={headerRight} />
+      <LargeHeader title={title} scrollY={scrollY} topInset={wide ? space.s : insets.top} onBack={showBack ? goBack : undefined} />
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         // Sayı klavyesinin "bitti" tuşu yok: içeriği sürüklemek klavyeyi indirir.
         keyboardDismissMode="on-drag"
+        // Yapışık şerit HEP 1. çocuktur (0: başlık bloğu): koşullu çocuklar indeksi kaydırmasın diye sarılı.
+        stickyHeaderIndices={sticky && allowed ? [1] : undefined}
         refreshControl={onRefresh ? <RefreshControl refreshing={pull.spinning} onRefresh={pull.onRefresh} tintColor={t.tint} colors={[t.tint]} progressBackgroundColor={t.surface} /> : undefined}
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + space.xl, paddingHorizontal: pad }]}
       >
-        <LargeTitle title={title} scrollY={scrollY} subtitle={subtitle} bleed={pad} />
-        <StatusBands />
-        {switchError ? <Banner tone="error" text={switchError} testID="bant-tesis-gecisi" /> : null}
-        {allowed ? children : <Banner tone="error" icon="lock-closed-outline" text="Bu bölümü görme yetkiniz yok" />}
+        <View>
+          <LargeTitle title={title} scrollY={scrollY} subtitle={subtitle} bleed={pad} action={headerRight} />
+          <StatusBands />
+          {switchError ? <Banner tone="error" text={switchError} testID="bant-tesis-gecisi" /> : null}
+        </View>
+        {sticky && allowed ? <View style={[s.sticky, { marginHorizontal: -pad, paddingHorizontal: pad }]}>{sticky}</View> : null}
+        <View>{allowed ? children : <Banner tone="error" icon="lock-closed-outline" text="Bu bölümü görme yetkiniz yok" />}</View>
       </Animated.ScrollView>
       {footer}
     </View>
@@ -173,6 +182,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
 
 const useStyles = makeStyles((t) => ({
   screen: { flex: 1, backgroundColor: t.bg },
+  sticky: { backgroundColor: t.bg, zIndex: 2 },
   content: { paddingTop: 0, maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },
   facilityPress: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
