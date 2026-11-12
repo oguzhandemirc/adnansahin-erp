@@ -180,7 +180,7 @@ const useStyles = makeStyles((t) => ({
   duzenleYazi: { fontSize: 16, lineHeight: 21, fontWeight: "600" as const },
   kutular: { gap: space.m },
   ikili: { flexDirection: "row" as const, gap: space.m },
-  yarim: { flex: 1, minWidth: 0 },
+  yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
   intro: { ...typography.callout, color: t.textSecondary, marginTop: space.s },
   note: { ...typography.footnote, color: t.textSecondary, marginTop: space.m },
 }));

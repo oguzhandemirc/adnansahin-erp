@@ -11,7 +11,8 @@
 //     yalnız ona bağlı anlıklar düşer, diğerleri kurulur (buildSnapshots fırlatmaz); `ozet` bölüm bazında
 //     yalıtılır — istasyon hatası yalnız `ozet.uretim`i düşürür, diğer dört bölüm gider.
 //  §3 Doğruluk: anlık ↔ bağımsız SQL ↔ panel servisi (açık sipariş · bugün brüt sevk · mamul stok · istasyon
-//     kuyruk/bugün · fason açık) — `scripts/lib/anlik-bagimsiz.ts`.
+//     kuyruk/bugün · fason açık · fasondaki/boyahanedeki top ↔ üretim akışı "Fason'da" kolonu · firma başına top +
+//     kategori) — `scripts/lib/anlik-bagimsiz.ts`; fixture: boyahaneye 2 top + zımparaya 1 top açık fason sevki.
 //  §4 KAPALI: ön koşul yokken tur `GONDERILMEDI`, anlık hesabı yok (`snapshotRun` null), dış istek yok; iş tıkı
 //     da hesap yapmaz (`lastSnapshotAt` null); `snapshots:false` turunda da hesap yok.
 //  §5 Sıklık: anlıklar aralık başına EN ÇOK bir kez hesaplanır (devam turu hesaplamaz); içerik özeti aynıysa
@@ -25,6 +26,9 @@
 //   · iş tıkında `const snapshots = true` (her turda hesap) → §5 "devam turu hesaplamaz" ✗
 //   · `stok-karnesi` `bitmisMiktar` ← `s.rawQty` (yanlış eşleme) → §3 mamul stok ✗
 //   · `ozet` bölümleri tek try içinde kuruldu (eski davranış) → §2 "ozet bölüm yalıtımı" ✗
+// NEGATİF SONDA (2026-11-13, kırmızı verdi, geri alındı):
+//   · `boyahanedeTop` ← tüm açık toplar (kategori süzgeci yok) → §3 fixture farkı + "boyahanedeki top" ✗
+//   · firma `kategoriler` boş dizi → §3 "firma başına top + kategori uyuşmazlığı" ✗
 // =============================================================================
 import { gunzipSync } from "node:zlib";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -45,6 +49,7 @@ import { generateKeyFile, loadKeyFile } from "../src/lib/cloud-signing/key-file"
 import { DashboardService } from "../src/services/dashboard.service";
 import { __configureCloudSyncForTests, getCloudSyncStatus, runCloudSyncTick } from "../src/jobs/cloud-sync.job";
 import { accuracyRows, rowOk } from "./lib/anlik-bagimsiz";
+import { ensureTestDyeHouse, ensureTestSander } from "./fixture-subcontractor";
 
 let pass = 0, fail = 0;
 function check(l: string, ok: boolean, x = ""): void {
@@ -60,7 +65,7 @@ const CLOUD_SNAPSHOT_NAMES = new Set([
   "emanet-bakiye", "fason-acik", "hizmet-geliri", "stok-karnesi", "acik-siparis-karsilama", "rapor-katalogu", "uretim-akisi", "saglik", "tesis", "cari-ozeti",
 ]);
 const STAMP = `TEST-D3B-${Date.now()}-`;
-const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[] };
+const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[], wos: [] as string[], dispatches: [] as string[] };
 const NOT_IN_ADNAN =["ozet-finans", "ozet-masraf", "karlilik-ozet", "hizmet-geliri", "emanet-bakiye", "saglik"];
 
 function keysOf(v: unknown, out: Set<string> = new Set()): Set<string> {
@@ -147,8 +152,38 @@ async function main(): Promise<void> {
   const order = await prisma.order.create({ data: { orderNumber: `${STAMP}O`, customerId: customer.id, status: "APPROVED" }, select: { id: true } });
   fx.orders.push(order.id);
   await prisma.orderLine.create({ data: { orderId: order.id, itemId: item.id, quantity: 300, shippedQty: 0 } });
+  // Fason: boyahane firmasına 2 top, zımpara firmasına 1 top — açık sevk (iş emri + adım + parti başlığı CHECK'i).
+  const [dye, sander] = [await ensureTestDyeHouse(), await ensureTestSander()];
+  const fasonSt = await prisma.station.findFirst({ where: { code: "BOYA_FASON" }, select: { id: true } });
+  if (!fasonSt) throw new Error("Seed fixture eksik: BOYA_FASON istasyonu");
+  const wo = await prisma.workOrder.create({
+    data: { workOrderNumber: `${STAMP}WO`, type: "STOCK_PRODUCTION", status: "IN_PROGRESS", targetItemId: item.id, steps: { create: [{ stationId: fasonSt.id, stepSequence: 1, status: "ACTIVE" }] } },
+    select: { id: true, steps: { select: { id: true } } },
+  });
+  fx.wos.push(wo.id);
+  const batch = await prisma.batch.create({ data: { batchNumber: `${STAMP}P`, workOrderId: wo.id }, select: { id: true } });
+  for (const [k, [firm, count]] of ([[dye.id, 2], [sander.id, 1]] as const).entries()) {
+    const d = await prisma.subcontractorDispatch.create({
+      data: { dispatchNo: `${STAMP}SD${k}`, workOrderId: wo.id, stepId: wo.steps[0]!.id, batchId: batch.id, subcontractorId: firm },
+      select: { id: true },
+    });
+    fx.dispatches.push(d.id);
+    for (let j = 0; j < count; j++) {
+      const r = await prisma.roll.create({
+        data: { itemId: item.id, initialQty: 40, currentQty: 40, status: "AT_SUBCONTRACTOR", entrySource: "SUPPLIER_RECEIPT", barcode: `${STAMP}F${k}${j}` },
+        select: { id: true },
+      });
+      fx.rolls.push(r.id);
+      await prisma.subcontractorDispatchItem.create({ data: { dispatchId: d.id, rollId: r.id, dispatchedQty: 40 } });
+    }
+  }
   const acc = await accuracyRows(now);
   const delta = (name: string, k: string) => Math.round((pick(acc.snapshots, name, k) - pick(base, name, k)) * 10) / 10;
+  const top = (snaps: typeof b.snapshots, k: string): number => Number((snaps.find((x) => x.projection === "fason-acik")?.data as Record<string, unknown>)?.[k] ?? NaN);
+  const fasonDelta = (k: string) => top(acc.snapshots, k) - top(base, k);
+  check("fixture farkı: fasonda +3 top, boyahanede +2", fasonDelta("acikTop") === 3 && fasonDelta("boyahanedeTop") === 2, `${fasonDelta("acikTop")} · ${fasonDelta("boyahanedeTop")}`);
+  const dyeRow = ((acc.snapshots.find((x) => x.projection === "fason-acik")?.data as { firmalar?: Array<Record<string, unknown>> })?.firmalar ?? []).find((f) => f.fasonFirmaId === dye.id);
+  check("firma satırı: boyahane 2 top, kategori Boyahane", dyeRow?.acikTop === 2 && Array.isArray(dyeRow.kategoriler) && (dyeRow.kategoriler as string[]).includes("Boyahane"), JSON.stringify(dyeRow));
   check("fixture farkı: mamul stok +173,4 m / +2 top", delta("stok-karnesi", "bitmisMiktar") === 173.4 && delta("stok-karnesi", "bitmisAdet") === 2, `${delta("stok-karnesi", "bitmisMiktar")} m · ${delta("stok-karnesi", "bitmisAdet")} top`);
   check("fixture farkı: ham stok +77 m", delta("stok-karnesi", "hamMiktar") === 77, `${delta("stok-karnesi", "hamMiktar")}`);
   check("fixture farkı: açık sipariş +1 kalem / +300 m", delta("acik-siparis-karsilama", "acikKalem") === 1 && delta("acik-siparis-karsilama", "acikMiktar") === 300);
@@ -223,10 +258,15 @@ async function main(): Promise<void> {
 main()
   .catch((e: unknown) => { fail++; console.log(`  ✗ FAIL: beklenmeyen hata — ${e instanceof Error ? e.stack ?? e.message : String(e)}`); })
   .finally(async () => {
-    // Fixture FK sırasıyla silinir (kalem → sipariş → top → kumaş → müşteri).
+    // Fixture FK sırasıyla silinir (fason kalem → sevk → parti/iş emri; kalem → sipariş → top → kumaş → müşteri).
+    if (fx.dispatches.length) await prisma.subcontractorDispatchItem.deleteMany({ where: { dispatchId: { in: fx.dispatches } } });
+    if (fx.dispatches.length) await prisma.subcontractorDispatch.deleteMany({ where: { id: { in: fx.dispatches } } });
+    if (fx.wos.length) await prisma.batch.deleteMany({ where: { workOrderId: { in: fx.wos } } });
     if (fx.orders.length) await prisma.orderLine.deleteMany({ where: { orderId: { in: fx.orders } } });
     if (fx.orders.length) await prisma.order.deleteMany({ where: { id: { in: fx.orders } } });
     if (fx.rolls.length) await prisma.roll.deleteMany({ where: { id: { in: fx.rolls } } });
+    if (fx.wos.length) await prisma.workOrderStep.deleteMany({ where: { workOrderId: { in: fx.wos } } });
+    if (fx.wos.length) await prisma.workOrder.deleteMany({ where: { id: { in: fx.wos } } });
     if (fx.items.length) await prisma.item.deleteMany({ where: { id: { in: fx.items } } });
     if (fx.customers.length) await prisma.customer.deleteMany({ where: { id: { in: fx.customers } } });
     await prisma.$disconnect();

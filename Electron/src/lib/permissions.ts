@@ -70,6 +70,7 @@ export const SYSTEM_ACTIVITY_ACCESS = ["admin:settings", "system:activity"];
 export const SYSTEM_WORK_SESSIONS_ACCESS = ["admin:settings", "system:work-sessions"];
 export const SYSTEM_SERVER_STATUS_ACCESS = ["admin:settings", "system:server-status"];
 export const SYSTEM_CLIENTS_ACCESS = ["admin:settings", "system:clients"];
+export const SYSTEM_SESSIONS_ACCESS = ["admin:settings", "system:sessions"];
 export const SYSTEM_BACKUPS_ACCESS = ["admin:settings", "system:backups"];
 export const SYSTEM_ROLL_ARCHIVE_ACCESS = ["admin:settings", "roll:read"];
 
@@ -103,5 +104,6 @@ export const SYSTEM_HUB_ACCESS = [
   "system:work-sessions",
   "system:server-status",
   "system:clients",
+  "system:sessions",
   "system:backups",
 ];

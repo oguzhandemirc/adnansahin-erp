@@ -81,12 +81,6 @@ export interface AppPreferences {
      *  sahiplenir ve okurken süzer (bozuk/eski → varsayılan); burada bilerek `unknown`. */
     stockLineExport?: unknown;
   };
-  /** Dashboard widget düzeni — gizli widget'lar + grup/öğe sırası. */
-  dashboard?: {
-    hidden?: string[];
-    groupOrder?: string[];
-    itemOrders?: Record<string, string[]>;
-  };
   // NOT: `scanner`, `labelPrinter`, `scaleDevice` — makineye bağlı donanım
   // ayarları — bilerek burada DEĞİL. `@/lib/machine-config` (secure-store,
   // per-machine) içindeler; `useMachineConfig` ile okunur/yazılır.

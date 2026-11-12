@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoleAccess } from "@/hooks/useRoleAccess";
 import { Activity } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { PanoCard } from "./pano/PanoBoxFrame";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { stationKindLabels, type StationKind } from "@/types/enums";
 import {
   fetchStationLiveState,
   type StationLiveState,
-} from "./dashboardService";
+} from "./pano/pano-kaynak";
 import { foldSearchText } from "@/lib/search-fold";
 import { trCompare } from "@/lib/collate";
 
@@ -59,20 +59,16 @@ export function StationLoad() {
   if (!allowed) return null;
 
   return (
-    <Card className="border-t-2 border-t-primary/50">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-          <Activity className="h-4 w-4 text-muted-foreground" />
-          İstasyon Doluluk
-          {data && data.length > 0 && (
-            <span className="ml-auto flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
-              <span className="live-dot" />
-              Canlı
-            </span>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <PanoCard
+      title="İstasyon doluluğu"
+      titleExtra={<Activity className="h-4 w-4 text-muted-foreground" aria-hidden />}
+      action={data && data.length > 0 ? (
+        <span className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+          <span className="live-dot" />
+          Canlı
+        </span>
+      ) : undefined}
+    >
         {isLoading ? (
           <LoadingGrid />
         ) : isError ? (
@@ -97,8 +93,7 @@ export function StationLoad() {
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+    </PanoCard>
   );
 }
 
@@ -122,7 +117,8 @@ function StationCell({ station }: { station: StationLiveState }) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{station.name}</p>
+          {/* İki satıra sarar: "Zımpara (Fason)" gibi adların ayırt edici sonu Fason rozetinin yanında kesiliyordu. */}
+          <p className="line-clamp-2 break-words text-sm font-medium leading-tight" title={station.name}>{station.name}</p>
           <p className="truncate text-[10px] text-muted-foreground">{kindLabel}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">

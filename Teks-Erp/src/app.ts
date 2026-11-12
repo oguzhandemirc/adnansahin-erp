@@ -114,6 +114,7 @@ import dashboardRoutes from "./routes/dashboard.routes";
 import reportsRoutes from "./routes/reports.routes";
 import { devicePublicRouter, deviceAdminRouter } from "./routes/device.routes";
 import workSessionRoutes from "./routes/work-session.routes";
+import sessionRoutes from "./routes/session.routes";
 import { resolveDevice } from "./middlewares/device.middleware";
 import { latencyMiddleware } from "./middlewares/latency.middleware";
 import { clientInfoMiddleware } from "./middlewares/client-info.middleware";
@@ -990,6 +991,7 @@ app.use("/api/reports", reportsRoutes);
 app.use("/api/devices", devicePublicRouter);
 app.use("/api/admin/devices", deviceAdminRouter);
 app.use("/api/work-sessions", workSessionRoutes);
+app.use("/api/sessions", sessionRoutes);
 // Global arama (Ctrl+K) — izin süzgeci ROUTE'ta değil SERVİSTE, kova bazında.
 app.use("/api/search", searchRoutes);
 // Mobil uzaktan güncelleme (tabletlerin JS paketi + kurulum dosyası).

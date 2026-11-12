@@ -17,6 +17,26 @@ export function formatNumber(value: unknown, digits = 2): string {
   return neg && body !== "0" ? `-${body}` : body;
 }
 
+// Sayının okunuşundaki SON kelimeye göre üçüncü tekil iyelik eki ("12'si", "18'i", "30'u", "100'ü").
+const DIGIT_SUFFIX = ["ı", "i", "si", "ü", "ü", "i", "sı", "si", "i", "u"] as const;
+const TENS_SUFFIX = ["", "u", "si", "u", "ı", "si", "ı", "i", "i", "ı"] as const;
+
+/** Tam sayı + iyelik eki: 12 → "12'si", 1500 → "1.500'ü"; sayı değilse "—". */
+export function formatCountPossessive(value: unknown): string {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
+  if (!Number.isFinite(n)) return "—";
+  const a = Math.abs(Math.round(n));
+  const suffix =
+    a === 0 ? "ı"
+    : a % 10 !== 0 ? DIGIT_SUFFIX[a % 10]!
+    : a % 100 !== 0 ? TENS_SUFFIX[(a % 100) / 10]!
+    : a % 1000 !== 0 ? "ü"
+    : a % 1_000_000 !== 0 ? "i"
+    : a % 1_000_000_000 !== 0 ? "u"
+    : "ı";
+  return `${formatNumber(Math.round(n), 0)}'${suffix}`;
+}
+
 export function formatMoney(value: unknown, currency = "TRY"): string {
   const n = formatNumber(value, 2);
   if (n === "—") return n;

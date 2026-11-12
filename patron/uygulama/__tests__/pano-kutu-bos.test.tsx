@@ -25,3 +25,21 @@ describe("pano kutusu boş/hata ayrımı", () => {
     expect(screen.getByText(/Alınamadı/)).toBeTruthy();
   });
 });
+
+describe("Fasondaki top kutusu (`fason-acik`)", () => {
+  const fason = (veri: unknown): KutuBaglami => ({
+    ...baglam(uzak({})),
+    anlik: { "fason-acik": uzak({ data: { projeksiyon: "fason-acik", veri, surum: "1" } }) },
+  });
+  it("top sayısı + boyahanedeki payı fabrikadan", () => {
+    render(<>{KUTU_CIZICI.fasonTop(fason({ acikSevk: 4, kalanMiktar: "4200.000", acikTop: 18, boyahanedeTop: 12, firmalar: [] }))}</>);
+    expect(screen.getByText("18")).toBeTruthy();
+    expect(screen.getByText("12'si boyahanede")).toBeTruthy();
+  });
+  it("eski fabrika (alan yok) → değer uydurulmaz, ipucu 'şu an fasonda'", () => {
+    render(<>{KUTU_CIZICI.fasonTop(fason({ acikSevk: 4, kalanMiktar: "4200.000", firmalar: [] }))}</>);
+    expect(screen.getByText("şu an fasonda")).toBeTruthy();
+    expect(screen.queryByText(/boyahanede/)).toBeNull();
+    expect(screen.queryByText("18")).toBeNull();
+  });
+});
