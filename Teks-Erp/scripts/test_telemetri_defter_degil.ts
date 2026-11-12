@@ -12,7 +12,9 @@
 //
 // ⚠️ KAPSAM BEYANI — bu bekçi altı kuralın HEPSİNİ ölçmez:
 //   ÖLÇÜLÜR bugün: ① sınıf beyanı + budama yolunun beyanı · ④ budayan yolun TEK dosyada
-//     olması · "tavanlı" olmanın yapısal karşılığı (yüklem YAŞA bağlı, ada değil).
+//     olması · "tavanlı" olmanın yapısal karşılığı (yüklem YAŞA bağlı, ada değil) ·
+//     §7 budanan TELEMETRİ tablosunun OKUYUCU kümesi beyanla birebir (rapor/karar yolu
+//     okuyucu olarak giremez — "silinse hiçbir sayı değişmez"in ölçülebilen yanı).
 //   ÖLÇÜLEMEZ bugün (Faz 2, `test_machine_prune_safety`): ② donan sayı · ③ manifest
 //     bekçisi · ⑤ tek helper + DB seddi ikizi · ⑥ açık koşum/vardiya/mühürsüz pencere.
 //   Bu ayrım BEYAN EDİLİR ki "telemetri kapısı var" cümlesi hepsini kapsıyor sanılmasın.
@@ -78,6 +80,32 @@ export function yasYuklemi(where: ts.ObjectLiteralExpression, sf: ts.SourceFile)
   return { yas: bulunan !== "", alan: bulunan };
 }
 
+/**
+ * Dosya tabloyu OKUYOR mu? SAF — girdi kaynak, çıktı karar. Okuma = delegate erişimi
+ * (`x.<delegate>.…`) ya da tablo adını kelime olarak taşıyan dize/şablon (ham SQL,
+ * eşitleme kataloğu). Yorum ve nesne ANAHTARI (`sync_marks: "…"`) okuma değildir.
+ */
+export function tabloyuOkur(kaynak: string, dosya: string, delegate: string, tablo: string): boolean {
+  const sf = ts.createSourceFile(dosya, kaynak, ts.ScriptTarget.Latest, true);
+  const kelime = new RegExp(`(^|[^A-Za-z0-9_])${tablo}($|[^A-Za-z0-9_])`);
+  let bulundu = false;
+  const gez = (n: ts.Node): void => {
+    if (bulundu) return;
+    if (ts.isPropertyAccessExpression(n) && n.name.text === delegate) { bulundu = true; return; }
+    if ((ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) && kelime.test(n.text)) { bulundu = true; return; }
+    if (ts.isTemplateExpression(n) && kelime.test(n.getText(sf))) { bulundu = true; return; }
+    n.forEachChild(gez);
+  };
+  gez(sf);
+  return bulundu;
+}
+
+/** Şemadaki `@@map` adı (yoksa model adı). */
+function tabloAdi(sema: string, model: string): string {
+  const blok = new RegExp(`\\nmodel\\s+${model}\\s*\\{([\\s\\S]*?)\\n\\}`).exec(sema);
+  return (blok && /@@map\("([^"]+)"\)/.exec(blok[1])?.[1]) ?? model;
+}
+
 /** `prisma.<model>.deleteMany(...)` çağrılarını bulur. SAF — girdi kaynak, çıktı yerler. */
 export function budamalariTara(kaynak: string, dosya: string): BudamaYeri[] {
   const sf = ts.createSourceFile(dosya, kaynak, ts.ScriptTarget.Latest, true);
@@ -119,9 +147,12 @@ function main(): void {
   ];
 
   const budamalar: BudamaYeri[] = [];
+  const kaynaklar = new Map<string, string>();
   for (const f of walkTs(join(KOK, "src"))) {
     const rel = relative(KOK, f);
-    budamalar.push(...budamalariTara(readFileSync(f, "utf8"), rel));
+    const kaynak = readFileSync(f, "utf8");
+    kaynaklar.set(rel, kaynak);
+    budamalar.push(...budamalariTara(kaynak, rel));
   }
 
   check("§1 körlük zemini: yaş budaması bulundu", budamalar.length > 0,
@@ -160,6 +191,23 @@ function main(): void {
   check("§5 ⭐ DEFTER sınıflı tablo YAŞA göre budanmıyor", defterBudanan.length === 0,
     defterBudanan.length ? defterBudanan.map((b) => `${b.model} ← ${b.dosya}:${b.satir}`).join(" · ") : "defter budanmıyor");
 
+  // §7 ⭐ BUDAMA İZNİNİN ÖLÇÜMÜ: budanan TELEMETRİ tablosunu okuyan dosya kümesi beyanla BİREBİR.
+  // Okuyucu kümesine bir rapor/karar yolu girerse budama o sayıyı sessizce değiştirir ⇒ beyan
+  // yeniden tartışılır (sınıf DEFTER'e döner ya da sayı budamadan önce kalıcı kolona donar).
+  const sema = readFileSync(join(KOK, "prisma", "schema.prisma"), "utf8");
+  for (const b of DEFTER_BEYANI.filter((x) => x.sinif === "TELEMETRI" && (x.silen?.length ?? 0) > 0)) {
+    const delegate = b.model.charAt(0).toLowerCase() + b.model.slice(1);
+    const tablo = tabloAdi(sema, b.model);
+    const gercek = [...kaynaklar].filter(([d, k]) => tabloyuOkur(k, d, delegate, tablo)).map(([d]) => d).sort();
+    const beyanli = [...(b.okuyan ?? [])].sort();
+    const yeni = gercek.filter((d) => !beyanli.includes(d));
+    const olu = beyanli.filter((d) => !gercek.includes(d));
+    check(`§7 ⭐ ${b.model} (${tablo}) okuyucu kümesi beyanla BİREBİR`, beyanli.length > 0 && yeni.length === 0 && olu.length === 0,
+      [beyanli.length === 0 ? "`okuyan` beyanı YOK — budanan telemetrinin okuyucusu ölçülmeden budama izni verilmez" : "",
+        yeni.length ? `BEYANSIZ okuyucu: ${yeni.join(", ")}` : "", olu.length ? `ÖLÜ beyan: ${olu.join(", ")}` : ""].filter(Boolean).join(" · ")
+        || gercek.join(", "));
+  }
+
   console.log("\n=== §6 SONDALAR (saf yüklem) ===");
   const S = (k: string) => budamalariTara(k, "sonda.ts");
   check("§6a ⭐ `lt` tarih eşiği YAŞ budamasıdır",
@@ -171,6 +219,12 @@ function main(): void {
   check("§6e iç içe yüklemde de bulunur (AND)",
     S("await prisma.x.deleteMany({ where: { AND: [{ day: { lt: c } }] } });")[0]?.alan === "day");
   check("§6f model adı büyük harfe çevrilir", S("await prisma.endpointLatencyDaily.deleteMany({ where: { day: { lt: c } } });")[0]?.model === "EndpointLatencyDaily");
+  const O = (k: string) => tabloyuOkur(k, "sonda.ts", "syncMark", "sync_marks");
+  check("§6g ⭐ delegate erişimi OKUMADIR", O("await prisma.syncMark.count();"));
+  check("§6h ⭐ ham SQL dizesi OKUMADIR", O("const q = 'SELECT 1 FROM \"sync_marks\" m';"));
+  check("§6i ⭐ şablon içindeki tablo adı OKUMADIR", O("const q = `SELECT * FROM sync_marks WHERE x = ${1}`;"));
+  check("§6j yorum ve nesne anahtarı okuma DEĞİL", !O("// sync_marks budanır\nconst m = { sync_marks: \"x\" };"));
+  check("§6k ön/son ekli ad aynı tablo DEĞİL", !O("const q = 'SELECT 1 FROM sync_marks_archive';"));
 
   console.log(`\n=== Sonuç: ${pass} geçti, ${fail} başarısız ===`);
   process.exit(fail > 0 ? 1 : 0);
