@@ -56,7 +56,7 @@ Backend'in dört kırmızısından **yalnız biri listede** (`test_hook_config` 
 | `test_scan_code_case` 18/1 | **ORTAM, gerçek değil** | PostgreSQL planlayıcısı küçük tabloda index seçmez, Seq Scan'e düşer; CI'ın DB'si taze ve küçük. Yerelde tam migre DB'de yeşil. "Hangi veride" alanı eksikti, hüküm değil |
 | `test_script_guards` 43/1 | **ZATEN DÜZELTİLDİ** | `71f59957` (`scripts/test_script_guards.ts` +2). CI `8f68c367`'yi koştu, düzeltme ondan SONRA indi — sonraki turda yeşile döner |
 
-Mobil kırmızısı da listede değil ve gerçek: `mobil/src/test/update-feed-url.test.ts:76`, kod imzalama sertifikası dosyası yok.
+Mobil kırmızısı da listede değil ve gerçek: OTA kanal bekçisi (silindi 2026-11-12) sertifika dosyası yok diye kırmızıydı.
 
 ⚠️ **"Hangi VERİDE" bir liste alanıdır.** Üç hükmün ikisi ortamın verisine bağlıydı; veri yazılmadan hüküm taşınamaz.
 

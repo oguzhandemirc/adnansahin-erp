@@ -1,5 +1,7 @@
 # Mobil Uzaktan Güncelleme — Kurulum ve Kullanım Reçetesi
 
+> ⚠️ **BU KURULUMDA KULLANILMIYOR (2026-11-12 kararı):** saha uygulaması yalnız Google Play'den güncellenir; `expo-updates`, `yayinla-ota.mjs` ve `deploy/mobil-yayinla.mjs` kaldırıldı. Güncel reçete: `docs/ops/SAHA-PLAY-DAGITIM.md`. Bu belge tarihsel kayıttır.
+
 **Durum:** 2026-08-27 — **yayın sunucusu KURULDU ve doğrulandı**; sahadaki tabletlere
 2026-09-04'te elden kuruldu (APK 1.0.0-vc57); sonraki JS turları OTA ile gider.
 
@@ -243,10 +245,10 @@ Güncelleme: internet). İkisinin farklı olması normaldir; ekran bunu uyarı o
 | Bekçi | Ne ölçer |
 |---|---|
 | `Teks-Erp/scripts/test_mobile_update.ts` | Donmuş manifest baytları BOZULMADAN servis ediliyor mu · imza sertifikayla doğrulanıyor mu · protokol başlıkları · yol kaçışı · geri alma · **backend ↔ mobil ↔ nginx sınırlayıcı tutarlılığı** (37 kontrol) |
-| `mobil/src/test/update-feed-url.test.ts` | Feed adresi tek kaynak · `enabled` açık · sertifika dosyası gerçekten var · ERP adresinden bağımsızlık (7 kontrol) |
-| `mobil/src/services/appUpdate.service.test.ts` | Yenileme kapısı (bekleyen kayıt) + sürüm karşılaştırması (8 kontrol) |
+| update-feed-url.test (silindi 2026-11-12) | Feed adresi tek kaynak · `enabled` açık · sertifika dosyası gerçekten var · ERP adresinden bağımsızlık (7 kontrol) |
+| appUpdate.service.test (silindi 2026-11-12) | Yenileme kapısı (bekleyen kayıt) + sürüm karşılaştırması (8 kontrol) |
 | `mobil/scripts/build-apk.mjs` | Manifest'te feed adresi + runtimeVersion + **kod imzalama sertifikası** · APK'nın mührü |
-| `mobil/scripts/yayinla-ota.mjs` | Bundle'daki ERP adresi · native parmak izi ↔ runtimeVersion · imzanın sertifikayla doğrulanması |
+| yayinla-ota (silindi 2026-11-12) | Bundle'daki ERP adresi · native parmak izi ↔ runtimeVersion · imzanın sertifikayla doğrulanması |
 
 Hepsi negatif sondayla kırmızı verdiği ölçülerek yazıldı.
 

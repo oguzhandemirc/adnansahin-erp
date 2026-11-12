@@ -13214,3 +13214,12 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Nasıl.** Bulut göçü `20261112120000_dogrulama_istege_bagli` (`identities.totp_enabled_at`; kurulu sırrı ve son adımı olan kimlik AÇIK kalır; CHECK'ler AKTİF ⇒ parola, açık ⇒ sır). Kod gerekli yanıtı (`DOGRULAMA_KODU_GEREKLI`) yalnız doğru paroladan sonra döner — durum yanlış parolada sızmaz. Kurtarma yalnız satıcı CLI'si `tesis.ts dogrulama-kapat` (talep + gerekçe zorunlu, denetim `DOGRULAMA_KAPATILDI`). Yaygın parola listesi eklendi (asgari 12 aynı). Kurulum sırası önce bulut: yeni uygulama eski bulutta kodsuz giremez; eski uygulamanın TOTP adımlı daveti yeni bulutta hesabı yine AKTİF eder.
 
 **Ölçüm.** Bulut bekçisi `test_dogrulama_kodu` (eski `test_totp_zorunlu`un yerine; üç negatif sonda kırmızı), bulut paketi yeşil; uygulama tsc 0 + jest 465/465.
+
+
+## 2026-11-12 — Saha uygulaması yalnız Google Play'den güncellenir; OTA kaldırıldı [PROFİL]
+
+**Karar (kullanıcı, 2026-11-12).** "Sahadaki tüm güncellemeleri sadece Google Play'den dağıtırız." Gerekçe: tek kanal, ek anahtar ve sunucu yok. Bedel (kabul edildi): sessiz/anında kod güncellemesi yok; her değişiklik yeni `versionCode`lu Play sürümü.
+
+**Nasıl.** `expo-updates` ve `expo-intent-launcher` bağımlılıktan, `updates`/`runtimeVersion`/kod imzalama yapılandırması `app.json`dan çıktı; `REQUEST_INSTALL_PACKAGES` engellendi. Uygulamada OTA denetimi/indirme ve kendi-APK şeridi kalktı; tek yol uygulama içi Play güncellemesi, zorunluluğu sunucu `minVersion`ı belirler; `minPaketTarihi` istemcide okunmaz (backend alanı yerinde, ayrı dilimde kalkar). `yayinla-ota.mjs` ve `deploy/mobil-yayinla.mjs` silindi; `deploy/kanallar.json` tablet OTA alanlarını taşımaz (kapalı şema reddeder). `build-apk` paketin ETKİN OTA meta verisi taşımadığını ölçer — Expo prebuild expo-updates kurulu değilken de `ENABLED=false` + iki varsayılan yazar, bunlar iz sayılmaz. `feed.cjs`/`manifest.mjs` yalnız backend OTA ucu bekçisi (`test_mobile_update` §9–§10) için kalıntıdır.
+
+**Ölçüm.** `check-kanallar` yeşil + sonda (yeni negatifler: app.json'a OTA, kayda `otaManifest`, package.json'a `expo-updates`, silinen yayıncının dönüşü); `test_kanal_yayin_kapisi` 68/0; `test_surum` 16/0; mobil jest 1303/1303.

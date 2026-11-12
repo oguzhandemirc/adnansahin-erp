@@ -117,5 +117,6 @@ Eski sürümler ve kapsam dışı `dokuma.md`/`finans.md` yalnız başvuru için
 
 - **Sıra:** bulut ayakta → bakım penceresinde backend paketi (eşitleme KAPALI) → okuma aç → ≥ 1 hafta izle → yazma aç. Backend ÖNCE, panel + tablet sonra.
 - **Sürüm:** sürüm notu yazılmadan sürüm çıkmaz (taslağı Claude yazar; tek kaynak `surum-notlari.json`). Terfi kapısı ve hazırlık kanalı YOK; fabrikaya yayın yalnız kullanıcının o sürüm için açık onayıyla. Müşteri kodu her derleme ve yayın komutunda argümandan (`adnansahin`), kanal kimlikleri `deploy/kanallar.json`. Reçete: `docs/kurallar/surum-yayin.md`.
+- **Saha uygulaması (tablet):** güncellemeler YALNIZ Google Play'den (dahili test + uygulama içi Play güncellemesi); OTA ve kendi APK yayını yok (kullanıcı kararı 2026-11-12).
 - **Patron uygulaması:** Adnan Şahin'e özel ad/simge; doğrudan mağazaya açık yayın, Apple reddederse listelenmeyen yayın.
 - **Alt projeler:** `Teks-Erp/CLAUDE.md`, `Electron/CLAUDE.md`, `mobil/CLAUDE.md`. Kod standardı `docs/standart/README.md`, sözlük `docs/SOZLUK.md`, geliştirme döngüsü `docs/GELISTIRME-DONGUSU.md`.

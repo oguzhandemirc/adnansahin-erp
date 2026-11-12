@@ -1,33 +1,29 @@
 # Sürüm, yayın ve kurulum
 
-Backend paketinin üretilip fabrika sunucusuna kurulması, panelin (Electron) ve tabletin (OTA/APK) güncelleme kanalına yayınlanması, migration disiplini. Kod: `deploy/` (`paketle.ps1`, `kur.ps1`, `ilk-kurulum.ps1`, `electron-paketle.sh`, `electron-yayinla.sh`, `mobil-yayinla.mjs`, `kanallar.json`), `mobil/scripts/` (`yayinla-ota.mjs`, `build-apk.mjs`), kök `scripts/` (sürüm notu ve kanal kapıları), `Teks-Erp/prisma/migrations/`, `Teks-Erp/src/config/client-version-policy.ts`.
+Backend paketinin üretilip fabrika sunucusuna kurulması, panelin (Electron) güncelleme kanalına ve tabletin Google Play dahili teste yayınlanması, migration disiplini. Kod: `deploy/` (`paketle.ps1`, `kur.ps1`, `ilk-kurulum.ps1`, `electron-paketle.sh`, `electron-yayinla.sh`, `play-yukle.mjs`, `kanallar.json`), `mobil/scripts/` (`build-apk.mjs`), kök `scripts/` (sürüm notu ve kanal kapıları), `Teks-Erp/prisma/migrations/`, `Teks-Erp/src/config/client-version-policy.ts`.
 
 ## Kurallar
 
 ### Sürüm ve yayın
-- Tek dağıtım kanalı `adnansahin`; kanal kimlikleri (yayın adresleri, appId, paket adları, ERP adresi, OTA sertifikası) yalnız `deploy/kanallar.json`da yaşar, koda gömülmez. [bekçi: check-kanallar.mjs]
+- Tek dağıtım kanalı `adnansahin`; kanal kimlikleri (panel yayın adresleri, appId, paket adları, ERP adresi) yalnız `deploy/kanallar.json`da yaşar, koda gömülmez. [bekçi: check-kanallar.mjs]
 - Sürüm notu yazılmadan sürüm çıkmaz: taslağı Claude yazar, tek kaynak kök `surum-notlari.json`; `node scripts/surum-notlari-kopyala.mjs` ile panele ve tablete kopyalanır, `node scripts/check-surum-notlari.mjs` geçmeden paketlenmez. [bekçi: check-surum-notlari.mjs]
-- Fabrikaya her paketleme ve yayın (backend paketi, panel, OTA, APK) YALNIZ kullanıcının o sürüm için verdiği açık onaydan sonra yapılır; onay başka sürüme taşınmaz. [inceleme]
+- Fabrikaya her paketleme ve yayın (backend paketi, panel, tablet Play sürümü) YALNIZ kullanıcının o sürüm için verdiği açık onaydan sonra yapılır; onay başka sürüme taşınmaz. [inceleme]
 - Sıra: backend ÖNCE, panel + tablet SONRA; sözleşme kıran değişiklikte (uç kaldırma, alan adı/tipi, zorunlu parametre, enum değeri, yeni izin) "eski istemci ne yapar" sorusu yazılı cevaplanır. [inceleme]
 - Müşteri kodu her derleme ve yayın komutunda argümandan verilir (`--musteri=adnansahin` / `electron-paketle.sh adnansahin`); ağaçtaki `musteri.json` işaretçisine güvenilmez, ham `npm run build:win` ile panel paketlenmez. [bekçi: test_kanal_yayin_kapisi.mjs]
 - Panel: `./deploy/electron-paketle.sh adnansahin` → `./deploy/electron-yayinla.sh --musteri=adnansahin`; yayın sonrası `--dogrula` ile dışarıdan denetlenir. [bekçi: test_kanal_yayin_kapisi.mjs]
-- Tablet OTA: `cd mobil && npm run yayinla:check -- --musteri=adnansahin` → `npm run yayinla -- --musteri=adnansahin` (paketi ÜRETİR) → `node deploy/mobil-yayinla.mjs --musteri=adnansahin --paket=<dizin>` (sahaya çıkarır). [bekçi: test_kanal_yayin_kapisi.mjs]
-- Tablet APK yalnız native değiştiyse: `npm run build:apk -- --musteri=adnansahin` → `node deploy/mobil-yayinla.mjs --musteri=adnansahin --apk=<yol> --surum=X --vc=N`; `cd android && ./gradlew` elle çağrılmaz. [inceleme]
-- OTA mı APK mı tahmin edilmez: `yayinla:check` "parmak izi tutarlı" derse OTA, "NATIVE DEĞİŞTİ" derse `runtimeVersion` artar + APK; şüphede `runtimeVersion` artırılır. [inceleme]
-- OTA turunda `android.versionCode`a dokunulmaz; `versionCode` yalnız yayınlanacak APK için artar. [inceleme]
+- Tablet YALNIZ Google Play'den dağıtılır (dahili test + uygulama içi Play güncellemesi); OTA (expo-updates) ve kendi APK yayını yoktur — `updates`/`runtimeVersion`/`expo-updates` geri gelirse KIRMIZI. [bekçi: check-kanallar.mjs · app-config-kanal.test.ts]
+- Her tablet değişikliği yeni `versionCode`lu bir Play sürümüdür: `npm run build:apk -- --musteri=adnansahin --aab` → `node deploy/play-yukle.mjs --musteri=adnansahin --aab=<yol>` (kuru) → `--uygula`; `cd android && ./gradlew` elle çağrılmaz. [bekçi: test_kanal_yayin_kapisi.mjs]
 - Sürüm numarası artmazsa hiçbir istemci güncellenmez; yama hanesi git etiketinden (`panel-v*` / `tablet-v*`) otomatik türer, küçük/büyük hane elle verilen karardır. [bekçi: test_surum.mjs]
-- Yükleme sırası: paket dosyaları ÖNCE, manifest / `latest.yml` / APK künyesi EN SON; elle `scp` yapılmaz. [bekçi: test_kanal_yayin_kapisi.mjs]
-- OTA manifesti yayın anında donar ve imzalanır, tek üreticisi `mobil/scripts/lib/manifest.mjs`; sunucu yalnız bayt servis eder. [bekçi: test_mobile_update]
-- Kod imzalama anahtarları `mobil/keystore/` altında, git ve VDS dışında kalır; anahtar kaybı her tablette sil+kur demektir. [bekçi: update-feed-url.test.ts]
+- Panel yükleme sırası: paket dosyaları ÖNCE, `latest.yml` EN SON; elle `scp` yapılmaz. [bekçi: test_kanal_yayin_kapisi.mjs]
+- Play yükleme anahtarı `mobil/keystore/` altında, git ve VDS dışında kalır; kaybı Play Console'dan anahtar sıfırlama ister. [inceleme]
 - Yayın sunucusu önündeki Cloudflare proxy açık kalır; DNS-only'ye çevrilirse güncellemeler sessizce durur. [inceleme]
 - ERP adresi tabletin derlemesine gömülür ve kanal kaydından çözülür; açık verilen `--api-url` kanalınkiyle eşit olmak zorundadır, koda gömülü varsayılan yoktur. [inceleme]
 - İstemci sürüm politikası kodda sabittir (`client-version-policy.ts`); `minVersion` yalnız gerçek sözleşme kırılmasında yükselir, sahadaki sürümden BÜYÜK olamaz ve önce yeni istemci yayınlanır. [bekçi: test_client_policy]
 - Electron `artifactName` ASCII kalır, `${productName}` kullanılmaz (ad `latest.yml`de URL'dir). [bekçi: update-feed-url.test.ts]
 - Panel güncelleyicisinde `autoUpdater`a modül gövdesinde dokunulmaz (`updater()` getter), `autoInstallOnAppQuit=false` kalır, kontrol zamanlayıcısı yalnız main süreçte koşar. [bekçi: update-check-interval.test.ts]
 
-- Tablet NATIVE sürümü (yeni versionCode) Google Play dahili testten çıkar: `npm run build:apk -- --musteri=adnansahin --aab` → `node deploy/play-yukle.mjs --musteri=adnansahin --aab=<yol>` (kuru) → `--uygula`; ilk paket Console'dan elle, üretim kanalına araç yüklemez. [bekçi: check-kanallar.mjs §5]
-- Tablet JS güncellemesi OTA'dan gelmeye devam eder; Play'e her native turunda `runtimeVersion` artar ki yeni JS eski native'e gitmesin. [bekçi: update-feed-url.test.ts]
-- Uygulama içi Play güncellemesi FAIL-OPEN'dır: Play yok / Play'den kurulmamış / çevrimdışı / hata → sessiz; yalnız boşta (ana menü, kuyruk boş) önerilir, zorunluluğu sunucu politikası (`minVersion`) belirler; Play ikilisinde APK künyesi okunmaz. [bekçi: playUpdate.test.ts]
+- Play'e ilk paket Console'dan elle yüklenir; araç üretim kanalına yüklemez. [bekçi: check-kanallar.mjs §5]
+- Uygulama içi Play güncellemesi FAIL-OPEN'dır: Play yok / Play'den kurulmamış / çevrimdışı / hata → sessiz; yalnız boşta (ana menü, kuyruk boş) önerilir, zorunluluğu sunucu politikası (`minVersion`) belirler; `minPaketTarihi` istemcide okunmaz. [bekçi: playUpdate.test.ts]
 - Paket adı değişimi bir KİMLİK GÖÇÜdür: eski uygulama sahada elle kaldırılır, cihaz yeniden eşleşir; `com.teks.erp.mobil` → `com.etkiliyazilim.adnansahin.saha` (2026-11-12, kullanıcı kararı). [bekçi: check-kanallar.mjs DONMUS]
 
 ### Backend paketi ve kurulum
@@ -77,6 +73,6 @@ Kök: `check-surum-notlari.mjs` · `check-kanallar.mjs` · `test_kanal_yayin_kap
 
 Backend: `test_surum_belgesi` · `test_backend_surum` · `test_client_policy` · `test_mobile_update` · `test_migration_hygiene` · `test_migration_order` · `test_migration_enum_add_value` · `test_schema_drift` · `test_db_invariants` · `test_timestamptz_contract` · `test_sunucu_betikleri` · `test_deploy_move_retry` · `test_deploy_log_rotation` · `test_script_guards` · `test_db_copy`
 
-İstemci: `update-feed-url.test.ts` (Electron + mobil) · `update-check-interval.test.ts` · `update-gate-escape.test.ts` · `clientPolicy.service.test.ts`
+İstemci: `update-feed-url.test.ts` (Electron) · `app-config-kanal.test.ts` (mobil) · `playUpdate.test.ts` · `update-check-interval.test.ts` · `update-gate-escape.test.ts` · `clientPolicy.service.test.ts`
 
 Gerekçe ve ölçüm hikâyesi: eski sürüm history dizininde.

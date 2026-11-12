@@ -1,10 +1,10 @@
 # Saha uygulaması — Google Play dahili test dağıtımı
 
-Uygulama: **Adnan Şahin TeksERP Saha** (`com.etkiliyazilim.adnansahin.saha`). Native sürüm Play dahili testten, JS düzeltmeleri OTA'dan gelir. Kurallar: `docs/kurallar/surum-yayin.md`.
+Uygulama: **Adnan Şahin TeksERP Saha** (`com.etkiliyazilim.adnansahin.saha`). Bütün güncellemeler YALNIZ Google Play'den gelir (dahili test + uygulama içi Play güncellemesi); OTA ve kendi APK yayını yok (kullanıcı kararı 2026-11-12). Kurallar: `docs/kurallar/surum-yayin.md`.
 
 ## Paket üretimi
 1. `surum-notlari.json`a tablet notu → `node scripts/surum-notlari-kopyala.mjs` → `node scripts/check-surum-notlari.mjs`.
-2. `mobil/app.json`: `version` + `android.versionCode` artar; native değiştiyse `runtimeVersion` (ve `deploy/kanallar.json`) artar.
+2. `mobil/app.json`: `version` + `android.versionCode` artar (her değişiklik, JS dahil, yeni Play sürümüdür).
 3. `cd mobil && npm run build:apk -- --musteri=adnansahin --aab` → APK + AAB, aynı derleme, bütün kapılar.
    Yükleme anahtarı `mobil/keystore/` (git dışı); yedeği repo dışında, parola yalnız yedeğin yanındaki `OKU.txt`'te.
 
@@ -33,4 +33,4 @@ Console → Dahili test → Test kullanıcıları → e-posta listesi. Tablettek
 Sonraki sürümlerde uygulama ana menüde "Yeni sürüm hazır — Güncelle" der; zorunlu sürümde tam ekran Play güncellemesi açılır.
 
 ## Geri dönüş
-Play'de sürüm geri alınmaz; düzeltme daha büyük `versionCode` ile yeni paket olarak çıkar. Acil JS düzeltmesi OTA ile (aynı `runtimeVersion`). Play erişimi olmayan cihaza aynı derlemenin APK'sı USB ile kurulabilir (uygulama içi güncelleme o cihazda sessiz kalır).
+Play'de sürüm geri alınmaz; düzeltme daha büyük `versionCode` ile yeni paket olarak çıkar. Acil düzeltme de yeni Play sürümüdür (dahili testte inceleme genelde dakikalar). Play erişimi olmayan cihaza aynı derlemenin APK'sı USB ile kurulabilir (uygulama içi güncelleme o cihazda sessiz kalır).

@@ -9,10 +9,8 @@ npx expo start                     # geliştirme; BT/BLE için native derleme: n
 npm run typecheck                  # tsc --noEmit
 npm run lint
 npm test                           # jest --runInBand (commit kapısında koşar)
-npm run yayinla:check -- --musteri=adnansahin   # OTA mı APK mı? (native parmak izi)
-npm run yayinla -- --musteri=adnansahin         # OTA paketi üretir (ota-cikti/adnansahin/<rv>/<damga>)
-npm run build:apk -- --musteri=adnansahin       # native değişti → APK; ./gradlew ELLE ÇAĞRILMAZ
-node ../deploy/mobil-yayinla.mjs --musteri=adnansahin --paket=<ota-cikti/...>   # sahaya çıkış, manifest en son
+npm run build:apk -- --musteri=adnansahin --aab # her değişiklik = yeni versionCode; APK + AAB; ./gradlew ELLE ÇAĞRILMAZ
+node ../deploy/play-yukle.mjs --musteri=adnansahin --aab=<yol>            # Play dahili test (kuru); --uygula ile yükler
 ```
 
 Ağır koşum `node ../scripts/agir-is.mjs -- <komut>` ile. Sürüm notu (`surum-notlari.json`) yazılmadan yayın yapılmaz.
@@ -29,8 +27,8 @@ Ağır koşum `node ../scripts/agir-is.mjs -- <komut>` ile. Sürüm notu (`surum
 
 ## Tuzaklar
 
-- `runtimeVersion` native kimliğidir: native değişip artmazsa yeni JS eski native'i çağırır ve bütün tabletler çöker. OTA turunda `versionCode`a dokunulmaz.
-- `keystore/` git dışıdır; kaybı her tablette sil + yeniden kur demektir.
+- Tablet YALNIZ Google Play'den güncellenir: OTA (expo-updates) yok, uygulama kendi APK'sını indirmez; `updates`/`runtimeVersion` geri eklenmez (bekçi `app-config-kanal.test.ts`).
+- `keystore/` git dışıdır; Play yükleme anahtarı kaybı Console'dan anahtar sıfırlama ister.
 - Sensör fail-closed: cihaz yok / bond yok / okunamadı / değer ≤ 0 → Türkçe toast, mutasyon HİÇ çağrılmaz; `simulate` cihazda uydurulan değer `source:'SIMULATED'` beyanıyla gider.
 - `Card` + `onPress` kullanma (`Card.Content` dokunmayı yutar); tıklanabilir alan Paper `TouchableRipple`/`Button`/`IconButton`/`List.Item`.
 - `SegmentedButtons` `flexDirection:'row'` kabının doğrudan çocuğu olamaz (yanındaki başlığı sıfır genişliğe iter).
@@ -45,10 +43,10 @@ Ağır koşum `node ../scripts/agir-is.mjs -- <komut>` ile. Sürüm notu (`surum
 | Konu | Belge |
 |---|---|
 | Ekran kalıbı, çevrimdışı yazma, okutma, UI sözleşmesi, boyut, test | `docs/standart/MOBIL.md` |
-| Yeni ekran / özellik, OTA-APK kapıları (reçete) | `docs/RECETELER.md` |
+| Yeni ekran / özellik (reçete) | `docs/RECETELER.md` |
 | KK1, idempotency, kurşun | `docs/kurallar/kk1.md` |
 | Tambur, kesim, refakat kartı | `docs/kurallar/tambur.md` |
 | Sebep kataloğu, numara serisi | `docs/kurallar/defter.md` |
 | Cihaz eşleme, keşif, HAL | `docs/kurallar/genel.md` |
-| OTA, APK, kanal | `docs/kurallar/surum-yayin.md`, `docs/ops/MOBIL-UZAKTAN-GUNCELLEME.md` |
+| Play dağıtımı, kanal | `docs/kurallar/surum-yayin.md`, `docs/ops/SAHA-PLAY-DAGITIM.md` |
 | Tablet test sürücüsü (adb) | `mobil/scripts/surucu/README.md` |

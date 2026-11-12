@@ -31,7 +31,7 @@
         {
           "kapsam": "tablet",
           "tip": "iyilestirme",
-          "metin": "Güncellemeler artık Google Play'den gelir. Yeni sürüm olunca uygulama ana menüde \"Yeni sürüm hazır\" der; \"Güncelle\"ye dokunmanız yeter. Bir işin ortasındayken sormaz, internet yoksa sessiz kalır."
+          "metin": "Güncellemeler artık yalnız Google Play'den gelir; uygulama yeni sürümü kendisi bildirir. Yeni sürüm olunca ana menüde \"Yeni sürüm hazır\" der; \"Güncelle\"ye dokunmanız yeter. Bir işin ortasındayken sormaz, internet yoksa sessiz kalır."
         }
       ]
     },
