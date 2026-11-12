@@ -403,3 +403,20 @@ describe("§9 D4-I6 cari kilidi rozeti (fabrika `cari-hesap.kilit`)", () => {
     expect(screen.queryByTestId(`cari-kilit-${HESAP}`)).toBeNull();
   });
 });
+
+describe("§10 D7b cari kartı: finans kapalı fabrikada bölüm hiç yok; gelmeyen veri 'henüz gelmedi'", () => {
+  it("bakiye izni yoksa hesap istenmez, 'izniniz yok' yazısı ve ekstre düğmesi yok; sekmeler ve bekleyen bloklar var", async () => {
+    mockParams = { id: ID1 };
+    mockRecord.mockResolvedValue(rec(ID1, { ad: "Deniz Tekstil", kod: "C-1", il: "Bursa", musteriRolu: true }));
+    mockList.mockResolvedValue(page());
+    render(<CustomerDetail />);
+    await settle();
+    expect(mockList).not.toHaveBeenCalledWith("cari-hesap", expect.anything());
+    expect(screen.queryByText(/izniniz yok/)).toBeNull();
+    expect(screen.queryByTestId("ekstre-iste")).toBeNull();
+    expect(screen.getByTestId("cari-sekme-ozet")).toBeTruthy();
+    expect(screen.getAllByText("Henüz gelmedi")).toHaveLength(3);
+    fireEvent.press(screen.getByTestId("cari-sekme-bilgi"));
+    expect(screen.getByText("C-1")).toBeTruthy();
+  });
+});

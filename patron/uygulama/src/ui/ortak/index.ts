@@ -8,3 +8,4 @@ export { MetricList, ActivityList, type MetricItem, type ActivityItem } from "./
 export { ListeSatiri, type ListeSatiriProps } from "./ListeSatiri";
 export { BosDurum, HataDurumu, Iskelet, type IskeletBicimi } from "./Durumlar";
 export { TamGenislik, BlokBasligi, ListeBlogu, OzetSeridi, type SeritOgesi } from "./Bloklar";
+export { AltSekmeler, type AltSekme } from "./AltSekmeler";
