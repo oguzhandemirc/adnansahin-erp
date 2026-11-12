@@ -10,6 +10,7 @@ const mockApi = {
   accountList: jest.fn(),
   permissions: jest.fn(),
   changePassword: jest.fn(),
+  twoFactorStatus: jest.fn(async () => ({ acik: false, acilis: null })),
 };
 const mockSession = {
   api: mockApi, permissions: ["bulut:hesap:yonet", "bulut:siparis:yaz"] as string[], facility: { tesis: { id: "t", ad: "Örnek Tekstil", saklamaAy: 13 }, hesap: { ad: "Ayşe Yılmaz", eposta: "a@ornek.invalid" }, esitleme: null } as unknown,

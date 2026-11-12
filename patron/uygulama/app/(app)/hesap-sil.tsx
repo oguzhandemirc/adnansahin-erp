@@ -1,4 +1,4 @@
-// Hesabımı sil (Google Play hesap silme politikası): açıklama → parola + güncel doğrulama kodu → iki adımlı onay.
+// Hesabımı sil (Google Play hesap silme politikası): açıklama → parola (+ iki adımlı doğrulama açıksa güncel kod) → iki adımlı onay.
 // Başarıda sunucu bütün oturumları kapatmıştır; "Tamam" bu cihazdaki oturumu ve önbelleği de siler.
 // Metinler ve testID'ler sözleşmedir (mağaza/gizlilik metni + `account-deletion.test.tsx`); burada yalnız görünüm.
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -13,6 +13,7 @@ import { Banner, Button, Card, ConfirmButton, Field } from "../../src/ui/kit";
 import { makeStyles, useTokens } from "../../src/ui/theme-context";
 import { space, typography } from "../../src/ui/tokens";
 import { useWrite } from "../../src/ui/useWrite";
+import { useTwoFactorStatus } from "../../src/ui/IkiAdimliDogrulama";
 
 export default function DeleteAccount() {
   const { api, logout } = useSession();
@@ -22,7 +23,8 @@ export default function DeleteAccount() {
   const [parola, setParola] = useState("");
   const [totp, setTotp] = useState("");
   const [done, setDone] = useState<AccountDeletion | null>(null);
-  const del = useWrite(useCallback(() => api.deleteOwnAccount({ parola, totp }), [api, parola, totp]));
+  const codeNeeded = useTwoFactorStatus().status?.acik === true;
+  const del = useWrite(useCallback(() => api.deleteOwnAccount({ parola, ...(codeNeeded ? { totp } : {}) }), [api, parola, totp, codeNeeded]));
   if (done) {
     return (
       <Screen title="Hesabımı sil" module="profil">
@@ -50,13 +52,13 @@ export default function DeleteAccount() {
       </Card>
       <View style={s.gap} />
       <Field label="Parola" value={parola} onChangeText={setParola} secureTextEntry testID="hesap-sil-parola" />
-      <Field label="Doğrulama kodu" value={totp} onChangeText={(v) => setTotp(v.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" testID="hesap-sil-totp" />
+      {codeNeeded ? <Field label="Doğrulama kodu" value={totp} onChangeText={(v) => setTotp(v.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" testID="hesap-sil-totp" /> : null}
       {del.error ? <Banner tone="error" text={del.error} testID="hesap-sil-hata" /> : null}
       <ConfirmButton
         label="Hesabımı kalıcı olarak sil"
         question="Hesabınız ve bütün fabrika üyelikleriniz hemen kapanacak. Emin misiniz?"
         busy={del.busy}
-        disabled={del.disabled || parola === "" || totp.length !== 6}
+        disabled={del.disabled || parola === "" || (codeNeeded && totp.length !== 6)}
         onConfirm={() => void del.run(totp).then((r) => { if (r) setDone(r); })}
         testID="hesap-sil"
       />

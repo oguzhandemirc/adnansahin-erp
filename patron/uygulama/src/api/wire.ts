@@ -34,7 +34,10 @@ export interface FacilityChoice {
   readonly hizmet: ServicePhase;
 }
 
-/** `POST /oturum/ac` — e-posta + parola + TOTP tek istekte (TOTP'siz oturum yok); `tesisId` ipucu opsiyonel. */
+/**
+ * `POST /oturum/ac` — e-posta + parola; `totp` İSTEĞE BAĞLI (yalnız doğrulaması açık hesapta denetlenir). Açık hesapta kod
+ * eksikse 401 `DOGRULAMA_KODU_GEREKLI` (yalnız doğru paroladan sonra); yanlış kod/parola 401 `GIRIS_BASARISIZ`. `tesisId` ipucu opsiyonel.
+ */
 export interface LoginResponse {
   readonly belirtec: string;
   readonly bitis: string;
@@ -586,14 +589,14 @@ export interface InviteInfo {
   readonly ad: string;
   readonly tesisAd: string | null;
   readonly bitis: string;
+  /** Eski akış: davet kabul edilmiş, onay bekliyor (yeni istemci parolayla yeniden kabul eder). */
   readonly totpKurulumuBekliyor: boolean;
 }
 
-/** `POST /davet/kabul` — TOTP sırrı YALNIZ bu yanıtta. */
+/** `POST /davet/kabul` — parola belirlenir, hesap HEMEN AKTİF (doğrulama kodu kapalı doğar; profilden açılır). */
 export interface InviteAccepted {
   readonly eposta: string;
-  readonly totpSirri: string;
-  readonly otpauth: string;
+  readonly durum: "AKTIF";
 }
 
 export interface InviteConfirmed {
@@ -601,8 +604,23 @@ export interface InviteConfirmed {
   readonly durum: "AKTIF";
 }
 
+/** `GET /oturum/dogrulama` — iki adımlı doğrulama (TOTP) durumu; `acilis` açıldığı an. Onay bekleyen kurulum açık SAYILMAZ. */
+export interface TwoFactorStatus {
+  readonly acik: boolean;
+  readonly acilis: string | null;
+}
+
 /**
- * `POST /oturum/hesap-sil` (parola + TOTP) — kendi hesabını silme: kimlik ve bütün tesis üyelikleri HEMEN kapanır, bütün
+ * `POST /oturum/dogrulama/baslat` (parola) — kurulum sırrı YALNIZ bu yanıtta; `POST /oturum/dogrulama/onay` (totp) ilk kodla
+ * AÇAR, onaysız açık sayılmaz. `POST /oturum/dogrulama/kapat` (parola + totp) kapatır. Açıkken başlatma 409 `DURUM_CAKISMASI`.
+ */
+export interface TwoFactorSetup {
+  readonly totpSirri: string;
+  readonly otpauth: string;
+}
+
+/**
+ * `POST /oturum/hesap-sil` (parola + açıksa totp) — kendi hesabını silme: kimlik ve bütün tesis üyelikleri HEMEN kapanır, bütün
  * oturumlar düşer; kişisel veri `silinme` anında silinir. Son aktif yöneticisi olunan tesis varsa 409 `SON_YONETICI`
  * (`details.tesisler`: `{id, ad}[]`); yanlış faktör 400 `GIRIS_BASARISIZ`.
  */

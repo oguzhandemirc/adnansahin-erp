@@ -10,6 +10,8 @@ import type {
   ExportFormat,
   ExportManifest,
   FacilityChoice,
+  TwoFactorSetup,
+  TwoFactorStatus,
   FacilityStatus,
   InboxItemKind,
   InboxItem,
@@ -45,6 +47,10 @@ export const ENDPOINTS = {
   switchFacility: ["post", "/oturum/gecis"],
   changePassword: ["post", "/oturum/parola"],
   deleteOwnAccount: ["post", "/oturum/hesap-sil"],
+  twoFactorStatus: ["get", "/oturum/dogrulama"],
+  twoFactorBegin: ["post", "/oturum/dogrulama/baslat"],
+  twoFactorConfirm: ["post", "/oturum/dogrulama/onay"],
+  twoFactorDisable: ["post", "/oturum/dogrulama/kapat"],
   permissions: ["get", "/izinler"],
   list: ["get", "/veri/:projeksiyon"],
   record: ["get", "/veri/:projeksiyon/:id"],
@@ -108,20 +114,24 @@ export interface ListParams {
 export function createApi(c: ApiClient) {
   const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, cariHesapId: p.cariHesapId, siparisId: p.siparisId, teklifId: p.teklifId, ara: p.ara, suzgec: p.suzgec, kategoriAnahtari: p.kategoriAnahtari });
   return {
-    login: (b: { eposta: string; parola: string; totp: string; istemci?: "mobil" | "web"; tesisId?: string }) => c.post<LoginResponse>(pathOf("login"), b),
+    login: (b: { eposta: string; parola: string; totp?: string; istemci?: "mobil" | "web"; tesisId?: string }) => c.post<LoginResponse>(pathOf("login"), b),
     inviteInspect: (davet: string) => c.post<InviteInfo>(pathOf("inviteInspect"), { davet }),
     inviteAccept: (davet: string, parola: string) => c.post<InviteAccepted>(pathOf("inviteAccept"), { davet, parola }),
     inviteConfirm: (davet: string, totp: string) => c.post<InviteConfirmed>(pathOf("inviteConfirm"), { davet, totp }),
     /** Mevcut bulut kimliğini davetin tesisine bağlar (yeni hesap açmaz). */
-    inviteLink: (b: { davet: string; eposta: string; parola: string; totp: string }) => c.post<InviteConfirmed>(pathOf("inviteLink"), b),
+    inviteLink: (b: { davet: string; eposta: string; parola: string; totp?: string }) => c.post<InviteConfirmed>(pathOf("inviteLink"), b),
     session: () => c.get<FacilityStatus>(pathOf("session")),
     logout: (b: { hepsi?: boolean } = {}) => c.post<null>(pathOf("logout"), b),
     facilities: () => c.get<FacilityChoice[]>(pathOf("facilities")),
     /** Yeni belirteç döner; eski oturum sunucuda kapanır. Ret: 403 `TESIS_GECISI_YOK`. */
     switchFacility: (tesisId: string) => c.post<LoginResponse>(pathOf("switchFacility"), { tesisId }),
-    changePassword: (b: { mevcutParola: string; yeniParola: string; totp: string }) => c.post<null>(pathOf("changePassword"), b),
+    changePassword: (b: { mevcutParola: string; yeniParola: string; totp?: string }) => c.post<null>(pathOf("changePassword"), b),
+    twoFactorStatus: () => c.get<TwoFactorStatus>(pathOf("twoFactorStatus")),
+    twoFactorBegin: (parola: string) => c.post<TwoFactorSetup>(pathOf("twoFactorBegin"), { parola }),
+    twoFactorConfirm: (totp: string) => c.post<TwoFactorStatus>(pathOf("twoFactorConfirm"), { totp }),
+    twoFactorDisable: (b: { parola: string; totp: string }) => c.post<TwoFactorStatus>(pathOf("twoFactorDisable"), b),
     /** Kendi hesabını silme: kimlik + bütün tesis üyelikleri kapanır, oturumlar düşer. Ret: 400 `GIRIS_BASARISIZ` · 409 `SON_YONETICI`. */
-    deleteOwnAccount: (b: { parola: string; totp: string }) => c.post<AccountDeletion>(pathOf("deleteOwnAccount"), b),
+    deleteOwnAccount: (b: { parola: string; totp?: string }) => c.post<AccountDeletion>(pathOf("deleteOwnAccount"), b),
     permissions: () => c.get<PermissionCatalog>(pathOf("permissions")),
     list: (projeksiyon: string, p: ListParams = {}) => c.get<Page<ProjectionRecord>>(pathOf("list", { projeksiyon }), q(p)),
     record: (projeksiyon: string, id: string) => c.get<ProjectionRecord>(pathOf("record", { projeksiyon, id })),

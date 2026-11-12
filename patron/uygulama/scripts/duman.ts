@@ -1,4 +1,4 @@
-// YEREL API DUMANI — uygulamanın KENDİ API istemcisiyle (src/api) zincir: davet → parola → TOTP onay →
+// YEREL API DUMANI — uygulamanın KENDİ API istemcisiyle (src/api) zincir: davet → parola → (profilden) TOTP aç →
 // giriş → oturum/pano → gelen kutusuna sipariş → durum oku → iptal (tekrarı aynı sonuç) → çıkış.
 // Yalnız yerel _test sunucusuna karşı koşulur (127.0.0.1/localhost dışı adres RED).
 //   ../sunucu/node_modules/.bin/tsx scripts/duman.ts --api=http://127.0.0.1:4631 --davet=<belirteç>
@@ -45,21 +45,34 @@ async function main(): Promise<void> {
   ok(`davet incelendi (${info.eposta}, tesis: ${info.tesisAd ?? "—"})`);
   const parola = `Duman-${randomUUID()}`;
   const acc = await api.inviteAccept(INVITE!, parola);
-  expect(acc.totpSirri.length >= 16 && acc.otpauth.startsWith("otpauth://"), "TOTP sırrı yok");
-  ok("parola belirlendi, TOTP sırrı alındı");
-  await api.inviteConfirm(INVITE!, totp(acc.totpSirri));
-  ok("ilk TOTP kodu onaylandı → AKTİF");
+  expect(acc.durum === "AKTIF", "kabul hesabı etkinleştirmedi");
+  ok("parola belirlendi → hesap AKTİF (doğrulama kodu kapalı)");
 
   try {
-    await api.login({ eposta: info.eposta, parola, totp: "000000", istemci: "mobil" });
-    throw new Error("KIRMIZI: yanlış TOTP ile giriş açıldı");
+    await api.login({ eposta: info.eposta, parola: `${parola}-yanlis`, istemci: "mobil" });
+    throw new Error("KIRMIZI: yanlış parola ile giriş açıldı");
   } catch (e) {
-    expect(e instanceof ApiError && e.status === 401 && e.code === "GIRIS_BASARISIZ", `yanlış TOTP 401 GIRIS_BASARISIZ değil: ${String(e)}`);
+    expect(e instanceof ApiError && e.status === 401 && e.code === "GIRIS_BASARISIZ", `yanlış parola 401 GIRIS_BASARISIZ değil: ${String(e)}`);
   }
-  ok("yanlış TOTP → 401 GIRIS_BASARISIZ (details.code)");
+  ok("yanlış parola → 401 GIRIS_BASARISIZ (details.code)");
+
+  const ilk = await api.login({ eposta: info.eposta, parola, istemci: "mobil" });
+  token = ilk.belirtec;
+  const kurulum = await api.twoFactorBegin(parola);
+  expect(kurulum.otpauth.startsWith("otpauth://"), "kurulum sırrı yok");
+  await api.twoFactorConfirm(totp(kurulum.totpSirri));
+  ok("iki adımlı doğrulama profilden açıldı");
+  token = null;
+  try {
+    await api.login({ eposta: info.eposta, parola, istemci: "mobil" });
+    throw new Error("KIRMIZI: açık hesap kodsuz girdi");
+  } catch (e) {
+    expect(e instanceof ApiError && e.code === "DOGRULAMA_KODU_GEREKLI", `kodsuz giriş DOGRULAMA_KODU_GEREKLI değil: ${String(e)}`);
+  }
+  ok("kodsuz giriş → 401 DOGRULAMA_KODU_GEREKLI");
 
   await nextStep();
-  const login = await api.login({ eposta: info.eposta, parola, totp: totp(acc.totpSirri), istemci: "mobil" });
+  const login = await api.login({ eposta: info.eposta, parola, totp: totp(kurulum.totpSirri), istemci: "mobil" });
   token = login.belirtec;
   ok(`giriş (izin: ${login.hesap.izinler.length})`);
 

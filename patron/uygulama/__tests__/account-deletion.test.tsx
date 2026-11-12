@@ -1,17 +1,18 @@
-// Hesabımı sil ekranı: açıklama (ne olur) · parola + 6 haneli kod olmadan düğme kapalı · iki adımlı onay · başarıda
+// Hesabımı sil ekranı: açıklama (ne olur) · parola (+ iki adımlı doğrulama açıksa 6 haneli kod) olmadan düğme kapalı · iki adımlı onay · başarıda
 // silinme günü ve "Tamam" → yerel çıkış · ret (409 SON_YONETICI) iletisi gösterilir, çıkış yapılmaz · profil bağlantısı.
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { ApiError } from "../src/api/client";
 import type { AccountDeletion } from "../src/api/wire";
 import { DELETION_EFFECTS, DELETION_SUPPORT_EMAIL, deletionDoneText } from "../src/lib/account-deletion";
 
-const deleteOwnAccount = jest.fn<Promise<AccountDeletion>, [{ parola: string; totp: string }]>();
+const deleteOwnAccount = jest.fn<Promise<AccountDeletion>, [{ parola: string; totp?: string }]>();
+const twoFactorStatus = jest.fn(async () => ({ acik: true, acilis: "2026-11-01T00:00:00.000Z" as string | null }));
 const mockSession = {
   permissions: ["bulut:oturum"] as string[], facility: null as unknown, offline: false, offlineSince: null as string | null,
   facilities: [] as { id: string; ad: string; hizmet: string }[], facilityId: null as string | null, switchError: null as string | null,
   switchFacility: jest.fn(async (_id: string) => true),
   logout: jest.fn(async () => undefined),
-  api: { deleteOwnAccount, changePassword: jest.fn() },
+  api: { deleteOwnAccount, changePassword: jest.fn(), twoFactorStatus },
 };
 const mockRouter = { navigate: jest.fn(), push: jest.fn(), back: jest.fn(), canGoBack: () => false, replace: jest.fn() };
 jest.mock("../src/state/session", () => ({ useSession: () => mockSession }));
@@ -23,9 +24,9 @@ const Profile = (require("../app/(app)/profil") as typeof import("../app/(app)/p
 
 const SONUC: AccountDeletion = { kapanis: "2026-10-15T09:00:00.000Z", silinme: "2026-11-14T09:00:00.000Z", tesisSayisi: 2 };
 
-function doldurVeOnayla(): void {
+async function doldurVeOnayla(): Promise<void> {
   fireEvent.changeText(screen.getByTestId("hesap-sil-parola"), "gizli-parola-123");
-  fireEvent.changeText(screen.getByTestId("hesap-sil-totp"), "12 34 56");
+  fireEvent.changeText(await screen.findByTestId("hesap-sil-totp"), "12 34 56");
   fireEvent.press(screen.getByTestId("hesap-sil"));
   fireEvent.press(screen.getByTestId("hesap-sil-evet"));
 }
@@ -58,7 +59,7 @@ describe("hesabımı sil", () => {
   it("onayda parola + kod gider; başarıda silinme günü gösterilir, Tamam yerel çıkış yapar", async () => {
     deleteOwnAccount.mockResolvedValue(SONUC);
     render(<DeleteAccount />);
-    doldurVeOnayla();
+    await doldurVeOnayla();
     await waitFor(() => expect(screen.getByTestId("hesap-silindi")).toBeTruthy());
     expect(deleteOwnAccount).toHaveBeenCalledWith({ parola: "gizli-parola-123", totp: "123456" });
     expect(screen.getByText(deletionDoneText(SONUC))).toBeTruthy();
@@ -67,11 +68,24 @@ describe("hesabımı sil", () => {
     expect(mockSession.logout).toHaveBeenCalledTimes(1);
   });
 
+  it("iki adımlı doğrulama KAPALI: kod alanı yok, onayda yalnız parola gider", async () => {
+    twoFactorStatus.mockResolvedValueOnce({ acik: false, acilis: null });
+    deleteOwnAccount.mockResolvedValue(SONUC);
+    render(<DeleteAccount />);
+    await waitFor(() => expect(twoFactorStatus).toHaveBeenCalled());
+    await act(async () => undefined);
+    expect(screen.queryByTestId("hesap-sil-totp")).toBeNull();
+    fireEvent.changeText(screen.getByTestId("hesap-sil-parola"), "gizli-parola-123");
+    fireEvent.press(screen.getByTestId("hesap-sil"));
+    fireEvent.press(screen.getByTestId("hesap-sil-evet"));
+    await waitFor(() => expect(deleteOwnAccount).toHaveBeenCalledWith({ parola: "gizli-parola-123" }));
+  });
+
   it("son yönetici reddi (409 SON_YONETICI): sunucu iletisi gösterilir, çıkış yapılmaz", async () => {
     const ileti = "Şu tesisin son aktif hesap yöneticisisiniz: Örnek. Hesabınızı silmeden önce o tesiste başka bir kişiyi hesap yöneticisi yapın.";
     deleteOwnAccount.mockRejectedValue(new ApiError(409, "SON_YONETICI", ileti, { code: "SON_YONETICI", tesisler: [{ id: "t", ad: "Örnek" }] }));
     render(<DeleteAccount />);
-    doldurVeOnayla();
+    await doldurVeOnayla();
     await waitFor(() => expect(screen.getByTestId("hesap-sil-hata")).toBeTruthy());
     expect(screen.getByText(ileti)).toBeTruthy();
     expect(screen.queryByTestId("hesap-silindi")).toBeNull();

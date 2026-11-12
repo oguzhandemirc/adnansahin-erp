@@ -36,6 +36,7 @@ function oku(path: string, q: Query | undefined): unknown {
   const p = path.split("/").filter(Boolean).map(decodeURIComponent);
   if (path === "/oturum") return ornekOturum();
   if (path === "/oturum/tesisler") return ornekGiris().tesisler;
+  if (path === "/oturum/dogrulama") return { acik: false, acilis: null };
   if (p[0] === "anlik" && p[1]) {
     const veri = ORNEK_ANLIK()[p[1]];
     if (veri === undefined) throw yok();
@@ -74,6 +75,8 @@ function oku(path: string, q: Query | undefined): unknown {
 function yaz(path: string): unknown {
   if (path === "/oturum/ac" || path === "/oturum/gecis") return ornekGiris();
   if (path === "/oturum/kapat") return null;
+  // Kurulum adımı gösterilebilsin diye örnek anahtar (RFC 6238 örneği; gerçek bir hesaba bağlı değil); onay yazılmaz.
+  if (path === "/oturum/dogrulama/baslat") return { totpSirri: "JBSWY3DPEHPK3PXP", otpauth: "otpauth://totp/Adnan%20%C5%9Eahin%20Y%C3%B6netim:ornek%40ornek.invalid?secret=JBSWY3DPEHPK3PXP&issuer=Adnan%20%C5%9Eahin%20Y%C3%B6netim&algorithm=SHA1&digits=6&period=30" };
   if (path === "/tazele") return { zil: false, sonrakiMs: 60_000 };
   throw new ApiError(403, "ORNEK_VERI", "Örnek veri kipinde fabrikaya yazılmaz");
 }
