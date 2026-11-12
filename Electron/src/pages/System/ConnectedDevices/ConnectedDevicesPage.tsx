@@ -38,7 +38,7 @@ export function ConnectedDevicesPage() {
           </Callout>
         )}
 
-        {data && sessions.length > 0 && <VersionStrip buckets={versionSummary(sessions)} />}
+        {data && sessions.length > 0 && <VersionStrip buckets={versionSummary(sessions)} total={sessions.length} />}
 
         {data?.truncated && (
           <Callout tone="muted" title="Liste kısaltıldı">
@@ -57,7 +57,7 @@ export function ConnectedDevicesPage() {
             <div className="rounded-lg border">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="[&>th]:whitespace-nowrap">
                     <TableHead>Kullanıcı</TableHead>
                     <TableHead>Cihaz</TableHead>
                     <TableHead>Uygulama</TableHead>
