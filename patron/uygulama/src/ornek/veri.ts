@@ -115,11 +115,33 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
 export function ORNEK_RAPORLAR() {
   return {
     kayitlar: [
-      { id: "r1", raporAnahtari: "sales/sevkiyat", aile: "sales", parametreler: { dateFrom: sonra(-30), dateTo: sonra(0) }, durum: "HAZIR", hataKodu: null, olusturulma: once(0, 2), tamamlanma: once(0, 2) },
-      { id: "r2", raporAnahtari: "quality/kayip", aile: "quality", parametreler: { dateFrom: sonra(-7), dateTo: sonra(0) }, durum: "HESAPLANIYOR", hataKodu: null, olusturulma: once(0, 0), tamamlanma: null },
+      { id: "r1", sonuc: { veri: { sevkMiktari: 15230, sevkTopSayisi: 38, musteriSayisi: 4 }, hesaplandi: once(0, 2), kaynakUfuk: null }, raporAnahtari: "sales/sevkiyat", aile: "sales", parametreler: { dateFrom: sonra(-30), dateTo: sonra(0) }, durum: "HAZIR", hataKodu: null, olusturulma: once(0, 2), tamamlanma: once(0, 2) },
+      { id: "r2", sonuc: null, raporAnahtari: "quality/kayip", aile: "quality", parametreler: { dateFrom: sonra(-7), dateTo: sonra(0) }, durum: "HESAPLANIYOR", hataKodu: null, olusturulma: once(0, 0), tamamlanma: null },
     ],
     sonraki: null,
   };
+}
+
+/** Gönderdiklerim (örnek): işlenen sipariş, hata alan cari (ret nedeniyle), sırada bekleyen sipariş. */
+export function ORNEK_GELEN() {
+  const siparis = (n: number) => ({ cariKartId: "c1", doviz: "TRY", kalemler: Array.from({ length: n }, (_, i) => ({ urunId: `u${i}`, miktar: String(1200 + i * 400), birim: "MT", musteriUrunAdi: ["Örnek Saten", "Deneme Keten"][i % 2] })) });
+  return {
+    kayitlar: [
+      { mesajId: "g1", tur: "SIPARIS", durum: "BEKLIYOR", govde: siparis(2), hesapAdi: "Örnek Patron", sonuc: null, olusturulma: once(0, 0.2), islenme: null, iptal: null },
+      { mesajId: "g2", tur: "CARI", durum: "REDDEDILDI", govde: { ad: "Deneme Örme Ltd.", roller: { musteri: true }, il: "Bursa" }, hesapAdi: "Örnek Patron", sonuc: { mesaj: "Aynı vergi numarasıyla kayıtlı bir cari var" }, olusturulma: once(1, 3), islenme: once(1, 2), iptal: null },
+      { mesajId: "g3", tur: "SIPARIS", durum: "ISLENDI", govde: siparis(1), hesapAdi: "Örnek Patron", sonuc: { belgeNo: "SIP-2026-0452" }, olusturulma: once(2, 5), islenme: once(2, 4), iptal: null },
+    ],
+    sonraki: null,
+  };
+}
+
+/** Hesaplar (örnek): yönetici + çalışan + davetli. */
+export function ORNEK_HESAPLAR() {
+  return [
+    { id: "ornek-hesap", eposta: "ornek@ornek.invalid", ad: "Örnek Patron", durum: "AKTIF", izinler: ORNEK_IZINLER, sonGiris: once(0, 0.1), davetBitis: null, olusturulma: once(90) },
+    { id: "h2", eposta: "deneme@ornek.invalid", ad: "Deneme Satış", durum: "AKTIF", izinler: ["bulut:oturum", "bulut:siparis:oku"], sonGiris: once(1, 2), davetBitis: null, olusturulma: once(60) },
+    { id: "h3", eposta: "numune@ornek.invalid", ad: "Numune Planlama", durum: "DAVETLI", izinler: ["bulut:oturum"], sonGiris: null, davetBitis: sonra(3), olusturulma: once(1) },
+  ];
 }
 
 const kayit = (id: string, k: Record<string, unknown>, finans?: Record<string, unknown>): ProjectionRecord => ({ id, kayit: k, ...(finans ? { finans } : {}), surum: "1" });

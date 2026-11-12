@@ -1,7 +1,7 @@
 // Örnek veri istemcisi: `ApiClient`in yerine oturur (endpoints/kancalar aynen çalışır), ağa hiç çıkmaz.
 // Okumalar `veri.ts`ten gelir; yazmalar reddedilir. Kısa gecikme iskelet ve yenileme durumlarını gösterir.
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
-import { ORNEK_ANLIK, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
+import { ORNEK_ANLIK, ORNEK_GELEN, ORNEK_HESAPLAR, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
 
 const GECIKME_MS = 350;
 
@@ -44,8 +44,20 @@ function oku(path: string, q: Query | undefined): unknown {
   }
   if (p[0] === "veri" && p[1]) return listele(p[1], q);
   if (path === "/raporlar") return ORNEK_RAPORLAR();
-  if (["gelen-kutusu", "bildirimler"].includes(path.slice(1))) return BOS_SAYFA;
-  if (path === "/hesaplar" || path === "/cihazlar") return [];
+  if (p[0] === "raporlar" && p[1]) {
+    const r = ORNEK_RAPORLAR().kayitlar.find((x) => x.id === p[1]);
+    if (!r) throw yok();
+    return r;
+  }
+  if (path === "/gelen-kutusu") return { ...ORNEK_GELEN(), kayitlar: ORNEK_GELEN().kayitlar.filter((m) => !q?.durum || m.durum === q.durum) };
+  if (p[0] === "gelen-kutusu" && p[1]) {
+    const m = ORNEK_GELEN().kayitlar.find((x) => x.mesajId === p[1]);
+    if (!m) throw yok();
+    return m;
+  }
+  if (path === "/bildirimler") return BOS_SAYFA;
+  if (path === "/hesaplar") return ORNEK_HESAPLAR();
+  if (path === "/cihazlar") return [];
   throw yok();
 }
 
