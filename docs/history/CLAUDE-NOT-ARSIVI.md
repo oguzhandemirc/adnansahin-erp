@@ -13174,6 +13174,10 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 
 **Ölçüm.** `test_patron_bulut_esitleme` 32/0, üç negatif sonda kırmızı. Uçtan uca (yerel prova, 5.703 kayıt): ilk TAM 6,1 sn · 3 istek · en büyük gövde 1.825 KB açık / 302 KB gzip · RSS 339 → 367 MB; 13 projeksiyonda fabrika = bulut; artımlı 3 yazım → 1 istek, 8 kayıt, 0,4–0,7 sn. Ayrıntı `docs/ops/PATRON-ESITLEME-KURULUM.md` § Eşitlemeyi açma.
 
+## 2026-11-12 — Patron bulutu: `kurulum-kaydet --bitis=yok` süresiz hak [ÇEKİRDEK]
+
+**Bulgu.** CLI `yok`u `cloudUntil = NULL` yazıyordu; okuyucular (`cloudEntitlementError`, `contractOpen`) NULL'u "süresi dolmuş" sayıyor ⇒ kurulumun her `/v1` isteği 403 `PATRON_BULUT_KAPALI`. **Kök neden yazan tarafta:** NULL'un veri modelindeki anlamı satıcı kipinde "hak dondu"dur (`service-lifecycle.ts` başlığı) — okuyucuyu "NULL = süresiz" yapmak donmuş hakkı yeniden açardı. **Karar.** `yok` → açık uzak tarih `SURESIZ_BITIS` (9999-12-31), ayrıştırma tek yerde `parseCloudUntilArg`; NULL yalnız satıcı kipinin "hak dondu" anlamında kalır. Bekçi: `test_hizmet_sonu` §1j–o (saf) + `test_esitleme_idempotency` §5l2 (imzalı istek 200). Eski imajla kaydedilmiş kurulum aynı komutun yeni imajla yeniden koşulmasıyla düzelir (upsert).
+
 ## 2026-11-12 — Patron bulutu D4: telefondan yeni sipariş + yeni müşteri (gelen kutusu) [ÇEKİRDEK]
 
 **Kaynak.** Ana ürün `19aa48a9` `services/cloud-inbox.service.ts`, `jobs/cloud-inbox.job.ts`, `cloud-sync/inbox-wire.ts`. **Ana üründen farklar.** (1) Panelin sipariş/müşteri yaratma kodu DEĞİŞMEDİ: adımları `private` ve tx'e dikilemez olduğundan telefon yolu `services/patron-inbox/` altında kopyadır (müşteri yazıcısı `CustomerService`ten türer; ad boğazları ve `findSimilarNames` aynı koddur). (2) Yazma ayrı ayar (`patronCloud.inboxEnabled`, varsayılan kapalı). (3) Birim fiyat yok sayılır. (4) Benzer adlı müşteri RET (panel yalnız uyarır; telefonda insan yok, sessiz ikinci kart da haksız ret de yanlış — en az zararlı RET + açık neden). (5) Desteklenmeyen tür makbuzsuz ret. (6) Belirsiz hata 3 turda makbuzlu ret.
@@ -13182,5 +13186,5 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 
 **Bulgu.** Telefon `termin`i (YYYY-MM-DD) Prisma'ya çıplak gün olarak gidiyordu ve DateTime kolonu reddediyordu ⇒ terminli her sipariş 3 denemede "işlenemedi" olurdu; panel formu `new Date(gün).toISOString()` gönderir, telefon yolu aynı biçime çevrildi (karşılaştırma bekçisinde eşit).
 
-**Ölçüm.** `test_patron_bulut_gelen_kutusu` 85/0, altı negatif sonda kırmızı. Panel ↔ telefon: sipariş 22 alan, kalem 20 alan × 2, kart 28 alan, cari hesap (finans açık/kapalı) ve audit yükü eşit; beyanlı farklar kimlik · numara · zaman · `clientToken` · Oluşturan (panel siparişte boş bırakır, telefon teknik kullanıcıyı yazar) · audit kaynak izi.
+**Ölçüm.** `test_patron_bulut_gelen_kutusu` 86/0 (86. kontrol: terminsiz siparişte varsayılan termin ofseti iki yolda aynı; telefon kopyası gün eklemeyi UTC ile yapar, süreç saat dilimine yaslanmaz), altı negatif sonda kırmızı. Panel ↔ telefon: sipariş 22 alan, kalem 20 alan × 2, kart 28 alan, cari hesap (finans açık/kapalı) ve audit yükü eşit; beyanlı farklar kimlik · numara · zaman · `clientToken` · Oluşturan (panel siparişte boş bırakır, telefon teknik kullanıcıyı yazar) · audit kaynak izi.
 

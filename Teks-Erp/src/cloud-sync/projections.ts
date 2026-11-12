@@ -3,11 +3,11 @@
 // =============================================================================
 // Buluta ne gider, hangi kolondan, hangi izinle, değişikliği nereden anlarız. Kolon listesi
 // OPT-IN'dir — burada yazmayan kolon GİTMEZ. Kaynak: ana ürün 19aa48a9 `cloud-sync/projections.ts`.
-// Adnan farkı: BOYUT `hizmet` yok (tablo yok); ANLIK projeksiyonlar D3b'de; finans/teklif/maliyet
+// Adnan farkı: BOYUT `hizmet` yok (tablo yok); ANLIK yalnız finanssız 7 ad (aşağıda); finans/teklif/maliyet
 // projeksiyonu ve hiçbir projeksiyonda fiyat/tutar/bakiye alanı YOK (finans verisi buluta gitmez).
 // Adlar İngilizce; tel adları, projeksiyon adları ve kod değerleri Türkçe (sözleşme).
 // =============================================================================
-import { col, self, type DataClass, type Projection, type RecordProjection } from "./projection-types";
+import { col, self, type DataClass, type Projection, type RecordProjection, type SnapshotProjection } from "./projection-types";
 import { FACTS } from "./catalog-facts";
 
 export * from "./projection-types";
@@ -63,7 +63,34 @@ const DIMENSIONS: readonly RecordProjection[] = [
   },
 ];
 export const RECORD_PROJECTIONS: readonly RecordProjection[] = [...DIMENSIONS, ...FACTS];
-export const PROJECTIONS: readonly Projection[] = RECORD_PROJECTIONS;
+
+// ── ANLIK (toplam) projeksiyonlar ─────────────────────────────────────────────
+// Anlık turunda bütünüyle yeniden hesaplanır; içerik özeti son ONAYLANANLA aynıysa GÖNDERİLMEZ. Çıktı
+// `snapshot-schemas.ts`teki katı tel şemasından geçer. Adnan'da YOK: `ozet-finans`·`ozet-masraf`·`karlilik-ozet`·
+// `hizmet-geliri` (finans), `emanet-bakiye` (emanet modülü kapalı), `saglik` (yedek sağlığı `app.ts`te özel).
+export const SNAPSHOT_PROJECTIONS: readonly SnapshotProjection[] = [
+  {
+    name: "ozet", kind: "ANLIK", source: "cloud-sync/snapshots: stok/açık sipariş/sevkiyat/fason karneleri + üretim akışı + istasyon canlı durumu",
+    permission: "bulut:ozet:oku",
+    sections: [
+      { name: "ozet.stok", permission: "bulut:stok:oku" },
+      { name: "ozet.siparis", permission: "bulut:siparis:oku" },
+      { name: "ozet.uretim", permission: "bulut:uretim:oku", module: "production.enabled" },
+      { name: "ozet.sevkiyat", permission: "bulut:sevkiyat:oku" },
+      { name: "ozet.fason", permission: "bulut:uretim:oku" },
+    ],
+  },
+  { name: "stok-karnesi", kind: "ANLIK", source: "reports/stock-scorecard.report.service getStockScorecard", permission: "bulut:stok:oku" },
+  { name: "acik-siparis-karsilama", kind: "ANLIK", source: "reports/open-order-coverage.report.service getOpenOrderCoverage", permission: "bulut:siparis:oku" },
+  {
+    name: "uretim-akisi", kind: "ANLIK", source: "inventory.service getProductionFlow + DashboardService.getStationsLiveState",
+    permission: "bulut:uretim:oku", module: "production.enabled",
+  },
+  { name: "fason-acik", kind: "ANLIK", source: "fason-open-dispatch.helper outstandingItemOfOpenDispatch (açık sevk + fasonda kalan top metresi)", permission: "bulut:uretim:oku" },
+  { name: "rapor-katalogu", kind: "ANLIK", source: "constants/report-catalog ∩ uzak 6 rapor − reports.closedKeys", permission: "bulut:oturum" },
+  { name: "tesis", kind: "ANLIK", source: "constants/time FACTORY_TIMEZONE (tek dilim, dönem yok)", permission: "bulut:oturum" },
+];
+export const PROJECTIONS: readonly Projection[] = [...RECORD_PROJECTIONS, ...SNAPSHOT_PROJECTIONS];
 
 /** Silme işaretinin kurulduğu kök tablolar — migration tetikleyicileri ile İKİ YÖNLÜ ölçülür. */
 export const SYNC_ROOT_TABLES: readonly string[] = RECORD_PROJECTIONS.map((p) => p.root.table);
@@ -180,6 +207,10 @@ export function projectionPermissions(): Map<string, string> {
   for (const p of RECORD_PROJECTIONS) {
     out.set(p.name, p.permission);
     for (const cls of subRowClasses(p)) out.set(subRowName(p, cls), subRowPermission(p, cls));
+  }
+  for (const s of SNAPSHOT_PROJECTIONS) {
+    if (s.sections) for (const sec of s.sections) out.set(sec.name, sec.permission);
+    else out.set(s.name, s.permission);
   }
   return out;
 }

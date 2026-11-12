@@ -1,0 +1,38 @@
+// Gönderdiklerim satırı (tek satır ListeSatiri): içerik özeti · tür + yaş (+ gönderen). Kayıt onay beklemez: işlenen
+// kayıtta rozet YOK; yalnız hata alan kayıt "Hata" rozeti ve ikincil satırda ret nedeniyle öne çıkar.
+import type { InboxItem } from "../../api/wire";
+import { formatAgo } from "../../lib/format";
+import { resultText } from "../../lib/inbox";
+import { inboxKind } from "../../lib/labels/diger";
+import { ListeSatiri, Rozet } from "../ortak";
+import { DOMAIN_TONE } from "../tokens";
+import { inboxOverdue, inboxPending, inboxSummary } from "./inbox-format";
+
+export function inboxRowText(m: InboxItem, showAuthor = false) {
+  const kind = inboxKind(m.tur);
+  const red = m.durum === "REDDEDILDI";
+  const neden = red ? (resultText(m.sonuc) ?? "Fabrika bu kaydı kabul etmedi") : null;
+  const ikincil = neden ?? [kind.ad, showAuthor ? m.hesapAdi : null, formatAgo(m.olusturulma)].filter(Boolean).join(" · ");
+  const rozet = red ? { label: "Hata", tone: "danger" as const }
+    : m.durum === "IPTAL" ? { label: "İptal", tone: "soft" as const }
+    : inboxPending(m.durum) ? { label: "Sırada", tone: inboxOverdue(m) ? ("warning" as const) : ("soft" as const) }
+    : null;
+  return { kind, birincil: inboxSummary(m), ikincil, rozet, neden };
+}
+
+export function InboxRow({ m, onPress, showAuthor, ayrac }: { readonly m: InboxItem; readonly onPress: () => void; readonly showAuthor?: boolean; readonly ayrac?: boolean }) {
+  const x = inboxRowText(m, showAuthor);
+  return (
+    <ListeSatiri
+      birincil={x.birincil}
+      ikincil={x.ikincil}
+      icon={x.kind.icon}
+      ton={x.neden ? "danger" : DOMAIN_TONE[x.kind.domain]}
+      rozet={x.rozet ? <Rozet label={x.rozet.label} tone={x.rozet.tone} /> : undefined}
+      ayrac={ayrac}
+      onPress={onPress}
+      testID={`mesaj-${m.mesajId}`}
+      accessibilityLabel={[x.kind.ad, x.birincil, x.rozet?.label, x.neden ? `Neden: ${x.neden}` : null, formatAgo(m.olusturulma)].filter(Boolean).join(", ")}
+    />
+  );
+}

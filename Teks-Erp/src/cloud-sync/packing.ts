@@ -8,7 +8,7 @@ import { FULL_RESEND_MARKER, type StoredWatermark, type WatermarkWrite } from ".
 import type { RecordProjection } from "./projections";
 import { MAX_RECORDS_PER_PACKAGE, type DeleteReason, type RecordEntry, type ReconcileEntry, type Watermark, type WireContainer } from "./wire";
 
-/** Anlık kayıt (ANLIK projeksiyonlar D3b'de gelir; D3a turu bu listeyi hep boş gönderir). */
+/** Anlık kayıt (`snapshots.ts` kurar); tel adı, içerik özeti ve veri. */
 export interface BuiltSnapshot {
   readonly projection: string;
   readonly digest: string;

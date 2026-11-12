@@ -330,6 +330,8 @@ const REMAINDER_HAM_SQL_MUAF = new Set([
   "scripts/test_consistency_derived.ts",
   // Teşhis script'i (canlıda `--salt-okuma` ile koşar) — kural değil ÖLÇÜM yazar.
   "scripts/olcum_scorecard_kismi_dogrudan_sevk.ts",
+  // Patron anlığının BAĞIMSIZ karşılaştırma SQL'i — helper'ı çağırsa kendi kendini ölçerdi.
+  "scripts/lib/anlik-bagimsiz.ts",
 ]);
 
 function remainderHamSqlTara(): { muaflarda: string[]; kacaklar: string[] } {

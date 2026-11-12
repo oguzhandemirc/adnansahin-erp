@@ -109,8 +109,25 @@ export interface RecordProjection {
   readonly catalogVersion: number;
 }
 
-/** Adnan D3a: yalnız KAYIT projeksiyonları (ANLIK projeksiyonlar D3b). */
-export type Projection = RecordProjection;
+/** Bölümlü anlığın (`ozet`) bir bölümü: tel adı `<projeksiyon>.<bolum>`, ayrı izin. */
+export interface SnapshotSection {
+  readonly name: string;
+  readonly permission: string;
+  readonly module?: ModuleKey;
+}
+
+/** ANLIK projeksiyon: her anlık turunda bütünüyle yeniden hesaplanan toplam (§3.3); satır kimliği yok. */
+export interface SnapshotProjection {
+  readonly name: string;
+  readonly kind: "ANLIK";
+  /** Sayıyı üreten mevcut servis/rapor — anlık yeni iş mantığı yazmaz. */
+  readonly source: string;
+  readonly permission: string;
+  readonly module?: ModuleKey;
+  readonly sections?: readonly SnapshotSection[];
+}
+
+export type Projection = RecordProjection | SnapshotProjection;
 
 export const col = (wire: string, source: string, dataClass: DataClass = "ISLEM"): ColumnSpec => ({ wire, source, dataClass });
 export const self = (table: string, watermark: "updatedAt" | "createdAt" = "updatedAt"): ChangeSource => ({
