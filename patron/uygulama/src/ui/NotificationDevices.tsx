@@ -15,13 +15,10 @@ import { NATIVE_PUSH_SOON, pushAvailable } from "../push/support";
 import { useSession } from "../state/session";
 import { useRemote } from "../state/useRemote";
 import { GroupNote } from "./diger/parts";
-import { IconTile } from "./ortak";
+import { BlokBasligi, BosDurum, IconTile, ListeBlogu, ListeSatiri, Rozet, STATUS_ROZET_TONU } from "./ortak";
+import { statusEntry } from "../lib/labels";
 import { DOMAIN_TONE } from "./tokens";
 import { Banner, Button } from "./kit";
-import { ListGroup, ListRow } from "./ListRow";
-import { SectionHeader } from "./SectionHeader";
-import { Empty } from "./StateViews";
-import { StatusBadge } from "./StatusBadge";
 import { makeStyles, useTokens } from "./theme-context";
 import { TOUCH, space, typography } from "./tokens";
 import { useWrite } from "./useWrite";
@@ -38,15 +35,15 @@ export function testOutcome(r: TestNotificationResult): { tone: "off" | "warn"; 
 }
 
 /** Kayıtlı cihaz satırı: çıkarma iki adımlıdır (ilk dokunuş sorar). */
-function DeviceRow({ d, busy, onRemove }: { readonly d: Device; readonly busy: boolean; readonly onRemove: () => void }) {
+function DeviceRow({ d, busy, onRemove, ayrac }: { readonly d: Device; readonly busy: boolean; readonly onRemove: () => void; readonly ayrac?: boolean }) {
   const t = useTokens();
   const s = useStyles();
   const [asking, setAsking] = useState(false);
   const p = devicePlatform(d.platform);
   if (asking) {
     return (
-      <View style={[s.ask, { backgroundColor: t.status.kritik.bg }]}>
-        <Text style={[s.askText, { color: t.status.kritik.text }]}>Bu cihaza artık bildirim gönderilmesin mi?</Text>
+      <View style={[s.ask, { backgroundColor: t.color.danger.bg }]}>
+        <Text style={[s.askText, { color: t.color.danger.fg }]}>Bu cihaza artık bildirim gönderilmesin mi?</Text>
         <View style={s.askRow}>
           <View style={s.flex}><Button label="Vazgeç" tone="plain" onPress={() => setAsking(false)} /></View>
           <View style={s.flex}><Button label="Evet, çıkar" tone="danger" busy={busy} onPress={() => { setAsking(false); onRemove(); }} /></View>
@@ -55,14 +52,15 @@ function DeviceRow({ d, busy, onRemove }: { readonly d: Device; readonly busy: b
     );
   }
   return (
-    <ListRow
-      title={d.ad ?? p.ad}
-      subtitle={`${p.ad} · son görülme ${formatAgo(d.sonGorulme)}`}
+    <ListeSatiri
+      birincil={d.ad ?? p.ad}
+      ikincil={`${p.ad} · son görülme ${formatAgo(d.sonGorulme)}`}
       icon={p.icon}
-      domain="gelenKutusu"
-      accessory={
+      ton={DOMAIN_TONE.gelenKutusu}
+      ayrac={ayrac}
+      rozet={
         <Pressable accessibilityRole="button" accessibilityLabel="Bu cihazı çıkar" onPress={() => setAsking(true)} hitSlop={8} style={s.remove}>
-          <Text style={[s.removeText, { color: t.status.kritik.fill }]}>Çıkar</Text>
+          <Text style={[s.removeText, { color: t.color.danger.fg }]}>Çıkar</Text>
         </Pressable>
       }
     />
@@ -111,14 +109,14 @@ export function NotificationDevices({ vapidKey, pushHere = pushAvailable(Platfor
   const list = devices.data ?? [];
   return (
     <View>
-      <SectionHeader title="Cihazlar" count={devices.data ? list.length : undefined} />
+      <BlokBasligi baslik="Cihazlar" sayi={devices.data ? list.length : undefined} />
       {pushHere ? (
         <View style={s.here}>
           <IconTile icon="phone-portrait-outline" tone={DOMAIN_TONE.gelenKutusu} size="md" />
           <View style={s.flex}>
             <View style={s.hereHead}>
               <Text style={s.hereTitle}>Bu cihaz</Text>
-              {view ? <StatusBadge kind={view.kind} label={view.label} size="sm" testID="izin-durumu" /> : null}
+              {view ? <Rozet label={view.label} tone={STATUS_ROZET_TONU[view.kind]} accessibilityLabel={`Durum: ${view.label}`} testID="izin-durumu" /> : null}
             </View>
             <Text style={s.hereHint} testID="izin-aciklama">{view?.hint ?? "Bildirim izni istenir; izin verince bildirimler bu cihaza da gelir"}</Text>
           </View>
@@ -141,12 +139,12 @@ export function NotificationDevices({ vapidKey, pushHere = pushAvailable(Platfor
       {outcome ? <Banner tone={outcome.tone} text={outcome.text} testID="cihaz-sonuc" /> : null}
       {list.length > 0 ? (
         <View style={s.gap}>
-          <ListGroup testID="cihaz-listesi">
-            {list.map((d) => (
-              <DeviceRow key={d.id} d={d} busy={remove.busy && removeId.current === d.id}
+          <ListeBlogu testID="cihaz-listesi">
+            {list.map((d, i) => (
+              <DeviceRow key={d.id} d={d} ayrac={i > 0} busy={remove.busy && removeId.current === d.id}
                 onRemove={() => { removeId.current = d.id; void remove.run(d.id).then(() => devices.reload()); }} />
             ))}
-          </ListGroup>
+          </ListeBlogu>
         </View>
       ) : null}
       {remove.error ? <Banner tone="error" text={remove.error} /> : null}
@@ -168,31 +166,30 @@ export function NotificationHistory() {
   const items = list.data?.kayitlar ?? [];
   return (
     <View>
-      <SectionHeader title="Geçmiş" />
-      {list.data && items.length === 0 ? <Empty domain="genel" icon={EMPTY_ICON.bildirim} text="Henüz bildirim yok" /> : null}
+      {list.data && items.length === 0 ? <><BlokBasligi baslik="Geçmiş" /><BosDurum icon={EMPTY_ICON.bildirim} baslik="Henüz bildirim yok" /></> : null}
       {items.length > 0 ? (
-        <ListGroup testID="bildirim-gecmisi">
+        <ListeBlogu baslik="Geçmiş" ayracli testID="bildirim-gecmisi">
           {items.map((n) => {
             const route = safeRoute(n.rota);
             const look = notificationKind(n.tur);
             const why = n.atlamaNedeni ? NOTIFICATION_SKIP[n.atlamaNedeni] ?? n.atlamaNedeni : null;
             return (
               <Pressable key={n.id} disabled={!route} onPress={() => route && router.push(route as never)} accessibilityRole={route ? "link" : undefined}
-                style={({ pressed }) => [s.hist, pressed && route ? { backgroundColor: t.surfaceAlt } : null]}>
+                style={({ pressed }) => [s.hist, pressed && route ? { backgroundColor: t.color.pressed } : null]}>
                 <IconTile icon={look.icon} tone={DOMAIN_TONE[look.domain]} size="md" />
                 <View style={s.flex}>
                   <Text style={s.histTitle}>{n.baslik}</Text>
                   <Text style={s.histBody}>{n.metin}</Text>
                   <View style={s.histMeta}>
-                    <StatusBadge value={n.durum} size="sm" />
+                    <Rozet label={statusEntry(n.durum).label} tone={STATUS_ROZET_TONU[statusEntry(n.durum).tone]} accessibilityLabel={`Durum: ${statusEntry(n.durum).label}`} />
                     <Text style={s.histTime}>{why ? `${formatAgo(n.olusturulma)} · ${why}` : formatAgo(n.olusturulma)}</Text>
                   </View>
                 </View>
-                {route ? <Ionicons name="chevron-forward" size={18} color={t.textMuted} /> : null}
+                {route ? <Ionicons name="chevron-forward" size={18} color={t.color.textMuted} /> : null}
               </Pressable>
             );
           })}
-        </ListGroup>
+        </ListeBlogu>
       ) : null}
     </View>
   );
@@ -201,10 +198,10 @@ export function NotificationHistory() {
 const useStyles = makeStyles((t) => ({
   flex: { flex: 1, minWidth: 0 },
   gap: { marginTop: space.s },
-  here: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, backgroundColor: t.surface, borderRadius: t.radius.card, padding: space.l, marginBottom: space.s, ...t.cardShadow },
+  here: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, backgroundColor: t.color.card, borderRadius: t.radius.card, borderWidth: 1, borderColor: t.color.cardBorder, padding: space.l, marginBottom: space.s, ...t.shadow.card },
   hereHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, flexWrap: "wrap" as const },
-  hereTitle: { ...typography.headline, color: t.text },
-  hereHint: { ...typography.footnote, color: t.textSecondary, marginTop: 2 },
+  hereTitle: { ...typography.headline, color: t.color.text },
+  hereHint: { ...typography.footnote, color: t.color.textMuted, marginTop: 2 },
   soon: { alignItems: "center" as const, gap: space.m, backgroundColor: t.surface, borderRadius: t.radius.card, paddingVertical: space.xl, paddingHorizontal: space.l, marginBottom: space.m, ...t.cardShadow },
   soonIcon: { width: 52, height: 52, borderRadius: t.radius.cardInner + 4, alignItems: "center" as const, justifyContent: "center" as const },
   soonText: { ...typography.callout, color: t.textSecondary, textAlign: "center" as const },
@@ -214,8 +211,8 @@ const useStyles = makeStyles((t) => ({
   remove: { minHeight: TOUCH, justifyContent: "center" as const, paddingHorizontal: space.xs },
   removeText: { ...typography.subhead, fontWeight: "600" as const },
   hist: { flexDirection: "row" as const, alignItems: "flex-start" as const, gap: space.m, paddingHorizontal: space.l, paddingVertical: space.m },
-  histTitle: { ...typography.headline, color: t.text },
-  histBody: { ...typography.subhead, color: t.textSecondary, marginTop: 2 },
+  histTitle: { ...typography.headline, color: t.color.text },
+  histBody: { ...typography.subhead, color: t.color.textMuted, marginTop: 2 },
   histMeta: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginTop: space.s, flexWrap: "wrap" as const },
   histTime: { ...typography.footnote, color: t.textMuted },
 }));

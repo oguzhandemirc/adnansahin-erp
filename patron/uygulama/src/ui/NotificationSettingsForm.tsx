@@ -4,10 +4,9 @@ import { View } from "react-native";
 import type { NotificationKindInfo } from "../api/wire";
 import { notificationKind } from "../lib/labels/diger";
 import type { NotificationForm } from "../lib/notification-form";
-import { GroupCaption, GroupNote, ToggleRow } from "./diger/parts";
+import { GroupNote, ToggleRow } from "./diger/parts";
 import { Field } from "./kit";
-import { ListGroup } from "./ListRow";
-import { SectionHeader } from "./SectionHeader";
+import { ListeBlogu } from "./ortak";
 import { space } from "./tokens";
 
 export function NotificationSettingsForm(p: { form: NotificationForm; kinds: readonly NotificationKindInfo[]; onChange: (f: NotificationForm) => void }) {
@@ -15,12 +14,11 @@ export function NotificationSettingsForm(p: { form: NotificationForm; kinds: rea
   const set = <K extends keyof NotificationForm>(k: K, v: NotificationForm[K]) => p.onChange({ ...f, [k]: v });
   return (
     <View>
-      <ListGroup>
+      <ListeBlogu>
         <ToggleRow label="Bildirimler açık" hint="Kapalıyken hiçbir bildirim gelmez" value={f.acik} onChange={(v) => set("acik", v)} testID="bildirim-ana"
           icon={f.acik ? "notifications" : "notifications-off-outline"} domain="gelenKutusu" />
-      </ListGroup>
-      <GroupCaption>Bildirim türleri</GroupCaption>
-      <ListGroup testID="bildirim-turleri" iconSize={32}>
+      </ListeBlogu>
+      <ListeBlogu baslik="Bildirim türleri" ayracli testID="bildirim-turleri">
         {p.kinds.map((k) => {
           const look = notificationKind(k.tur);
           return (
@@ -30,9 +28,8 @@ export function NotificationSettingsForm(p: { form: NotificationForm; kinds: rea
               onChange={(v) => set("turler", { ...f.turler, [k.tur]: v })} />
           );
         })}
-      </ListGroup>
-      <GroupCaption>Sessiz saatler</GroupCaption>
-      <ListGroup iconSize={32}>
+      </ListeBlogu>
+      <ListeBlogu baslik="Sessiz saatler">
         <ToggleRow label="Sessiz saatler" hint="Bu aralıkta doğan bildirim aralık bitince gelir (İstanbul saati)" value={f.sessizAcik} onChange={(v) => set("sessizAcik", v)}
           disabled={!f.acik} testID="sessiz" icon="moon-outline" domain="uretim" />
         {f.sessizAcik ? (
@@ -41,10 +38,8 @@ export function NotificationSettingsForm(p: { form: NotificationForm; kinds: rea
             <View style={{ flex: 1 }}><Field label="Bitiş" value={f.bitis} onChangeText={(t) => set("bitis", t.slice(0, 5))} placeholder="07:00" /></View>
           </View>
         ) : null}
-      </ListGroup>
-      <SectionHeader title="Eşikler" />
-      <GroupNote>Boş bırakılan eşik kapalıdır. Değerler fabrikanın gönderdiği özetle karşılaştırılır.</GroupNote>
-      <ListGroup testID="bildirim-esikler">
+      </ListeBlogu>
+      <ListeBlogu baslik="Eşikler" testID="bildirim-esikler">
         <View style={{ paddingHorizontal: space.l, paddingTop: space.l, paddingBottom: space.xs }}>
           <Field label="Ham stok şu miktarın altına inince" value={f.hamStokAlt} onChangeText={(t) => set("hamStokAlt", t)} placeholder="Kapalı" keyboardType="decimal-pad" />
           <Field label="Bitmiş stok şu miktarın altına inince" value={f.bitmisStokAlt} onChangeText={(t) => set("bitmisStokAlt", t)} placeholder="Kapalı" keyboardType="decimal-pad" />
@@ -53,7 +48,8 @@ export function NotificationSettingsForm(p: { form: NotificationForm; kinds: rea
           <Field label="Günlük üretim kontrol saati (0–23)" value={f.gunlukUretimSaati} onChangeText={(t) => set("gunlukUretimSaati", t.replace(/\D/g, "").slice(0, 2))} keyboardType="number-pad" />
           <Field label="Fabrikadan şu kadar dakika veri gelmezse" value={f.esitlemeGecikmeDk} onChangeText={(t) => set("esitlemeGecikmeDk", t.replace(/\D/g, "").slice(0, 5))} keyboardType="number-pad" />
         </View>
-      </ListGroup>
+      </ListeBlogu>
+      <GroupNote>Boş bırakılan eşik kapalıdır. Değerler fabrikanın gönderdiği özetle karşılaştırılır.</GroupNote>
     </View>
   );
 }

@@ -68,6 +68,6 @@ describe("bulunabilirlik", () => {
   it("Bildirim Ayarları ekranında Cihazlar (izin) bölümü ayarlar formundan ÖNCE", () => {
     const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../app/(app)/bildirimler.tsx"), "utf8") as string;
     expect(src.indexOf("<NotificationDevices")).toBeGreaterThan(0);
-    expect(src.indexOf("<NotificationDevices")).toBeLessThan(src.indexOf('<SectionHeader title="Ayarlar"'));
+    expect(src.indexOf("<NotificationDevices")).toBeLessThan(src.indexOf('<BlokBasligi baslik="Ayarlar"'));
   });
 });

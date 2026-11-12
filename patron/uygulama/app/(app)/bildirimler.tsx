@@ -12,8 +12,7 @@ import { Screen } from "../../src/ui/Frame";
 import { Banner, Button, ConfirmButton } from "../../src/ui/kit";
 import { NotificationDevices, NotificationHistory } from "../../src/ui/NotificationDevices";
 import { NotificationSettingsForm } from "../../src/ui/NotificationSettingsForm";
-import { SectionHeader } from "../../src/ui/SectionHeader";
-import { Empty, ErrorState, LoadingSkeleton } from "../../src/ui/StateViews";
+import { BlokBasligi, BosDurum, HataDurumu, Iskelet } from "../../src/ui/ortak";
 import { space } from "../../src/ui/tokens";
 import { useWrite } from "../../src/ui/useWrite";
 import { EMPTY_ICON } from "../../src/ui/icons";
@@ -60,15 +59,15 @@ export default function Notifications() {
   const shell = (children: ReactNode) => (
     <Screen module="bildirimler" onRefresh={remote.reload} refreshing={remote.refreshing}>{children}</Screen>
   );
-  if (remote.loading && !view) return shell(<LoadingSkeleton rows={5} />);
-  if (remote.error && !view) return shell(<ErrorState text={remote.error} onRetry={remote.reload} />);
-  if (!view || !form) return shell(<Empty icon={EMPTY_ICON.bildirim} text="Ayarlar okunamadı" actionLabel="Tekrar dene" onAction={remote.reload} />);
+  if (remote.loading && !view) return shell(<Iskelet bicim="liste" satir={5} />);
+  if (remote.error && !view) return shell(<HataDurumu mesaj={remote.error} onTekrar={remote.reload} />);
+  if (!view || !form) return shell(<BosDurum icon={EMPTY_ICON.bildirim} baslik="Ayarlar okunamadı" eylem="Tekrar dene" onEylem={remote.reload} />);
   const error = formError ?? saveOwn.error ?? reset.error ?? saveFacility.error;
   return shell(
     <>
       {view.gonderim === "kapali" ? <Banner tone="warn" text="Bildirim gönderimi sunucuda henüz açık değil; ayarlarınız saklanır ve açıldığında geçerli olur." testID="gonderim-kapali" /> : null}
       <NotificationDevices vapidKey={view.webPushAnahtari} />
-      <SectionHeader title="Ayarlar" />
+      <BlokBasligi baslik="Ayarlar" />
       <GroupNote>{SOURCE[view.kaynak]}</GroupNote>
       <NotificationSettingsForm form={form} kinds={view.turler} onChange={(f) => { setForm(f); setSaved(null); }} />
       {error ? <Banner tone="error" text={error} testID="bildirim-hata" /> : null}
