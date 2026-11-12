@@ -1,5 +1,6 @@
 // Sipariş ayrıntısı (şartname §4.3): başlıkta sipariş no; özet kartı (müşteri → cari kartı, durum rozeti, açık miktar ·
-// tutar) → bilgiler → kalemler (sevk ve açık miktar kalem satırında). Termin/gecikme rozeti YOK. Her değer fabrikadan;
+// tutar) → bilgiler → kalemler (sevk ve açık miktar kalem satırında). Termin düz bilgi satırı (vurgu/rozet YOK). Parasal
+// alan (tutar, para birimi) yalnız değer geldiyse çizilir — bu fabrikada finans buluta gitmez. Her değer fabrikadan;
 // durum/yön sözlükten. Kalem satırları sunucunun `siparisId` süzgeciyle; sunucu süzgeci beyan etmiyorsa (eski bulut,
 // parametreyi yok sayar) fabrikanın kalem özeti kalır — istemci süzmez.
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -35,7 +36,8 @@ export default function OrderDetail() {
   const f = asObj(r.data?.finans);
   const no = str(k.siparisNo);
   const status = orderStatus(k.durum);
-  const doviz = str(k.doviz) ?? "TRY";
+  const doviz = str(k.doviz);
+  const tutar = present(f.tutar) ? formatMoney(f.tutar, doviz ?? "TRY") : null;
   const cariId = str(k.cariKartId);
   const cariAc = cariId && moduleVisible(permissions, "cariler") ? () => router.push({ pathname: "/cariler/[id]", params: { id: cariId } } as never) : undefined;
   const showOpen = isOpenOrder(k.durum) && present(k.acikMiktar);
@@ -43,7 +45,7 @@ export default function OrderDetail() {
     { key: "tarih", etiket: "Sipariş tarihi", deger: formatDate(k.siparisTarihi) },
     str(k.termin) ? { key: "termin", etiket: "Termin", deger: formatDate(k.termin) } : null,
     { key: "yon", etiket: "Sevk yönü", deger: destinationLabel(k.yon) },
-    { key: "doviz", etiket: "Para birimi", deger: doviz },
+    doviz ? { key: "doviz", etiket: "Para birimi", deger: doviz } : null,
     str(k.tamamlanma) ? { key: "tamam", etiket: "Tamamlanma", deger: formatDate(k.tamamlanma) } : null,
     str(k.iptalTarihi) ? { key: "iptal", etiket: "İptal tarihi", deger: formatDate(k.iptalTarihi) } : null,
   ].filter((x): x is { key: string; etiket: string; deger: string } => x !== null);
@@ -79,16 +81,16 @@ export default function OrderDetail() {
               )}
             </View>
           </KademeliGiris>
-          {showOpen || present(f.tutar) ? (
+          {showOpen || tutar ? (
             <KademeliGiris sira={1} style={s.ikili}>
               {showOpen ? (
                 <View style={s.yarim}>
                   <StatCard etiket="Açık miktar" icon="resize-outline" ton="blue" degerler={[{ deger: formatNumber(k.acikMiktar), birim: "m" }]} testID="siparis-acik" />
                 </View>
               ) : null}
-              {present(f.tutar) ? (
+              {tutar ? (
                 <View style={s.yarim}>
-                  <StatCard etiket="Tutar" icon="cash-outline" ton="green" degerler={[{ deger: formatMoney(f.tutar, doviz) }]} testID="siparis-tutar" />
+                  <StatCard etiket="Tutar" icon="cash-outline" ton="green" degerler={[{ deger: tutar }]} testID="siparis-tutar" />
                 </View>
               ) : null}
             </KademeliGiris>

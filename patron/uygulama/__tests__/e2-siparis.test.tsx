@@ -222,6 +222,20 @@ describe("§5 sipariş ayrıntısı", () => {
     expect(screen.getByTestId("siparis-tutar").props.accessibilityLabel).toContain("2.500 €");
     expect(screen.queryByText(/PENDING|EXPORT/)).toBeNull();
   });
+
+  it("tutarsız/dövizsiz kayıt (finans buluta gitmez): Tutar kartı, Para birimi satırı ve para işareti HİÇ çizilmez", async () => {
+    mockParams = { id: ID1 };
+    mockRecord.mockResolvedValue(rec(ID1, { siparisNo: "SP-8", durum: "APPROVED", yon: "DOMESTIC", termin: "2026-10-01", acikMiktar: "40", kalemSayisi: 2 }));
+    render(<OrderDetail />);
+    await settle();
+    expect(screen.getByTestId("siparis-acik")).toBeTruthy();
+    expect(screen.queryByTestId("siparis-tutar")).toBeNull();
+    expect(screen.queryByTestId("bilgi-doviz")).toBeNull();
+    expect(screen.queryByText(/Tutar|Para birimi|₺|TRY/)).toBeNull();
+    // Termin düz bilgi satırı: rozet/geri sayım yok.
+    expect(screen.getByTestId("bilgi-termin")).toBeTruthy();
+    expect(screen.queryByText(/gün kaldı|Gecikti/)).toBeNull();
+  });
 });
 
 describe("§6 P6 sipariş kalemleri (sunucu `siparisId` süzgeci)", () => {

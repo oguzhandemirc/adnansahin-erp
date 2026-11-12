@@ -8,6 +8,7 @@ const sonra = (gun: number): string => new Date(Date.now() + gun * GUN).toISOStr
 
 export const ORNEK_KAPSAM = "ornek-tesis:ornek-hesap";
 
+// Bu fabrikanın gerçeği: finans/teklif/maliyet izni yok, kayıtlarda tutar/döviz/birim fiyat gelmez.
 export const ORNEK_IZINLER: readonly string[] = [
   "bulut:oturum",
   "bulut:ozet:oku",
@@ -18,7 +19,6 @@ export const ORNEK_IZINLER: readonly string[] = [
   "bulut:sevkiyat:oku",
   "bulut:uretim:oku",
   "bulut:stok:oku",
-  "bulut:teklif:oku",
   "bulut:rapor:oku",
   "bulut:hesap:yonet",
 ];
@@ -67,13 +67,6 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
     },
     "ozet.stok": { hamMiktar: 126500, bitmisMiktar: 84200, yariMamulMiktar: 27600, oluMiktar: 3100 },
     "ozet.fason": { bugun: fasonDonem(0.2), buAy: fasonDonem(1), gecenAy: fasonDonem(1.3), son30Gun: fasonDonem(1.5) },
-    "ozet-finans": {
-      yaslandirma: [
-        { doviz: "TRY", acikToplam: "1845000.00", gecikmis: "212500.00" },
-        { doviz: "USD", acikToplam: "48600.00", gecikmis: "0.00" },
-      ],
-      cekVade: [],
-    },
     "uretim-akisi": {
       kolonlar: [
         { anahtar: "hamStok", etiket: "Ham stok", adet: 310 },
@@ -152,14 +145,12 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         cariKartId: c.id,
         durum,
         yon: i % 4 === 3 ? "EXPORT" : "DOMESTIC",
-        doviz: i % 3 === 2 ? "USD" : "TRY",
         siparisTarihi: once(i * 3 + 1).slice(0, 10),
         termin: sonra(10 + i * 4),
         acikMiktar: durum === "COMPLETED" || durum === "CANCELLED" ? 0 : 2400 + i * 850,
         kalemSayisi: 1 + (i % 3),
         tamamlanma: durum === "COMPLETED" ? 100 : durum === "PARTIAL_SHIPPED" ? 45 : 0,
       },
-      { tutar: String(180000 + i * 37500) },
     );
   });
   const kalem = siparis.flatMap((s, i) =>
@@ -172,11 +163,10 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         sevkMiktari: j === 0 ? 400 : 0,
         acikMiktar: 800 + j * 600,
         birim: "m",
-        doviz: (s.kayit as { doviz: string }).doviz,
-      }, { tutar: String(60000 + j * 15000), birimFiyat: "52.50" }),
+      }),
     ),
   );
-  const cari = CARILER.map((c) => kayit(c.id, { ad: c.ad, kod: c.kod, il: c.il, ulke: "Türkiye", aktif: true, musteriRolu: !c.tedarikci, tedarikciRolu: !!c.tedarikci, fasonRolu: false, varsayilanDoviz: "TRY" }));
+  const cari = CARILER.map((c) => kayit(c.id, { ad: c.ad, kod: c.kod, il: c.il, ulke: "Türkiye", aktif: true, musteriRolu: !c.tedarikci, tedarikciRolu: !!c.tedarikci, fasonRolu: false }));
   const sevkiyat = Array.from({ length: 6 }, (_, i) =>
     kayit(`v${i + 1}`, {
       sevkNo: `SVK-${String(451 - i).padStart(4, "0")}`,
