@@ -65,7 +65,12 @@ export const SNAPSHOT_WIRE_SCHEMAS = {
     acikSevk: Num,
     /** Fasonda kalan top metresi (ondalık metin, 3 hane). */
     kalanMiktar: z.string().regex(/^\d+(\.\d+)?$/),
-    firmalar: z.array(z.strictObject({ fasonFirmaId: z.string().uuid(), etiket: Str, acikSevk: Num, kalanMiktar: z.string().regex(/^\d+(\.\d+)?$/) })),
+    /** Fasonda bekleyen top sayısı; `boyahanedeTop` bunun Boyahane kategorili firmalardaki kısmı. */
+    acikTop: Num,
+    boyahanedeTop: Num,
+    firmalar: z.array(z.strictObject({
+      fasonFirmaId: z.string().uuid(), etiket: Str, acikSevk: Num, kalanMiktar: z.string().regex(/^\d+(\.\d+)?$/), acikTop: Num, kategoriler: z.array(Str),
+    })),
   }),
   "rapor-katalogu": z.strictObject({
     raporlar: z.array(z.strictObject({ anahtar: Str, baslik: Str, soru: Str, aile: Str, izin: Str, parametreler: z.array(Str), standartDonemler: z.array(Str) })),

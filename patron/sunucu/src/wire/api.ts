@@ -396,6 +396,9 @@ export interface SubcontractOpenFirm {
   readonly kalanMiktar: string;
   readonly iplikKg: string;
   readonly leventAdet: number;
+  /** Firmada bekleyen top sayısı ve firmanın hizmet kategorileri (adları); eski fabrika göndermez. */
+  readonly acikTop?: number;
+  readonly kategoriler?: readonly string[];
 }
 
 /**
@@ -408,6 +411,9 @@ export interface SubcontractOpenSnapshot {
   readonly yaklasan: number;
   readonly kalanMiktar: string;
   readonly kirpildi: boolean;
+  /** Fasonda bekleyen top sayısı; `boyahanedeTop` bunun Boyahane kategorili firmalardaki kısmı. Eski fabrika göndermez. */
+  readonly acikTop?: number;
+  readonly boyahanedeTop?: number;
   readonly firmalar: readonly SubcontractOpenFirm[];
 }
 
