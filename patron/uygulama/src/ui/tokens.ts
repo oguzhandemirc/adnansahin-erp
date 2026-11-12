@@ -510,3 +510,6 @@ export const BAR_HEIGHT = 44;
 export const TAB_BAR_HEIGHT = 64;
 /** Sol ray genişliği (≥ WIDE_MIN). */
 export const RAIL_WIDTH = 248;
+
+/** Ekran içeriğinin yan oluğu (Screen); tam genişlik bloklar (`ortak/Bloklar`) bu kadar taşar. */
+export const ekranOlugu = (wide: boolean): number => (wide ? space.xl : space.l);

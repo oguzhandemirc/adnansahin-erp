@@ -14,6 +14,15 @@ export const ORDER_STATUS: Readonly<Record<OrderStatus, StatusEntry>> = {
   CANCELLED: { label: "Sipariş iptal edildi", tone: "bilgi" },
 };
 
+/** Tek satırlık listede rozet için kısa etiket (sevk dili; tam etiket erişilebilirlik metninde ve ayrıntıda kalır). */
+export const ORDER_STATUS_KISA: Readonly<Record<OrderStatus, string>> = {
+  PENDING: "Onay bekliyor",
+  APPROVED: "Gönderilmedi",
+  PARTIAL_SHIPPED: "Kısmen",
+  COMPLETED: "Gönderildi",
+  CANCELLED: "İptal",
+};
+
 /** Liste süzgecinin sırası (sunucu `durum` parametresi tam eşitlikle süzer). */
 export const ORDER_STATUS_ORDER: readonly OrderStatus[] = ["PENDING", "APPROVED", "PARTIAL_SHIPPED", "COMPLETED", "CANCELLED"];
 
@@ -30,6 +39,11 @@ export function orderStatus(value: unknown): StatusEntry {
   return (ORDER_STATUS as Readonly<Record<string, StatusEntry | undefined>>)[value] ?? { label: value, tone: "bilgi" };
 }
 
+export function orderStatusShort(value: unknown): string {
+  if (typeof value !== "string") return "—";
+  return (ORDER_STATUS_KISA as Readonly<Record<string, string | undefined>>)[value] ?? value;
+}
+
 export function isOpenOrder(value: unknown): boolean {
   return typeof value === "string" && OPEN.has(value);
 }
@@ -42,16 +56,6 @@ function dictLabel(dict: Readonly<Record<string, string>>, value: unknown): stri
 export const destinationLabel = (v: unknown): string => dictLabel(DESTINATION, v);
 export const unitLabel = (v: unknown): string => dictLabel(UNIT, v);
 export const cariKindLabel = (v: unknown): string => dictLabel(CARI_KIND, v);
-
-/**
- * Termin rozeti — YALNIZ fabrikanın `gecikmis` alanından (uygulama tarih karşılaştırmaz):
- * gecikmiş → kritik "Gecikti"; açık + terminli + gecikmemiş → iyi "Zamanında"; kapanmış ya da terminsiz → yok.
- */
-export function deadlineBadge(kayit: Readonly<Record<string, unknown>>): StatusEntry | null {
-  if (kayit.gecikmis === true) return { label: "Gecikti", tone: "kritik" };
-  if (kayit.gecikmis === false && isOpenOrder(kayit.durum) && typeof kayit.termin === "string" && kayit.termin !== "") return { label: "Zamanında", tone: "iyi" };
-  return null;
-}
 
 /** Cari rolleri (kimlik ayrı, rol bayrak): `cari-kart` satırının rol bayraklarından etiketler. */
 export const CARI_ROLES = [

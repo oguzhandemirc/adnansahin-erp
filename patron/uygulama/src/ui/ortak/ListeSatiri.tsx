@@ -22,6 +22,8 @@ export interface ListeSatiriProps {
   /** İlk satırda ayraç çizilmez. */
   readonly ayrac?: boolean;
   readonly onPress?: () => void;
+  /** Basılabilir satırda ok; yoğun tek satırlık listede (4 alan) yer açmak için kapatılır. */
+  readonly ok?: boolean;
   readonly testID?: string;
   /** Verilmezse görünen metinlerden kurulur. */
   readonly accessibilityLabel?: string;
@@ -38,8 +40,8 @@ export function ListeSatiri(p: ListeSatiriProps) {
         <Text style={[s.birincil, p.birincilGenislik ? { width: p.birincilGenislik } : null]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.birincil}</Text>
         {p.ikincil ? <Text style={s.ikincil} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.ikincil}</Text> : <View style={s.esnek} />}
         {p.deger ? <Text style={s.deger} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.deger}</Text> : null}
-        {p.rozet}
-        {p.onPress ? <Ionicons name="chevron-forward" size={16} color={t.color.textMuted} /> : null}
+        {p.rozet ? <View style={s.rozet}>{p.rozet}</View> : null}
+        {p.onPress && p.ok !== false ? <Ionicons name="chevron-forward" size={16} color={t.color.textMuted} /> : null}
       </View>
     </View>
   );
@@ -61,5 +63,7 @@ const useStyles = makeStyles((t) => ({
   birincil: { ...typography.rowTitle, color: t.color.text, flexShrink: 0, maxWidth: "60%" as const },
   ikincil: { ...typography.label, color: t.color.textMuted, flex: 1, minWidth: 0 },
   esnek: { flex: 1 },
+  // Rozet kendi içinde `alignSelf: flex-start`; satırda dikey ortalansın diye sarılır.
+  rozet: { justifyContent: "center" as const, flexShrink: 0 },
   deger: { fontSize: 15, lineHeight: 20, fontWeight: "600" as const, ...tabularNums, color: t.color.text },
 }));

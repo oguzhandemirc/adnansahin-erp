@@ -6,8 +6,8 @@ import { ARAMA_AZAMI } from "../../api/wire";
 import { fmtFactoryTime } from "../../lib/factory-time";
 import { formatAgo } from "../../lib/format";
 import type { IconName } from "../icons";
-import { Button } from "../kit";
-import { Empty, ErrorState, LoadingSkeleton } from "../StateViews";
+import { Basilabilir } from "../hareket";
+import { BosDurum, HataDurumu, Iskelet } from "../ortak";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "../tokens";
 import type { RemoteList } from "./useRemoteList";
@@ -80,15 +80,24 @@ export function QuickChip(p: { label: string; selected: boolean; onPress: () => 
   );
 }
 
-/** Liste altlığı: iskelet · hata + tekrar dene · tasarlanmış boş durum · "Daha fazla". */
-export function ListStates(p: { list: RemoteList; empty: string; domain: Domain; icon?: IconName; testID?: string }) {
+/** Liste altlığı (ortak durumlar): iskelet · hata + tekrar dene · boş durum · "Daha fazla" (sayfalama düzeni). */
+export function ListStates(p: { list: RemoteList; empty: string; aciklama?: string; domain?: Domain; icon?: IconName; testID?: string }) {
   const { list } = p;
-  if (list.loading) return <LoadingSkeleton rows={4} testID={p.testID ? `${p.testID}-yukleniyor` : undefined} />;
+  const t = useTokens();
+  const s = useStyles();
+  if (list.loading) return <Iskelet bicim="liste" satir={5} testID={p.testID ? `${p.testID}-yukleniyor` : undefined} />;
   return (
     <View>
-      {list.error ? <ErrorState text={list.error} onRetry={list.reload} /> : null}
-      {!list.error && list.items.length === 0 ? <Empty text={p.empty} domain={p.domain} icon={p.icon} testID={p.testID ? `${p.testID}-bos` : undefined} /> : null}
-      {list.loadingMore ? <ActivityIndicator style={{ margin: space.l }} accessibilityLabel="Yükleniyor" /> : list.hasMore ? <Button label="Daha fazla" tone="secondary" icon="chevron-down" onPress={list.loadMore} testID="daha-fazla" /> : null}
+      {list.error ? <HataDurumu mesaj={list.error} onTekrar={list.reload} testID={p.testID ? `${p.testID}-hata` : undefined} /> : null}
+      {!list.error && list.items.length === 0 ? <BosDurum baslik={p.empty} aciklama={p.aciklama} icon={p.icon} testID={p.testID ? `${p.testID}-bos` : undefined} /> : null}
+      {list.loadingMore ? (
+        <ActivityIndicator style={s.dahaFazla} color={t.color.primary} accessibilityLabel="Yükleniyor" />
+      ) : list.hasMore ? (
+        <Basilabilir onPress={list.loadMore} style={s.dahaFazla} olcek={1} basiliZemin={t.color.pressed} accessibilityRole="button" testID="daha-fazla">
+          <Text style={[s.dahaFazlaYazi, { color: t.color.link }]}>Daha fazla</Text>
+          <Ionicons name="chevron-down" size={16} color={t.color.link} />
+        </Basilabilir>
+      ) : null}
     </View>
   );
 }
@@ -151,6 +160,8 @@ export function RolePill({ roleKey, label }: { roleKey: string; label: string })
 }
 
 export const useStyles = makeStyles((t) => ({
+  dahaFazla: { minHeight: TOUCH + 4, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "center" as const, gap: space.xs, marginTop: space.s },
+  dahaFazlaYazi: { fontSize: 15, lineHeight: 20, fontWeight: "600" as const },
   search: {
     minHeight: 44,
     flexDirection: "row" as const,

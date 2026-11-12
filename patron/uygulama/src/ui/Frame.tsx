@@ -17,7 +17,7 @@ import { LargeHeader, LargeTitle, useHeaderScroll } from "./LargeHeader";
 import { RoleBadge } from "./RoleBadge";
 import { RAIL_GROUPS, TABS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
-import { CONTENT_MAX, RAIL_WIDTH, TOUCH, WIDE_MIN, space, typography } from "./tokens";
+import { CONTENT_MAX, RAIL_WIDTH, TOUCH, WIDE_MIN, ekranOlugu, space, typography } from "./tokens";
 import { UYGULAMA_ADI } from "../lib/kimlik";
 
 export function useWide(): boolean {
@@ -122,7 +122,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const allowed = module === undefined || moduleVisible(permissions, module);
   const path = usePathname();
   const showBack = !wide && (back ?? !TABS.some((tab) => tab.route === path));
-  const pad = wide ? space.xl : space.l;
+  const pad = ekranOlugu(wide);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/pano"));
   return (
     <View style={s.screen}>

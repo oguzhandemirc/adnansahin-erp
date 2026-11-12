@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 import type { ProjectionRecord } from "../../api/wire";
 import { formatDate, formatMoney, formatNumber } from "../../lib/format";
 import { cariKindLabel, cariTxnSourceLabel, unitLabel } from "../../lib/labels/siparis";
-import { ListGroup, ListRow } from "../ListRow";
-import { SectionHeader } from "../SectionHeader";
+import { MODULE_ICON } from "../icons";
+import { ListeBlogu, ListeSatiri } from "../ortak";
 import { asObj, str } from "./OrderRow";
 import { ListStates } from "./parts";
 import { useRemoteList, type RemoteList } from "./useRemoteList";
@@ -39,22 +39,21 @@ export function lineRowText(r: ProjectionRecord) {
   };
 }
 
+/** Kalemler bloğu (tek satır: ürün · renk/sevk/açık · miktar); başlık sayısı yüklenen satır kadar. */
 export function OrderLines({ siparisId, tick = 0 }: { siparisId: string; tick?: number }) {
   const list = useRemoteList("siparis-kalemi", { siparisId }, { tags: ["siparis-kalemi", "siparis"] });
   useReloadOn(tick, list);
   return (
     <>
       {list.items.length > 0 ? (
-        <ListGroup testID="siparis-kalemleri">
-          {list.items.map((r) => {
+        <ListeBlogu baslik="Kalemler" sayi={list.hasMore ? undefined : list.items.length} testID="siparis-kalemleri">
+          {list.items.map((r, i) => {
             const x = lineRowText(r);
-            return (
-              <ListRow key={r.id} title={x.title} subtitle={x.subtitle} value={x.value} domain="siparisler" icon="layers-outline" testID={`kalem-${r.id}`} />
-            );
+            return <ListeSatiri key={r.id} birincil={x.title} ikincil={x.subtitle} deger={x.value} ayrac={i > 0} testID={`kalem-${r.id}`} />;
           })}
-        </ListGroup>
+        </ListeBlogu>
       ) : null}
-      <ListStates list={list} empty="Bu siparişin kalemi yok" domain="siparisler" testID="siparis-kalem" />
+      <ListStates list={list} empty="Bu siparişin kalemi yok" icon={MODULE_ICON.siparisler.icon} testID="siparis-kalem" />
     </>
   );
 }
@@ -78,16 +77,15 @@ function AccountMovements({ account, titled, tick }: { account: ProjectionRecord
   useReloadOn(tick, list);
   return (
     <>
-      {titled ? <SectionHeader title={`Son hareketler · ${cariKindLabel(asObj(account.kayit).tur)}`} domain="finans" /> : null}
       {list.items.length > 0 ? (
-        <ListGroup testID={`cari-hareketleri-${account.id}`}>
-          {list.items.map((r) => {
+        <ListeBlogu baslik={titled ? `Son hareketler · ${cariKindLabel(asObj(account.kayit).tur)}` : "Son hareketler"} testID={`cari-hareketleri-${account.id}`}>
+          {list.items.map((r, i) => {
             const x = movementRowText(r);
-            return <ListRow key={r.id} title={x.title} subtitle={x.subtitle} value={x.value} domain="finans" icon="swap-horizontal-outline" testID={`hareket-${r.id}`} />;
+            return <ListeSatiri key={r.id} birincil={x.title} ikincil={x.subtitle} deger={x.value} ayrac={i > 0} testID={`hareket-${r.id}`} />;
           })}
-        </ListGroup>
+        </ListeBlogu>
       ) : null}
-      <ListStates list={list} empty="Bu hesapta hareket yok" domain="finans" testID={`cari-hareket-${account.id}`} />
+      <ListStates list={list} empty="Bu hesapta hareket yok" icon={MODULE_ICON.finans.icon} testID={`cari-hareket-${account.id}`} />
     </>
   );
 }
@@ -95,10 +93,5 @@ function AccountMovements({ account, titled, tick }: { account: ProjectionRecord
 /** Carinin her muhasebe hesabı için son hareketler (`cari-hareket` `cariHesapId` taşır, `cariKartId` taşımaz). */
 export function CustomerMovements({ accounts, tick = 0 }: { accounts: readonly ProjectionRecord[]; tick?: number }) {
   if (accounts.length === 0) return null;
-  return (
-    <>
-      {accounts.length === 1 ? <SectionHeader title="Son hareketler" domain="finans" /> : null}
-      {accounts.map((a) => <AccountMovements key={a.id} account={a} titled={accounts.length > 1} tick={tick} />)}
-    </>
-  );
+  return <>{accounts.map((a) => <AccountMovements key={a.id} account={a} titled={accounts.length > 1} tick={tick} />)}</>;
 }

@@ -1,57 +1,45 @@
-// Siparişler (teal): fabrika özeti (açık · geciken · açık metre · karşılanma) + arama ve görünüm çipleri (SUNUCUDA,
-// `ara` + `suzgec`, `LIST_SEARCH.siparis`) + sipariş satırları. Sunucu sipariş aramasını beyan etmiyorsa (eski bulut)
-// arama gizlenir, tek "Durum" süzgeci (`durum`) kalır. "Yeni sipariş" yalnız yazma izniyle ve çevrimiçiyken.
+// Siparişler (şartname §4.2): başlık (+ Yeni) → arama → süzgeç (modal) → özet şeridi → tam genişlik tek satırlık liste.
+// Arama ve süzgeç SUNUCUDA (`ara` + `suzgec`, `LIST_SEARCH.siparis`); sunucu sipariş aramasını beyan etmiyorsa (eski
+// bulut) arama gizlenir, tek "Durum" süzgeci (`durum`) kalır. Gecikme süzgeci ve "Geciken" sayısı çizilmez (kullanıcı
+// kararı: termin/gecikme göstergesi yok). "Yeni sipariş" yalnız yazma izniyle ve çevrimiçiyken.
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, View } from "react-native";
-import type { ListSearchSpec } from "../../../../src/api/wire";
+import { View } from "react-native";
 import { can } from "../../../../src/lib/access";
 import { formatNumber } from "../../../../src/lib/format";
-import { ORDER_STATUS, ORDER_STATUS_ORDER, type OrderStatus } from "../../../../src/lib/labels/siparis";
+import { ORDER_STATUS, ORDER_STATUS_ORDER } from "../../../../src/lib/labels/siparis";
 import { useSession } from "../../../../src/state/session";
 import { useRemote } from "../../../../src/state/useRemote";
 import { FilterChip } from "../../../../src/ui/FilterChip";
 import { useDebounced } from "../../../../src/ui/Picker";
 import { Screen } from "../../../../src/ui/Frame";
-import { KpiCard, KpiGrid } from "../../../../src/ui/KpiCard";
-import { ListGroup } from "../../../../src/ui/ListRow";
-import { SectionHeader } from "../../../../src/ui/SectionHeader";
+import { MODULE_ICON } from "../../../../src/ui/icons";
+import { KademeliGiris } from "../../../../src/ui/hareket";
+import { ListeBlogu, OzetSeridi } from "../../../../src/ui/ortak";
 import { openRecord } from "../../../../src/ui/nav";
 import { ChoiceSheet } from "../../../../src/ui/siparis/ChoiceSheet";
 import { OrderRow, asObj } from "../../../../src/ui/siparis/OrderRow";
 import { useListCapability } from "../../../../src/ui/siparis/capabilities";
-import { CapsuleButton, ListStates, QuickChip, SearchField, StaleNote } from "../../../../src/ui/siparis/parts";
+import { CapsuleButton, ListStates, SearchField, StaleNote } from "../../../../src/ui/siparis/parts";
 import { useRemoteList } from "../../../../src/ui/siparis/useRemoteList";
 import { space } from "../../../../src/ui/tokens";
 
-type DurumKey = OrderStatus | "tumu";
-const CHOICES = [{ key: "tumu" as DurumKey, label: "Tümü" }, ...ORDER_STATUS_ORDER.map((k) => ({ key: k as DurumKey, label: ORDER_STATUS[k].label }))];
+const TUMU = "tumu";
+const DURUMLAR = [{ key: TUMU, label: "Tümü" }, ...ORDER_STATUS_ORDER.map((k) => ({ key: k as string, label: ORDER_STATUS[k].label }))];
+/** Termin/gecikme göstergesi yok: sunucunun gecikme görünümü seçeneklere girmez. */
+const GECIKME_ALANI = "gecikmis";
 
-function Summary({ veri }: { veri: unknown }) {
+function Ozet({ veri }: { veri: unknown }) {
   const v = asObj(veri);
-  const late = Number(v.gecikenKalem) > 0;
   return (
-    <KpiGrid testID="siparis-ozet">
-      <KpiCard label="Açık kalem" value={formatNumber(v.acikKalem, 0)} unit="kalem" domain="siparisler" icon="receipt-outline" testID="ozet-acik" />
-      <KpiCard
-        label="Geciken" value={formatNumber(v.gecikenKalem, 0)} unit="kalem" domain="siparisler" icon="alarm-outline" testID="ozet-geciken"
-        status={late ? { kind: "kritik", label: "Gecikme var" } : { kind: "iyi", label: "Gecikme yok" }}
-      />
-      <KpiCard label="Açık miktar" value={formatNumber(v.acikMiktar, 0)} unit="m" domain="siparisler" icon="resize-outline" testID="ozet-miktar" />
-      <KpiCard label="Karşılanma" value={formatNumber(v.karsilanmaYuzde, 0)} unit="%" domain="siparisler" icon="checkmark-done-outline" testID="ozet-karsilanma" />
-    </KpiGrid>
-  );
-}
-
-/** Görünüm çipleri sunucu beyanından (`LIST_SEARCH.siparis.suzgec`): tek seçim, "Tümü" süzgeci kaldırır. */
-function ViewChips({ spec, value, onChange }: { spec: NonNullable<ListSearchSpec["suzgec"]>; value: string | null; onChange: (v: string | null) => void }) {
-  const options = [{ deger: null as string | null, etiket: "Tümü" }, ...spec.secenekler];
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.s }} testID="siparis-cipleri" accessibilityLabel={spec.etiket}>
-      {options.map((o) => (
-        <QuickChip key={o.deger ?? "_tumu"} label={o.etiket} selected={value === o.deger} onPress={() => onChange(o.deger)} testID={`cip-${o.deger ?? "tumu"}`} />
-      ))}
-    </ScrollView>
+    <OzetSeridi
+      testID="siparis-ozet"
+      items={[
+        { key: "acik", deger: formatNumber(v.acikKalem, 0), birim: "kalem", etiket: "Açık" },
+        { key: "miktar", deger: formatNumber(v.acikMiktar, 0), birim: "m", etiket: "Açık miktar" },
+        { key: "karsilanma", deger: formatNumber(v.karsilanmaYuzde, 0), birim: "%", etiket: "Karşılanma" },
+      ]}
+    />
   );
 }
 
@@ -59,24 +47,25 @@ export default function Orders() {
   const { api, permissions, offline } = useSession();
   const router = useRouter();
   const search = useListCapability().search("siparis");
-  const [durum, setDurum] = useState<DurumKey>("tumu");
+  const [secim, setSecim] = useState<string>(TUMU);
   const [sheet, setSheet] = useState(false);
   const [term, setTerm] = useState("");
-  const [chip, setChip] = useState<string | null>(null);
   const ara = useDebounced(term.trim(), 300);
-  const list = useRemoteList(
-    "siparis",
-    search ? { ara: ara || undefined, suzgec: chip ?? undefined } : { durum: durum === "tumu" ? undefined : durum },
-  );
-  const chipLabel = search?.suzgec?.secenekler.find((o) => o.deger === chip)?.etiket ?? null;
-  const title = search ? (chipLabel ?? "Tüm siparişler") : durum === "tumu" ? "Tüm siparişler" : ORDER_STATUS[durum].label;
-  const filtered = search ? !!ara || chip !== null : durum !== "tumu";
+  const secili = secim === TUMU ? undefined : secim;
+  const list = useRemoteList("siparis", search ? { ara: ara || undefined, suzgec: secili } : { durum: secili });
+  const secenekler = search?.suzgec
+    ? [{ key: TUMU, label: "Tümü" }, ...search.suzgec.secenekler.filter((o) => o.alan !== GECIKME_ALANI).map((o) => ({ key: o.deger, label: o.etiket }))]
+    : DURUMLAR;
+  const suzgecAdi = search?.suzgec ? search.suzgec.etiket : "Durum";
+  const secimEtiketi = secenekler.find((c) => c.key === secim)?.label ?? "Tümü";
+  const filtered = !!ara || secim !== TUMU;
   const canWrite = can(permissions, "bulut:siparis:yaz");
   const summary = useRemote(can(permissions, "bulut:ozet:oku") ? "anlik:ozet.siparis" : null, () => api.snapshot("ozet.siparis"), { tags: ["ozet", "ozet.siparis"] });
   const refresh = () => {
     list.reload();
     summary.reload();
   };
+  const sayi = !list.loading && !list.hasMore ? list.items.length : undefined;
   return (
     <Screen
       title="Siparişler" module="siparisler" back={false}
@@ -84,25 +73,32 @@ export default function Orders() {
       subtitle={<StaleNote stale={list.stale} savedAt={list.savedAt} />}
       headerRight={canWrite ? <CapsuleButton label="Yeni sipariş" icon="add" disabled={offline} onPress={() => router.push("/siparisler/yeni")} testID="yeni-siparis" /> : undefined}
     >
-      {summary.data ? <Summary veri={summary.data.veri} /> : null}
-      <SectionHeader title={title} domain="siparisler" count={!list.loading && !list.hasMore ? list.items.length : undefined} />
-      {search ? (
-        <View style={{ gap: space.s, marginBottom: space.m }}>
-          <SearchField value={term} onChangeText={setTerm} placeholder="Sipariş no ya da müşteri ara" testID="siparis-ara" />
-          {search.suzgec ? <ViewChips spec={search.suzgec} value={chip} onChange={setChip} /> : null}
+      <KademeliGiris sira={0}>
+        <View style={{ gap: space.s, marginTop: space.xs }}>
+          {search ? <SearchField value={term} onChangeText={setTerm} placeholder="Sipariş no ya da müşteri ara" testID="siparis-ara" /> : null}
+          {secenekler.length > 1 ? (
+            <View style={{ flexDirection: "row" }}>
+              <FilterChip label={suzgecAdi} value={secimEtiketi} selected={secim !== TUMU} onPress={() => setSheet(true)} testID="suzgec-durum" />
+            </View>
+          ) : null}
         </View>
-      ) : (
-        <View style={{ flexDirection: "row", marginBottom: space.m }}>
-          <FilterChip label="Durum" value={CHOICES.find((c) => c.key === durum)?.label ?? "Tümü"} selected={durum !== "tumu"} onPress={() => setSheet(true)} testID="suzgec-durum" />
-        </View>
-      )}
-      {list.items.length > 0 ? (
-        <ListGroup testID="siparis-listesi">
-          {list.items.map((r) => <OrderRow key={r.id} r={r} onPress={() => openRecord(router, "siparis", r.id)} />)}
-        </ListGroup>
+      </KademeliGiris>
+      {summary.data ? (
+        <KademeliGiris sira={1}>
+          <View style={{ marginTop: space.m }}>
+            <Ozet veri={summary.data.veri} />
+          </View>
+        </KademeliGiris>
       ) : null}
-      <ListStates list={list} empty={filtered ? "Bu süzgeçte sipariş yok" : "Henüz sipariş yok"} domain="siparisler" testID="siparisler" />
-      <ChoiceSheet visible={sheet} title="Durum" choices={CHOICES} value={durum} onSelect={setDurum} onClose={() => setSheet(false)} testIDPrefix="durum-" />
+      <KademeliGiris sira={2}>
+        {list.items.length > 0 ? (
+          <ListeBlogu baslik={filtered ? secimEtiketi : "Tüm siparişler"} sayi={sayi} testID="siparis-listesi">
+            {list.items.map((r, i) => <OrderRow key={r.id} r={r} ayrac={i > 0} onPress={() => openRecord(router, "siparis", r.id)} />)}
+          </ListeBlogu>
+        ) : null}
+        <ListStates list={list} empty={filtered ? "Bu süzgeçte sipariş yok" : "Henüz sipariş yok"} icon={MODULE_ICON.siparisler.icon} testID="siparisler" />
+      </KademeliGiris>
+      <ChoiceSheet visible={sheet} title={suzgecAdi} choices={secenekler} value={secim} onSelect={setSecim} onClose={() => setSheet(false)} testIDPrefix="durum-" />
     </Screen>
   );
 }

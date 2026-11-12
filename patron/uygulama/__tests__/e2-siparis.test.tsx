@@ -29,7 +29,7 @@ const CustomerDetail = (require("../app/(app)/(tabs)/cariler/[id]") as { default
 const { listCapability } = require("../src/ui/siparis/capabilities") as typeof import("../src/ui/siparis/capabilities");
 const { lineRowText, movementRowText } = require("../src/ui/siparis/OrderLines") as typeof import("../src/ui/siparis/OrderLines");
 const { LIST_ID_FILTERS, LIST_SEARCH } = require("../src/api/wire") as typeof import("../src/api/wire");
-const { orderStatus, deadlineBadge, ORDER_STATUS } = require("../src/lib/labels/siparis") as typeof import("../src/lib/labels/siparis");
+const { orderStatus, orderStatusShort, ORDER_STATUS } = require("../src/lib/labels/siparis") as typeof import("../src/lib/labels/siparis");
 const { cariLockView } = require("../src/lib/cari-lock") as typeof import("../src/lib/cari-lock");
 const { orderRowText } = require("../src/ui/siparis/OrderRow") as typeof import("../src/ui/siparis/OrderRow");
 const { openRecord } = require("../src/ui/nav") as typeof import("../src/ui/nav");
@@ -68,20 +68,22 @@ describe("§1 sipariş satırı", () => {
     await settle();
     expect(screen.getByText("—")).toBeTruthy();
     expect(screen.getByText("Deniz Tekstil")).toBeTruthy();
-    expect(screen.getByText(/SP-0002 · Henüz gönderilmedi/)).toBeTruthy();
+    expect(screen.getByText("SP-0002")).toBeTruthy(); // tek satır: müşteri · no · miktar · kısa rozet
+    expect(screen.getAllByText("Gönderilmedi")).toHaveLength(2);
+    expect(screen.getByTestId(`siparis-${ID2}`).props.accessibilityLabel).toContain("Henüz gönderilmedi");
   });
 
   it("açık miktar fabrikadan, birimli; tutar yalnız finans alt satırı geldiyse para birimiyle", () => {
     const a = orderRowText(rec(ID1, { siparisNo: "SP-1", durum: "PARTIAL_SHIPPED", acikMiktar: "1250.5", doviz: "USD", termin: "2026-11-01" }, { tutar: "1000" }) as never);
     expect(a.open).toBe("1.250,5 m");
-    expect(a.subtitle).toContain("1.000 $");
+    expect(a.amount).toBe("1.000 $");
     const b = orderRowText(rec(ID1, { siparisNo: "SP-1", durum: "COMPLETED", acikMiktar: "0", doviz: "USD" }) as never);
     expect(b.open).toBeNull(); // kapanmış siparişte açık miktar yok
-    expect(b.subtitle).not.toContain("$"); // finans alt satırı yok → tutar yok
+    expect(b.amount).toBeNull(); // finans alt satırı yok → tutar yok
   });
 });
 
-describe("§2 durum ve termin rozeti sözlükten", () => {
+describe("§2 durum rozeti sözlükten; termin/gecikme göstergesi yok", () => {
   it("her OrderStatus Türkçe; bilinmeyen değer ham döner", () => {
     for (const k of Object.keys(ORDER_STATUS)) expect(orderStatus(k).label).not.toBe(k);
     expect(orderStatus("PARTIAL_SHIPPED")).toEqual({ label: "Bir kısmı gönderildi", tone: "bilgi" });
@@ -101,16 +103,17 @@ describe("§2 durum ve termin rozeti sözlükten", () => {
     render(<Orders />);
     await settle();
     expect(screen.queryByText(/PARTIAL_SHIPPED/)).toBeNull();
-    expect(screen.getByText(/Bir kısmı gönderildi/)).toBeTruthy();
+    expect(screen.getByText("Kısmen")).toBeTruthy();
+    expect(screen.getByTestId(`siparis-${ID1}`).props.accessibilityLabel).toContain("Bir kısmı gönderildi");
   });
 
-  it("termin rozeti yalnız fabrikanın `gecikmis` alanından", () => {
-    expect(deadlineBadge({ gecikmis: true, durum: "APPROVED", termin: "2026-01-01" })).toEqual({ label: "Gecikti", tone: "kritik" });
-    expect(deadlineBadge({ gecikmis: false, durum: "APPROVED", termin: "2026-01-01" })).toEqual({ label: "Zamanında", tone: "iyi" });
-    // Termin geçmiş görünse bile fabrika "gecikmedi" diyorsa uygulama tarih karşılaştırmaz.
-    expect(deadlineBadge({ gecikmis: false, durum: "APPROVED", termin: "2000-01-01" })?.tone).toBe("iyi");
-    expect(deadlineBadge({ gecikmis: false, durum: "COMPLETED", termin: "2026-01-01" })).toBeNull();
-    expect(deadlineBadge({ durum: "APPROVED", termin: "2026-01-01" })).toBeNull(); // alan yok → rozet yok
+  it("her durumun kısa rozet etiketi var; listede termin ve gecikme yazısı yok", async () => {
+    for (const k of Object.keys(ORDER_STATUS)) expect(orderStatusShort(k)).not.toBe(k);
+    expect(orderStatusShort("YENI_DURUM")).toBe("YENI_DURUM");
+    mockList.mockResolvedValue(page(rec(ID1, { siparisNo: "SP-9", durum: "APPROVED", musteriAdi: "A", gecikmis: true, termin: "2026-01-01" })));
+    render(<Orders />);
+    await settle();
+    expect(screen.queryByText(/Gecikti|Zamanında|Termin/)).toBeNull();
   });
 });
 
@@ -165,7 +168,8 @@ describe("§4 süzgeç ve arama SUNUCUDA", () => {
     render(<Orders />);
     await settle();
     expect(mockSnapshot).toHaveBeenCalledWith("ozet.siparis");
-    expect(screen.getByTestId("ozet-geciken").props.accessibilityLabel).toContain("1");
+    expect(screen.getByTestId("siparis-ozet-acik").props.accessibilityLabel).toContain("Açık");
+    expect(screen.queryByTestId("siparis-ozet-geciken")).toBeNull(); // gecikme göstergesi yok
     expect(screen.getByText("1.251")).toBeTruthy(); // 1250.5 m → tam sayı biçimi (yuvarlamayı biçimleyici yapar)
   });
 
@@ -213,9 +217,9 @@ describe("§5 sipariş ayrıntısı", () => {
     expect(mockRecord).toHaveBeenCalledWith("siparis", ID1);
     expect(screen.getByTestId("siparis-musteri").props.children).toBe("—");
     expect(screen.getByText("Henüz onaylanmadı")).toBeTruthy();
-    expect(screen.getByText("Gecikti")).toBeTruthy();
+    expect(screen.queryByText("Gecikti")).toBeNull(); // termin rozeti yok
     expect(screen.getByText("İhracat")).toBeTruthy();
-    expect(screen.getByTestId("siparis-tutar").props.children).toBe("2.500 €");
+    expect(screen.getByTestId("siparis-tutar").props.accessibilityLabel).toContain("2.500 €");
     expect(screen.queryByText(/PENDING|EXPORT/)).toBeNull();
   });
 });
@@ -257,7 +261,7 @@ describe("§6 P6 sipariş kalemleri (sunucu `siparisId` süzgeci)", () => {
   });
 });
 
-describe("§7 P6 sipariş araması + görünüm çipleri", () => {
+describe("§7 P6 sipariş araması + görünüm süzgeci (modal)", () => {
   it("yetenek varsa arama `ara`, çip `suzgec` olarak sunucuya gider; `durum` gönderilmez; Tümü süzgeci kaldırır", async () => {
     jest.useFakeTimers();
     try {
@@ -265,17 +269,18 @@ describe("§7 P6 sipariş araması + görünüm çipleri", () => {
       mockList.mockResolvedValue(page(rec(ID1, { siparisNo: "SP-1", durum: "COMPLETED", musteriAdi: "Sunucunun döndüğü" })));
       render(<Orders />);
       await settle();
-      expect(screen.queryByTestId("suzgec-durum")).toBeNull();
       fireEvent.changeText(screen.getByTestId("siparis-ara"), " mavi ");
       await act(async () => { jest.advanceTimersByTime(350); });
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ ara: "mavi", suzgec: undefined, durum: undefined }));
-      fireEvent.press(screen.getByTestId("cip-GECIKMIS"));
+      fireEvent.press(screen.getByTestId("suzgec-durum"));
+      fireEvent.press(screen.getByTestId("durum-KISMI_SEVK"));
       await settle();
-      expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ ara: "mavi", suzgec: "GECIKMIS" }));
+      expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ ara: "mavi", suzgec: "KISMI_SEVK" }));
       expect(screen.getByText("Sunucunun döndüğü")).toBeTruthy(); // istemci süzmez
-      expect(screen.getByTestId("cip-GECIKMIS").props.accessibilityState).toEqual({ selected: true });
-      fireEvent.press(screen.getByTestId("cip-tumu"));
+      expect(screen.getByText("Görünüm: Bir kısmı gönderildi")).toBeTruthy();
+      fireEvent.press(screen.getByTestId("suzgec-durum"));
+      fireEvent.press(screen.getByTestId("durum-tumu"));
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ suzgec: undefined }));
     } finally {
@@ -283,12 +288,16 @@ describe("§7 P6 sipariş araması + görünüm çipleri", () => {
     }
   });
 
-  it("çipler sunucu beyanından; eski sunucuda arama yok, `durum` süzgeci kalır", async () => {
+  it("seçenekler sunucu beyanından (gecikme hariç); eski sunucuda arama yok, `durum` süzgeci kalır", async () => {
     mockSession.facility = YENI_SUNUCU;
     mockList.mockResolvedValue(page());
     const view = render(<Orders />);
     await settle();
-    for (const o of LIST_SEARCH.siparis!.suzgec!.secenekler) expect(screen.getByTestId(`cip-${o.deger}`)).toBeTruthy();
+    fireEvent.press(screen.getByTestId("suzgec-durum"));
+    for (const o of LIST_SEARCH.siparis!.suzgec!.secenekler) {
+      if (o.alan === "gecikmis") expect(screen.queryByTestId(`durum-${o.deger}`)).toBeNull(); // gecikme görünümü çizilmez
+      else expect(screen.getByTestId(`durum-${o.deger}`)).toBeTruthy();
+    }
     view.unmount();
     mockSession.facility = { liste: undefined };
     render(<Orders />);

@@ -136,7 +136,7 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         musteriAdi: c.ad,
         cariKartId: c.id,
         durum,
-        yon: "SATIS",
+        yon: i % 4 === 3 ? "EXPORT" : "DOMESTIC",
         doviz: i % 3 === 2 ? "USD" : "TRY",
         siparisTarihi: once(i * 3 + 1).slice(0, 10),
         termin: sonra(10 + i * 4),
