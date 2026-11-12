@@ -220,6 +220,7 @@ export const PERMISSION_CATALOG = [
   { code: "system:work-sessions", module: "ADMIN", category: "web", description: "Sistem → Çalışma Oturumları (canlı görünüm, geçmiş, zorla kapatma)" },
   { code: "system:server-status", module: "ADMIN", category: "web", description: "Sistem → Sunucu Durumu" },
   { code: "system:clients", module: "ADMIN", category: "web", description: "Sistem → Bağlı İstemciler" },
+  { code: "system:sessions", module: "ADMIN", category: "web", description: "Sistem → Bağlı Cihazlar (açık oturumlar, uygulama sürümleri; salt okuma)" },
   { code: "system:backups", module: "ADMIN", category: "web", description: "Sistem → Yedekler (yedek al, zamanlama, dış kopya durumu) — yedek listesi/indirme ayrıca admin:users ister" },
   // 2026-08-05: Tanımlar → Çıktılar altındaki belge/kart TASARIM ekranları
   // (Belge Şablonları, Refakat Kartı, Refakat Kartı Şablonları, Serbest

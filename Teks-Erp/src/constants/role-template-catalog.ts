@@ -527,6 +527,7 @@ const WEB_ROLES: readonly RoleTemplateEntry[] = [
       "system:work-sessions",
       "system:server-status",
       "system:clients",
+      "system:sessions",
       "system:backups",
       "report:audit",
       // Toplu içe aktarım: kurulum/veri taşıma işini yapan kişi sistem

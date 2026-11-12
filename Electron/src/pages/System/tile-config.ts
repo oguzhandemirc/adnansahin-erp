@@ -1,4 +1,4 @@
-import { Activity, Archive, ScrollText, Hash, Blocks, Cpu, DatabaseBackup, DatabaseZap, Download, FileCode2, Gauge, MapPin, Search, Building2, Monitor, Printer, SlidersHorizontal, Upload, type LucideIcon, Merge, MonitorSmartphone } from "lucide-react";
+import { Activity, Archive, ScrollText, Hash, Blocks, Cpu, DatabaseBackup, DatabaseZap, Download, FileCode2, Gauge, MapPin, Search, Building2, Monitor, Printer, SlidersHorizontal, Upload, type LucideIcon, Merge, MonitorSmartphone, TabletSmartphone } from "lucide-react";
 import {
   SETTINGS_COMPANY_ACCESS,
   SETTINGS_FLAGS_ACCESS,
@@ -9,6 +9,7 @@ import {
   SYSTEM_CLIENTS_ACCESS,
   SYSTEM_ROLL_ARCHIVE_ACCESS,
   SYSTEM_SERVER_STATUS_ACCESS,
+  SYSTEM_SESSIONS_ACCESS,
   SYSTEM_WORK_SESSIONS_ACCESS,
 } from "@/lib/permissions";
 
@@ -202,6 +203,17 @@ export const systemTiles: SystemTile[] = [
     to: "/system/clients",
     group: "monitoring",
     permissionAny: SYSTEM_CLIENTS_ACCESS,
+  },
+  {
+    // Bağlı Cihazlar — açık OTURUMLAR (kalıcı tablo): kim, hangi cihazda, hangi
+    // uygulama sürümüyle. Bağlı İstemciler süreç belleğindedir, restart'ta boşalır.
+    key: "sessions",
+    title: "Bağlı Cihazlar",
+    description: "Açık oturumlar: kullanıcı, cihaz ve uygulama sürümü",
+    icon: TabletSmartphone,
+    to: "/system/sessions",
+    group: "monitoring",
+    permissionAny: SYSTEM_SESSIONS_ACCESS,
   },
   {
     key: "backups",
