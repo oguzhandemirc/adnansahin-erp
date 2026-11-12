@@ -105,10 +105,12 @@ export interface ScreenProps {
   readonly headerRight?: ReactNode;
   /** Büyük başlığın altındaki satır (ör. tesis adı + SyncIndicator). */
   readonly subtitle?: ReactNode;
+  /** Kaydırmanın altında sabit kalan çubuk (ör. düzenleme kipinin eylemleri). */
+  readonly footer?: ReactNode;
 }
 
 /** Her ekranın kabı: büyük başlık, bantlar, kaydırma ve aşağı çek-yenile; izin kapısı. */
-export function Screen({ title: titleProp, module, children, back, onRefresh, refreshing, headerRight, subtitle }: ScreenProps) {
+export function Screen({ title: titleProp, module, children, back, onRefresh, refreshing, headerRight, subtitle, footer }: ScreenProps) {
   const title = titleProp ?? (module ? moduleTitle(module) : "");
   const t = useTokens();
   const s = useStyles();
@@ -135,6 +137,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         {switchError ? <Banner tone="error" text={switchError} testID="bant-tesis-gecisi" /> : null}
         {allowed ? children : <Banner tone="error" icon="lock-closed-outline" text="Bu bölümü görme yetkiniz yok" />}
       </Animated.ScrollView>
+      {footer}
     </View>
   );
 }

@@ -46,6 +46,7 @@ const mockSession = {
 };
 const mockRouter = { navigate: jest.fn(), push: jest.fn(), back: jest.fn(), canGoBack: () => false, replace: jest.fn() };
 jest.mock("../src/state/session", () => ({ useSession: () => mockSession }));
+jest.mock("../src/state/store", () => ({ plainStore: mockMem(), secretStore: mockMem(), legacyPlainStore: null }));
 jest.mock("expo-router", () => ({
   useRouter: () => mockRouter,
   usePathname: () => "/pano",
@@ -67,33 +68,33 @@ beforeEach(() => {
 });
 
 describe("Pano", () => {
-  it("§1 izinsiz alan kartı çizilmez", async () => {
+  it("§1 izinsiz kutu çizilmez ve verisi istenmez", async () => {
     mockSession.permissions = ["bulut:oturum", "bulut:ozet:oku", "bulut:siparis:oku"];
     render(<Dashboard />);
-    expect(await screen.findByTestId("anlik-ozet.siparis")).toBeTruthy();
-    expect(screen.queryByTestId("anlik-ozet-finans")).toBeNull();
-    expect(screen.queryByTestId("anlik-ozet.uretim")).toBeNull();
+    expect(await screen.findByTestId("kutu-siparis")).toBeTruthy();
+    expect(screen.queryByTestId("kutu-alacak")).toBeNull();
+    expect(screen.queryByTestId("kutu-uretim")).toBeNull();
     await waitFor(() => expect(mockApi.snapshot).toHaveBeenCalledWith("ozet.siparis"));
     expect(mockApi.snapshot).not.toHaveBeenCalledWith("ozet-finans");
+    expect(mockApi.snapshot).not.toHaveBeenCalledWith("ozet.uretim");
   });
 
-  it("§2 gece yedeği alınamadıysa Dikkat şeridinde kritik madde", async () => {
+  it("§2 gece yedeği alınamadıysa başlık altında kritik bant", async () => {
     FIXTURES.saglik = { yedek: { hukum: "kritik", yasSaat: null } };
     mockSession.permissions = ["bulut:oturum", "bulut:ozet:oku", "bulut:siparis:oku"];
     render(<Dashboard />);
-    expect(await screen.findByTestId("dikkat-yedek")).toBeTruthy();
-    expect(screen.queryByTestId("dikkat-yolunda")).toBeNull();
+    expect(await screen.findByTestId("bant-yedek")).toBeTruthy();
     const [first] = attentionItems({ health: { yedek: { hukum: "kritik" } }, orders: { gecikenKalem: 0 } });
     expect(first).toMatchObject({ key: "yedek", tone: "kritik" });
     expect(attentionItems({ health: { yedek: { hukum: "ok" } } })).toEqual([]);
   });
 
-  it("§3 çalışan (özet izni yok): 'Görebildiğin alanlar', Dikkat şeridi yok", async () => {
+  it("§3 çalışan (özet izni yok): 'Görebildiğin alanlar', kutu ve istek yok", async () => {
     mockSession.permissions = ["bulut:oturum", "bulut:siparis:oku"];
     render(<Dashboard />);
     expect(screen.getByTestId("gorebildigin-alanlar")).toBeTruthy();
     expect(screen.getByTestId("kisayol-siparisler")).toBeTruthy();
-    expect(screen.queryByTestId("dikkat")).toBeNull();
+    expect(screen.queryByTestId("pano-kutular")).toBeNull();
     await act(async () => undefined);
     expect(mockApi.snapshot).not.toHaveBeenCalled();
   });
