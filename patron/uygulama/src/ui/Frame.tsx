@@ -156,6 +156,8 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         onScroll={onScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
+        // Sayı klavyesinin "bitti" tuşu yok: içeriği sürüklemek klavyeyi indirir.
+        keyboardDismissMode="on-drag"
         refreshControl={onRefresh ? <RefreshControl refreshing={pull.spinning} onRefresh={pull.onRefresh} tintColor={t.tint} colors={[t.tint]} progressBackgroundColor={t.surface} /> : undefined}
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + space.xl, paddingHorizontal: pad }]}
       >
