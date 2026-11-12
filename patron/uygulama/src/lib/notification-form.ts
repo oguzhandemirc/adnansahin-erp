@@ -97,3 +97,13 @@ export function base64UrlToBytes(value: string): Uint8Array {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
+
+/** Termin türevine bağlı bildirim türü: fabrika `gecikenKalem` göndermiyorsa hiç tetiklenmez. */
+export const DUE_DATE_KIND = "geciken-siparis";
+
+/** Fabrika termin türevi gönderiyor mu (`ozet.siparis.gecikenKalem` sayı)? Bilinmiyorsa `false` — seçenek çizilmez. */
+export function sendsDueDateDerivatives(orderSummary: unknown): boolean {
+  if (typeof orderSummary !== "object" || orderSummary === null) return false;
+  const v = (orderSummary as { gecikenKalem?: unknown }).gecikenKalem;
+  return typeof v === "number" || (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)));
+}

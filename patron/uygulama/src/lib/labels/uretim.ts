@@ -121,6 +121,12 @@ export const STOCK_AGE_TONE: Readonly<Record<string, StatusEntry["tone"]>> = {
 /** Üretim akışı kolonları (`uretim-akisi.kolonlar[].anahtar`; etiket fabrikadan, Kanban ile aynı). */
 export const FLOW_KEYS = ["hamStok", "yariMamul", "fason", "kursun", "tambur", "depo", "sevk"] as const;
 
+/** Stok ↔ akış ayrımı: stoktaki bitmiş = çuvala/sevke girmemiş SERBEST mal; akıştaki "depo" çuvaldakileri de sayar. */
+export const FREE_STOCK_LABEL = "Serbest stok";
+export const FREE_STOCK_HINT = "çuvalsız";
+/** Akış kolonu altına küçük ikincil not (etiket fabrikadan; not yalnız sayının kapsamını söyler). */
+export const FLOW_NOTE: Readonly<Partial<Record<(typeof FLOW_KEYS)[number], string>>> = { depo: "çuvaldakiler dahil" };
+
 /** Kayıt durumu sözlükten; bilinmeyen değer ham adıyla nötr çizilir (uyarı rengi uydurulmaz). */
 export function recordStatus(dict: Readonly<Record<string, RecordStatusEntry>>, value: unknown): RecordStatusEntry {
   const key = typeof value === "string" ? value : "";

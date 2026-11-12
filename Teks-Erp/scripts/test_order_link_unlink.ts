@@ -178,17 +178,32 @@ const BEKLENEN_ISTISNA_DOSYALARI = new Set<string>([
   "src/services/workorder-timeline.service.ts", // iş emri Hareketler çizelgesi: geçmiş gösterilir, karar/sayı üretmez,
 ]);
 
+/**
+ * Ham SQL ile bu tabloya başvurabilen BEYANLI dosyalar (her başvuru yine `"unlinkedAt" IS NULL` taşır — §13d).
+ * Patron bulutu kataloğu: değişiklik taraması kök iş emirlerini SQL metniyle çözer (`lookup` kaynakları
+ * `change-scan` içinde `$queryRawUnsafe` ile koşar); Prisma çağrısına çevrilemez, süzgeç metindedir.
+ */
+const BEKLENEN_SQL_DOSYALARI = new Set<string>([
+  "src/cloud-sync/catalog-facts.ts", // WO_OF_ORDER_LINES · WO_OF_ORDERS — açık bağın iş emrini buluta yeniden gönderir
+]);
+
 function astKontrolleri(): void {
   const kok = join(__dirname, "..");
   const r = aktifYuklemTara(kok, [{
     delegate: "workOrderToOrderLine", model: "WorkOrderToOrderLine", sabit: "ACTIVE_ORDER_LINK", damga: "unlinkedAt",
     tablo: "work_order_to_order_lines", helper: join("src", "services", "helpers", "order-link.helper.ts"),
   }]).get("workOrderToOrderLine")!;
-  // Zeminler BU tablo için ölçüldü (2026-09-14): çağrı 15 · ilişki 24 · ham SQL 0 (=== 0).
+  // Zeminler BU tablo için ölçüldü (2026-09-14): çağrı 15 · ilişki 24. Ham SQL okuyucuları beyanlı küme (§13d2).
   check("§13a ⭐ `src/`de `workOrderToOrderLine.delete*` KALMADI", r.silme.length === 0, r.silme.join(", "));
   check("§13b her okuma/güncelleme çağrısı ACTIVE_ORDER_LINK taşır ya da gerekçeli istisnadır", r.cagriSayisi >= 12 && r.cagriIhlal.length === 0, `çağrı=${r.cagriSayisi}${r.cagriIhlal.length ? " İHLAL: " + r.cagriIhlal.join(", ") : ""}`);
   check("§13c her ilişki süzgeci / iç içe okuması aktif yüklemi taşır (every YOK)", r.iliskiSayisi >= 20 && r.iliskiIhlal.length === 0, `ilişki=${r.iliskiSayisi}${r.iliskiIhlal.length ? " İHLAL: " + r.iliskiIhlal.join(", ") : ""}`);
-  check("§13d ham SQL başvurusu YOK (=== 0)", r.sqlSayisi === 0 && r.sqlIhlal.length === 0, `sql=${r.sqlSayisi}`);
+  check("§13d ⭐ her ham SQL başvurusu aktif yüklemi taşır", r.sqlIhlal.length === 0, `sql=${r.sqlSayisi}${r.sqlIhlal.length ? " İHLAL: " + r.sqlIhlal.join(", ") : ""}`);
+  const sqlDosyalari = new Set(r.sqlYerleri.map((y) => y.split(":")[0]));
+  const sqlYeni = [...sqlDosyalari].filter((d) => !BEKLENEN_SQL_DOSYALARI.has(d));
+  const sqlOlu = [...BEKLENEN_SQL_DOSYALARI].filter((d) => !sqlDosyalari.has(d));
+  check("§13d2 ham SQL okuyucu kümesi beyanla BİREBİR (sessiz yeni okuyucu yok, ölü beyan yok)",
+    sqlYeni.length === 0 && sqlOlu.length === 0 && r.sqlYerleri.length === r.sqlSayisi,
+    `beklenmeyen=[${sqlYeni.join(", ")}] ölü=[${sqlOlu.join(", ")}] yer=${r.sqlYerleri.join(", ")}`);
   const istisnaDosyalari = new Set(r.istisnalar.map((y) => y.split(":")[0]));
   const beklenmeyen = [...istisnaDosyalari].filter((d) => !BEKLENEN_ISTISNA_DOSYALARI.has(d));
   const olu = [...BEKLENEN_ISTISNA_DOSYALARI].filter((d) => !istisnaDosyalari.has(d));

@@ -32,7 +32,7 @@ export function ornekOturum(): FacilityStatus {
     projeksiyonlar: Object.keys(ORNEK_ANLIK()),
     esitleme: { sonEsitleme: once(0, 0.05), ufuk: once(0, 0.05), ufukTakildi: false, sozlesmeUyarisi: null, fabrikaSurumu: "örnek" },
     hizmet: { asama: "ACIK", bitis: null, saltOkunurBitis: null },
-    liste: { kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "cari-hesap"], siparisId: ["siparis-kalemi"] }, aranabilir: ["cari-kart"] },
+    liste: { kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "cari-hesap"], siparisId: ["siparis-kalemi"] }, aranabilir: ["cari-kart", "siparis"] },
   };
 }
 

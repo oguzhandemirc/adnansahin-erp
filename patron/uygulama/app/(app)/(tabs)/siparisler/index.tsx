@@ -37,7 +37,7 @@ function Ozet({ veri }: { veri: unknown }) {
       items={[
         { key: "acik", deger: formatNumber(v.acikKalem, 0), birim: "kalem", etiket: "Açık" },
         { key: "miktar", deger: formatNumber(v.acikMiktar, 0), birim: "m", etiket: "Açık miktar" },
-        { key: "karsilanma", deger: formatNumber(v.karsilanmaYuzde, 0), birim: "%", etiket: "Karşılanma" },
+        { key: "karsilanma", deger: v.karsilanmaYuzde == null ? "—" : `%${formatNumber(v.karsilanmaYuzde, 0)}`, etiket: "Karşılanma" },
       ]}
     />
   );

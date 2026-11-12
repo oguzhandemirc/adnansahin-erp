@@ -17,7 +17,7 @@ import { join, relative } from "node:path";
 import { ROLE_TEMPLATES } from "../src/catalog/permissions";
 import { ANAHTAR_SUZGEC_AZAMI, LIST_KEY_FILTER_KEYS, LIST_KEY_FILTERS, type FacilityStatus } from "../src/wire/api";
 import { api, girdi, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
-import { fabrikaDosyasi } from "./lib/fabrika-karsiligi";
+import { KATALOG_DISI_FINANS, fabrikaDosyasi } from "./lib/fabrika-karsiligi";
 
 type Liste = { kayitlar: { id: string }[]; sonraki: string | null };
 const P = "kasa-hareketi";
@@ -118,11 +118,14 @@ function statik(): void {
   kontrol("§4b anahtar adları patron/sunucu src'de yalnız tel + veri servisinde", disari.length === 0, disari.join(", ") || "temiz");
   const fabrika = fabrikaDosyasi("Teks-Erp/src/cloud-sync/catalog-facts.ts", "D3");
   if (fabrika === null) return;
+  // Beyanlı projeksiyon ya fabrikada anahtarı TÜRETİR ya da (yalnız katalog dışı finans, KATALOG_DISI_FINANS) katalogda
+  // HİÇ yoktur — veri gelmeyen listede süzgeç sessizce boş dönmez; katalog taşımaya başlarsa türetme şartı geri gelir.
   const eksik = LIST_KEY_FILTER_KEYS.flatMap((k) => LIST_KEY_FILTERS[k].filter((p) => {
-    const b = fabrika.split(/\bname: "/).find((x) => x.startsWith(`${p}"`)) ?? "";
-    return !b.includes(`derived("${k}",`);
+    const b = fabrika.split(/\bname: "/).find((x) => x.startsWith(`${p}"`));
+    if (b === undefined && KATALOG_DISI_FINANS.has(p)) return false;
+    return !(b ?? "").includes(`derived("${k}",`);
   }).map((p) => `${k}:${p}`));
-  kontrol("§4c ⭐ beyanlı her projeksiyonda alan FABRİKADA türetilir (catalog-facts derived)", eksik.length === 0, eksik.join(", ") || "temiz");
+  kontrol("§4c ⭐ beyanlı her projeksiyonda alan FABRİKADA türetilir (catalog-facts derived) ya da katalog dışı finanssa katalogda hiç yok", eksik.length === 0, eksik.join(", ") || "temiz");
 }
 
 async function yetenek(o: Ortam, h: TestHesabi): Promise<void> {

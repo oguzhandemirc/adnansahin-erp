@@ -3,7 +3,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ScrollView, Text, View } from "react-native";
 import { lookup } from "../../lib/labels";
-import { STATION_TYPE, UNIT } from "../../lib/labels/uretim";
+import { FLOW_NOTE, STATION_TYPE, UNIT } from "../../lib/labels/uretim";
 import { BarRow } from "../charts";
 import { makeStyles, useTokens } from "../theme-context";
 import { space, tabularNums, typography } from "../tokens";
@@ -17,18 +17,22 @@ export function FlowStrip({ data, testID = "akis" }: { readonly data: unknown; r
   if (cols.length === 0) return null;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.flow} testID={testID}>
-      {cols.map((c, i) => (
-        <View key={String(c.anahtar)} style={s.stopWrap}>
-          {i > 0 ? <Ionicons name="chevron-forward" size={14} color={t.color.textMuted} /> : null}
-          <View style={[s.stop, { borderTopColor: t.chart[i % t.chart.length] }]} accessible accessibilityLabel={`${str(c.etiket) ?? String(c.anahtar)}: ${qty(c.adet)} ${UNIT.top}`} testID={`akis-${String(c.anahtar)}`}>
-            <Text style={s.stopLabel} numberOfLines={1}>{str(c.etiket) ?? String(c.anahtar)}</Text>
-            <View style={s.stopValueRow}>
-              <Text style={s.stopValue}>{qty(c.adet)}</Text>
-              <Text style={s.stopUnit}>{UNIT.top}</Text>
+      {cols.map((c, i) => {
+        const note = FLOW_NOTE[String(c.anahtar) as keyof typeof FLOW_NOTE];
+        return (
+          <View key={String(c.anahtar)} style={s.stopWrap}>
+            {i > 0 ? <Ionicons name="chevron-forward" size={14} color={t.color.textMuted} /> : null}
+            <View style={[s.stop, { borderTopColor: t.chart[i % t.chart.length] }]} accessible accessibilityLabel={`${str(c.etiket) ?? String(c.anahtar)}: ${qty(c.adet)} ${UNIT.top}${note ? `, ${note}` : ""}`} testID={`akis-${String(c.anahtar)}`}>
+              <Text style={s.stopLabel} numberOfLines={1}>{str(c.etiket) ?? String(c.anahtar)}</Text>
+              <View style={s.stopValueRow}>
+                <Text style={s.stopValue}>{qty(c.adet)}</Text>
+                <Text style={s.stopUnit}>{UNIT.top}</Text>
+              </View>
+              {note ? <Text style={s.stopNote} numberOfLines={1} testID={`akis-not-${String(c.anahtar)}`}>{note}</Text> : null}
             </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
     </ScrollView>
   );
 }
@@ -72,6 +76,7 @@ const useStyles = makeStyles((t) => ({
   stopValueRow: { flexDirection: "row" as const, alignItems: "baseline" as const, gap: 3, marginTop: 2 },
   stopValue: { ...typography.title2, ...tabularNums, color: t.color.text },
   stopUnit: { ...typography.footnote, color: t.color.textMuted },
+  stopNote: { ...typography.caption, color: t.color.textMuted, marginTop: 1 },
   card: { gap: space.xl },
   station: { gap: 2 },
   // BarRow altındaki boşluğu geri al: dipnot kendi çubuğuna yapışsın, sonraki istasyonla karışmasın.

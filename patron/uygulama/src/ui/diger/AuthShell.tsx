@@ -1,8 +1,11 @@
 // Giriş/davet kabuğu: her temada lacivert zemin + uygulama adı (`kimlik.json`) + opak
 // form kartı. Lacivert zemindeki metin `onNavy` token'larındandır (zemin her temada koyu).
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import Animated from "react-native-reanimated";
+import { girisAnimasyonu, useHareketAzalt } from "../hareket";
 import { UYGULAMA_ADI } from "../../lib/kimlik";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, space, typography } from "../tokens";
@@ -17,9 +20,16 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
 }) {
   const t = useTokens();
   const s = useStyles();
+  const azalt = useHareketAzalt();
+  // Marka her ekranda AYNI yükseklikte durur (ortalanınca kart boyu değişen giriş ↔ davet geçişinde zıplıyordu).
+  const { height } = useWindowDimensions();
+  // Giriş ↔ davet ↔ doğrulama adımı: zemin ve marka sabit kalır, yalnız kart (başlığa anahtarlı) hafif aşağıdan solar.
+  const anim = (sira: number) => (azalt || Platform.OS === "web" ? undefined : girisAnimasyonu(sira, false));
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[s.flex, { backgroundColor: t.color.primary }]}>
-      <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+      {/* Zemin her temada koyu mor: durum çubuğu içeriği açık (son takılan StatusBar geçerlidir). */}
+      <StatusBar style="light" />
+      <ScrollView contentContainerStyle={[s.scroll, { paddingTop: Math.max(space.xxl, Math.round(height * 0.09)) }]} keyboardShouldPersistTaps="handled">
         <View style={s.brand}>
           <View style={s.mark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <Ionicons name="stats-chart" size={34} color={t.color.onPrimary} />
@@ -27,7 +37,7 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
           <Text style={s.brandName} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{UYGULAMA_ADI}</Text>
           <Text style={s.brandTag}>Fabrikanızın özeti, her an yanınızda</Text>
         </View>
-        <View style={[s.card, { backgroundColor: t.surface }]}>
+        <Animated.View key={title} entering={anim(0)} style={[s.card, { backgroundColor: t.surface }]}>
           {step ? (
             <View style={s.steps} accessible accessibilityLabel={`Adım ${step.at} / ${step.of}`}>
               {Array.from({ length: step.of }, (_, i) => (
@@ -39,8 +49,8 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
           <Text style={s.title} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
           {subtitle ? <Text style={s.subtitle}>{subtitle}</Text> : null}
           <View style={s.body}>{children}</View>
-        </View>
-        {footer ? <View style={s.footer}>{footer}</View> : null}
+        </Animated.View>
+        {footer ? <Animated.View key={`alt-${title}`} entering={anim(1)} style={s.footer}>{footer}</Animated.View> : null}
         <View style={s.secure}>
           <Ionicons name="lock-closed" size={13} color={t.color.onPrimary} />
           <Text style={s.secureText}>Parola + doğrulama kodu ile korunur</Text>
@@ -52,7 +62,7 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
 
 const useStyles = makeStyles((t) => ({
   flex: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: "center" as const, padding: space.l, paddingVertical: space.xxl, width: "100%" as const, maxWidth: 480, alignSelf: "center" as const },
+  scroll: { flexGrow: 1, justifyContent: "flex-start" as const, padding: space.l, paddingVertical: space.xxl, width: "100%" as const, maxWidth: 480, alignSelf: "center" as const },
   brand: { alignItems: "center" as const, marginBottom: space.xl },
   mark: { width: 72, height: 72, borderRadius: t.radius.card, backgroundColor: t.color.primary2, alignItems: "center" as const, justifyContent: "center" as const, marginBottom: space.l, borderWidth: 1, borderColor: t.color.primary2 },
   brandName: { ...typography.largeTitle, fontSize: 30, lineHeight: 36, color: t.color.onPrimary, textAlign: "center" as const },

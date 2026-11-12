@@ -114,6 +114,12 @@ export interface DefterBeyani {
   /** TELEMETRI: budamanın sınırı — hangi KARARI besliyor. */
   kararUfku?: string;
   /**
+   * TELEMETRI + `silen`: tabloyu OKUYAN (delegate erişimi ya da ham SQL/katalog metni) BEYANLI
+   * dosyalar. Budama izninin ölçümü budur — okuyucu kümesinde rapor/karar yolu yoksa budanan
+   * satır hiçbir sayıyı değiştirmez. `test_telemetri_defter_degil` §7 kümeyi BİREBİR ölçer.
+   */
+  okuyan?: string[];
+  /**
    * Deftere `delete`/`deleteMany` atan BEYANLI dosyalar. Doktrin bunu YASAKLAR;
    * burada yalnız BORÇ olarak görünür kalır (muafiyet değil). Beyansız bir silme
    * yolu kırmızıdır.
@@ -515,14 +521,17 @@ export const DEFTER_BEYANI: DefterBeyani[] = [
   { model: "EndpointLatencyDaily", sinif: "TELEMETRI",
     gerekce: "uç gecikme özeti (gün × route); TEK okuyucusu kendi servisidir (ölçüldü 2026-09-14: `endpointLatencyDaily` delegate'i src'de yalnız latency-persist.service.ts'te geçer) ⇒ satır silindiğinde raporlanan hiçbir sayı değişmez",
     kararUfku: "performans gözlemi — gün bazlı özet `RETENTION_DAYS` penceresinde tutulur ve budama YAŞA bağlıdır (`day < cutoff`); hiçbir iş kararı, guard ya da karne bu tablodan okumaz, dolayısıyla ufuk gözlem penceresinin kendisidir",
-    silen: ["src/services/latency-persist.service.ts"] },
+    silen: ["src/services/latency-persist.service.ts"], okuyan: ["src/services/latency-persist.service.ts"] },
 
   { model: "SystemLog", sinif: "TELEMETRI",
     gerekce: "kalıcı sayaç/rapor SystemLog'tan değil KALICI KOLONDAN okunur ⇒ audit satırı silindiğinde raporlanan hiçbir sayı değişmez",
     kararUfku: "6 ayda arşivlenir; iş kaynağı olarak okunmaz. ⚠️ ÇÜRÜTMENİN ZAYIF HALKASI ÖLÇÜLDÜ (2026-09-13): audit satırı BİR sayaçta okunuyor — backup-impact.service.ts:331 `systemLog.count`. Ama o satır \"İş kaybı DEĞİL — iz kaydı\" etiketiyle `system` grubunda duruyor (iş sayısı değil) ve kod arşivleme ufkunu ZATEN biliyor: :404 `_min(createdAt)` ile kapsamı ölçüp en eski log cutoff'tan sonraysa rollup'ı alt sınır saymıyor, \"ölçülemedi\" diyor — 0 demiyor. Panzehir yerinde olduğu için sınıf TELEMETRİ kalır. Audit'e uzanma ihtiyacı bir DEFTER EKSİKLİĞİNİN işaretidir (bkz. SackAllocation borcu)." },
 
-  // Patron bulutu (D2, ana ürünün `20260929152815_patron_bulut_esitleme` migration'ından): budayıcı `src/cloud-sync/marks-pruning.ts` D3'te gelir.
+  // Patron bulutu (D2, ana ürünün `20260929152815_patron_bulut_esitleme` migration'ından); budayıcı D3a ile indi.
   { model: "SyncMark", sinif: "TELEMETRI",
+    silen: ["src/cloud-sync/marks-pruning.ts"],
+    // Okuyucular yalnız eşitleme motoru: tarama kaynağı beyanı · SILINDI/KIRLI işaret sorgusu · budayıcı.
+    okuyan: ["src/cloud-sync/change-scan.ts", "src/cloud-sync/marks-pruning.ts", "src/cloud-sync/projections.ts"],
     gerekce: "patron bulutu eşitleme işareti (SILINDI/KIRLI) — yalnız \"bu kökü buluta yeniden gönder\" der; tek okuyucusu eşitleme taramasıdır (D3), hiçbir rapor/ekran/karar okumaz ⇒ satır silindiğinde raporlanan hiçbir sayı değişmez; satırı uygulama değil DB tetikleyicisi yazar ve tetikleyiciler varsayılan KAPALIDIR",
     kararUfku: "eşitleme onayı — bulutun onayladığı zincirin gerisinde kalan ve 7 günden eski işaret budanır; kaçan silmeyi günlük uzlaştırma TAM gönderimle onarır (ana ürün tasarım §4.4)" },
 

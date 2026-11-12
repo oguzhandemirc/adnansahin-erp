@@ -14,9 +14,9 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { ROLE_TEMPLATES } from "../src/catalog/permissions";
 import { FOLD_FROM, FOLD_TO, foldTerm, likePattern } from "../src/lib/search";
-import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_SEARCH, type FacilityStatus } from "../src/wire/api";
+import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_KEY_FILTERS, LIST_SEARCH, type FacilityStatus } from "../src/wire/api";
 import { api, girdi, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
-import { fabrikaDosyasi } from "./lib/fabrika-karsiligi";
+import { KATALOG_DISI_FINANS, fabrikaDosyasi, katalogDisiDenetimi } from "./lib/fabrika-karsiligi";
 
 type Liste = { kayitlar: { id: string; kayit: Record<string, unknown> }[]; sonraki: string | null };
 
@@ -239,10 +239,14 @@ async function kimlikRls(o: Ortam, h: TestHesabi, h2: TestHesabi, id: SiparisIds
 }
 
 /** Fabrika kataloğunda `col("<anahtar>"` taşıyan projeksiyonlar (dosya METİN olarak okunur; içe aktarılmaz). */
-function katalogTasiyanlar(): Map<string, Set<string>> | null {
+function katalogMetni(): string | null {
   const parcalar = ["catalog-facts.ts", "projections.ts"].map((f) => fabrikaDosyasi(`Teks-Erp/src/cloud-sync/${f}`, "D3"));
-  if (parcalar.some((m) => m === null)) return null;
-  const metin = parcalar.join("\n");
+  return parcalar.some((m) => m === null) ? null : parcalar.join("\n");
+}
+
+function katalogTasiyanlar(): Map<string, Set<string>> | null {
+  const metin = katalogMetni();
+  if (metin === null) return null;
   const out = new Map<string, Set<string>>(LIST_ID_FILTER_KEYS.map((k) => [k, new Set<string>()]));
   for (const blok of metin.split(/\bname: "/).slice(1)) {
     const ad = blok.slice(0, blok.indexOf('"'));
@@ -256,12 +260,16 @@ async function beyanKatalog(o: Ortam, h: TestHesabi): Promise<void> {
   const tasiyan = katalogTasiyanlar();
   if (tasiyan) {
     kontrol("§8a tarayıcı körleşmedi (siparisId → siparis-kalemi bulundu)", tasiyan.get("siparisId")!.has("siparis-kalemi"));
+    // Finans projeksiyonları bu repoda kapsam dışı: beyanlı ama katalogda yok olmaları BEKLENİR (KATALOG_DISI_FINANS).
     const fark = LIST_ID_FILTER_KEYS.flatMap((k) => {
       const beyan = new Set(LIST_ID_FILTERS[k]);
       const kat = tasiyan.get(k)!;
-      return [...[...beyan].filter((p) => !kat.has(p)).map((p) => `${k}:${p} beyanlı ama kolon yok`), ...[...kat].filter((p) => !beyan.has(p)).map((p) => `${k}:${p} kolon var ama beyansız`)];
+      return [...[...beyan].filter((p) => !kat.has(p) && !KATALOG_DISI_FINANS.has(p)).map((p) => `${k}:${p} beyanlı ama kolon yok`), ...[...kat].filter((p) => !beyan.has(p)).map((p) => `${k}:${p} kolon var ama beyansız`)];
     });
-    kontrol("§8b ⭐ LIST_ID_FILTERS ↔ fabrika kolonları iki yönlü eşit", fark.length === 0, fark.join(" | "));
+    kontrol("§8b ⭐ LIST_ID_FILTERS ↔ fabrika kolonları iki yönlü eşit (katalog dışı finans hariç)", fark.length === 0, fark.join(" | "));
+    const d = katalogDisiDenetimi(katalogMetni()!, [...Object.values(LIST_ID_FILTERS), ...Object.values(LIST_KEY_FILTERS)]);
+    kontrol("§8b2 ⭐ katalog dışı finans kümesi bayat değil (katalog taşımıyor · her üye beyanlı)", d.katalogda.length === 0 && d.beyansiz.length === 0,
+      [...d.katalogda.map((p) => `${p} katalogda — kümeden çıkar`), ...d.beyansiz.map((p) => `${p} beyansız — kümeden çıkar`)].join(" | ") || "temiz");
   }
   const r = await api(o, "GET", "/api/oturum", { belirtec: h.belirtec });
   const liste = (r.json.data as FacilityStatus | undefined)?.liste;

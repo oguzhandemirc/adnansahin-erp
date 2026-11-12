@@ -11,6 +11,7 @@ import { PERIODS, type PeriodKey } from "../../../src/lib/labels/uretim";
 import { TERIM } from "../../../src/lib/terim";
 import { useSession } from "../../../src/state/session";
 import { useOpenRefresh } from "../../../src/state/useOpenRefresh";
+import { serviceBand } from "../../../src/ui/data";
 import { FacilityName, Screen, useWide } from "../../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../src/ui/icons";
@@ -81,7 +82,8 @@ export default function Dashboard() {
     hepsi.forEach((r) => r.reload());
   };
 
-  const bantlar = attentionItems({ health: health.data?.veri, lastSync: facility ? factoryStamp : undefined });
+  // Hiç eşitleme yoksa fabrika henüz bağlanmadı: üst bant "bağlanıyor" der, "veri gecikti" maddesi çıkmaz.
+  const bantlar = attentionItems({ health: health.data?.veri, lastSync: facility && serviceBand(facility) !== "baglaniyor" ? factoryStamp : undefined });
   const bantAc = (i: AttentionItem) => (i.action === "esitle" ? reloadAll() : undefined);
   const baglam: KutuBaglami = { anlik, liste, donem, router, permissions };
   const donemli = duzen.kutular.some((a) => kutu(a).donemli);

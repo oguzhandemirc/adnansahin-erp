@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { NOTIFICATION_KINDS, type NotificationKindInfo, type NotificationSettings } from "../src/api/wire";
-import { base64UrlToBytes, fromForm, safeRoute, toForm } from "../src/lib/notification-form";
+import { base64UrlToBytes, fromForm, safeRoute, sendsDueDateDerivatives, toForm } from "../src/lib/notification-form";
 import { NotificationSettingsForm } from "../src/ui/NotificationSettingsForm";
 
 const SETTINGS: NotificationSettings = {
@@ -56,7 +56,7 @@ describe("ayar ekranı görünümü", () => {
   ];
   it("izni yetmeyen tür açıklanır ve kapatılamaz/açılamaz; ana anahtar formu değiştirir", () => {
     const onChange = jest.fn();
-    render(<NotificationSettingsForm form={toForm(SETTINGS)} kinds={kinds} onChange={onChange} />);
+    render(<NotificationSettingsForm form={toForm(SETTINGS)} kinds={kinds} onChange={onChange} dueDates />);
     expect(screen.getByText("Çek/senet vadesi (finans)")).toBeTruthy();
     expect(screen.getByText("Yetkiniz bu bildirimi almaya yetmiyor")).toBeTruthy();
     expect(screen.getByTestId("tur-cek-vadesi").props.disabled).toBe(true);
@@ -65,7 +65,20 @@ describe("ayar ekranı görünümü", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ acik: false }));
   });
   it("bildirimler kapalıyken tür anahtarları pasif", () => {
-    render(<NotificationSettingsForm form={{ ...toForm(SETTINGS), acik: false }} kinds={kinds} onChange={jest.fn()} />);
+    render(<NotificationSettingsForm form={{ ...toForm(SETTINGS), acik: false }} kinds={kinds} onChange={jest.fn()} dueDates />);
     expect(screen.getByTestId("tur-geciken-siparis").props.disabled).toBe(true);
+  });
+  it("fabrika termin türevi göndermiyorsa geciken kalem türü ve eşiği hiç çizilmez", () => {
+    render(<NotificationSettingsForm form={toForm(SETTINGS)} kinds={kinds} onChange={jest.fn()} />);
+    expect(screen.queryByTestId("tur-geciken-siparis")).toBeNull();
+    expect(screen.queryByText(/Geciken sipariş kalemi/)).toBeNull();
+    expect(screen.getByText("Çek/senet vadesi (finans)")).toBeTruthy();
+  });
+  it("termin türevi işareti yalnız sayı gelince doğar", () => {
+    expect(sendsDueDateDerivatives({ acikKalem: 4 })).toBe(false);
+    expect(sendsDueDateDerivatives(null)).toBe(false);
+    expect(sendsDueDateDerivatives({ gecikenKalem: 0 })).toBe(true);
+    expect(sendsDueDateDerivatives({ gecikenKalem: "3" })).toBe(true);
+    expect(sendsDueDateDerivatives({ gecikenKalem: null })).toBe(false);
   });
 });
