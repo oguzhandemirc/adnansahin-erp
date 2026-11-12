@@ -117,13 +117,13 @@ describe("§1 izinsiz finans segmenti ve alanı çizilmez", () => {
     expect(screen.queryByText(/₺/)).toBeNull();
   });
 
-  it("jenerik kayıt: finans alt satırı taşıyan projeksiyonda alt satır yoksa kilit; tutar yok", async () => {
+  it("jenerik kayıt: finans alt satırı yoksa Tutarlar bölümü HİÇ çizilmez (kilit/boş kart yok)", async () => {
     mockParams.value = { projeksiyon: "fatura", id: U(2) };
     mockApi.record.mockResolvedValue({ id: U(2), kayit: { belgeNo: "FT-1", doviz: "EUR", tarih: "2026-10-01" }, surum: "1" });
     render(<RecordDetail />);
     await flush();
-    expect(screen.getByTestId("kayit-tutarlar-kilitli")).toBeTruthy();
-    expect(screen.getByText("Bu alanı görme iznin yok")).toBeTruthy();
+    expect(screen.queryByTestId("kayit-tutarlar-kilitli")).toBeNull();
+    expect(screen.queryByText(/Tutarlar|TUTARLAR|Tutar bilgisi/)).toBeNull();
     expect(screen.queryByTestId("kayit-tutarlar")).toBeNull();
   });
 });

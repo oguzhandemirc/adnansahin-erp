@@ -117,7 +117,7 @@ describe("§3 süre ve tarih", () => {
 });
 
 describe("§4 teklif detayı kalemleri sunucu süzgeciyle", () => {
-  it("süzgeç beyanlıysa `teklifId` ile ister; izinsiz kalemde tutar yok, kilit kartı var", async () => {
+  it("süzgeç beyanlıysa `teklifId` ile ister; izinsiz kalemde tutar yok, Tutarlar bölümü hiç yok", async () => {
     mockSession.facility = { liste: { kimlikSuzgecleri: LIST_ID_FILTERS, aranabilir: Object.keys(LIST_SEARCH) } };
     mockParams.value = { projeksiyon: "teklif", id: U(3) };
     mockApi.record.mockResolvedValue({ id: U(3), kayit: QUOTE, surum: "1" });
@@ -126,7 +126,8 @@ describe("§4 teklif detayı kalemleri sunucu süzgeciyle", () => {
     await flush();
     expect(mockApi.list).toHaveBeenCalledWith("teklif-kalemi", expect.objectContaining({ teklifId: U(3) }));
     expect(screen.getByText("Gabardin 240")).toBeTruthy();
-    expect(screen.getByTestId("kayit-tutarlar-kilitli")).toBeTruthy();
+    expect(screen.queryByTestId("kayit-tutarlar-kilitli")).toBeNull();
+    expect(screen.queryByTestId("kayit-tutarlar")).toBeNull();
     expect(screen.queryByText(/\$/)).toBeNull();
   });
   it("eski bulut süzgeci beyan etmiyorsa kalem bölümü çizilmez ve istek gitmez", async () => {

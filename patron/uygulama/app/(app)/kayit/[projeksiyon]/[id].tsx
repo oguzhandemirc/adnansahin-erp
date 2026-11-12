@@ -1,9 +1,9 @@
-// Jenerik kayıt ayrıntısı: kök alanlar + izinliyse finans/kişisel alt satırı (sunucu süzer). Finans alt satırı taşıyan
-// projeksiyonda alt satır yoksa tutarlar HİÇ basılmaz, kilit gösterilir. Tutar kaydın dövizi ile; tarih fabrika diliminden.
-import Ionicons from "@expo/vector-icons/Ionicons";
+// Jenerik kayıt ayrıntısı: kök alanlar + izinliyse finans/kişisel alt satırı (sunucu süzer). Parasal alan yalnız değer
+// geldiyse çizilir: finans alt satırı yoksa ya da boşsa "Tutarlar" bölümü HİÇ yok (kilit/boş kart da yok — bu fabrikada
+// finans buluta gitmez). Tutar kaydın dövizi ile; tarih fabrika diliminden.
 import { useLocalSearchParams } from "expo-router";
 import { Text, View } from "react-native";
-import { FINANCE_LOCKED_TEXT, FINANCE_SUBROW_PROJECTIONS, RECORD_ENUMS } from "../../../../src/lib/labels/finans";
+import { RECORD_ENUMS } from "../../../../src/lib/labels/finans";
 import { humanize, recordTitle } from "../../../../src/lib/present";
 import { TERIM } from "../../../../src/lib/terim";
 import { useSession } from "../../../../src/state/session";
@@ -11,14 +11,11 @@ import { useRemote } from "../../../../src/state/useRemote";
 import { ErrorBox, Fields } from "../../../../src/ui/data";
 import { recordCurrency } from "../../../../src/ui/finans/rows";
 import { Screen } from "../../../../src/ui/Frame";
-import { IconTile } from "../../../../src/ui/ortak";
-import { DOMAIN_TONE } from "../../../../src/ui/tokens";
+import { KademeliGiris } from "../../../../src/ui/hareket";
 import type { IconName } from "../../../../src/ui/icons";
-import { Card } from "../../../../src/ui/kit";
-import { SectionHeader } from "../../../../src/ui/SectionHeader";
-import { LoadingSkeleton } from "../../../../src/ui/StateViews";
-import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
-import { FONT_SCALE, space, typography, type Domain } from "../../../../src/ui/tokens";
+import { BlokBasligi, IconTile, Iskelet } from "../../../../src/ui/ortak";
+import { makeStyles } from "../../../../src/ui/theme-context";
+import { DOMAIN_TONE, FONT_SCALE, space, typography, type Domain } from "../../../../src/ui/tokens";
 import { QuoteLines } from "../../../../src/ui/teklif/QuoteLines";
 
 /** Projeksiyon → okunur tür adı + alan rengi/ikon (başlık çipi). Bilinmeyen ad okunur hâle getirilir. */
@@ -45,58 +42,48 @@ const KIND: Readonly<Record<string, { readonly label: string; readonly domain: D
 export default function RecordDetail() {
   const { projeksiyon, id } = useLocalSearchParams<{ projeksiyon: string; id: string }>();
   const { api } = useSession();
-  const t = useTokens();
   const s = useStyles();
   const p = String(projeksiyon ?? "");
   const r = useRemote(projeksiyon && id ? `kayit:${projeksiyon}:${id}` : null, () => api.record(p, String(id)));
   const kind = KIND[p] ?? { label: humanize(p), domain: "genel" as Domain, icon: "document-outline" as IconName };
   const d = r.data;
-  const financeLocked = d !== null && d.finans === undefined && FINANCE_SUBROW_PROJECTIONS.includes(p);
+  const finans = d && d.finans !== undefined && d.finans !== null && Object.keys(d.finans).length > 0 ? d.finans : null;
   const title = d ? recordTitle(d.kayit) : "Kayıt";
   return (
     <Screen title={title === "Kayıt" ? kind.label : title} back onRefresh={r.reload} refreshing={r.refreshing}>
-      {r.loading && !d ? <LoadingSkeleton rows={5} /> : null}
+      {r.loading && !d ? <Iskelet bicim="metin" satir={5} /> : null}
       {r.error && !d ? <ErrorBox text={r.error} onRetry={r.reload} /> : null}
       {d ? (
         <>
-          <Card domain={kind.domain} testID="kayit-ozet">
-            <View style={s.head}>
-              <IconTile icon={kind.icon} tone={DOMAIN_TONE[kind.domain]} size="md" />
-              <View style={{ flex: 1 }}>
-                <Text style={s.kind}>{kind.label}</Text>
-                <Text style={s.title} maxFontSizeMultiplier={FONT_SCALE.title} numberOfLines={2}>{title}</Text>
+          <KademeliGiris sira={0}>
+            <View style={s.kart} testID="kayit-ozet">
+              <View style={s.head}>
+                <IconTile icon={kind.icon} tone={DOMAIN_TONE[kind.domain]} size="md" />
+                <View style={s.flex}>
+                  <Text style={s.kind}>{kind.label}</Text>
+                  <Text style={s.title} maxFontSizeMultiplier={FONT_SCALE.title} numberOfLines={2}>{title}</Text>
+                </View>
+              </View>
+              <View style={s.fields}>
+                <Fields value={d.kayit} enums={RECORD_ENUMS[p]} />
               </View>
             </View>
-            <View style={s.fields}>
-              <Fields value={d.kayit} enums={RECORD_ENUMS[p]} />
-            </View>
-          </Card>
-          {d.finans !== undefined ? (
+          </KademeliGiris>
+          {finans ? (
             <>
-              <SectionHeader title="Tutarlar" domain="finans" />
-              <Card domain="finans" testID="kayit-tutarlar">
-                {d.finans === null ? <Text style={s.kind}>Tutar bilgisi yok</Text> : <Fields value={d.finans} currency={recordCurrency(d.kayit)} />}
-              </Card>
-            </>
-          ) : null}
-          {financeLocked ? (
-            <>
-              <SectionHeader title="Tutarlar" />
-              <Card testID="kayit-tutarlar-kilitli">
-                <View style={s.locked} accessible accessibilityLabel={FINANCE_LOCKED_TEXT}>
-                  <Ionicons name="lock-closed" size={20} color={t.textMuted} />
-                  <Text style={s.lockedText}>{FINANCE_LOCKED_TEXT}</Text>
-                </View>
-              </Card>
+              <BlokBasligi baslik="Tutarlar" />
+              <View style={s.kart} testID="kayit-tutarlar">
+                <Fields value={finans} currency={recordCurrency(d.kayit)} />
+              </View>
             </>
           ) : null}
           {p === "teklif" ? <QuoteLines teklifId={String(id)} currency={recordCurrency(d.kayit)} /> : null}
           {d.kisisel !== undefined && d.kisisel !== null ? (
             <>
-              <SectionHeader title="İletişim" />
-              <Card domain={kind.domain}>
+              <BlokBasligi baslik="İletişim" />
+              <View style={s.kart}>
                 <Fields value={d.kisisel} />
-              </Card>
+              </View>
             </>
           ) : null}
         </>
@@ -106,10 +93,10 @@ export default function RecordDetail() {
 }
 
 const useStyles = makeStyles((t) => ({
+  kart: { backgroundColor: t.color.card, borderRadius: t.radius.card, borderWidth: 1, borderColor: t.color.cardBorder, padding: space.l, marginTop: space.xs, ...t.shadow.card },
   head: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
-  kind: { ...typography.footnote, color: t.textSecondary },
-  title: { ...typography.title2, color: t.text },
+  flex: { flex: 1, minWidth: 0 },
+  kind: { ...typography.footnote, color: t.color.textMuted },
+  title: { ...typography.title2, color: t.color.text },
   fields: { marginTop: space.m },
-  locked: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
-  lockedText: { ...typography.callout, color: t.textSecondary, flex: 1 },
 }));
