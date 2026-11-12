@@ -1,6 +1,5 @@
-// Siparişler + Cariler ekranlarının ortak parçaları: arama alanı, kapsül düğme, liste altlığı, bilgi satırı, rol rozeti.
+// Siparişler + Cariler ekranlarının ortak parçaları: arama alanı, kapsül düğme, hızlı çip, liste altlığı, bayatlık notu.
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Fragment, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { ARAMA_AZAMI } from "../../api/wire";
 import { fmtFactoryTime } from "../../lib/factory-time";
@@ -9,7 +8,7 @@ import type { IconName } from "../icons";
 import { Basilabilir } from "../hareket";
 import { BosDurum, HataDurumu, Iskelet } from "../ortak";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "../tokens";
+import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain } from "../tokens";
 import type { RemoteList } from "./useRemoteList";
 
 export function SearchField(p: { value: string; onChangeText: (v: string) => void; placeholder: string; testID?: string; accessibilityLabel?: string }) {
@@ -110,51 +109,6 @@ export function StaleNote({ stale, savedAt }: { stale: boolean; savedAt: string 
     <View style={s.stale} testID="fabrika-verisi">
       <Ionicons name="time-outline" size={14} color={s.staleText.color} />
       <Text style={s.staleText}>{`Fabrika verisi ${fmtFactoryTime(savedAt)} · ${formatAgo(savedAt)}`}</Text>
-    </View>
-  );
-}
-
-/** Etiket ↔ değer satırı (ayrıntı kartları); değer durum anlamı taşıyorsa tonlu. */
-export function FactRow(p: { label: string; value: string; tone?: StatusKind; accessory?: ReactNode; testID?: string }) {
-  const t = useTokens();
-  const s = useStyles();
-  return (
-    <View style={s.fact} testID={p.testID} accessible accessibilityLabel={`${p.label}: ${p.value}`}>
-      <Text style={s.factLabel}>{p.label}</Text>
-      <View style={s.factRight}>
-        {p.accessory}
-        <Text style={[s.factValue, p.tone ? { color: t.status[p.tone].fill } : null]} numberOfLines={2}>{p.value}</Text>
-      </View>
-    </View>
-  );
-}
-
-/** Bilgi satırlarını opak kart içinde ince ayraçla toplar. */
-export function FactGroup({ children, testID }: { children: ReactNode; testID?: string }) {
-  const s = useStyles();
-  const items = (Array.isArray(children) ? children : [children]).flat().filter(Boolean);
-  return (
-    <View style={s.group} testID={testID}>
-      {items.map((c, i) => (
-        <Fragment key={i}>
-          {i > 0 ? <View style={s.sep} /> : null}
-          {c}
-        </Fragment>
-      ))}
-    </View>
-  );
-}
-
-const ROLE_DOMAIN: Readonly<Record<string, Domain>> = { musteriRolu: "cariler", tedarikciRolu: "stok", fasonRolu: "fason" };
-
-/** Rol rozeti (kimlik ≠ rol): Müşteri gül, Tedarikçi taş, Fason fuşya — renk "hangi rol" der, iyi/kötü değil. */
-export function RolePill({ roleKey, label }: { roleKey: string; label: string }) {
-  const t = useTokens();
-  const s = useStyles();
-  const c = t.domain[ROLE_DOMAIN[roleKey] ?? "genel"];
-  return (
-    <View style={[s.pill, { backgroundColor: c.chip }]} accessible accessibilityLabel={`Rol: ${label}`}>
-      <Text style={[s.pillText, { color: c.fg }]} maxFontSizeMultiplier={FONT_SCALE.title}>{label}</Text>
     </View>
   );
 }
