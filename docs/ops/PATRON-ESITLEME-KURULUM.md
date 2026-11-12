@@ -41,7 +41,7 @@ Ardından panelde top listesi açılır, tabletten bir okutma yapılır (normal 
 - Şema sorunu: migration geri alınmaz; backend durdurulur, 1. adımdaki yedekten geri yüklenir (`docs/kurallar/surum-yayin.md` § Migration).
 
 ## 5. Eşitlemeyi açma (ayrı bakım işi, kullanıcıya gösterilerek)
-1. Anahtar: `.env`e `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (veri dizininde, repoda değil) → `cd Teks-Erp && npx tsx scripts/patron-bulut-anahtar.ts`; dosya yoksa 0600 üretir, `--kurulum=` ve `--acik-anahtar=` değerlerini basar (özel anahtarı basmaz).
+1. Anahtar: `.env`e `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (veri dizininde, repoda değil) → fabrikada paketin içinden `node dist\tools\patron-bulut-anahtar.cjs --dosya=<aynı yol>` (geliştirmede `npx tsx scripts/patron-bulut-anahtar.ts`; araç `.env`i yolu çözdükten sonra yükler, `--dosya=` açık verilir); dosya yoksa 0600 üretir, `--kurulum=` ve `--acik-anahtar=` değerlerini basar (özel anahtarı basmaz). Windows'ta mod bitleri ölçülmez; anahtarın klasörü elle SYSTEM + Administrators'a kısıtlanır.
 2. Buluta kaydet: bulutta `tesis.ts kurulum-kaydet --kurulum=… --acik-anahtar=… --bitis=yok`. `yok` = süresiz hak (lisans/abonelik yok); süreli kurulumda ISO tarih verilir. Eski bulut imajı (2026-11-12 öncesi) `yok`u boş yazıp her isteği 403 `PATRON_BULUT_KAPALI` ile reddediyordu; o imajda kayıtlı kurulum yeni imajla aynı komutu yeniden koşarak düzelir.
 3. Ortam: `.env`e `PATRON_CLOUD_URL=https://<bulut kökeni>` → backend yeniden başlatılır. Adres tek başına açmaz; açılış log'u sessizdir.
 4. Ayar: `PUT /api/admin/settings/patronCloud.syncEnabled` `{"value":"true"}` (admin:settings + ayar şifresi). Beklenen log: `tetikleyiciler açıldı (28; …)` + `eşitleme işi başladı`; psql `SELECT * FROM patron_sync_status()` → `enabled_triggers = 28`.

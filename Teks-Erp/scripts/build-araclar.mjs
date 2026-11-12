@@ -36,6 +36,8 @@ const ARACLAR = [
   { giris: "scripts/fix_tambur_undo_cancel_marker.ts", cikti: "dist/tools/fix_tambur_undo_cancel_marker.cjs" },
   { giris: "scripts/backfill_workorder_events.ts", cikti: "dist/tools/backfill_workorder_events.cjs" },
   { giris: "scripts/kartela_durum_anomali.ts", cikti: "dist/tools/kartela_durum_anomali.cjs" },
+  // Patron bulutu kurulum anahtari: fabrikada `tsx` yok; acma recetesinin 1. adimi bunu ister.
+  { giris: "scripts/patron-bulut-anahtar.ts", cikti: "dist/tools/patron-bulut-anahtar.cjs" },
 ];
 
 // Calisma aninda node_modules'ten cozulecekler. Hepsi URETIM bagimliligidir
