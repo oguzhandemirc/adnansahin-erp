@@ -56,9 +56,11 @@ if (argv.includes('--etiketle')) {
   if (elle) k.surum = elle;
   if (argv.includes('--uygula')) {
     const ham = fs.readFileSync(PKG, 'utf8');
-    const yeni = ham.replace(/("version"\s*:\s*)"[^"]+"/, `$1"${k.surum}"`);
-    if (yeni === ham) { console.error('package.json > version yazilamadi'); process.exit(1); }
-    fs.writeFileSync(PKG, yeni);
+    const kalip = /("version"\s*:\s*)"[^"]+"/;
+    // Surum elle onceden yazilmis olabilir (surum belgesi commit'i): ayni deger = is yok, hata degil.
+    if (!kalip.test(ham)) { console.error('package.json > version yazilamadi'); process.exit(1); }
+    const yeni = ham.replace(kalip, `$1"${k.surum}"`);
+    if (yeni !== ham) fs.writeFileSync(PKG, yeni);
   }
   console.log(k.surum);
   if (process.env.BACKEND_SURUM_GEREKCE) console.error(k.gerekce);
