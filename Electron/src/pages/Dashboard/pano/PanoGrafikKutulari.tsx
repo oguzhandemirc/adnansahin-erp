@@ -30,7 +30,7 @@ export function PanoEgilim({ d }: { d: TrendBox }) {
     <>
       <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeDasharray="3 3" />
       <XAxis dataKey="ad" tickLine={false} axisLine={false} fontSize={11} tick={{ fill: "hsl(var(--muted-foreground))" }} minTickGap={16} />
-      <YAxis tickLine={false} axisLine={false} fontSize={11} width={40} tick={{ fill: "hsl(var(--muted-foreground))" }} tickFormatter={kisaEksen} />
+      <YAxis tickLine={false} axisLine={false} fontSize={11} width={48} tick={{ fill: "hsl(var(--muted-foreground))" }} tickFormatter={kisaEksen} />
       <Tooltip formatter={(v) => metre(Number(v))} contentStyle={{ borderRadius: 10, fontSize: 12, borderColor: "hsl(var(--border))", background: "hsl(var(--popover))" }} />
     </>
   );

@@ -4,7 +4,7 @@ import { BOX_META } from "./box-meta";
 import { hasContent, hasRenderer } from "./box-render";
 import { donemPenceresi, kovala, validPeriod } from "./pano-donem";
 import { applySubsetOrder, cleanLayout, cleanSizes, defaultLayout, moveBox, packRows } from "./pano-layout";
-import { placeMasonry } from "./pano-masonry";
+import { columnsAt, placeMasonry } from "./pano-masonry";
 
 // Pano saf katmanı: kutu kaydı, dönem penceresi, yerleşim. Davranış (istek/kapı/hata) `pano.test.tsx`te.
 
@@ -85,6 +85,11 @@ describe("yerleşim", () => {
     const rows = packRows([{ key: "a", size: "genis" }, { key: "b", size: "orta" }, { key: "c", size: "kucuk" }, { key: "d", size: "orta" }]);
     for (const r of rows) expect(r.reduce((s, p) => s + p.span, 0)).toBe(12);
     expect(rows[0]!.map((p) => p.key)).toEqual(["a", "b"]);
+  });
+
+  it("sütun sayısı kırılımdan: tam 1100 px iki sütun, 1101 px on iki", () => {
+    const at = (w: number) => columnsAt((q) => w >= Number(/(\d+)px/.exec(q)![1]));
+    expect([at(700), at(768), at(1100), at(1101), at(1440)]).toEqual([1, 2, 2, 12, 12]);
   });
 
   it("sütun akışı kısa kutunun altına sonrakini yerleştirir", () => {

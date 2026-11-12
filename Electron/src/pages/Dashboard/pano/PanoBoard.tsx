@@ -14,8 +14,8 @@ import { useMasonry } from "./pano-masonry";
 import { SizePicker } from "./PanoSizePicker";
 import type { BoxState } from "./usePanoBoxData";
 
-/** 12 sütunlu ızgarada genişlik — Tailwind sınıfları statik kalsın diye tablo. Aralıklar çakışmaz: `md` (rem) ile
- *  `min-[1101px]` (px) Tailwind 4'te sıralanamıyor, `md` kazanıyordu. */
+/** 12 sütunlu ızgarada genişlik — Tailwind sınıfları statik kalsın diye tablo. Aralıklar boşluksuz: Tailwind 4'te
+ *  `max-[1101px]` = genişlik < 1101, `min-[1101px]` = ≥ 1101 (tam 1100 px iki sütunda). */
 const SPAN: Record<number, string> = {
   1: "min-[1101px]:col-span-1", 2: "min-[1101px]:col-span-2", 3: "min-[1101px]:col-span-3", 4: "min-[1101px]:col-span-4",
   5: "min-[1101px]:col-span-5", 6: "min-[1101px]:col-span-6", 7: "min-[1101px]:col-span-7", 8: "min-[1101px]:col-span-8",
@@ -79,8 +79,8 @@ export function PanoBoard({ boxes, states, editing, ctx, onRemove, onReorder, on
       <div className="space-y-[var(--space-gap)]" data-testid="pano-board" data-editing={editing || undefined}>
         {kpis.length > 0 && (
           <SortableContext items={kpis.map((b) => b.anahtar)} strategy={rectSortingStrategy}>
-            {/* Eşit hücreli şerit: beş kompakt kart 1280 genişlikte tek sıra; taşan kart alt sıraya eşit genişlikte iner. */}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(11.5rem,1fr))] gap-[var(--space-gap)]" data-testid="pano-kpi-seridi">
+            {/* Eşit hücreli şerit: beş kompakt kart 1100 genişlikte de tek sıra; taşan kart alt sıraya iner. */}
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-[var(--space-gap)]" data-testid="pano-kpi-seridi">
               {kpis.map((b) => (
                 <Cell key={b.anahtar} id={b.anahtar} editing={editing}>{cell(b)}</Cell>
               ))}
@@ -90,10 +90,10 @@ export function PanoBoard({ boxes, states, editing, ctx, onRemove, onReorder, on
         {body.length > 0 && (
           <SortableContext items={body.map((b) => b.anahtar)} strategy={rectSortingStrategy}>
             {/* Sütun akışı: 4 px satır birimi + ölçülen boy → kısa kutunun altı boş kalmaz; boşluk hücre dolgusunda. */}
-            <div ref={masonry.gridRef} className="grid auto-rows-[4px] gap-x-[var(--space-gap)] gap-y-0 min-[768px]:max-[1100px]:grid-cols-2 min-[1101px]:grid-cols-12" data-testid="pano-izgara">
+            <div ref={masonry.gridRef} className="grid auto-rows-[4px] gap-x-[var(--space-gap)] gap-y-0 min-[768px]:max-[1101px]:grid-cols-2 min-[1101px]:grid-cols-12" data-testid="pano-izgara">
               {flow.map((f, i) => { const b = body[i]!; return (
                 <Cell key={b.anahtar} id={b.anahtar} editing={editing} measureRef={masonry.measure(b.anahtar)} place={masonry.styleOf(f.key)}
-                  className={cn(b.boyut === "genis" && "min-[768px]:max-[1100px]:col-span-2", SPAN[spans.get(b.anahtar) ?? 4])}>{cell(b)}</Cell>
+                  className={cn(b.boyut === "genis" && "min-[768px]:max-[1101px]:col-span-2", SPAN[spans.get(b.anahtar) ?? 4])}>{cell(b)}</Cell>
               ); })}
             </div>
           </SortableContext>

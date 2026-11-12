@@ -48,12 +48,22 @@ function absorbSlivers(heights: number[], b: { col: number; top: number; span: n
   return { col, top: b.top, span };
 }
 
-/** Izgaranın o anki sütun sayısı (kırılım noktasına göre 1 / 2 / 12); ızgara sonradan doğabilir → ref geri çağrısı. */
+/** Kırılım noktası → sütun sayısı; ızgaranın `min-[768px]` / `min-[1101px]` sınıflarıyla aynı sınırlar. */
+export function columnsAt(matches: (query: string) => boolean): number {
+  if (matches("(min-width: 1101px)")) return 12;
+  return matches("(min-width: 768px)") ? 2 : 1;
+}
+
+/**
+ * Izgaranın o anki sütun sayısı (1 / 2 / 12); ızgara sonradan doğabilir → ref geri çağrısı. Hesaplanan
+ * `grid-template-columns` okunmaz: açık konumlu kutuların açtığı örtük sütunları da sayar, pencere
+ * daralınca eski sütun sayısında takılı kalırdı.
+ */
 function useGridColumns(): [number, (el: HTMLDivElement | null) => void] {
   const [cols, setCols] = useState(0);
   const gridRef = useCallback((el: HTMLDivElement | null) => {
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const read = () => setCols(getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length);
+    if (!el || typeof ResizeObserver === "undefined" || typeof matchMedia === "undefined") return;
+    const read = () => setCols(columnsAt((q) => matchMedia(q).matches));
     const ro = new ResizeObserver(read);
     ro.observe(el);
     read();

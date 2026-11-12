@@ -106,14 +106,14 @@ export const BOX_CATALOG: readonly BoxSpec[] = [
   },
   { ...def("hizliIslemler", "Hızlı işlemler", "Sık kullanılan ekranlara tek tıkla geçiş.", ["genel", "orta", false, true]), acik: (e) => HIZLI_EYLEMLER.some((h) => e.canGo(h)) },
   {
-    ...def("sonHareketler", "Son hareketler", "Son girilen siparişler ve son sevkler.", ["satis", "genis", false, true]),
-    acik: (e) => e.izin("order:read") || e.izin("shipping:read"),
-    yukle: sonHareketler,
-  },
-  {
     ...def("bekleyen", "Bekleyen işler", "Açık sipariş, iş emri açılmamış sipariş, depoda ve üretimde top.", ["genel", "kucuk", false, true]),
     acik: (e) => e.izin("order:read") || e.izin("roll:read"),
     yukle: bekleyen,
+  },
+  {
+    ...def("sonHareketler", "Son hareketler", "Son girilen siparişler ve son sevkler.", ["satis", "genis", false, true]),
+    acik: (e) => e.izin("order:read") || e.izin("shipping:read"),
+    yukle: sonHareketler,
   },
   { ...def("bekleyenMal", "Adımda bekleyen mal", "Yarı mamulün şu an hangi istasyonda beklediği.", ["uretim", "orta", false, true]), acik: reportOpen("wip"), yukle: tek("wip", D.bekleyenMal, false) },
   {

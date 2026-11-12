@@ -40,7 +40,7 @@ export function StatCard({ label, value, icon: Icon, tone = "primary", delta, tr
       )}>
       {Icon && (
         <Icon aria-hidden strokeWidth={1.75} data-tone={tone}
-          className={cn("pointer-events-none absolute -right-2 top-1/2 h-14 w-14 -translate-y-1/2 opacity-[0.13] dark:opacity-20",
+          className={cn("pointer-events-none absolute right-1 top-1/2 h-14 w-14 -translate-y-1/2 opacity-[0.13] dark:opacity-20",
             tone === "primary" ? "text-primary" : `tile-${tone} text-[hsl(var(--tile-fg))]`)} />
       )}
       <div className="relative min-w-0 flex-1 pr-8">
