@@ -4,8 +4,7 @@
 // Derleme anında kayıt defterinden (`deploy/kanallar.json` → `gorunurEtiket`) uygulama
 // yapılandırmasına gömülür (`extra.gorunurEtiket`, `mobil/scripts/lib/kanal.cjs`).
 // Üretim kanalında alan HİÇ doğmaz → null → hiçbir şey çizilmez (bugünkü görünüm).
-// Tablette `Constants.expoConfig` APK'dan ya da OTA manifestinin `extra.expoClient`inden
-// gelir; ikisi de aynı derleme adımında kanaldan üretilir.
+// Tablette `Constants.expoConfig` uygulama paketine gömülüdür; aynı derleme adımında kanaldan üretilir.
 // =============================================================================
 
 type ConfigLike = { extra?: unknown } | null | undefined;

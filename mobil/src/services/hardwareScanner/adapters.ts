@@ -1,4 +1,4 @@
-// El terminali okuyucu adaptörleri — marka bilgisi YALNIZ burada (OTA ile düzeltilebilir).
+// El terminali okuyucu adaptörleri — marka bilgisi YALNIZ burada (yeni sürümle düzeltilebilir).
 // Point Mobile cihazda doğrulandı (PM68, 2026-11-07); Zebra ve Honeywell SAHADA DOĞRULANMADI — sözleşme
 // adaptör testleriyle kilitli (hardwareScanner.adapters.test.ts). Kaynak: docs/plan/EL-TERMINALI-OKUYUCU-PLAN.md §1.
 import type { BroadcastSpec, NativeCapabilities, NativeIntentEvent } from './native';

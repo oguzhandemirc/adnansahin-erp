@@ -17,7 +17,7 @@ export function usePermissions() {
     // "yetkin yok" ekranına düşer — yani giriş BAŞARILI görünür, hata yoktur,
     // ekran yoktur. Arıza yetki katmanında değil GÖRÜNÜRLÜK katmanındadır.
     // Backend `*`i zaten kabul ettiği için istemcide daraltmak yalnız sessiz
-    // tutarsızlık üretirdi. Saf JS → OTA ile gider, APK gerekmez.
+    // tutarsızlık üretirdi.
     const hasGlobalWildcard = set.has('*');
     const hasMobileWildcard = set.has('mobile:*');
     const hasAdminWildcard = set.has('admin:*');

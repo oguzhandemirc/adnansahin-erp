@@ -6,12 +6,8 @@
 // ve nasıl bozulacakları sözleşmeye bağlıdır: bazen 400 döner (görünür), bazen
 // alan SESSİZCE düşer (görünmez, en tehlikelisi).
 //
-// ⚠️ MOBİLDE İKİ SÜRÜM EKSENİ VAR — masaüstünde yok:
-//   · APK sürümü (`versionName`) → yalnız kurulum dosyası değişince artar
-//   · Uzak paket tarihi (`Updates.createdAt`) → her OTA yayınında ilerler
-// JS düzeltmesi `versionName`i DEĞİŞTİRMEDEN sahaya gider. Yani "2.9.8 görünen"
-// bir tabletin JS'i haftalarca eski olabilir. Tek eksenli bir kapı bunu ifade
-// EDEMEZ; ikisi ayrı ayrı kontrol edilir.
+// Tek eksen uygulama sürümüdür (`versionName`): kod yalnız Play'den gelen yeni
+// sürümle değişir. Eski tablet Play'in zorunlu (immediate) akışına yönlendirilir.
 //
 // ⚠️ FAIL-OPEN: politika okunamaz/bozuk/404 ise tablet KİLİTLENMEZ. Bu, bu
 // projenin genel fail-closed eğiliminin bilinçli istisnasıdır — "kapalı"
@@ -23,8 +19,6 @@ import { apiClient } from './api';
 export interface IstemciPolitikasi {
   minVersion: string;
   currentVersion: string;
-  /** Mobile özel ikinci eksen — ISO 8601. Yoksa yalnız APK ekseni uygulanır. */
-  minPaketTarihi?: string;
   message?: string;
 }
 
@@ -59,7 +53,7 @@ export function surumKarsilastir(a: string, b: string): number {
   return 0;
 }
 
-export type EskilikSebebi = 'apk' | 'paket' | null;
+export type EskilikSebebi = 'apk' | null;
 
 export interface PolitikaDurumu {
   /** Tablet politikanın altında mı. */
@@ -69,38 +63,19 @@ export interface PolitikaDurumu {
 }
 
 /**
- * Tabletin politikayı karşılayıp karşılamadığına karar verir.
- *
- * ⚠️ SIRA ÖNEMLİ: önce APK ekseni bakılır. İkisi birden eskiyse çözüm kurulum
- * dosyasıdır (uzaktan güncelleme onu düzeltemez) — operatöre "indir ve kur"
- * demek, "yenile" demekten doğrudur.
+ * Tabletin politikayı karşılayıp karşılamadığına karar verir. Sunucu eski
+ * sürümlerin gönderdiği ek alanları (ör. paket tarihi) taşıyabilir; okunmaz.
  */
 export function politikaDegerlendir(args: {
   politika: IstemciPolitikasi | null;
   apkSurumu: string;
-  paketTarihi: Date | null;
 }): PolitikaDurumu {
-  const { politika, apkSurumu, paketTarihi } = args;
+  const { politika, apkSurumu } = args;
   // FAIL-OPEN: politika yoksa kilit yok.
   if (!politika) return { eski: false, sebep: null };
-
   if (surumKarsilastir(apkSurumu, politika.minVersion) < 0) {
     return { eski: true, sebep: 'apk' };
   }
-
-  if (politika.minPaketTarihi) {
-    const esik = Date.parse(politika.minPaketTarihi);
-    if (!Number.isNaN(esik)) {
-      // ⚠️ `paketTarihi === null` = tablet APK'nın GÖMÜLÜ paketiyle çalışıyor,
-      // yani hiç OTA almamış. Gömülü paket APK ile aynı yaşta olduğundan APK
-      // eksenini geçmişse eskime YOKTUR — burada `null`ı "çok eski" saymak,
-      // yeni kurulmuş her tableti kilitlerdi.
-      if (paketTarihi && paketTarihi.getTime() < esik) {
-        return { eski: true, sebep: 'paket' };
-      }
-    }
-  }
-
   return { eski: false, sebep: null };
 }
 

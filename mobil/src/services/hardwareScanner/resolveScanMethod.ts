@@ -14,7 +14,7 @@ export type ScanMethod = { kind: 'camera' } | { kind: 'intent'; adapterId: Adapt
 
 /**
  * Donanım okuyuculu el terminali üreten markalar (`Build.MANUFACTURER`, boşluk/tire/alt çizgisiz büyük harf).
- * Tanınan adaptörü olmayan bu cihazlar Otomatik'te klavye kamasına düşer — kamera AÇILMAZ. OTA ile genişler.
+ * Tanınan adaptörü olmayan bu cihazlar Otomatik'te klavye kamasına düşer — kamera AÇILMAZ. Yeni sürümle genişler.
  */
 export const SCANNER_MANUFACTURERS: readonly string[] = [
   'POINTMOBILE',
@@ -35,7 +35,7 @@ export const SCANNER_MANUFACTURERS: readonly string[] = [
   'M3MOBILE',
 ];
 
-/** Adaptörü olsa da klavye kamasına zorlanan modeller (`MANUFACTURER MODEL`, compactUpper) — OTA ile sahadan. */
+/** Adaptörü olsa da klavye kamasına zorlanan modeller (`MANUFACTURER MODEL`, compactUpper) — kodla, yeni sürümle sahaya. */
 export const FORCE_WEDGE_MODELS: readonly string[] = [];
 
 export function isScannerManufacturer(manufacturer: string | null | undefined): boolean {
@@ -53,7 +53,7 @@ export interface ResolveInput {
   adapterId: AdapterId | null;
   /** Üretici okuyuculu el terminali markası. */
   scannerVendor: boolean;
-  /** Model OTA tablosuyla wedge'e zorlanmış. */
+  /** Model zorlama tablosuyla wedge'e zorlanmış. */
   forcedWedge?: boolean;
 }
 

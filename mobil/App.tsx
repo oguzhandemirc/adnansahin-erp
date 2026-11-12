@@ -191,11 +191,9 @@ export default function App() {
                 </SimplePortalScope>
               </PaperProvider>
             </View>
-            {/* Uzaktan güncelleme kapısı — EN ÜST katman, kilit katmanından da
-                SONRA. Yenileme örtüsü her şeyin üstünde görünmeli: `reloadAsync`
-                uygulamayı aniden yeniden başlatır ve altta kalan bir örtü,
-                operatörün bunu çökme sanmasını engelleyemez. Kayıt yokken
-                hiçbir şey çizmez (null döner). */}
+            {/* Güncelleme kapısı (Play) — EN ÜST katman, kilit katmanından da
+                SONRA: zorunlu güncelleme örtüsü her şeyin üstünde görünmeli.
+                Gösterecek bir şey yokken null döner. */}
             <SurumNotuGate />
             <UpdateGate />
             {/* Hazırlık kanalının işareti (ör. "TEST FABRİKA") — en üstte, dokunmayı yutmaz;

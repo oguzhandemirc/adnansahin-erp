@@ -181,7 +181,7 @@ describe('resolveScanMethod — plan tablosu (12 hücre)', () => {
   ] as const)('%s + %s + %j → %j', (pref, link, c, want) => {
     expect(resolveScanMethod({ pref, link, ...c })).toEqual(want);
   });
-  it('model OTA tablosuyla zorlanınca adaptör olsa da wedge; "Donanım"+Klavye okuyucusuzda wedge', () => {
+  it('model zorlama tablosuyla zorlanınca adaptör olsa da wedge; "Donanım"+Klavye okuyucusuzda wedge', () => {
     expect(resolveScanMethod({ pref: 'auto', link: 'auto', ...col.adapter, forcedWedge: true })).toEqual(wedge);
     expect(resolveScanMethod({ pref: 'hardware', link: 'wedge', ...col.plain })).toEqual(wedge);
   });

@@ -11,8 +11,7 @@ import { storage } from '../utils/storage';
  *
  * ⚠️ Notlar PAKETE GÖMÜLÜDÜR, sunucudan çekilmez. İki sebep: tablet bilinçli
  * olarak çevrimdışı çalışıyor (ağ isteği + hata dalı + önbellek yönetimi
- * gerekmesin) ve OTA güncellemesi not TAŞIMIYOR — gömülü dosya OTA paketiyle
- * birlikte gittiği için en sık güncelleme türü de kapsanıyor.
+ * gerekmesin) ve not, onu getiren Play sürümüyle birlikte gelir.
  */
 export type NotKapsam = 'panel' | 'tablet' | 'her-ikisi';
 export type NotTip = 'yeni' | 'duzeltme' | 'iyilestirme';

@@ -1,6 +1,6 @@
 // =============================================================================
-// TeksERP Mobil — APK'nın KENDİ KİMLİĞİ (paket adı · güncelleme adresi · OTA
-// sertifikası · gömülü uygulama yapılandırması) — build-apk ve mobil-yayinla ORTAK
+// TeksERP Mobil — APK'nın KENDİ KİMLİĞİ (paket adı · expo-updates meta verisi ·
+// gömülü uygulama yapılandırması) — build-apk ve play-yukle ORTAK
 // =============================================================================
 // Otorite paketin kendisidir: AndroidManifest.xml ikili XML'dir (AXML) ve Android
 // kurulumda paket adını `<manifest package=…>` özniteliğinden okur. Metin araması
@@ -12,7 +12,6 @@
 // =============================================================================
 
 import { Buffer } from 'node:buffer';
-import crypto from 'node:crypto';
 
 import { zipGirdisiOku } from './zip.mjs';
 
@@ -94,21 +93,12 @@ export function axmlOgeleri(b) {
   return ogeler;
 }
 
-/** PEM'in DER parmak izi (satır sonu/biçim farkı kimlik farkı değildir). */
-export function sertifikaParmakIzi(pem) {
-  try {
-    return new crypto.X509Certificate(String(pem)).fingerprint256;
-  } catch {
-    return null;
-  }
-}
-
 const UPD = 'expo.modules.updates.';
 
 /**
  * APK dosyasının kimliği.
- * @returns {{ paket: string, guncellemeAdresi: string|null, sertifikaPem: string|null,
- *             guncellemeAcik: string|null, appConfig: object|null }}
+ * `otaMeta`: pakette kalan `expo.modules.updates.*` meta-data adları (tablette boş olmalı).
+ * @returns {{ paket: string, otaMeta: string[], appConfig: object|null }}
  */
 export function apkKimligi(apkYolu) {
   let r;
@@ -127,7 +117,7 @@ export function apkKimligi(apkYolu) {
   for (const e of ogeler) if (e.ad === 'meta-data' && e.oznitelik.name) meta[e.oznitelik.name] = e.oznitelik.value ?? null;
 
   // expo-constants her derlemede yapılandırmayı `assets/app.config`e gömer; çalışma anında
-  // `Constants.expoConfig` odur (APK künyesinin adresi ve görünür etiket buradan okunur).
+  // `Constants.expoConfig` odur (görünür etiket buradan okunur).
   let appConfig = null;
   try {
     const c = zipGirdisiOku(apkYolu, 'assets/app.config');
@@ -137,9 +127,7 @@ export function apkKimligi(apkYolu) {
   }
   return {
     paket: kok.oznitelik.package,
-    guncellemeAdresi: meta[`${UPD}EXPO_UPDATE_URL`] ?? null,
-    sertifikaPem: meta[`${UPD}CODE_SIGNING_CERTIFICATE`] ?? null,
-    guncellemeAcik: meta[`${UPD}ENABLED`] ?? null,
+    otaMeta: Object.keys(meta).filter((ad) => ad.startsWith(UPD)),
     appConfig,
   };
 }

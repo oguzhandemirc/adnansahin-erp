@@ -1,5 +1,5 @@
 // Play uygulama içi güncelleme — yerel katmana TEK erişim noktası + saf karar yüklemi.
-// Yerel modül (mobil/modules/teks-erp-play-guncelleme) yoksa (eski APK) Play yolu hiç doğmaz.
+// Yerel modül (mobil/modules/teks-erp-play-guncelleme) yoksa Play yolu hiç doğmaz.
 // FAIL-OPEN: Play yok / Play'den kurulmamış / çevrimdışı / hata → sessizce "yok"; iş hiç engellenmez.
 import { requireOptionalNativeModule } from 'expo';
 
@@ -23,15 +23,7 @@ const native = requireOptionalNativeModule<PlayUpdateNative>('TeksErpPlayGuncell
 /** Play'i kuran paket adı. */
 export const PLAY_INSTALLER = 'com.android.vending';
 
-/**
- * Bu ikili Play dağıtımı için mi derlendi? Yerel modül yalnız Play dönemi native'inde var
- * (runtimeVersion ≥ 54.4). Doğruysa sunucudaki APK künyesi denetimi KAPALIDIR — künye eski
- * paket adının kurulum dosyasını anlatır ve Play'den kurulan uygulamayı oraya yönlendiremez.
- */
-export function isPlayDistribution(): boolean {
-  return native !== null;
-}
-
+/** Uygulamayı Play mi kurdu — yerel modül yoksa ya da USB/yan yükleme ise false (Play yolu susar). */
 export function installedFromPlay(): boolean {
   try {
     return native?.installerPackage() === PLAY_INSTALLER;
@@ -134,6 +126,32 @@ export function offeredFlow(s: PlayQuery | null): 'esnek' | 'hemen' | null {
   if (s.flexibleAllowed) return 'esnek';
   if (s.immediateAllowed) return 'hemen';
   return null;
+}
+
+/** Ayarlar'daki elle denetimin sonucu: ne yapılacak + operatöre gösterilecek cümle. */
+export type ManualCheckOutcome =
+  | { action: 'baslat'; flow: 'esnek' | 'hemen' }
+  | { action: 'bilgi' | 'hata'; text: string };
+
+export function manualCheckOutcome(fromPlay: boolean, s: PlayQuery): ManualCheckOutcome {
+  // Elle basılan düğmeye sessiz kalınmaz; Play dışı kurulum bilgi olarak söylenir.
+  if (!fromPlay) return { action: 'bilgi', text: 'Bu kurulum Google Play’den yapılmamış; güncelleme Play’den denetlenemez.' };
+  switch (s.kind) {
+    case 'yok':
+      return { action: 'bilgi', text: 'Uygulama güncel.' };
+    case 'indiriliyor':
+      return { action: 'bilgi', text: 'Yeni sürüm indiriliyor.' };
+    case 'indirildi':
+      return { action: 'bilgi', text: 'Yeni sürüm indirildi — alttaki karttan “Yeniden başlat”.' };
+    case 'suruyor':
+      return { action: 'baslat', flow: 'hemen' };
+    case 'var': {
+      const flow = offeredFlow(s);
+      return flow ? { action: 'baslat', flow } : { action: 'bilgi', text: 'Yeni sürüm var ama Play şu an kurulum izni vermiyor.' };
+    }
+    default:
+      return { action: 'hata', text: 'Google Play’e ulaşılamadı. Tabletin interneti var mı?' };
+  }
 }
 
 /** Operatörün boşta sayıldığı ekranlar — bir form/okutma açık olamaz. */

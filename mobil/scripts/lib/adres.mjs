@@ -1,14 +1,8 @@
 // =============================================================================
 // TeksERP Mobil — sunucu adresi çözümü (TEK KAYNAK)
 // =============================================================================
-// Hem `build-apk.mjs` (kurulum dosyası) hem `yayinla-ota.mjs` (uzaktan
-// güncelleme paketi) bu dosyayı kullanır.
-//
-// ⚠️ NEDEN TEK KAYNAK: iki script farklı sırayla adres çözseydi, aynı gün
-// derlenen APK ile yayınlanan paket FARKLI sunucuya bakabilirdi. Bu ayrışma
-// hiçbir hata üretmez — tablet çalışır, güncelleme hiç gelmez ya da paket
-// yanlış sunucuya konuşur. Adres çözümü bu projede iki kez ısırmış bir yerdir
-// (bkz. build-apk.mjs başlığı); ikinci bir kopya üçüncü ısırığın davetidir.
+// `build-apk.mjs` adresi buradan çözer. Adres çözümü bu projede iki kez ısırmış
+// bir yerdir (bkz. build-apk.mjs başlığı); ikinci bir kopya üçüncü ısırığın davetidir.
 // =============================================================================
 
 import fs from 'node:fs';
@@ -78,21 +72,10 @@ export function adresiCoz(cliDeger, projeKok, kanal) {
   return { deger: null, kaynak: null };
 }
 
-/** `http://10.0.0.5:4000/api` → `http://10.0.0.5:4000` (app.config.js ile AYNI kural). */
-export function kokAdres(apiUrl) {
-  return String(apiUrl || '')
-    .trim()
-    .replace(/\/+$/, '')
-    .replace(/\/api$/i, '');
-}
-
-/** Güncelleme manifest yolunun TEK yazımı — app.config.js ile eşleşmeli. */
-export const UPDATE_PATH = '/api/mobile/updates/manifest';
-
 /**
  * Bir JS bundle'ının (Hermes; `latin1` okunmuş) taşıdığı ERP adresleri — "beklenen
  * adres var mı, yanında BAŞKA bir sayısal-IP sunucu var mı" sorusunun TEK ölçümü.
- * APK derlemesi, OTA üretimi ve yayın kapısı aynı yüklemi kullanır.
+ * APK derlemesi bu yüklemi kullanır.
  *
  * ⚠️ Hermes dizeleri UÇ UCA paketler (sonlandırıcı yok): "/api'den sonra harf
  * gelmesin" sondajı gerçek adresi bile eler — bu yüzden lookahead YOK.
@@ -107,27 +90,3 @@ export function bundleAdresOlcumu(metin, beklenenAdres) {
   );
   return { gecenSayi, bulunanlar, yabanciIp };
 }
-
-/* ================================================================== *
- * GÜNCELLEME KANALI — API ADRESİNDEN AYRI
- * ================================================================== *
- * Sabitler `feed.cjs`te yaşar ve buradan yeniden dışa açılır.
- *
- * ⚠️ NEDEN CommonJS: `app.config.js` (Expo yapılandırması) CommonJS'tir ve bir
- * `.mjs` dosyasını `require` EDEMEZ. Sabiti oraya kopyalamak "iki kaynak"
- * demekti — ve bu dosyanın başındaki uyarının (üçüncü ısırık) tam olarak
- * anlattığı hata. `.cjs` dosyasını hem CommonJS `require` edebilir hem ESM
- * `import` — tek kaynak korunur.
- * ================================================================== */
-
-export {
-  YAYIN_KOKU,
-  musteriOku,
-  feedUrl,
-  MOBIL_FEED_URL,
-  MULTIPART_BOUNDARY,
-  normalizeFeed,
-  guncellemeAdresiCoz,
-  manifestUrl,
-  apkKunyeUrl,
-} from './feed.cjs';

@@ -1,6 +1,10 @@
 // =============================================================================
-// TeksERP Mobil — Expo Updates manifest ÜRETİCİSİ (TEK KAYNAK)
+// TeksERP Mobil — Expo Updates manifest ÜRETİCİSİ (KALINTI)
 // =============================================================================
+// ⚠️ Tablet artık yalnız Google Play'den güncellenir; hiçbir yayın betiği bunu
+// çağırmaz. Yalnız backend'in OTA ucu bekçisi (`Teks-Erp/scripts/test_mobile_update.ts`)
+// okur — o uç kalkınca silinir.
+//
 // Manifest'i üreten TEK yer burasıdır. Sunucu (nginx ya da fabrika backend'i)
 // yalnız üretilen baytları servis eder.
 //

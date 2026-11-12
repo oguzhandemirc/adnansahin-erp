@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SurumNotuKarti } from '../../../components/SurumNotuKarti';
-import { kuruluVersionName } from '../../../services/appUpdate.service';
+import { kuruluVersionName } from '../../../services/appVersion';
 import { tumYayinlar } from '../../../services/surumNotlari';
 import { SETTINGS_COLORS as C, SettingsPage } from './settingsUi';
 

@@ -3,6 +3,7 @@ import {
   isIdle,
   offeredFlow,
   decidePlayUpdate,
+  manualCheckOutcome,
   type PlayDecisionInput,
   type PlayQuery,
 } from './playUpdate';
@@ -86,6 +87,22 @@ describe('onerilenAkis', () => {
   });
 });
 
+describe('manualCheckOutcome — Ayarlar elle denetim', () => {
+  it('Play dışı kurulumda akış başlatmaz, bilgi verir', () => {
+    expect(manualCheckOutcome(false, AVAILABLE).action).toBe('bilgi');
+  });
+  it('yeni sürüm varsa izinli akışı başlatır; yarıda kalan akış tam ekran sürer', () => {
+    expect(manualCheckOutcome(true, AVAILABLE)).toEqual({ action: 'baslat', flow: 'esnek' });
+    expect(manualCheckOutcome(true, { kind: 'suruyor' })).toEqual({ action: 'baslat', flow: 'hemen' });
+  });
+  it('güncel / indiriliyor / indirildi bilgi; Play hatası hata', () => {
+    expect(manualCheckOutcome(true, { kind: 'yok' }).action).toBe('bilgi');
+    expect(manualCheckOutcome(true, { kind: 'indirildi' }).action).toBe('bilgi');
+    expect(manualCheckOutcome(true, { kind: 'hata' }).action).toBe('hata');
+    expect(manualCheckOutcome(true, { kind: 'var', immediateAllowed: false, flexibleAllowed: false }).action).toBe('bilgi');
+  });
+});
+
 describe('bostaMi', () => {
   it('ana menü + kuyruk boş → boşta', () => {
     expect(isIdle('ModuleSelect', 0)).toBe(true);
@@ -110,9 +127,8 @@ describe('yerel katman (taklit) — fail-open sarmalayıcı', () => {
     return require('./playUpdate') as typeof import('./playUpdate');
   }
 
-  it('modül yoksa: Play dağıtımı değil, sorgu hata, başlatma false', async () => {
+  it('modül yoksa: Play kurulumu değil, sorgu hata, başlatma false', async () => {
     const m = load(null);
-    expect(m.isPlayDistribution()).toBe(false);
     expect(m.installedFromPlay()).toBe(false);
     await expect(m.queryPlay()).resolves.toEqual({ kind: 'hata' });
     await expect(m.startPlayUpdate('esnek')).resolves.toBe(false);
@@ -136,7 +152,6 @@ describe('yerel katman (taklit) — fail-open sarmalayıcı', () => {
         throw new Error('x');
       },
     });
-    expect(m.isPlayDistribution()).toBe(true);
     expect(m.installedFromPlay()).toBe(false);
     await expect(m.queryPlay()).resolves.toEqual({ kind: 'hata' });
     await expect(m.startPlayUpdate('hemen')).resolves.toBe(false);

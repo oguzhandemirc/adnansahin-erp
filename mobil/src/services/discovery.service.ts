@@ -6,7 +6,7 @@
  * modül) ve `expo prebuild` gerekirdi — o da belgelenmiş bir saha regresyonu
  * riski taşıyor (2026-08-15: prebuild manifesti sıfırladı, `usesCleartextTraffic`
  * düştü, HER istek "Network Error"). Tarama ayağı yeni yerel modül İSTEMEZ,
- * hiçbir multicast filtresine takılmaz ve OTA ile gidebilir.
+ * hiçbir multicast filtresine takılmaz.
  *
  * ⚠️ SIRA LOAD-BEARING: önce OLASI adresler (kayıtlı/son kullanılan/gömülü
  * varsayılan/tipik sunucu IP'leri), sonra tam süpürme. HIZLI kipte (arka plan

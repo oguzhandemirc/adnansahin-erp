@@ -1,41 +1,21 @@
 // =============================================================================
-// TeksERP Mobil — uzaktan güncelleme kapısı
+// TeksERP Mobil — güncelleme kapısı (tek karar noktası)
 // =============================================================================
-// Görünmez bileşen. İki iş yapar:
-//
-//  1) Uygulama ÖN PLANA döndüğünde güncelleme sorar (açılışta zaten
-//     `checkAutomatically: ON_LOAD` soruyor). Fabrikada tablet vardiya boyunca
-//     açık kalır; yalnız açılışta sormak, günler boyunca güncelleme almayan
-//     cihazlar üretirdi.
-//
-//  3) Play dağıtımında (native sürüm Play'den) uygulama içi güncellemeyi
-//     gösterir: zorunluysa tam ekran Play akışı + kilit, değilse "Güncelle"
-//     kartı; yalnız operatör boştayken (`usePlayUpdate`). APK künyesi o
-//     ikilide hiç okunmaz. Hangi türün hangi ekranla gösterileceği BURADA seçilir.
-//
-//  2) İndirilmiş güncelleme varsa UYGULAR (kullanıcı kararı: "hemen yenilesin").
-//     Tek kapı: gönderilmemiş istasyon kaydı varken yenilemez — bkz.
-//     `guvenliYenile`. Tavan dolarsa yenileme atlanır, paket kaybolmaz.
-//
-// ⚠️ Yenileme sırasında kısa bir örtü basılır. Bunun sebebi estetik değil:
-// `reloadAsync` uygulamayı aniden yeniden başlatır ve operatör hiçbir açıklama
-// olmadan ekranın sıfırlandığını görürse bunu ÇÖKME sanar (sahada "tablet
-// kendi kendine kapandı" olarak raporlanır ve gerçek çökme aramasına yol açar).
+// Görünmez bileşen. Güncellemenin TEK yolu Google Play'dir:
+//  · Sunucu politikası (`/api/client-policy/mobil`) bu sürümü eski sayıyorsa
+//    Play'in zorunlu (tam ekran) akışı açılır ve kilit örtüsü basılır.
+//  · Değilse isteğe bağlı sürüm "Güncelle" kartıyla önerilir.
+// İkisi de yalnız operatör boştayken (`usePlayUpdate`). Play dışı kurulumda
+// Play yolu susar; politika şeridi yine görünür.
 // =============================================================================
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
+import { AppState, StyleSheet, Text, View } from 'react-native';
 import { Button } from 'react-native-paper';
-import * as Updates from 'expo-updates';
 import { useAuthStore } from '../store/authStore';
 
-import {
-  apkDurumu,
-  apkIndirVeKur,
-  bekleyenYazimSayisi,
-  guvenliYenile,
-  kuruluVersionName,
-} from '../services/appUpdate.service';
+import { kuruluVersionName } from '../services/appVersion';
+import { bekleyenYazimSayisi } from '../offline/pendingStationWrites';
 import {
   kilitlenmeliMi,
   politikaDegerlendir,
@@ -44,168 +24,72 @@ import {
 } from '../services/clientPolicy.service';
 import { usePlayUpdate } from '../hooks/usePlayUpdate';
 import PlayUpdateCard from './PlayUpdateCard';
-import { isPlayDistribution } from '../services/playUpdate';
+import { installedFromPlay } from '../services/playUpdate';
 import { colors } from '../theme/tokens';
 
-/** Ön plana her dönüşte sormak gereksiz trafik — en az bu kadar ara olsun. */
-const SORMA_ARALIGI_MS = 10 * 60 * 1000;
-
 export default function UpdateGate() {
-  const { isUpdatePending } = Updates.useUpdates();
   const [politikaDurum, setPolitikaDurum] = useState<PolitikaDurumu>({ eski: false, sebep: null });
-  const [apkHazir, setApkHazir] = useState(false);
-  const [apkUrl, setApkUrl] = useState<string | null>(null);
-  const [kuruluyor, setKuruluyor] = useState(false);
-  const [yenileniyor, setYenileniyor] = useState(false);
-  const sonSorma = useRef(0);
-  const yenilemeBasladi = useRef(false);
-  const play = usePlayUpdate(politikaDurum.sebep === 'apk');
-  const playMode = isPlayDistribution();
+  const play = usePlayUpdate(politikaDurum.eski);
 
-  /* --- (1) Ön plana dönüşte sor ------------------------------------ */
-  const sor = useCallback(async () => {
-    if (!Updates.isEnabled) return;
-    if (Date.now() - sonSorma.current < SORMA_ARALIGI_MS) return;
-    sonSorma.current = Date.now();
-    try {
-      const sonuc = await Updates.checkForUpdateAsync();
-      if (sonuc.isAvailable) await Updates.fetchUpdateAsync();
-    } catch {
-      // Sunucuya ulaşılamaması NORMAL bir durumdur (ağ kopması, sunucu
-      // yeniden başlıyor). Operatöre gösterilecek bir şey yok.
-    }
-  }, []);
-
-  /* --- (1b) Sürüm politikası ------------------------------------- */
   const politikaKontrol = useCallback(async () => {
     const politika = await politikaOku();
-    const durum = politikaDegerlendir({
-      politika,
-      apkSurumu: kuruluVersionName(),
-      paketTarihi: Updates.createdAt,
-    });
-    setPolitikaDurum(durum);
-    // Kilit KOŞULLU: "düzeltme kurulabilir mi" sorusunun cevabı sebebe göre
-    // farklı yerde — paket ekseninde indirilmiş güncelleme, APK ekseninde
-    // sunucudaki kurulum dosyası.
-    if (durum.sebep === 'apk' && !isPlayDistribution()) {
-      const a = await apkDurumu();
-      setApkHazir(a.yeniVarMi);
-      setApkUrl(a.kunye?.indirmeUrl ?? null);
-    }
+    setPolitikaDurum(politikaDegerlendir({ politika, apkSurumu: kuruluVersionName() }));
   }, []);
 
   useEffect(() => {
     void politikaKontrol();
-  }, [politikaKontrol]);
-
-  useEffect(() => {
     const sub = AppState.addEventListener('change', (durum) => {
-      if (durum === 'active') {
-        void sor();
-        void politikaKontrol();
-      }
+      if (durum === 'active') void politikaKontrol();
     });
     return () => sub.remove();
-  }, [sor, politikaKontrol]);
+  }, [politikaKontrol]);
 
-  /* --- (1c) HER GİRİŞTE sor (kullanıcı isteği) ---------------------
-   * Ön plana dönüş tetiği 10 dakikalık bir aralıkla sınırlı; tablet vardiya
-   * boyunca açık kaldığı için o aralık çoğu zaman doludur. Oturum açılışı ayrı
-   * bir tetiktir ve aralığı BİLEREK sıfırlar: vardiya değişiminde giren kişi,
-   * bir öncekinin 9 dakika önce yaptığı kontrolün gölgesinde kalmamalı. */
+  // Her girişte taze politika: vardiya değişiminde giren kişi eski sonucun gölgesinde kalmasın.
   const token = useAuthStore((st) => st.token);
   const oncekiToken = useRef<string | null>(null);
   useEffect(() => {
     const girisOldu = !oncekiToken.current && !!token;
     oncekiToken.current = token;
-    if (!girisOldu) return;
-    sonSorma.current = 0; // aralığı sıfırla — giriş her zaman taze kontrol hak eder
-    void sor();
-    void politikaKontrol();
-  }, [token, sor, politikaKontrol]);
+    if (girisOldu) void politikaKontrol();
+  }, [token, politikaKontrol]);
 
-  /* --- (2) İndirilmişi uygula -------------------------------------- */
-  useEffect(() => {
-    if (!isUpdatePending || yenilemeBasladi.current) return;
-    yenilemeBasladi.current = true;
-    setYenileniyor(true);
-    void (async () => {
-      const sonuc = await guvenliYenile();
-      if (sonuc !== 'yenilendi') {
-        // Ertelendi: kuyruk boşalmadı. Örtüyü kaldır — operatör çalışmaya
-        // devam etsin; paket bir sonraki açılışta uygulanır.
-        setYenileniyor(false);
-        yenilemeBasladi.current = false;
-      }
-      // 'yenilendi' dalında bu kod zaten çalışmaz (uygulama yeniden başladı).
-    })();
-  }, [isUpdatePending]);
-
-  /* --- Render ------------------------------------------------------ */
-
-  if (yenileniyor) {
-    return (
-      <View style={styles.ortu} pointerEvents="auto">
-        <ActivityIndicator size="large" color={colors.brand} />
-        <Text style={styles.baslik}>Yeni sürüm uygulanıyor</Text>
-        <Text style={styles.alt}>Uygulama birkaç saniye içinde yeniden açılacak.</Text>
-      </View>
-    );
-  }
-
-  const duzeltmeHazir =
-    politikaDurum.sebep === 'apk' ? (playMode ? play.decision === 'hemen' : apkHazir) : isUpdatePending;
   const bekleyen = bekleyenYazimSayisi();
-  const kilit = kilitlenmeliMi({ durum: politikaDurum, duzeltmeHazir, bekleyenYazim: bekleyen });
+  const kilit = kilitlenmeliMi({
+    durum: politikaDurum,
+    duzeltmeHazir: play.decision === 'hemen',
+    bekleyenYazim: bekleyen,
+  });
 
-  // KİLİT — yalnız düzeltme gerçekten kurulabilirken ve kuyruk boşken.
+  // KİLİT — yalnız Play zorunlu akışı açılabilirken ve kuyruk boşken.
   if (kilit) {
     return (
       <View style={styles.ortu} pointerEvents="auto">
         <Text style={styles.baslik}>Güncelleme gerekli</Text>
         <Text style={styles.alt}>
-          {politikaDurum.sebep === 'apk'
-            ? playMode
-              ? 'Sunucu daha yeni bir uygulama sürümü bekliyor. Google Play’den güncelleyin.'
-              : 'Sunucu daha yeni bir uygulama sürümü bekliyor. Kurulum dosyası hazır.'
-            : 'Sunucu daha yeni bir sürüm bekliyor. Güncelleme indirildi, uygulanmayı bekliyor.'}
+          Sunucu daha yeni bir uygulama sürümü bekliyor. Google Play’den güncelleyin.
         </Text>
         <Button
           mode="contained"
-          loading={kuruluyor}
-          disabled={kuruluyor}
           buttonColor={colors.brand}
           style={styles.dugme}
-          onPress={() => {
-            if (politikaDurum.sebep === 'apk' && playMode) {
-              play.update(true);
-            } else if (politikaDurum.sebep === 'apk') {
-              if (!apkUrl) return;
-              setKuruluyor(true);
-              void apkIndirVeKur(apkUrl).finally(() => setKuruluyor(false));
-            } else {
-              void guvenliYenile();
-            }
-          }}
+          onPress={() => play.update(true)}
         >
-          {politikaDurum.sebep === 'apk' ? (playMode ? 'Güncelle' : 'İndir ve kur') : 'Şimdi yenile'}
+          Güncelle
         </Button>
       </View>
     );
   }
 
-  // ŞERİT — sürüm eski ama düzeltme henüz kurulabilir değil (örn. internet yok)
-  // ya da gönderilmemiş kayıt var. Uyarı kaybolmaz, üretim durmaz.
+  // ŞERİT — sürüm eski ama kilit koşulu yok (iş ekranı, kuyruk, internet). Üretim durmaz.
   if (politikaDurum.eski) {
     return (
       <View style={styles.serit} pointerEvents="box-none">
         <Text style={styles.seritMetin}>
           {bekleyen > 0
             ? `Sürümünüz eski · ${bekleyen} kayıt gönderilince güncellenecek`
-            : playMode && politikaDurum.sebep === 'apk'
+            : installedFromPlay()
               ? 'Sürümünüz eski · ana menüye dönünce güncellenecek'
-              : 'Sürümünüz eski · güncelleme indirilir indirilmez uygulanacak'}
+              : 'Sürümünüz eski · Google Play’den güncelleyin'}
         </Text>
       </View>
     );

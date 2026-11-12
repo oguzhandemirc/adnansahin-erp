@@ -1,5 +1,5 @@
 // =============================================================================
-// BEKÇİ: istemci sürüm politikası — İKİ EKSEN + KOŞULLU KİLİT
+// BEKÇİ: istemci sürüm politikası — SÜRÜM EKSENİ + KOŞULLU KİLİT
 // =============================================================================
 // ⚠️ Buradaki hataların ikisi de sahada geri dönüşü pahalı:
 //  · Fazla gevşek → eski tablet yeni backend'e yazmaya devam eder, alan
@@ -33,66 +33,28 @@ describe('surumKarsilastir', () => {
 
 describe('politikaDegerlendir — APK ekseni', () => {
   it('eski APK eskidir', () => {
-    expect(politikaDegerlendir({ politika: POL, apkSurumu: '2.9.7', paketTarihi: null }))
+    expect(politikaDegerlendir({ politika: POL, apkSurumu: '2.9.7' }))
       .toEqual({ eski: true, sebep: 'apk' });
   });
   it('eşit/yeni APK eski değildir', () => {
-    expect(politikaDegerlendir({ politika: POL, apkSurumu: '2.9.8', paketTarihi: null }).eski)
+    expect(politikaDegerlendir({ politika: POL, apkSurumu: '2.9.8' }).eski)
       .toBe(false);
-    expect(politikaDegerlendir({ politika: POL, apkSurumu: '3.0.0', paketTarihi: null }).eski)
+    expect(politikaDegerlendir({ politika: POL, apkSurumu: '3.0.0' }).eski)
       .toBe(false);
   });
 });
 
-describe('politikaDegerlendir — PAKET ekseni (mobile özel)', () => {
-  const polPaket: IstemciPolitikasi = { ...POL, minPaketTarihi: '2026-08-27T00:00:00.000Z' };
-
-  it('APK güncel ama JS paketi eskiyse YAKALAR', () => {
-    // Masaüstü modelinin göremediği durum: versionName doğru, JS eski.
-    const d = politikaDegerlendir({
-      politika: polPaket,
-      apkSurumu: '2.9.8',
-      paketTarihi: new Date('2026-08-20T00:00:00.000Z'),
-    });
-    expect(d).toEqual({ eski: true, sebep: 'paket' });
-  });
-
-  it('yeni paket geçer', () => {
-    expect(politikaDegerlendir({
-      politika: polPaket,
-      apkSurumu: '2.9.8',
-      paketTarihi: new Date('2026-08-28T00:00:00.000Z'),
-    }).eski).toBe(false);
-  });
-
-  it('⚠️ hiç OTA almamış tablet (paketTarihi null) ESKİ SAYILMAZ', () => {
-    // Gömülü paket APK ile aynı yaşta; `null`ı "çok eski" saymak YENİ kurulmuş
-    // her tableti kilitlerdi — kapının en kolay yapacağı zarar.
-    expect(politikaDegerlendir({ politika: polPaket, apkSurumu: '2.9.8', paketTarihi: null }).eski)
-      .toBe(false);
-  });
-
-  it('APK de paket de eskiyse sebep APK (çözüm kurulum dosyası)', () => {
-    const d = politikaDegerlendir({
-      politika: polPaket,
-      apkSurumu: '2.9.7',
-      paketTarihi: new Date('2026-08-01T00:00:00.000Z'),
-    });
-    expect(d.sebep).toBe('apk');
-  });
-
-  it('bozuk tarih yok sayılır (fail-open)', () => {
-    expect(politikaDegerlendir({
-      politika: { ...POL, minPaketTarihi: 'çöp' },
-      apkSurumu: '2.9.8',
-      paketTarihi: new Date('2020-01-01T00:00:00.000Z'),
-    }).eski).toBe(false);
+describe('politikaDegerlendir — paket tarihi ekseni YOK', () => {
+  it('sunucu minPaketTarihi gönderse de yok sayılır', () => {
+    const eskiSunucu = { ...POL, minPaketTarihi: '2099-01-01T00:00:00.000Z' } as IstemciPolitikasi;
+    expect(politikaDegerlendir({ politika: eskiSunucu, apkSurumu: '2.9.8' }))
+      .toEqual({ eski: false, sebep: null });
   });
 });
 
 describe('FAIL-OPEN', () => {
   it('politika yoksa tablet ESKİ sayılmaz', () => {
-    expect(politikaDegerlendir({ politika: null, apkSurumu: '1.0.0', paketTarihi: null }).eski)
+    expect(politikaDegerlendir({ politika: null, apkSurumu: '1.0.0' }).eski)
       .toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from 'react-native-paper';
 import { SETTINGS_COLORS as C } from '../screens/Common/settings/settingsUi';
-import { kuruluVersionName } from '../services/appUpdate.service';
+import { kuruluVersionName } from '../services/appVersion';
 import {
   SURUM_NOTLARI,
   damgalanacakId,
@@ -21,9 +21,9 @@ import { SurumNotuKarti } from './SurumNotuKarti';
  * context'ini görmüyor. Burada `UpdateGate`'in kendi kanıtlanmış deseni var:
  * düz `View` + `StyleSheet.absoluteFill`.
  *
- * ⚠️ Karar AÇILIŞTA verilir. OTA uygulandığında `Updates.reloadAsync()` JS'i
- * öldürüyor — "yenilemeden önce" hiçbir durum taşınamaz. Yeni boot = yeni paket
- * + yeni not dosyası + eski işaret → doğru sonuç kendiliğinden çıkıyor.
+ * ⚠️ Karar AÇILIŞTA verilir: Play güncellemesi uygulamayı yeniden başlatır.
+ * Yeni açılış = yeni sürüm + yeni not dosyası + eski işaret → doğru sonuç
+ * kendiliğinden çıkıyor.
  *
  * ⚠️ Yalnız "Tamam" ile kapanır: kazara kapatılan not, okunmamış nottur.
  */

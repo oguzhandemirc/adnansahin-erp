@@ -1,17 +1,16 @@
 // Play uygulama içi güncellemenin durum kancası — sorar, olayları dinler, kararı verir.
-// Karar saf yüklemdedir (`services/playGuncelleme.ts`); ekranı `UpdateGate` seçer (tek karar noktası).
+// Karar saf yüklemdedir (`services/playUpdate.ts`); ekranı `UpdateGate` seçer (tek karar noktası).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 
 import { rootNavigationRef } from '../navigation/navigationRef';
-import { bekleyenYazimSayisi } from '../services/appUpdate.service';
+import { bekleyenYazimSayisi } from '../offline/pendingStationWrites';
 import {
   PLAY_CHECK_INTERVAL_MS,
   isIdle,
   offeredFlow,
   startPlayUpdate,
-  isPlayDistribution,
   decidePlayUpdate,
   onPlayEvent,
   queryPlay,
@@ -23,7 +22,7 @@ import {
 import { withSystemDialog } from '../store/lockStore';
 import { useAuthStore } from '../store/authStore';
 
-/** Oturum açılışı ayrı tetiktir ve aralığı sıfırlar (UpdateGate'teki OTA kuralının aynısı). */
+/** Oturum açılışı ayrı tetiktir ve aralığı sıfırlar: vardiya değişiminde giren kişi taze denetim alır. */
 function useCheckOnLogin(check: (force?: boolean) => Promise<void>) {
   const token = useAuthStore((st) => st.token);
   const prevToken = useRef<string | null>(null);
@@ -45,7 +44,7 @@ export interface PlayUpdateState {
 }
 
 export function usePlayUpdate(mandatory: boolean): PlayUpdateState {
-  const enabled = useRef(isPlayDistribution() && installedFromPlay()).current;
+  const enabled = useRef(installedFromPlay()).current;
   const [query, setQuery] = useState<PlayQuery | null>(null);
   const [online, setOnline] = useState<boolean | null>(null);
   const [screen, setScreen] = useState<string | undefined>(undefined);

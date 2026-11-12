@@ -44,8 +44,9 @@
  * gürültülü biçimde durur. "Belki doğrudur" diye APK bırakmaz — doğrulama
  * başarısızsa üretilen dosya kanonik yolundan taşınır (aşağıya bkz.).
  *
- * KANAL (2026-09-27): `--musteri=<kod>` hedef kanaldır (niyet); kimlik — paket adı,
- * görünen ad, güncelleme adresi, OTA sertifikası, ERP adresi — `deploy/kanallar.json`dan.
+ * KANAL: `--musteri=<kod>` hedef kanaldır (niyet); kimlik — paket adı, görünen ad,
+ * ERP adresi — `deploy/kanallar.json`dan. Tablet yalnız Google Play'den güncellenir:
+ * pakette uzaktan kod güncellemesi (expo-updates) yapılandırması bulunmaz ve bu ölçülür.
  * Çocuk süreçlere `TEKSERP_KANAL` geçer (app.config.js kimliği onunla uygular); APK'nın
  * kendi kimliği derlemeden SONRA ölçülür, hedef kanalınki değilse paket reddedilir.
  *
@@ -75,11 +76,10 @@ import {
   adresiCoz as adresiCozPaylasilan,
   envDosyasiOku,
   ENV_DOSYALARI,
-  manifestUrl,
   bundleAdresOlcumu,
 } from './lib/adres.mjs';
 import { zipGirdisiOku } from './lib/zip.mjs';
-import { ApkOlculemedi, apkKimligi, axmlOgeleri, sertifikaParmakIzi } from './lib/apk-kimlik.mjs';
+import { ApkOlculemedi, apkKimligi, axmlOgeleri } from './lib/apk-kimlik.mjs';
 import { KANAL_ORTAM, tabletYapilandirmaFarki } from './lib/kanal.cjs';
 import { KAYIT_REL, Olculemedi, erpAdresiEsit, kanalCoz } from '../../scripts/lib/kanallar.mjs';
 
@@ -156,7 +156,7 @@ function kanalKapisi() {
   if (!kod) {
     dur(
       'HANGİ KANAL İÇİN DERLENİYOR?',
-      '`--musteri=<kod>` zorunludur. Paket adı, güncelleme adresi, OTA sertifikası ve',
+      '`--musteri=<kod>` zorunludur. Paket adı, görünen ad ve',
       'ERP adresi pakete gömülür; yanlış kanal, o kanalın tabletlerine BAŞKA bir kanalın',
       'kimliğini taşır (sessiz).',
       '',
@@ -175,7 +175,7 @@ function kanalKapisi() {
   if (ortamdaki && ortamdaki !== kod) {
     dur('KANAL ÇELİŞKİSİ', `komutta           : ${kod}`, `${KANAL_ORTAM} ortamı : ${ortamdaki}`, 'İkisi aynı kanalı söylemeli.');
   }
-  // Gradle'ın koşturduğu expo-constants / expo-updates adımları yapılandırmayı bu kanalla gömer.
+  // Gradle'ın koşturduğu expo-constants adımı yapılandırmayı bu kanalla gömer.
   process.env[KANAL_ORTAM] = kod;
   return { kod, kanal };
 }
@@ -194,24 +194,6 @@ function erpKanalKapisi(adres, kaynak, kod, kanal) {
   }
 }
 
-/** Uygulamanın `runtimeVersion`ı — app.json kanaldan bağımsızdır (uyum kimliği). */
-function rvOku() {
-  try {
-    return String(JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'app.json'), 'utf8')).expo?.runtimeVersion ?? '');
-  } catch {
-    return '';
-  }
-}
-
-/** Kanalın OTA sertifikasının DER parmak izi; dosya yoksa null (çağıran ölçülemedi der). */
-function kanalSertifikaIzi(kanal) {
-  try {
-    return sertifikaParmakIzi(fs.readFileSync(path.join(PROJECT_ROOT, kanal.tablet.otaSertifika), 'utf8'));
-  } catch {
-    return null;
-  }
-}
-
 /** Kanal derlemesi için prebuild komutu — mesajlarda tek yazım. */
 const prebuildKomutu = (kod) => `${KANAL_ORTAM}=${kod} npx expo prebuild --platform android --clean --no-install`;
 
@@ -221,9 +203,6 @@ const prebuildKomutu = (kod) => `${KANAL_ORTAM}=${kod} npx expo prebuild --platf
 
 /** Basit `.env` ayrıştırıcı — dotenv'in bize lazım olan alt kümesi. */
 // Adres çözümü ARTIK PAYLAŞILAN MODÜLDE: `scripts/lib/adres.mjs`.
-// Sebep: uzaktan güncelleme paketini üreten `yayinla-ota.mjs` de AYNI adresi
-// çözmek zorunda. İki kopya, aynı gün üretilen APK ile paketin farklı sunucuya
-// bakmasına yol açardı — ve bu ayrışma hiçbir hata basmaz.
 
 /** Çözülen adresi kullanılabilirlik açısından denetler; sorun varsa DURUR. */
 function adresiDogrula(adres, kaynak) {
@@ -454,21 +433,18 @@ function surumBas() {
 }
 
 /* ------------------------------------------------------------------ *
- * (f2) Sürüm notu kapısı — APK yolunun OTA ikizi
+ * (f2) Sürüm notu kapısı
  * ------------------------------------------------------------------ */
 
 /**
- * Not yazılmadan sürüm çıkmaz (kök CLAUDE.md). OTA yolu (`yayinla-ota.mjs`) bu
- * kapıyı taşıyordu, APK yolu TAŞIMIYORDU (ölçüldü 2026-09-14, `docs/RECETELER.md`
- * boşluk listesi): native değişiklikle çıkan bir sürüm notsuz sahaya gidebiliyor,
- * eksiklik ancak bir sonraki OTA turunda görülüyordu.
+ * Not yazılmadan sürüm çıkmaz (kök CLAUDE.md); Play'e giden her paket bu derlemeden geçer.
  *
  * ⚠️ ÜÇ SONUÇ: yeşil · kırmızı · ÖLÇÜLEMEDİ (app.json'dan sürüm okunamadı).
  * Üçüncüsü de DURDURUR — sürümü okunamayan paket için "notu var" denemez ve
  * sessiz atlama bu kapıyı süse çevirirdi.
  *
  * ⚠️ DAİRESEL DEĞİL: beklenen sürüm app.json'dan OKUNUP bekçiye ARGÜMAN verilir;
- * not dosyası onu üretmez, yalnız doğrular (OTA yolundaki emsalin aynısı).
+ * not dosyası onu üretmez, yalnız doğrular.
  */
 function surumNotuKapisi(s) {
   baslik('SÜRÜM NOTU KAPISI');
@@ -650,7 +626,7 @@ function apkDogrula(beklenenAdres, { derlemeBaslangici, apkYolu = APK_PATH } = {
   // üretir (2026-07-31 gecesi tam olarak bu yaşandı).
   const metin = veri.toString('latin1');
 
-  // Ölçüm TEK yardımcıda (lib/adres.mjs) — OTA üretimi ve yayın kapısı da onu kullanır.
+  // Ölçüm TEK yardımcıda (lib/adres.mjs).
   const { gecenSayi, bulunanlar, yabanciIp } = bundleAdresOlcumu(metin, beklenenAdres);
   bilgi(`Bundle boyutu   : ${(veri.length / 1024 / 1024).toFixed(1)} MB`);
   bilgi(`Aranan adres    : ${beklenenAdres}`);
@@ -697,25 +673,15 @@ function apkDogrula(beklenenAdres, { derlemeBaslangici, apkYolu = APK_PATH } = {
  * ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ *
- * Uzaktan güncelleme kapısı — AndroidManifest gerçekten yapılandırıldı mı?
+ * Prebuild kimlik kapısı — android/ bu kanalın ve OTA'sız mı?
  * ------------------------------------------------------------------ */
 
 /**
- * ⚠️ NEDEN AYRI BİR KAPI: güncelleme adresi ve `runtimeVersion` APK'ya
- * `expo prebuild` sırasında AndroidManifest'e yazılır. Bu script prebuild
- * KOŞMAZ (`android/` zaten var kabul edilir), yani prebuild atlanırsa:
- *
- *   • `EXPO_UPDATE_URL` hiç yazılmaz → APK uzaktan güncelleme ALMAZ, ama
- *     her şey normal görünür. Sahaya bir daha ulaşamayacağınız bir paket
- *     kurmuş olursunuz ve bunu ancak ilk güncellemeyi göndermeye çalışınca
- *     anlarsınız.
- *   • Ya da manifest ESKİ adresi taşır → yeni sunucuya kurulan tabletler
- *     eski sunucudan güncelleme arar (sessiz).
- *
- * Bu, `usesCleartextTraffic`in 2026-08-15'te ısırdığı tuzağın birebir aynısı:
- * "prebuild çıktısı git dışıdır, elde kalan klasör doğru görünür".
+ * `android/` prebuild ÇIKTISIDIR ve git dışıdır: elde kalan eski klasör doğru görünür
+ * ama başka kanalın kimliğini ya da kaldırılmış expo-updates meta verisini taşıyabilir.
+ * Beklenen kimlik ağaçtan değil komut argümanından (kanal kaydı) çözülür.
  */
-function guncellemeKapisi(kod, kanal) {
+function prebuildKimlikKapisi(kod, kanal) {
   const manifestYol = path.join(ANDROID_DIR, 'app/src/main/AndroidManifest.xml');
   let manifest;
   try {
@@ -723,72 +689,6 @@ function guncellemeKapisi(kod, kanal) {
   } catch {
     dur('AndroidManifest.xml okunamadı', `Beklenen: ${manifestYol}`);
   }
-
-  const oku = (ad) => {
-    const re = new RegExp(
-      `<meta-data[^>]*android:name="${ad.replace(/\./g, '\\.')}"[^>]*android:value="([^"]*)"`,
-    );
-    const m = re.exec(manifest);
-    if (m) return m[1];
-    // Öznitelik sırası ters de yazılabilir.
-    const re2 = new RegExp(
-      `<meta-data[^>]*android:value="([^"]*)"[^>]*android:name="${ad.replace(/\./g, '\\.')}"`,
-    );
-    return re2.exec(manifest)?.[1] ?? null;
-  };
-
-  const appCfg = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'app.json'), 'utf8')).expo;
-  const rvBeklenen = String(appCfg.runtimeVersion ?? '');
-
-  // ⚠️⚠️ BEKLENEN KİMLİK AĞAÇTAN DEĞİL, KOMUT ARGÜMANINDAN (kanal kaydı) GELİR.
-  //
-  // Bu, kapının çalışmasının TEK sebebi: `app.config.js` adresi aynı kaynaktan
-  // türetseydi ve beklenen de oradan gelseydi, yanlış kanal ikisinde de aynı yanlışı
-  // söyler ve kapı geçerdi. GENEL KURAL: beklenen değeri, gerçek değerle AYNI
-  // kaynaktan alan bir kapı, o kaynağın yanlış olmasını yakalayamaz — beklenen değer
-  // bağımsız bir NİYETTEN (`--musteri`) çözülür.
-  const beklenenUrl = manifestUrl(kanal.yayin.mobilFeed, rvBeklenen);
-
-  // ⚠️ Manifest değeri LİTERAL OLMAYABİLİR: expo-updates `runtimeVersion`i
-  // `@string/expo_runtime_version` kaynak referansı olarak yazar. Doğrudan
-  // karşılaştırma yapan bir kapı burada HER ZAMAN kırmızı verir ve bir süre
-  // sonra "bu kapı zaten hep bağırıyor" diye devre dışı bırakılır — yani
-  // gerçek bir sapmada da susar. Referansı çöz.
-  const stringKaynagiCoz = (deger) => {
-    if (!deger || !deger.startsWith('@string/')) return deger;
-    const ad = deger.slice('@string/'.length);
-    try {
-      const xml = fs.readFileSync(
-        path.join(ANDROID_DIR, 'app/src/main/res/values/strings.xml'),
-        'utf8',
-      );
-      const m = new RegExp(`<string name="${ad}"[^>]*>([^<]*)</string>`).exec(xml);
-      return m ? m[1].trim() : deger;
-    } catch {
-      return deger;
-    }
-  };
-
-  const url = stringKaynagiCoz(oku('expo.modules.updates.EXPO_UPDATE_URL'));
-  const rv = stringKaynagiCoz(oku('expo.modules.updates.EXPO_RUNTIME_VERSION'));
-  const acik = oku('expo.modules.updates.ENABLED');
-
-  baslik('UZAKTAN GÜNCELLEME YAPILANDIRMASI');
-  bilgi(`Manifest ENABLED        : ${acik ?? '(yok)'}`);
-  bilgi(`Manifest EXPO_UPDATE_URL: ${url ?? '(yok)'}`);
-  bilgi(`Manifest RUNTIME_VERSION: ${rv ?? '(yok)'}`);
-
-  const sertifika = oku('expo.modules.updates.CODE_SIGNING_CERTIFICATE');
-  const imzaMeta = oku('expo.modules.updates.CODE_SIGNING_METADATA');
-  bilgi(`Manifest KOD İMZASI     : ${sertifika ? 'sertifika gömülü' : '(YOK)'}`);
-  bilgi(`Beklenen kanal          : ${kod} (komut argümanından)`);
-
-  // Prebuild çıktısının KİMLİĞİ: paket adı + görünen ad + gömülü OTA sertifikası.
-  // Kanal değişince `android/` yeniden üretilmeden derlenen APK eski kanalın kimliğiyle doğardı.
-  const xmlCoz = (v) => String(v ?? '')
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
-    .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
   const dosyadan = (rel, desen) => {
     try {
       return desen.exec(fs.readFileSync(path.join(ANDROID_DIR, rel), 'utf8'))?.[1] ?? null;
@@ -798,55 +698,40 @@ function guncellemeKapisi(kod, kanal) {
   };
   const paket = dosyadan('app/build.gradle', /applicationId\s+['"]([^'"]+)['"]/);
   const uygulamaAdi = dosyadan('app/src/main/res/values/strings.xml', /<string name="app_name"[^>]*>([^<]*)<\/string>/);
-  const beklenenIz = kanalSertifikaIzi(kanal);
+  const otaIzi = /expo\.modules\.updates\./.test(manifest);
+
+  baslik('PREBUILD KİMLİĞİ');
+  bilgi(`Beklenen kanal          : ${kod} (komut argümanından)`);
   bilgi(`Prebuild paket adı      : ${paket ?? '(yok)'}`);
   bilgi(`Prebuild görünen ad     : ${uygulamaAdi ?? '(yok)'}`);
+  bilgi(`OTA meta verisi         : ${otaIzi ? 'VAR' : 'yok'}`);
 
   const sorunlar = [];
-  if (acik !== 'true') sorunlar.push(`ENABLED "${acik ?? 'yok'}" (beklenen: true)`);
-  // ⚠️ Paket internetten geliyor: imzasız bir APK, sunucuya sızan birinin
-  // sahadaki HER tablete istediği kodu göndermesi demektir. Sertifika APK'ya
-  // gömülü DEĞİLSE istemci imzayı hiç KONTROL ETMEZ (FileDownloader.kt:559).
-  if (!sertifika) sorunlar.push('CODE_SIGNING_CERTIFICATE yok — istemci imzayı hiç kontrol etmez');
-  if (!imzaMeta) sorunlar.push('CODE_SIGNING_METADATA yok');
-  if (url !== beklenenUrl) sorunlar.push(`EXPO_UPDATE_URL "${url ?? 'yok'}" ≠ "${beklenenUrl}"`);
   if (paket !== kanal.tablet.androidPaket) sorunlar.push(`applicationId "${paket ?? 'yok'}" ≠ "${kanal.tablet.androidPaket}"`);
   if (uygulamaAdi !== kanal.tablet.gorunenAd) sorunlar.push(`app_name "${uygulamaAdi ?? 'yok'}" ≠ "${kanal.tablet.gorunenAd}"`);
-  if (!beklenenIz) sorunlar.push(`kanalın OTA sertifikası okunamadı: ${kanal.tablet.otaSertifika} (keystore/ git dışıdır — yedekten geri koy)`);
-  else if (sertifika && sertifikaParmakIzi(xmlCoz(sertifika)) !== beklenenIz) {
-    sorunlar.push(`gömülü OTA sertifikası "${kod}" kanalınınki değil (${kanal.tablet.otaSertifika})`);
-  }
-  if (rvBeklenen && rv !== rvBeklenen)
-    sorunlar.push(`EXPO_RUNTIME_VERSION "${rv ?? 'yok'}" ≠ app.json "${rvBeklenen}"`);
+  if (otaIzi) sorunlar.push('AndroidManifest expo.modules.updates.* meta verisi taşıyor — tablet yalnız Google Play\'den güncellenir');
 
   if (sorunlar.length) {
     dur(
-      'ANDROIDMANIFEST UZAKTAN GÜNCELLEMEYE HAZIR DEĞİL',
+      'ANDROID/ BU KANALIN PREBUILD ÇIKTISI DEĞİL',
       ...sorunlar.map((x) => `• ${x}`),
       '',
       `Sebep neredeyse her zaman aynı: \`expo prebuild\` "${kod}" kanalıyla koşulmadı.`,
-      'android/ klasörü git dışıdır ve prebuild ÇIKTISIDIR — elde kalan eski',
-      'klasör doğru görünür ama eski (ya da başka kanalın) kimliğini taşır.',
-      '',
-      'Çözüm (kanal değişiminde --clean şart: paket adı Kotlin dizinlerini de değiştirir):',
+      'Çözüm (--clean şart: paket adı Kotlin dizinlerini de değiştirir):',
       `  ${prebuildKomutu(kod)}`,
       `  sonra tekrar: npm run build:apk -- --musteri=${kod}`,
-      '',
-      '⚠️ prebuild sonrası cleartext bayrağını da doğrula:',
-      "  grep -o 'usesCleartextTraffic=\"[^\"]*\"' android/app/src/main/AndroidManifest.xml",
     );
   }
-  bilgi('✔ Uzaktan güncelleme yapılandırması APK ile tutarlı.');
+  bilgi('✔ Prebuild kimliği kanalla tutarlı, OTA yapılandırması yok.');
 }
 
 /**
  * KANAL KİMLİĞİ (K3) — APK'nın KENDİSİ hedef kanalın mı?
  *
- * ⚠️ Prebuild çıktısını (guncellemeKapisi) ölçmek YETMEZ: Gradle yapılandırmayı derleme
- * anında YENİDEN değerlendirir (expo-constants `assets/app.config`, expo-updates gömülü
- * manifest) ve ortamda kanal yoksa dinlenme kimliğini gömer. O APK başka kanalın paket
- * adıyla kurulur ama APK künyesini FABRİKA kanalından okur — sessiz. Otorite paketin
- * kendisidir: paket adı + güncelleme adresi + OTA sertifikası + çalışma anı yapılandırması.
+ * ⚠️ Prebuild çıktısını (prebuildKimlikKapisi) ölçmek YETMEZ: Gradle yapılandırmayı derleme
+ * anında YENİDEN değerlendirir (expo-constants `assets/app.config`) ve ortamda kanal yoksa
+ * dinlenme kimliğini gömer. Otorite paketin kendisidir: paket adı + çalışma anı
+ * yapılandırması + expo-updates meta verisinin YOKLUĞU.
  */
 function apkKanalKapisi(apkYolu, kod, kanal) {
   baslik(`KANAL KİMLİĞİ — APK'nın kendisinden ("${kod}")`);
@@ -858,24 +743,17 @@ function apkKanalKapisi(apkYolu, kod, kanal) {
     apkyiReddet(apkYolu);
     dur('ÖLÇÜLEMEDİ — APK kimliği okunamadı', e.message, 'Kimliği ölçülemeyen paket sahaya kurulmaz.');
   }
-  const rv = rvOku();
-  const beklenenUrl = manifestUrl(kanal.yayin.mobilFeed, rv);
-  const beklenenIz = kanalSertifikaIzi(kanal);
   bilgi(`Paket adı (applicationId): ${k.paket}`);
-  bilgi(`Güncelleme adresi        : ${k.guncellemeAdresi ?? '(yok)'}`);
-  bilgi(`OTA sertifikası          : ${k.sertifikaPem ? 'gömülü' : '(YOK)'}`);
-  bilgi(`Çalışma anı yapılandırması: ${k.appConfig ? `"${k.appConfig.name}" · ${k.appConfig.updates?.url ?? '(adres yok)'}` : '(yok)'}`);
+  bilgi(`OTA meta verisi          : ${k.otaMeta.length ? k.otaMeta.join(', ') : 'yok'}`);
+  bilgi(`Çalışma anı yapılandırması: ${k.appConfig ? `"${k.appConfig.name}"` : '(yok)'}`);
 
   const sorunlar = [];
   if (k.paket !== kanal.tablet.androidPaket) sorunlar.push(`paket adı "${k.paket}" ≠ "${kanal.tablet.androidPaket}"`);
-  if (k.guncellemeAcik !== 'true') sorunlar.push(`expo-updates ENABLED "${k.guncellemeAcik ?? 'yok'}" (beklenen true)`);
-  if (k.guncellemeAdresi !== beklenenUrl) sorunlar.push(`EXPO_UPDATE_URL "${k.guncellemeAdresi ?? 'yok'}" ≠ "${beklenenUrl}"`);
-  if (!beklenenIz) sorunlar.push(`kanalın OTA sertifikası okunamadı: ${kanal.tablet.otaSertifika} — kıyas ÖLÇÜLEMEDİ`);
-  else if (!k.sertifikaPem || sertifikaParmakIzi(k.sertifikaPem) !== beklenenIz) {
-    sorunlar.push(`gömülü OTA sertifikası "${kod}" kanalınınki değil (${kanal.tablet.otaSertifika})`);
+  if (k.otaMeta.length) {
+    sorunlar.push(`expo-updates meta verisi pakette (${k.otaMeta.join(', ')}) — tablet yalnız Google Play'den güncellenir`);
   }
   if (!k.appConfig) sorunlar.push('assets/app.config yok ya da okunamadı — çalışma anı kimliği ÖLÇÜLEMEDİ');
-  else sorunlar.push(...tabletYapilandirmaFarki(kanal, k.appConfig, rv, { herkese: true }).map((x) => `assets/app.config ${x}`));
+  else sorunlar.push(...tabletYapilandirmaFarki(kanal, k.appConfig).map((x) => `assets/app.config ${x}`));
 
   if (sorunlar.length) {
     apkyiReddet(apkYolu);
@@ -1198,13 +1076,11 @@ async function main() {
     // yakalanmalı, 70 saniyelik derlemenin ortasında değil.
     const sCheck = surumBas();
     surumNotuKapisi(sCheck);
-    // Güncelleme kapısı ucuz yolda da koşar — "prebuild'i unuttum" hatası
-    // 70 saniyelik derlemenin sonunda değil, saniyeler içinde görünsün.
-    // android/ henüz üretilmemişse kapı atlanır (androidVarMi zaten söyler).
+    // Prebuild kapısı ucuz yolda da koşar — "prebuild'i unuttum" saniyeler içinde görünsün.
     if (fs.existsSync(path.join(ANDROID_DIR, 'app/src/main/AndroidManifest.xml'))) {
-      guncellemeKapisi(kod, kanal);
+      prebuildKimlikKapisi(kod, kanal);
     } else {
-      uyari('android/ klasörü yok — uzaktan güncelleme yapılandırması denetlenemedi.');
+      uyari('android/ klasörü yok — prebuild kimliği denetlenemedi.');
     }
     // ⚠️ ORTAM DENETİMİ EN SONDA VE --check'İN PARÇASI: derleme ortamı eksikse
     // bunu 6 dakikalık bir Gradle koşumunun ORTASINDA değil, ön kontrolde
@@ -1213,7 +1089,7 @@ async function main() {
     const ortamCheck = derlemeOrtami();
     bilgi(`Android SDK : ${ortamCheck.sdk}`);
     bilgi(`Java (JDK)  : ${ortamCheck.jdk}`);
-    console.log('\n  ✔ Ön kontrol tamam (--check): adres, sürüm, güncelleme yapılandırması ve derleme ortamı tutarlı. Derleme YAPILMADI.\n');
+    console.log('\n  ✔ Ön kontrol tamam (--check): adres, sürüm, prebuild kimliği ve derleme ortamı tutarlı. Derleme YAPILMADI.\n');
     return;
   }
 
@@ -1237,7 +1113,7 @@ async function main() {
   androidVarMi();
   const s = surumBas();
   surumNotuKapisi(s);
-  guncellemeKapisi(kod, kanal);
+  prebuildKimlikKapisi(kod, kanal);
 
   const derlemeBaslangici = Date.now();
   onbellekleriTemizle();
