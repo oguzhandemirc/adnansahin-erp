@@ -1,16 +1,17 @@
 // "Diğer" sekmesi: üstte hesap kartı (→ Profil), sonra sekmeye sığmayan bölümler gruplu, tam genişlik TEK satırlık
 // liste (simge karesi + ad + ok). İzinsiz bölüm/grup çizilmez (`moduleVisible`; ör. finans izni yoksa Finans satırı da
-// yok). Gönderdiklerim satırında sayaç YOK: kayıt onay beklemez, bekleyen sayısı öne çıkarılmaz.
+// yok). Gönderdiklerim satırında bekleyen sayısı YOK (kayıt onay beklemez); yalnız okunmamış RET sayısı rozetle.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import { MODULES, moduleNavTitle, moduleVisible } from "../../../src/lib/access";
+import { rozetMetni, useOkunmamisRet } from "../../../src/state/okunmamis-ret";
 import { useSession } from "../../../src/state/session";
 import { Avatar } from "../../../src/ui/diger/parts";
 import { FacilityName, Screen } from "../../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../src/ui/icons";
-import { ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
+import { ListeBlogu, ListeSatiri, Rozet } from "../../../src/ui/ortak";
 import { RoleBadge } from "../../../src/ui/RoleBadge";
 import { MORE_GROUPS } from "../../../src/ui/tabs";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
@@ -23,6 +24,8 @@ export default function More() {
   const t = useTokens();
   const s = useStyles();
   const hesap = facility?.hesap;
+  const okunmamis = useOkunmamisRet();
+  const retRozeti = rozetMetni(okunmamis);
   const gruplar = MORE_GROUPS.map((g) => ({ ...g, mods: g.modules.filter((k) => moduleVisible(permissions, k)).map((k) => MODULES.find((m) => m.key === k)!) })).filter((g) => g.mods.length > 0);
 
   return (
@@ -54,7 +57,8 @@ export default function More() {
                 icon={MODULE_ICON[m.key].icon}
                 ton={DOMAIN_TONE[MODULE_ICON[m.key].domain]}
                 ayrac={i > 0}
-                accessibilityLabel={moduleNavTitle(m.key)}
+                rozet={m.key === "gelen-kutusu" && retRozeti ? <Rozet label={retRozeti} tone="danger" testID="gelen-okunmamis" /> : undefined}
+                accessibilityLabel={m.key === "gelen-kutusu" && retRozeti ? `${moduleNavTitle(m.key)}, ${okunmamis} okunmamış hata` : moduleNavTitle(m.key)}
                 onPress={() => router.push(m.route as never)}
                 testID={`menu-${m.key}`}
               />

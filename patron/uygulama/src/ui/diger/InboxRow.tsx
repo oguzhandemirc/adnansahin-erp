@@ -20,19 +20,21 @@ export function inboxRowText(m: InboxItem, showAuthor = false) {
   return { kind, birincil: inboxSummary(m), ikincil, rozet, neden };
 }
 
-export function InboxRow({ m, onPress, showAuthor, ayrac }: { readonly m: InboxItem; readonly onPress: () => void; readonly showAuthor?: boolean; readonly ayrac?: boolean }) {
+export function InboxRow({ m, onPress, showAuthor, ayrac, okunmamis = false }: { readonly m: InboxItem; readonly onPress: () => void; readonly showAuthor?: boolean; readonly ayrac?: boolean; readonly okunmamis?: boolean }) {
   const x = inboxRowText(m, showAuthor);
+  // Açılmamış ret "Yeni hata" der (okunmamış rozetinin kaynağı); açılınca "Hata"ya döner.
+  const rozet = x.rozet && okunmamis ? { ...x.rozet, label: "Yeni hata" } : x.rozet;
   return (
     <ListeSatiri
       birincil={x.birincil}
       ikincil={x.ikincil}
       icon={x.kind.icon}
       ton={x.neden ? "danger" : DOMAIN_TONE[x.kind.domain]}
-      rozet={x.rozet ? <Rozet label={x.rozet.label} tone={x.rozet.tone} /> : undefined}
+      rozet={rozet ? <Rozet label={rozet.label} tone={rozet.tone} testID={okunmamis ? `mesaj-yeni-${m.mesajId}` : undefined} /> : undefined}
       ayrac={ayrac}
       onPress={onPress}
       testID={`mesaj-${m.mesajId}`}
-      accessibilityLabel={[x.kind.ad, x.birincil, x.rozet?.label, x.neden ? `Neden: ${x.neden}` : null, formatAgo(m.olusturulma)].filter(Boolean).join(", ")}
+      accessibilityLabel={[x.kind.ad, x.birincil, rozet?.label, x.neden ? `Neden: ${x.neden}` : null, formatAgo(m.olusturulma)].filter(Boolean).join(", ")}
     />
   );
 }

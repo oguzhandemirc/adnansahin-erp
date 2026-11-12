@@ -6,6 +6,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { rozetMetni, useOkunmamisRet } from "../../../src/state/okunmamis-ret";
 import { useSession } from "../../../src/state/session";
 import { useWide } from "../../../src/ui/Frame";
 import { TABS, tabVisible } from "../../../src/ui/tabs";
@@ -22,6 +23,9 @@ export default function TabsLayout() {
   const wide = useWide();
   const insets = useSafeAreaInsets();
   const g = useGezinme();
+  // Okunmamış ret (fabrikanın kabul etmediği gönderim) "Diğer" simgesinde; kayıt açılınca söner.
+  const okunmamis = useOkunmamisRet();
+  const rozet = rozetMetni(okunmamis);
   return (
     <Tabs
       screenOptions={{
@@ -46,7 +50,9 @@ export default function TabsLayout() {
             title: tab.title,
             href: tabVisible(permissions, tab) ? undefined : null,
             tabBarButtonTestID: `tab-${tab.name}`,
-            tabBarAccessibilityLabel: tab.title,
+            tabBarAccessibilityLabel: tab.name === "diger" && rozet ? `${tab.title}, ${okunmamis} okunmamış hata` : tab.title,
+            tabBarBadge: tab.name === "diger" && rozet ? rozet : undefined,
+            tabBarBadgeStyle: { backgroundColor: t.color.danger.solid, color: t.color.onPrimary, fontSize: 11, fontWeight: "700" },
             tabBarIcon: ({ color, focused }) => (
               <View
                 style={{ width: SEKME_HAPI.genislik, height: SEKME_HAPI.yukseklik, borderRadius: t.radius.badge, alignItems: "center", justifyContent: "center", backgroundColor: focused ? t.color.primarySoft : "transparent" }}

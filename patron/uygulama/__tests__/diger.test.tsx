@@ -109,9 +109,10 @@ describe("gelen kutusu", () => {
     await mockRemote.calls.at(-1)!.fetcher();
     expect(mockApi.inboxList).toHaveBeenLastCalledWith({ durum: undefined, limit: 50 });
   });
-  it("Diğer: Gönderdiklerim ikincil giriş — bekleyen sayacı yok, istek atılmaz", () => {
+  it("Diğer: Gönderdiklerim ikincil giriş — bekleyen sayacı yok; yalnız ret listesi istenir (okunmamış rozeti)", () => {
     render(<More />);
-    expect(mockRemote.calls.some((c) => String(c.key).startsWith("gelen-kutusu"))).toBe(false);
+    const keys = mockRemote.calls.map((c) => String(c.key)).filter((k) => k.startsWith("gelen-kutusu"));
+    expect([...new Set(keys)]).toEqual(["gelen-kutusu:REDDEDILDI"]);
     expect(screen.queryByTestId("gelen-rozet")).toBeNull();
     expect(screen.getByTestId("menu-gelen-kutusu")).toBeTruthy();
     expect(screen.getByTestId("menu-hesaplar")).toBeTruthy();

@@ -7,6 +7,7 @@ import { errorMessage } from "../../../src/api/client";
 import type { InboxItem, InboxStatus } from "../../../src/api/wire";
 import { can } from "../../../src/lib/access";
 import { useSession } from "../../../src/state/session";
+import { useGorulduKumesi } from "../../../src/state/okunmamis-ret";
 import { useRemote } from "../../../src/state/useRemote";
 import { inboxPending } from "../../../src/ui/diger/inbox-format";
 import { InboxRow } from "../../../src/ui/diger/InboxRow";
@@ -62,6 +63,7 @@ export default function Inbox() {
   }
 
   const admin = can(permissions, "bulut:hesap:yonet");
+  const goruldu = useGorulduKumesi();
   const bos = EMPTY[filter];
   return (
     <Screen module="gelen-kutusu" back onRefresh={r.reload} refreshing={r.refreshing}>
@@ -72,7 +74,7 @@ export default function Inbox() {
       {items.length > 0 ? (
         <ListeBlogu testID="gelen-liste">
           {items.map((m, i) => (
-            <InboxRow key={m.mesajId} m={m} ayrac={i > 0} showAuthor={admin} onPress={() => router.push({ pathname: "/gelen-kutusu/[mesajId]", params: { mesajId: m.mesajId } } as never)} />
+            <InboxRow key={m.mesajId} m={m} ayrac={i > 0} okunmamis={m.durum === "REDDEDILDI" && !goruldu.has(m.mesajId)} showAuthor={admin} onPress={() => router.push({ pathname: "/gelen-kutusu/[mesajId]", params: { mesajId: m.mesajId } } as never)} />
           ))}
         </ListeBlogu>
       ) : null}

@@ -1,12 +1,13 @@
 // Gönderilen kaydın ayrıntısı + iptal (yalnız yazar, yalnız BEKLIYOR; iki adımlı onay). Fabrika işlemeye başladıysa
 // sunucu 409 döner ve ekran taze durumu gösterir. Hata alan kayıtta ret nedeni ilk blokta açıkça okunur.
 import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { errorMessage } from "../../../src/api/client";
 import { formatDateTime } from "../../../src/lib/format";
 import { canCancel, resultText } from "../../../src/lib/inbox";
 import { useSession } from "../../../src/state/session";
+import { retGoruldu } from "../../../src/state/okunmamis-ret";
 import { useRemote } from "../../../src/state/useRemote";
 import { Fields } from "../../../src/ui/data";
 import { inboxRowText } from "../../../src/ui/diger/InboxRow";
@@ -30,6 +31,10 @@ export default function InboxDetail() {
   const m = r.data;
   const me = { ad: facility?.hesap.ad ?? "", admin: permissions.includes("bulut:hesap:yonet") };
   useSettlePoll(!!m && inboxPending(m.durum), r.reload);
+  // Ret nedeni bu ekranda okunur: okunmamış rozeti burada söner.
+  useEffect(() => {
+    if (m) retGoruldu(m);
+  }, [m]);
 
   async function cancel() {
     setBusy(true);

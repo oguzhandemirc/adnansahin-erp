@@ -225,3 +225,22 @@ describe("§4 para yok · birimler toplanmaz · sevk brüt · dönem", () => {
     expect(mockList).not.toHaveBeenCalledWith("siparis", expect.objectContaining({ suzgec: "ACIK" }));
   });
 });
+
+describe("§5 sipariş listesi 'Açık' süzgeci (bulut `LIST_SEARCH` aynasından)", () => {
+  const Orders = (require("../app/(app)/(tabs)/siparisler/index") as { default: () => ReactElement }).default;
+
+  it("seçenek 'Tümü'den hemen sonra; seçilince süzme SUNUCUDA (`suzgec=ACIK`), istemci süzmez", async () => {
+    mockList.mockResolvedValue(page(ACIK, rec("s2", { siparisNo: "SP-0102", durum: "COMPLETED", acik: false })));
+    render(<Orders />);
+    await settle();
+    fireEvent.press(screen.getByTestId("suzgec-durum"));
+    await settle();
+    expect(screen.getByTestId("durum-ACIK")).toBeTruthy();
+    expect(screen.getByText("Açık (gönderilmeyi bekleyen)")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("durum-ACIK"));
+    await settle();
+    expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ suzgec: "ACIK" }));
+    // Sunucu ne döndürdüyse o çizilir (ör. eski satır) — istemci `acik` alanına bakıp süzmez.
+    expect(screen.getByText("SP-0102")).toBeTruthy();
+  });
+});
