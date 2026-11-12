@@ -18,7 +18,7 @@ import { Basilabilir, KademeliGiris } from "../../../../src/ui/hareket";
 import { HataDurumu, IconTile, Iskelet, ListeBlogu, ListeSatiri, Rozet, StatCard } from "../../../../src/ui/ortak";
 import { ROZET_TONU, asObj, present, str } from "../../../../src/ui/siparis/OrderRow";
 import { useListCapability } from "../../../../src/ui/siparis/capabilities";
-import { OrderLines } from "../../../../src/ui/siparis/OrderLines";
+import { OrderLines, useOrderLines } from "../../../../src/ui/siparis/OrderLines";
 import { StaleNote } from "../../../../src/ui/siparis/parts";
 import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
 import { FONT_SCALE, TOUCH, space, typography } from "../../../../src/ui/tokens";
@@ -32,6 +32,7 @@ export default function OrderDetail() {
   const lines = useListCapability().idFilter("siparis-kalemi", "siparisId");
   const [tick, setTick] = useState(0);
   const r = useRemote(id ? `kayit:siparis:${id}` : null, () => api.record("siparis", String(id)));
+  const kalemler = useOrderLines(lines && id ? String(id) : null);
   const k = asObj(r.data?.kayit);
   const f = asObj(r.data?.finans);
   const no = str(k.siparisNo);
@@ -102,7 +103,7 @@ export default function OrderDetail() {
           </KademeliGiris>
           <KademeliGiris sira={3}>
             {lines && id ? (
-              <OrderLines siparisId={String(id)} tick={tick} />
+              <OrderLines list={kalemler} tick={tick} />
             ) : (
               <ListeBlogu baslik="Kalemler" testID="siparis-kalem-ozeti">
                 <ListeSatiri birincil="Etkin kalem" deger={present(k.kalemSayisi) ? `${formatNumber(k.kalemSayisi, 0)} kalem` : "—"} ayrac={false} />

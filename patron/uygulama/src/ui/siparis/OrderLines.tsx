@@ -40,8 +40,12 @@ export function lineRowText(r: ProjectionRecord) {
 }
 
 /** Kalemler bloğu (tek satır: ürün · renk/sevk/açık · miktar); başlık sayısı yüklenen satır kadar. */
-export function OrderLines({ siparisId, tick = 0 }: { siparisId: string; tick?: number }) {
-  const list = useRemoteList("siparis-kalemi", { siparisId }, { tags: ["siparis-kalemi", "siparis"] });
+/** Kalem listesi sayfanın tepesinde açılır: başlık kaydıyla AYNI ANDA yüklenir (ardışık iki bekleme + geç beliren blok olmasın). */
+export function useOrderLines(siparisId: string | null): RemoteList {
+  return useRemoteList("siparis-kalemi", { siparisId: siparisId ?? undefined }, { tags: ["siparis-kalemi", "siparis"], enabled: siparisId !== null });
+}
+
+export function OrderLines({ list, tick = 0 }: { list: RemoteList; tick?: number }) {
   useReloadOn(tick, list);
   return (
     <>
@@ -53,7 +57,7 @@ export function OrderLines({ siparisId, tick = 0 }: { siparisId: string; tick?: 
           })}
         </ListeBlogu>
       ) : null}
-      <ListStates list={list} empty="Bu siparişin kalemi yok" icon={MODULE_ICON.siparisler.icon} testID="siparis-kalem" />
+      <ListStates list={list} empty="Bu siparişin kalemi yok" icon={MODULE_ICON.siparisler.icon} iskeletSatir={2} testID="siparis-kalem" />
     </>
   );
 }

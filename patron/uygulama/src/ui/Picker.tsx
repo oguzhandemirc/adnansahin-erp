@@ -3,7 +3,7 @@
 import { BASMA } from "./hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LIST_SEARCH, type ListSearchSpec } from "../api/wire";
 import { recordSubtitle, recordTitle } from "../lib/present";
@@ -79,7 +79,8 @@ function Sheet(p: { label: string; projection: string; spec: ListSearchSpec | un
   const ara = useDebounced(term.trim(), ARAMA_BEKLEME_MS);
   const list = useRemoteList(p.projection, { ara: ara || undefined, suzgec: filter ?? undefined });
   return (
-    <View style={[s.sheet, { paddingTop: Math.max(insets.top, space.m) }]}>
+    // iOS pageSheet durum çubuğunun ALTINDA açılır: üst güvenli alanı ikinci kez eklemek boş bir bant bırakıyordu.
+    <View style={[s.sheet, { paddingTop: Platform.OS === "ios" ? space.m : Math.max(insets.top, space.m) }]}>
       <View style={s.inner}>
         <View style={s.head}>
           <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" testID="secici-kapat" style={({ pressed }) => [s.headBtn, pressed && { opacity: BASMA.opaklik }]}>

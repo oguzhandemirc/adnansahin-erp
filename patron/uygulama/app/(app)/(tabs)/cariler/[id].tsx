@@ -88,7 +88,8 @@ export default function CustomerDetail() {
   const movements = cap.idFilter("cari-hareket", "cariHesapId") && balance;
   const [sekme, setSekme] = useState<Sekme>("ozet");
   const [tick, setTick] = useState(0);
-  const hazir = !!cariId && !!r.data;
+  // Listeler kartla AYNI ANDA istenir: kart gelince sırayla istenen bloklar "Fabrikadan beklenen"i aşağı itiyordu.
+  const hazir = !!cariId;
   const accounts = useRemoteList("cari-hesap", { cariKartId: cariId ?? undefined }, { enabled: balance && hazir });
   const recent = useRemoteList("siparis", { cariKartId: cariId ?? undefined }, { enabled: orders && hazir, limit: 10 });
   const sevk = useRemoteList("sevkiyat", { cariKartId: cariId ?? undefined }, { enabled: shipments && hazir, limit: 10 });
@@ -152,11 +153,13 @@ export default function CustomerDetail() {
                   {movements ? <CustomerMovements accounts={accounts.items} tick={tick} /> : null}
                 </View>
               ) : null}
+              {orders && recent.loading && recent.items.length === 0 ? <Iskelet bicim="liste" satir={2} testID="cari-siparisler-yukleniyor" /> : null}
               {orders && recent.items.length > 0 ? (
                 <ListeBlogu baslik="Son siparişler" sag={<Text style={s.tumu} onPress={() => setSekme("siparisler")} accessibilityRole="link">Tümü</Text>} testID="cari-siparisler">
                   {siparisSatirlari(OZET_SATIR)}
                 </ListeBlogu>
               ) : null}
+              {shipments && sevk.loading && sevk.items.length === 0 ? <Iskelet bicim="liste" satir={2} testID="cari-sevkiyatlar-yukleniyor" /> : null}
               {shipments && sevk.items.length > 0 ? (
                 <ListeBlogu baslik="Son sevkiyatlar" sag={<Text style={s.tumu} onPress={() => setSekme("sevkiyatlar")} accessibilityRole="link">Tümü</Text>} testID="cari-sevkiyatlar">
                   {sevkSatirlari(OZET_SATIR)}

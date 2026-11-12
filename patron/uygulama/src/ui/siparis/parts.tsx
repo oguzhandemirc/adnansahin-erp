@@ -80,11 +80,11 @@ export function QuickChip(p: { label: string; selected: boolean; onPress: () => 
 }
 
 /** Liste altlığı (ortak durumlar): iskelet · hata + tekrar dene · boş durum · "Daha fazla" (sayfalama düzeni). */
-export function ListStates(p: { list: RemoteList; empty: string; aciklama?: string; domain?: Domain; icon?: IconName; testID?: string }) {
+export function ListStates(p: { list: RemoteList; empty: string; aciklama?: string; domain?: Domain; icon?: IconName; iskeletSatir?: number; testID?: string }) {
   const { list } = p;
   const t = useTokens();
   const s = useStyles();
-  if (list.loading) return <Iskelet bicim="liste" satir={5} testID={p.testID ? `${p.testID}-yukleniyor` : undefined} />;
+  if (list.loading) return <Iskelet bicim="liste" satir={p.iskeletSatir ?? 5} testID={p.testID ? `${p.testID}-yukleniyor` : undefined} />;
   return (
     <View>
       {list.error ? <HataDurumu mesaj={list.error} onTekrar={list.reload} testID={p.testID ? `${p.testID}-hata` : undefined} /> : null}

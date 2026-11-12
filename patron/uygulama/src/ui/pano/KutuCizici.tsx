@@ -55,7 +55,8 @@ function Gosterge({ b, a, degerler, ipucu, git, layout }: {
   const testID = `kutu-${a}`;
   if (r?.loading && !r.data) return <View style={{ flex: 1 }} testID={testID}><Iskelet bicim="kpi" satir={1} testID={`${testID}-iskelet`} /></View>;
   if (!r?.data) {
-    const hata = r?.error ?? null;
+    // 404 = fabrika bu özeti henüz göndermedi: hata değil boş durum (SnapshotGate ile aynı ayrım).
+    const hata = r?.notFound ? null : (r?.error ?? null);
     return <StatCard etiket={t.baslik} icon={t.icon} ton={t.ton} degerler={[]} bos={hata ? "Alınamadı · dokun, yeniden dene" : HENUZ} onPress={hata ? r?.reload : undefined} testID={testID} />;
   }
   return <StatCard etiket={t.baslik} icon={t.icon} ton={t.ton} degerler={degerler(veri)} ipucu={ipucu(veri)} layout={layout} onPress={git ? () => b.router.push(git as never) : undefined} testID={testID} />;
@@ -83,7 +84,7 @@ function Kart({ a, r, children, eylem, onEylem, iskelet = "liste" }: {
   );
 }
 
-const anlikDurum = (r: Remote<Snapshot> | undefined) => (r ? { loading: r.loading, error: r.error, reload: r.reload, varMi: r.data !== null } : { loading: false, error: null, reload: () => undefined, varMi: false });
+const anlikDurum = (r: Remote<Snapshot> | undefined) => (r ? { loading: r.loading, error: r.notFound ? null : r.error, reload: r.reload, varMi: r.data !== null } : { loading: false, error: null, reload: () => undefined, varMi: false });
 const listeDurum = (r: RemoteList | undefined) => (r ? { loading: r.loading, error: r.error, reload: r.reload, varMi: r.items.length > 0 || (!r.loading && !r.error) } : { loading: false, error: null, reload: () => undefined, varMi: false });
 
 function HizliIslemler({ b }: { readonly b: KutuBaglami }) {
