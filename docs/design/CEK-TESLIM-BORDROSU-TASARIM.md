@@ -85,7 +85,7 @@ değiştirir. Bizdeki karşılığı:
 - Bu, 2026-08-15 "belge-only" kararını tersine çevirir. O kararın gerekçesi, iki yoldan tetikleme riski, ancak çek başına geçiş uçları bordroya indirgenirse kapanır (tek çekli işlem tek satırlı bordro olur). Bu yüzden K3 kullanıcıya sorulur.
 - K1, K3'ü engellemez, hazırlığıdır.
 
-**Karardan bağımsız bulgu:** `docs/kurallar/finans.md`teki çek bordrosu satırı bayat. "Donmuş
+**Karardan bağımsız bulgu:** `docs/history/kurallar-2026-09/finans.md`teki çek bordrosu satırı bayat. "Donmuş
 `PrintedDocument` üretilmez … önce `ChequeBatch` benzeri kaynak model" diyor, ama `ChequeDeliveryNote`
 `18c87bd5`ten beri var. Karar verildiğinde satır tek cümleyle yeniden yazılır ve eski cümle silinir.
 

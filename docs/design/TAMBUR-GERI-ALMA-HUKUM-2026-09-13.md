@@ -3,7 +3,7 @@
 > **Durum:** **HÜKÜM VERİLDİ (1e, 2026-09-13) — §11.** Bu dosya her kalem için ÖLÇÜLMÜŞ şıkları, bedellerini ve çürütme sonuçlarını taşır; §0–§10 1c'nin ölçümü, §11 yöneticinin kararı ve iş dağılımı. Kod yazılmadı; sondalar geçici, commit dışı.
 > **Taban:** `origin/main` **`c1b973e2`** — içinde 01'in depo-kesimi geri alma düzeltmesi (`c2a10e88`), 6e'nin `initialQty` düzeltmesi (`edbd3ea0`, undo iki dalı `initialBump`; bekçi §12 üç ayak), 82'nin beyan yapısı (`31844dbc`, `CUT_SPLIT` → `BAGLI_TERS`, `TERS_KODU.ileri` küme), dokuma P3 (`44b34d23`). Bütün sondalar bu tabanda koşuldu; ilk tur (`a54e4d54` + 01 cherry-pick) yalnız ④'te fark verdi ve o fark §6'da yazılı.
 > **Kalemler:** ① `CUT_DISCARD` (ve kapanış `SCRAP` ikizi) · ② `OVERAGE` · ③ `DISPOSITION` (+ K=0 kapısının körlüğü) · ④ `initialQty` etkileşimi · ⑤ beyan yapısı (kalan iş). Çürütme turu (§9) her kalemde en az bir öncülü düzeltti; düzeltilmiş hâl aşağıdadır, ilk yazım silinmedi, "ÇÜRÜDÜ →" ile işaretli.
-> **İlgili:** `docs/kurallar/defter.md` · `docs/kurallar/tambur.md` · `docs/kurallar/top-duzeltme.md` · `Teks-Erp/scripts/lib/defter-beyan.ts` (`STOK_OLAY_BEYANI`) · `Teks-Erp/src/services/tambur-undo.service.ts` · `Teks-Erp/src/services/helpers/warehouse-ledger-reverse.helper.ts` · `Teks-Erp/scripts/lib/stok-defteri-bag-olcumu.ts`
+> **İlgili:** `docs/kurallar/defter.md` · `docs/kurallar/tambur.md` · `docs/history/kurallar-2026-09/top-duzeltme.md` · `Teks-Erp/scripts/lib/defter-beyan.ts` (`STOK_OLAY_BEYANI`) · `Teks-Erp/src/services/tambur-undo.service.ts` · `Teks-Erp/src/services/helpers/warehouse-ledger-reverse.helper.ts` · `Teks-Erp/scripts/lib/stok-defteri-bag-olcumu.ts`
 
 ---
 

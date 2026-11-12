@@ -42,8 +42,8 @@ const BANS = [
      `DELETE FROM a; DELETE FROM b WHERE c` sessizce geçiyordu (ölçüldü 2026-09-13). */
     why: "WHERE'siz `DELETE FROM` YASAK — toplu DELETE canlı veri kuralına aykırı; soft delete ya da dry-run'lı script." },
   { re: /git\s+push\b[^\n]*(--force\b|\s-f\b)/i, why: "`git push --force` YASAK — paylaşılan dalın geçmişini ezer. Gerekiyorsa kullanıcı `!` ile kendisi koşar." },
-  { re: /npm\s+run\s+build:win\b/i, why: "Ham `npm run build:win` YASAK — bir önceki müşterinin yayın adresiyle derler. `./deploy/electron-paketle.sh <müşteri>` kullan." },
-  { re: /gradlew\s+assembleRelease\b/i, why: "`./gradlew assembleRelease` ELLE ÇAĞRILMAZ — `cd mobil && npm run build:apk -- --musteri=<kod>` (adres doğrulaması + bundle kontrolü)." },
+  { re: /npm\s+run\s+build:win\b/i, why: "Ham `npm run build:win` YASAK — önbellekteki eski yayın adresiyle derleyebilir ve hata sessizdir. `./deploy/electron-paketle.sh adnansahin` kullan (paketteki adres argümanla kıyaslanır)." },
+  { re: /gradlew\s+assembleRelease\b/i, why: "`./gradlew assembleRelease` ELLE ÇAĞRILMAZ — `cd mobil && npm run build:apk -- --musteri=adnansahin` (adres doğrulaması + bundle kontrolü)." },
 ];
 /**
  * Komut satırını ayrı KOMUTLARA böler — yasak, kendi argümanları içinde aranır.

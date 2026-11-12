@@ -1,7 +1,7 @@
 # Modül & Bayrak Stratejisi — Tek Koddan Çok Fabrikaya
 
 > **Tarih:** 2026-09-02 · **Durum:** ✅ P1–P8 UYGULANDI (2026-09-02/04) — `constants/module-flags.ts`, `module.middleware.ts`, `constants/module-profiles.ts`, `User.isSystemAccount`, `npm run superadmin:kur`, ayar şifresi.
-> ⚠️ **Adlandırma:** tasarımdaki `modul.*` KAVRAMSAL addır ve koda GİRMEZ; DB anahtarları `finance.enabled` kalıbındadır (`ticaret.enabled`, `iplik.enabled`, `depo.multiEnabled`, `kumasTeknik.enabled`, `tezgah.enabled`). Profiller `deploy/profiller/*.json` değil TS sabitidir. `adnansahin` dalı emekli edildi. Canlı kural özeti: `docs/kurallar/modul-bayrak.md`.
+> ⚠️ **Adlandırma:** tasarımdaki `modul.*` KAVRAMSAL addır ve koda GİRMEZ; DB anahtarları `finance.enabled` kalıbındadır (`ticaret.enabled`, `iplik.enabled`, `depo.multiEnabled`, `kumasTeknik.enabled`, `tezgah.enabled`). Profiller `deploy/profiller/*.json` değil TS sabitidir. `adnansahin` dalı emekli edildi. Canlı kural özeti: `docs/kurallar/yetki-izin.md`.
 > **Karar sahibi:** kullanıcı (bu belgedeki her karar soru-cevapla tek tek onaylandı)
 > **Kaynak analiz:** 7 ajanlık tarama — 77 mevcut ayar anahtarı, tüm route/ekran
 > envanteri, 8 sıkı/gevşek bağ, 5 sektör segmenti, ERP standartları.

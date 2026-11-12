@@ -63,15 +63,6 @@ export function etiketAdi(onEk, surum) {
 }
 
 /**
- * Terfi (onay) etiketi: `terfi/<kanal>/<ürün>-v<sürüm>` — kullanıcının onay cümlesini taşıyan
- * AÇIKLAMALI etiket (kapı: `scripts/lib/terfi.mjs`). `terfi/` ön eki `<onEk>-v*` süzgecine
- * girmez: sürüm çizgisini saymaz, yalnız "bu sürüm bu kanala onaylandı" der.
- */
-export function terfiEtiketAdi(kanal, onEk, surum) {
-  return `terfi/${kanal}/${etiketAdi(onEk, surum)}`;
-}
-
-/**
  * Bu çizginin EN YÜKSEK etiketi.
  *
  * ⚠️ Sıralama SAYISAL. Sözlüksel bir sıra `v1.1.9`u `v1.1.10`dan büyük
@@ -189,16 +180,13 @@ export function etiketDefteriKiyasla(hesaplanan, yayinda) {
  * ⚠️ VAR OLAN ETİKETE DOKUNULMAZ (aynı turda ikinci müşteri): `-f` ile
  * taşımak, etiketin işaret ettiği kodu sessizce değiştirir.
  *
- * `mesaj`: yalnız terfi atlanarak yapılan yayında verilir (kullanıcının kaçış cümlesi);
- * verilmezse bugünkü `<onEk> <sürüm>`.
- *
  * @returns {{durum: 'atildi'|'zaten-var'|'basarisiz', ad: string, not?: string}}
  */
-export function etiketAt(onEk, surum, { mesaj } = {}) {
+export function etiketAt(onEk, surum) {
   const ad = etiketAdi(onEk, surum);
   try {
     if (git('tag', '--list', ad)) return { durum: 'zaten-var', ad };
-    git('tag', '-a', ad, '-m', mesaj || `${onEk} ${surum}`);
+    git('tag', '-a', ad, '-m', `${onEk} ${surum}`);
   } catch (e) {
     return { durum: 'basarisiz', ad, not: e?.message ?? String(e) };
   }

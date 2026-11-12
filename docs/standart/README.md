@@ -1,4 +1,4 @@
-# TeksERP Kod Yazım Standardı
+# Adnan Şahin ERP Kod Yazım Standardı
 
 Bu dizin **rutin** soruların cevabıdır: bir servis metodu nasıl yazılır, model nasıl tanımlanır, hangi katman neyi içerir, dosya ne kadar uzun olabilir, kütüphane nasıl seçilir, test ne zaman koşar.
 

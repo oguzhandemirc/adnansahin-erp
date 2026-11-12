@@ -7,7 +7,7 @@
 //
 // NE ÖLÇER (hepsi DİNLENME durumu, yani commit edilen ağaç):
 //   §1 kayıt defteri: kapalı şema · kod biçimi + önek-bağımsızlık · İKİLİ FARK
-//      (iki kanal hiçbir dağıtım kimliğini paylaşamaz) · S9 görünür etiket
+//      (iki kanal hiçbir dağıtım kimliğini paylaşamaz) · görünür etiket null
 //   §2 DONMUŞ kimlik: sahadaki üretim kanalının kimliği literal olarak burada;
 //      değişimi GÖÇTÜR (yeni uygulama · kayıp userData · kopan güncelleme kanalı)
 //   §3 türetilmiş `yayin` alanları koddaki sabitlerle birebir (yayın kökü, VDS
@@ -17,8 +17,7 @@
 //      index.html, splash.html, shared/channel.ts, build-channel.ts) kimliği KANALDAN
 //      alır, hiçbir kanalın literal kimliğini taşımaz; bilinmeyen kanal kodu KIRMIZI
 //   §5 yayın yolu ENVANTERİ: yayın/paketleme yapan her dosya beyanlı ve kapılı
-//      (kapısız ikinci yol = kırmızı; kapanmış borç beyanı da kırmızı — iki yönlü);
-//      `terfi` beyanlı yol terfi kapısını (K5, scripts/lib/terfi.mjs) da çağırır
+//      (kapısız ikinci yol = kırmızı; kapanmış borç beyanı da kırmızı — iki yönlü)
 //   §6 commit kapısı tetiği (`kanalBekcisiTetigi`) bu bekçinin okuduğu HER dosyayı
 //      kapsar ve açık listesinin her dosyası diskte vardır (tetik okunandan dar ya da ölü olamaz)
 //
@@ -86,11 +85,11 @@ const DONMUS = {
  *   borc       — kapısız, gerekçe + kapanma koşulu beyanlı; kapı gelirse beyan KIRMIZI
  */
 const YAYIN_YOLLARI = {
-  'deploy/electron-paketle.sh': { sinif: 'kapili', terfi: true },
-  'deploy/electron-yayinla.sh': { sinif: 'kapili', terfi: true },
-  'deploy/mobil-yayinla.mjs': { sinif: 'kapili', terfi: true },
-  'mobil/scripts/yayinla-ota.mjs': { sinif: 'kapili', terfi: true },
-  'mobil/scripts/build-apk.mjs': { sinif: 'kapili', terfi: true },
+  'deploy/electron-paketle.sh': { sinif: 'kapili' },
+  'deploy/electron-yayinla.sh': { sinif: 'kapili' },
+  'deploy/mobil-yayinla.mjs': { sinif: 'kapili' },
+  'mobil/scripts/yayinla-ota.mjs': { sinif: 'kapili' },
+  'mobil/scripts/build-apk.mjs': { sinif: 'kapili' },
   'deploy/electron-yayinla.ps1': { sinif: 'saplama' },
   'deploy/paketle.ps1': {
     sinif: 'kanal-disi',
@@ -101,11 +100,6 @@ const KAPI_IZI = 'scripts/lib/kanallar.mjs';
 /** Kapı izi: .mjs yayıncı kitaplığı import eder, kabuk yayıncı CLI'yi çağırır. */
 const KAPI_DESENI = /scripts\/(lib\/kanallar|kanal-kapisi)\.mjs/;
 const KAPI_CLI = 'scripts/kanal-kapisi.mjs';
-/**
- * Terfi kapısı (K5) izi: .mjs yayıncı `terfiKapisi(` çağırır, kabuk yayıncı CLI'nin `terfi` komutunu.
- * Yüklemin salt import'u ya da kaçış kaydı (`terfi-atla-kaydi`) kapı sayılmaz.
- */
-const TERFI_DESENI = /\bterfiKapisi\(|kanal-kapisi\.mjs"? terfi "/;
 
 const KOD_KAYNAKLARI = [
   'Electron/shared/update-feed.ts',
@@ -292,7 +286,6 @@ function olc(d, yayinDosyalari, yayinYollari = YAYIN_YOLLARI) {
       continue;
     }
     if (beyan.sinif === 'kapili' && !KAPI_DESENI.test(m)) kirmizi.push(`§5 ${f} kapılı beyanlı ama kanal kapısı (${KAPI_IZI} / ${KAPI_CLI}) çağrısı YOK`);
-    if (beyan.terfi && !TERFI_DESENI.test(m)) kirmizi.push(`§5 ${f} terfi kapılı beyanlı ama terfi kapısı (scripts/lib/terfi.mjs / ${KAPI_CLI} terfi) çağrısı YOK — üretim kanalına onaysız yol`);
     if (beyan.sinif === 'saplama') {
       const kod = m.replace(/<#[\s\S]*?#>/g, '').replace(/^\s*#.*$/gm, '');
       if (/\b(scp|ssh|rsync|Invoke-WebRequest|Invoke-RestMethod|Start-Process)\b/i.test(kod)) {
@@ -347,12 +340,10 @@ function sondalar(taban, tabanYollar) {
     fn(o);
     d[rel] = `${JSON.stringify(o, null, 2)}\n`;
   };
-  const tf = (o) => o.kanallar.testfabrika;
   const as = (o) => o.kanallar.adnansahin;
   const yeniKanal = (o, kod, tur = 'uretim') => {
     const k = JSON.parse(JSON.stringify(as(o)));
     k.tur = tur;
-    k.terfiKaynagi = null;
     k.ad = `Kanal ${kod}`;
     for (const a of Object.keys(k.yayin)) k.yayin[a] = k.yayin[a].replaceAll('/adnansahin', `/${kod}`);
     k.panel = { appId: `com.ornek.${kod}`, urunAdi: `Urun ${kod}`, paketAdi: `urun-${kod}`, erpDisAdresi: '', erpAdresi: `http://10.9.8.${kod.length}:4000` };
@@ -360,17 +351,23 @@ function sondalar(taban, tabanYollar) {
       erpAdresi: `http://10.9.9.${kod.length}:4000/api`, otaSertifika: `keystore/ota-certs-${kod}/certificate.pem` };
     o.kanallar[kod] = k;
   };
+  /** Çakışma sondaları için benzersiz kimlikli ikinci bir kanal (kayıtta tek kanal var). */
+  const IKINCI = 'ikincifabrika';
+  const tf = (o) => {
+    if (!o.kanallar[IKINCI]) yeniKanal(o, IKINCI);
+    return o.kanallar[IKINCI];
+  };
   const kayitta = (fn) => (d) => jd(d, KAYIT_REL, fn);
   const S = [
     // [ad, beklenen, mutasyon(d, yollar, beyanlar), iz?]
     ['P0 gerçek ağaç YEŞİL', 'yesil', () => {}],
-    ['P1 üçüncü üretim kanalı (aynasız, terfiKaynagi null) benzersiz kimliklerle YEŞİL (kapı aşırı sert değil)', 'yesil', kayitta((o) => yeniKanal(o, 'yenifabrika'))],
+    ['P1 ikinci üretim kanalı benzersiz kimliklerle YEŞİL (kapı aşırı sert değil)', 'yesil', kayitta((o) => yeniKanal(o, 'yenifabrika'))],
     ['P2 runtimeVersion doğru yükseltme (app.json + her kanalın rv + otaManifest) YEŞİL', 'yesil', (d) => {
-      jd(d, 'mobil/app.json', (o) => { o.expo.runtimeVersion = '54.3'; });
+      jd(d, 'mobil/app.json', (o) => { o.expo.runtimeVersion = '99.9'; });
       jd(d, KAYIT_REL, (o) => {
         for (const k of Object.values(o.kanallar)) {
-          k.tablet.runtimeVersion = '54.3';
-          k.yayin.otaManifest = k.yayin.otaManifest.replace('/ota/54.2/', '/ota/54.3/');
+          k.yayin.otaManifest = k.yayin.otaManifest.replace(`/ota/${k.tablet.runtimeVersion}/`, '/ota/99.9/');
+          k.tablet.runtimeVersion = '99.9';
         }
       });
     }],
@@ -387,14 +384,14 @@ function sondalar(taban, tabanYollar) {
       jd(d, 'Electron/package.json', (o) => { o.build.appId = yeni; });
       d['Electron/electron/main.ts'] = d['Electron/electron/main.ts'].replace('com.etkiliyazilim.adnan-sahin-erp', yeni);
     }],
-    ['N8 mobil/musteri.json işaretçisi testfabrika commit edildi → KIRMIZI', 'kirmizi', (d) => jd(d, 'mobil/musteri.json', (o) => { o.kod = 'testfabrika'; })],
-    ['N9 Electron/shared/musteri.json bilinmeyen kod (testfabirka) → KIRMIZI', 'kirmizi', (d) => jd(d, 'Electron/shared/musteri.json', (o) => { o.kod = 'testfabirka'; })],
+    ['N8 mobil/musteri.json işaretçisi kayıtlı ikinci kanal commit edildi → KIRMIZI', 'kirmizi', (d) => { kayitta(tf)(d); jd(d, 'mobil/musteri.json', (o) => { o.kod = IKINCI; }); }],
+    ['N9 Electron/shared/musteri.json bilinmeyen kod (adnansahn) → KIRMIZI', 'kirmizi', (d) => jd(d, 'Electron/shared/musteri.json', (o) => { o.kod = 'adnansahn'; })],
     ['N10 varsayilan bilinmeyen kanal → KIRMIZI', 'kirmizi', kayitta((o) => { o.varsayilan = 'yok'; })],
-    ['N11 app.json runtimeVersion yükseldi, kayıt yükselmedi → KIRMIZI', 'kirmizi', (d) => jd(d, 'mobil/app.json', (o) => { o.expo.runtimeVersion = '54.3'; })],
-    ['N12 türetilmiş alan bayat (testfabrika otaManifest 54.3) → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).yayin.otaManifest = tf(o).yayin.otaManifest.replace('54.2', '54.3'); })],
+    ['N11 app.json runtimeVersion yükseldi, kayıt yükselmedi → KIRMIZI', 'kirmizi', (d) => jd(d, 'mobil/app.json', (o) => { o.expo.runtimeVersion = '99.9'; })],
+    ['N12 türetilmiş alan bayat (ikinci kanal otaManifest rv ≠ runtimeVersion) → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).yayin.otaManifest = tf(o).yayin.otaManifest.replace(`/ota/${tf(o).tablet.runtimeVersion}/`, '/ota/0.1/'); })],
     ['N13 ps1 saplamasına scp geri döndü → KIRMIZI', 'kirmizi', (d) => { d['deploy/electron-yayinla.ps1'] += '\n& scp $setup "x:/y"\n'; }],
-    ['N14 hazırlık kanalında görünür etiket yok → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).gorunurEtiket = null; })],
-    ['N15 package.json publish adresi testfabrika commit edildi → KIRMIZI', 'kirmizi', (d) => jd(d, 'Electron/package.json', (o) => { o.build.publish[0].url = 'https://guncelleme.etkiliyazilim.com/testfabrika/electron/'; })],
+    ['N14 üretim kanalında görünür etiket → KIRMIZI', 'kirmizi', kayitta((o) => { as(o).gorunurEtiket = 'TEST'; }), 'görünür etiket'],
+    ['N15 package.json publish adresi ikinci kanalınki commit edildi → KIRMIZI', 'kirmizi', (d) => { kayitta(tf)(d); jd(d, 'Electron/package.json', (o) => { o.build.publish[0].url = `https://guncelleme.etkiliyazilim.com/${IKINCI}/electron/`; }); }],
     ['N16 beyansız yeni yayıncı (deploy/tablet-yayinla.sh) → KIRMIZI', 'kirmizi', (d, y) => { y.push('deploy/tablet-yayinla.sh'); }],
     ['N17 kapılı yayıncıdan kanal kapısı silindi (yayinla-ota.mjs) → KIRMIZI', 'kirmizi', (d) => { d['mobil/scripts/yayinla-ota.mjs'] = d['mobil/scripts/yayinla-ota.mjs'].replaceAll(KAPI_IZI, 'scripts/lib/baska.mjs'); }],
     ['N18 app.json android.package değişti (ağaç ↔ kayıt) → KIRMIZI', 'kirmizi', (d) => jd(d, 'mobil/app.json', (o) => { o.expo.android.package = 'com.teks.erp.mobil2'; })],
@@ -412,18 +409,13 @@ function sondalar(taban, tabanYollar) {
     ['N28 iki kanal aynı panel.erpAdresi (varsayılan sunucu) → KIRMIZI', 'kirmizi', kayitta((o) => { tf(o).panel.erpAdresi = 'http://192.168.1.250:4000'; })],
     ['N29 adnansahin panel.erpAdresi kayıtta "düzeltildi" → KIRMIZI (DONMUŞ)', 'kirmizi', kayitta((o) => { as(o).panel.erpAdresi = 'http://192.168.1.251:4000'; })],
     ['N30 build-channel.ts kayıt defterini okumuyor → KIRMIZI', 'kirmizi', (d) => { d['Electron/build-channel.ts'] = d['Electron/build-channel.ts'].replaceAll('deploy/kanallar.json', 'shared/baska.json'); }],
-    ['N31 splash.html <title> yeniden kanal ürün adı taşıyor → KIRMIZI', 'kirmizi', (d) => { d['Electron/resources/splash.html'] = d['Electron/resources/splash.html'].replace('<title>TeksERP</title>', '<title>TeksERP Test Fabrika</title>'); }],
+    ['N31 splash.html <title> yeniden kanal ürün adı taşıyor → KIRMIZI', 'kirmizi', (d) => { d['Electron/resources/splash.html'] = d['Electron/resources/splash.html'].replace('<title>TeksERP</title>', '<title>Adnan Şahin ERP</title>'); }],
     ['N32 shared/channel.ts kimliği sanal modülden değil (elle yazılmış) → KIRMIZI', 'kirmizi', (d) => { d['Electron/shared/channel.ts'] = d['Electron/shared/channel.ts'].replace('from "virtual:tekserp-channel"', 'from "./elle-kimlik"'); }],
     ['N33 bekçinin okuduğu bir yayın yolu commit tetiğinin DIŞINDA → KIRMIZI (§6)', 'kirmizi', (d, y) => { y.push('Electron/yayinla-panel.sh'); }, '§6'],
     ['N34 commit kancasından kanal adımı söküldü → KIRMIZI (§6)', 'kirmizi', (d) => { d[KAPI_KANCASI] = d[KAPI_KANCASI].replace('staged.some(kanalBekcisiTetigi)', 'false'); }, '§6'],
     ['N35 build-apk kanal kapısı silindi → KIRMIZI', 'kirmizi', (d) => { d['mobil/scripts/build-apk.mjs'] = d['mobil/scripts/build-apk.mjs'].replaceAll(KAPI_IZI, 'scripts/lib/baska.mjs'); }],
-    ['N36 adnansahin terfiKaynagi anahtarı silindi (K5 sessizce kapanırdı) → KIRMIZI', 'kirmizi', kayitta((o) => { delete as(o).terfiKaynagi; }), 'terfiKaynagi'],
-    ['N37 adnansahin terfiKaynagi null, testfabrika hâlâ aynası → KIRMIZI', 'kirmizi', kayitta((o) => { as(o).terfiKaynagi = null; }), 'terfiKaynagi'],
-    ['N38 terfiKaynagi bir ÜRETİM kanalını gösteriyor → KIRMIZI', 'kirmizi', kayitta((o) => { yeniKanal(o, 'yenifabrika'); as(o).terfiKaynagi = 'yenifabrika'; }), 'terfiKaynagi'],
-    ['N39 hazırlık kanalında terfiKaynagi anahtarı → KIRMIZI (şema kapalı)', 'kirmizi', kayitta((o) => { tf(o).terfiKaynagi = 'adnansahin'; }), 'tanınmayan anahtar'],
-    ['N40 kabuk yayıncıdan terfi kapısı çağrısı silindi (electron-yayinla.sh) → KIRMIZI', 'kirmizi', (d) => { d['deploy/electron-yayinla.sh'] = d['deploy/electron-yayinla.sh'].replaceAll('kanal-kapisi.mjs" terfi', 'kanal-kapisi.mjs" kanal'); }, 'terfi kapısı'],
-    ['N41 mjs yayıncıdan terfi yüklemi çağrısı silindi, import kaldı (mobil-yayinla.mjs) → KIRMIZI', 'kirmizi', (d) => { d['deploy/mobil-yayinla.mjs'] = d['deploy/mobil-yayinla.mjs'].replaceAll('terfiKapisi(', 'baskaKapi('); }, 'terfi kapısı'],
-    ['N42 build-apk terfi kapısı çağrısı silindi → KIRMIZI', 'kirmizi', (d) => { d['mobil/scripts/build-apk.mjs'] = d['mobil/scripts/build-apk.mjs'].replaceAll('terfiKapisi(', 'baskaKapi('); }, 'terfi kapısı'],
+    ['N36 kayda hazırlık türü kanal (tur "hazirlik") → KIRMIZI (tek tür: uretim)', 'kirmizi', kayitta((o) => { tf(o).tur = 'hazirlik'; }), 'tanınmıyor'],
+    ['N37 kanala eski terfiKaynagi anahtarı geri döndü → KIRMIZI (şema kapalı)', 'kirmizi', kayitta((o) => { as(o).terfiKaynagi = null; }), 'tanınmayan anahtar'],
     ['O1 kayıt defteri bozuk JSON → ÖLÇÜLEMEDİ', 'olculemedi', (d) => { d[KAYIT_REL] = d[KAYIT_REL].slice(0, 40); }],
     ['O2 update-feed.ts UPDATE_BASE_URL adı değişti → ÖLÇÜLEMEDİ', 'olculemedi', (d) => { d['Electron/shared/update-feed.ts'] = d['Electron/shared/update-feed.ts'].replace('export const UPDATE_BASE_URL', 'export const YAYIN_KOKU_URL'); }],
     ['O3 main.ts setAppUserModelId çağrısı kalktı → ÖLÇÜLEMEDİ', 'olculemedi', (d) => { d['Electron/electron/main.ts'] = d['Electron/electron/main.ts'].replace('app.setAppUserModelId(APP_ID);', 'void 0;'); }],

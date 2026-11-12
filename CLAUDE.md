@@ -37,7 +37,7 @@ Eklenecek (henüz yok): patron bulut sunucusu (Node, Adnan'a özel VDS) ve patro
 
 - **VAR:** okuma — sipariş, depo/stok (ürün + renk + depo özeti), sevkiyat/irsaliye, üretim, cari, eski 8 rapor · yazma — YALNIZ yeni sipariş + yeni müşteri · cari özeti (mobil + panel) · bildirim tercihi kullanıcı profilinde.
 - **YOK:** yapılandırma yazması · finans verisi · lisans altyapısı · Rust · dokuma · ana ürünün yeni modülleri · TestFlight/APK ara adımı.
-- Finans KODU pakette durur, `finance.enabled` bayrağıyla kapalı varsayılır (canlı değeri ölçülmedi); kod silinmez, genişletilmez.
+- Dokuma/tezgah ve finans kodu ile tabloları canlıda durur, modülleri kapalıdır ve tabloları boştur (ölçüldü 2026-11-12); kod silinmez, genişletilmez.
 
 ## Üretim akışı
 
@@ -67,7 +67,7 @@ Her adım istasyon kataloğu + rota şablonundan kurulur; rotanın SON adımı t
 - Aynı soruyu cevaplayan koşul TEK helper'da yaşar; elle kopya yasak. Liste + cursor + özet şeridi tek where'den doğar, süzme SUNUCUDA.
 - Enum'a değer, bayrak, route+izin eklemek reçeteli iştir (`docs/RECETELER.md`).
 - İstek gövdesini elle kuran istemci katmanı sessiz bir allowlist'tir; alan iki uçta da sözleşmeye eklenir. `BaseController` modelinde yeni skaler kolon aynı anda yeni YAZILABİLİR alandır — istenmiyorsa açıkça kapat.
-- Numara doğuşta materyalize edilir, render'da biçimlenmez (`docs/kurallar/numaralandirma.md`).
+- Numara doğuşta materyalize edilir, render'da biçimlenmez (`docs/kurallar/defter.md`).
 - FAIL-CLOSED varsayılan: tanınmayan kapsam 400, kapalı modül 403 `MODULE_DISABLED`; hata kodu `details.code` altında (`body.code` hep undefined).
 - Yeni davranış bayrağının varsayılanı = BUGÜNKÜ davranış, ve bu ÖLÇÜLMEDEN yazılmaz.
 - İş emri yalnız üretimi yönetir; top↔sipariş satırı bağı YOKTUR, karşılama `SackAllocation` ile sevk anında.
@@ -85,36 +85,23 @@ Her adım istasyon kataloğu + rota şablonundan kurulur; rotanın SON adımı t
 
 ## Alan dizini — dokunmadan önce oku (`docs/kurallar/`)
 
-| Alan | Dosya |
+| Dosya | Kapsar |
 |---|---|
-| Defter · ters kayıt · hard delete | `defter.md` |
-| Sevkiyat · çuval · brüt · storno/iade | `sevkiyat.md` |
-| Fason · kartela | `fason.md` |
-| Tambur · finalize · kesim | `tambur.md` |
-| Top düzeltme · iptal · fire | `top-duzeltme.md` |
-| KK1 · idempotency | `kk1.md` |
-| Kurşun planlama | `kursun.md` |
-| İş emri · sipariş bağı | `is-emri.md` |
-| Rota · renk · özellik | `rota-renk.md` |
-| Kalite · istasyon yeteneği | `kalite.md` |
-| Parti (Batch) | `parti.md` |
-| Yarı mamul | `yari-mamul.md` |
-| Refakat kartı | `refakat-karti.md` |
-| Belge · etiket · şablon | `belge-etiket.md` |
-| Mükerrer · ana veri arşivi | `mukerrer.md` |
-| Numaralandırma | `numaralandirma.md` |
-| Sebep katalogları | `sebep-katalogu.md` |
-| Keşif · cihaz · ağ | `kesif-cihaz.md` |
-| Sürüm · yayın | `surum-yayin.md` |
-| Deploy · kurulum · migration | `deploy-kurulum.md` |
-| Modül bayrakları | `modul-bayrak.md` |
-| Süperadmin · ayar şifresi | `superadmin.md` |
-| Yetki · izin · rol | `yetki-izin.md` |
-| Filtre · liste · arama | `filtre-liste.md` |
-| Raporlar · karneler | `raporlar.md` |
-| Genel · uzak erişim | `genel.md` |
+| `defter.md` | defter · ters kayıt · hard delete · numara serisi · mükerrer/ana veri arşivi · sebep kataloğu |
+| `sevkiyat.md` | çuval · sevkiyat · brüt · storno/iade · parti (Batch) · yarı mamul |
+| `fason.md` | fason sevk/kabul/kalan · kartela |
+| `is-emri.md` | iş emri · sipariş bağı · rota · renk/özellik · kalite istasyon yeteneği |
+| `kk1.md` | KK1 · idempotency · mükerrer tuzağı · kurşun planlama/bypass |
+| `tambur.md` | tambur finalize/kesim/geri alma · top düzeltme/iptal/fire · refakat kartı |
+| `belge-etiket.md` | irsaliye · belge şablonu · top/çuval etiketi · yazdırma |
+| `raporlar.md` | raporlar · karneler · filtre · liste · arama |
+| `yetki-izin.md` | izin kataloğu · rol · süperadmin · ayar şifresi · modül bayrakları |
+| `surum-yayin.md` | sürüm notu · panel/tablet yayını · backend paketi · kurulum · migration |
+| `genel.md` | audit · hata sözleşmesi · uzak erişim · keşif · cihaz/donanım |
+| `patron-bulutu.md` | patron bulutu eşitlemesi · kapatma düğmesi · istek imzası · anahtar dosyası |
+| `ZORLANMAYANLAR.md` | hiçbir araçla zorlanmayan kurallar ve kapı önerileri |
 
-Bu fabrikada kapsam DIŞI, yalnız başvuru için duran: `finans.md`, `dokuma.md`. Patron bulutu, gelen kutusu ve patron uygulaması kuralları kod kopyasıyla birlikte yazılacak.
+Eski sürümler ve kapsam dışı `dokuma.md`/`finans.md` yalnız başvuru için `docs/history/kurallar-2026-09/` altında. Gelen kutusu ve patron uygulaması kuralları kod kopyasıyla birlikte `patron-bulutu.md`ye yazılacak.
 
 ## Çalışma düzeni
 
@@ -129,6 +116,6 @@ Bu fabrikada kapsam DIŞI, yalnız başvuru için duran: `finans.md`, `dokuma.md
 ## Dağıtım
 
 - **Sıra:** bulut ayakta → bakım penceresinde backend paketi (eşitleme KAPALI) → okuma aç → ≥ 1 hafta izle → yazma aç. Backend ÖNCE, panel + tablet sonra.
-- **Sürüm:** sürüm notu yazılmadan sürüm çıkmaz (taslağı Claude yazar, kullanıcı onaylar; tek kaynak `surum-notlari.json`). Müşteri kodu her derleme ve yayın komutunda argümandan (`adnansahin`), kanal kimlikleri `deploy/kanallar.json`. Reçete: `docs/kurallar/surum-yayin.md`.
+- **Sürüm:** sürüm notu yazılmadan sürüm çıkmaz (taslağı Claude yazar; tek kaynak `surum-notlari.json`). Terfi kapısı ve hazırlık kanalı YOK; fabrikaya yayın yalnız kullanıcının o sürüm için açık onayıyla. Müşteri kodu her derleme ve yayın komutunda argümandan (`adnansahin`), kanal kimlikleri `deploy/kanallar.json`. Reçete: `docs/kurallar/surum-yayin.md`.
 - **Patron uygulaması:** Adnan Şahin'e özel ad/simge; doğrudan mağazaya açık yayın, Apple reddederse listelenmeyen yayın.
 - **Alt projeler:** `Teks-Erp/CLAUDE.md`, `Electron/CLAUDE.md`, `mobil/CLAUDE.md`. Kod standardı `docs/standart/README.md`, sözlük `docs/SOZLUK.md`, geliştirme döngüsü `docs/GELISTIRME-DONGUSU.md`.

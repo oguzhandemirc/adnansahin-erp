@@ -746,6 +746,11 @@ export const SETTING_KEYS = {
    *  İşi kimlik DOĞRULAMAK değil, FARKLI BİR KURULUMU TESPİT etmek. Gerçek yetki
    *  kontrolü JWT'dir. */
   SYSTEM_INSTALLATION_ID: "system.installationId",
+  /** Patron bulutu eşitlemesinin KAPATMA DÜĞMESİ — kayıt yoksa KAPALI (bugünkü davranış).
+   *  Tek başına açmaz: adres + anahtar dosyası + kurulum kimliği de gerekir (`cloud-sync/eligibility.ts`). */
+  PATRON_CLOUD_SYNC_ENABLED: "patronCloud.syncEnabled",
+  /** Patron bulutu yoklama aralığı (dakika, 1–60; varsayılan 5). */
+  PATRON_CLOUD_SYNC_INTERVAL_MINUTES: "patronCloud.syncIntervalMinutes",
 } as const;
 
 const DEFAULT_DEADLINE_DAYS = 7;
@@ -1924,6 +1929,14 @@ export class SystemSettingService {
     // Herhangi bir ayar yazımı feature-flag agregat cache'ini bayatlatabilir →
     // tek write chokepoint burada invalidate eder (toggle anında taze görünür).
     invalidateFeatureFlagsCache();
+
+    // Patron bulutu kapatma düğmesi ↔ tetikleyiciler/iş uzlaştırması: yalnız `patronCloud.*`
+    // anahtarında, beklenmeden; tembel import yükleme döngüsünü önler, hata isteğe sızmaz.
+    if (key.startsWith("patronCloud.")) {
+      void import("../jobs/patron-cloud.jobs")
+        .then((m) => m.notifyPatronCloudSettingWritten(key))
+        .catch(() => undefined);
+    }
 
     return { success: true, data: updated, message: "Ayar güncellendi" };
   }
@@ -6508,5 +6521,42 @@ export async function readScrapGradeLabelEnabled(
     select: { value: true },
   });
   return asBoolean(setting?.value);
+}
+
+/** Patron bulutu yoklama aralığı varsayılanı (dakika) — ana üründeki kurulum varsayılanıyla aynı. */
+export const DEFAULT_PATRON_CLOUD_SYNC_INTERVAL_MINUTES = 5;
+export const MIN_PATRON_CLOUD_SYNC_INTERVAL_MINUTES = 1;
+export const MAX_PATRON_CLOUD_SYNC_INTERVAL_MINUTES = 60;
+
+/**
+ * Patron bulutu eşitlemesi açık mı? Default FALSE — kayıt yoksa buluta hiç çıkılmaz.
+ * Ön koşulun yalnız bir ayağıdır; tek karar yeri `cloud-sync/eligibility.ts`.
+ */
+export async function readPatronCloudSyncEnabled(
+  tx?: Pick<typeof prisma, "systemSetting">,
+): Promise<boolean> {
+  const client = tx ?? prisma;
+  const setting = await client.systemSetting.findUnique({
+    where: { key: SETTING_KEYS.PATRON_CLOUD_SYNC_ENABLED },
+    select: { value: true },
+  });
+  return asBoolean(setting?.value);
+}
+
+/** Yoklama aralığı (dakika); kayıt yok, tam sayı değil ya da 1–60 dışı ⇒ varsayılan. */
+export async function readPatronCloudSyncIntervalMinutes(
+  tx?: Pick<typeof prisma, "systemSetting">,
+): Promise<number> {
+  const client = tx ?? prisma;
+  const setting = await client.systemSetting.findUnique({
+    where: { key: SETTING_KEYS.PATRON_CLOUD_SYNC_INTERVAL_MINUTES },
+    select: { value: true },
+  });
+  const n = asNumber(setting?.value);
+  if (n === null || !Number.isInteger(n)) return DEFAULT_PATRON_CLOUD_SYNC_INTERVAL_MINUTES;
+  if (n < MIN_PATRON_CLOUD_SYNC_INTERVAL_MINUTES || n > MAX_PATRON_CLOUD_SYNC_INTERVAL_MINUTES) {
+    return DEFAULT_PATRON_CLOUD_SYNC_INTERVAL_MINUTES;
+  }
+  return n;
 }
 

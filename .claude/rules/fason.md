@@ -10,4 +10,4 @@ paths:
   - "**/*Swatch*"
 ---
 
-Dokunduğun dosya **Fason · Kartela** alanına giriyor. Kod yazmadan/değiştirmeden ÖNCE `docs/kurallar/fason.md` dosyasını oku (bugün geçerli kurallar, geçersiz kılınanlar, çözülmüş çelişkiler, koşulacak bekçiler). Bitince o alanın bekçilerini koş (`/bekci-kos`). Yeni karar çıktıysa `/karar-notu` ile yaz.
+Dokunduğun dosya **Fason · Kartela** alanına giriyor. Kod yazmadan/değiştirmeden ÖNCE `docs/kurallar/fason.md` dosyasını oku (kurallar, tuzaklar, alanın bekçileri). Bitince o alanın bekçilerini koş (`/bekci-kos`). Yeni karar çıktıysa `/karar-notu` ile yaz.

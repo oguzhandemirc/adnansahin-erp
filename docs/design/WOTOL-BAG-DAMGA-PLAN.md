@@ -6,7 +6,7 @@
 
 - **Mekanizma:** DAMGA `unlinkedAt` + `unlinkedById` (+ `unlinkReason` VarChar(64): `MANUAL_UNLINK` · `WO_REPLACE` · `ORDER_LINE_CANCEL` · `ORDER_DELETE` · `ORDER_CANCEL`). Satır silinmez; yeniden bağlama YENİ satır yazar (un-unlink yok — `defter.md` "damga silinmez").
 - **Bileşik `@@id([workOrderId, orderLineId])` DAMGAYLA YAŞAYAMAZ** — aynı çift ikinci kez bağlanınca PK çakışır. Migration: vekil `id UUID PK` + **partial unique** `(workOrderId, orderLineId) WHERE "unlinkedAt" IS NULL` (raw SQL; Prisma partial unique tanımaz → `test_db_invariants` envanterine girer, `RollProperty` ile aynı satır). `@@id` → `@@unique` DEĞİL (tam unique yeniden bağlamayı yasaklar).
-- **Add-only:** kolonlar nullable, mevcut 394+ satır `unlinkedAt = NULL` = açık. Prova en eski canlı dump'ta (`docs/kurallar/deploy-kurulum.md`).
+- **Add-only:** kolonlar nullable, mevcut 394+ satır `unlinkedAt = NULL` = açık. Prova en eski canlı dump'ta (`docs/history/kurallar-2026-09/deploy-kurulum.md`).
 - **`updatedAt` kalır** (yarı beyanı) — damga yazımı onu da günceller, zararsız.
 
 ## 2. Tek kaynak

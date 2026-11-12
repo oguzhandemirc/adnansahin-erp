@@ -952,7 +952,7 @@ async function main(): Promise<void> {
     // (2) SÜPERADMİN LİSTEDE GÖRÜNÜR — 2026-09-04 kararı.
     // ⚠️ BU BÖLÜM 2026-09-06'DA DÜZELTİLDİ ve düzeltme kendi başına bir bulgudur:
     // buradaki dört kontrol GERİ ALINMIŞ bir davranışı ("gizle") ölçüyordu ve
-    // `docs/kurallar/superadmin.md`:14 ile açıkça çelişiyordu ("En yetkili hesap
+    // `docs/history/kurallar-2026-09/superadmin.md`:14 ile açıkça çelişiyordu ("En yetkili hesap
     // GİZLENMEZ … maskSystemActor geri getirilmez"), üstelik `test_superadmin_visible`
     // tam TERSİNİ ölçüp yeşil veriyordu. İki bekçi iki gün boyunca birbirine zıt
     // hüküm verdi ve KİMSE GÖRMEDİ — çünkü bu bölüm sunucu olmadan ATLANIYOR ve

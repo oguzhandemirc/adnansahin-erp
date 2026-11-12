@@ -85,7 +85,7 @@ const KURALLAR = join(KOK, "docs", "kurallar");
  *     | grep -E 'bekçi: `(YOK|yok|BELİRSİZ)' \
  *     | grep -vE ' · Kapanır: *[^ ·]' | wc -l
  */
-const B_TABAN = 7;  // 17 → 10 → 9 → 7 (2026-09-13/14, entegratör 1e): tren sonunda BİRLEŞİK index'te ölçüldü — 6e 7 Kapanır · ea kardeş-alan ayrıştırıcısı (3 artefakt düştü); kalan 7: 01 (parti:18 · rota-renk:34/51/53 · tambur:18/19/50); sabite trende TEK yazar
+const B_TABAN = 0;  // 17 → 10 → 9 → 7 → 0 (2026-11-12): kural dosyaları `[bekçi: …]` biçimiyle yeniden yazıldı, koşulsuz `YOK`/`BELİRSİZ` alanı kalmadı; ARTIK SERT
 
 /** Koşulsuz borç beyanı: adlandırılmış bekçi YOK. */
 const KOSULSUZ = /^(YOK|yok|BELİRSİZ)/;

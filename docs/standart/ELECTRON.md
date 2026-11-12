@@ -18,7 +18,7 @@ Master-data CRUD sayfası altı dosyaya bölünür ve her dosyanın tek işi var
 - **[EL-04]** Sayfaya özel saf yardımcıyı (biçimleme, eşleme, karar tablosu) ayrı dosyaya çıkar ve yanına `.test.ts`'ini koy · zorlama: insan:"saf mı" ölçülemez · kanıt: `pages/System/Clients/clients-utils.ts` + `clients-utils.test.ts` (2026-09-04, en yeni referans sayfa) · devralınan: yok
 - **[EL-05]** Basit master-data formunu `EntityFormDialog` sarmalayıcısıyla kur; kendi `useForm`'unu yalnız satır kalemli/karma form için aç · zorlama: insan:form karmaşıklığı ölçülemez · kanıt: 26 FormDialog'un 12'si sarmalayıcı; kendi form'unu kuran 14 dosyanın hepsi ≥118 satır (ortalama ~340) · devralınan: yok
 
-Route kaydı, `screen-catalog.ts` girdisi, hub karosu / komut paleti girişi ve "Sidebar'a satır EKLENMEZ" kuralı `Electron/CLAUDE.md` § Sayfa kalıpları ile `docs/RECETELER.md` § Electron sayfası'ndadır.
+Route kaydı, `screen-catalog.ts` girdisi, hub karosu / komut paleti girişi ve "Sidebar'a satır EKLENMEZ" kuralı `Electron/CLAUDE.md` § Tuzaklar ile `docs/RECETELER.md` § Electron sayfası'ndadır.
 
 ## 2 · İskelet
 
@@ -65,12 +65,12 @@ BELİRSİZ-01 kapandı: `pages/` altındaki 296 `.filter(` çağrısının **tam
 
 - **[EL-24]** `schema.ts`'i master-data CRUD'un TEK doğrulama kapısı olarak yaz — `BaseController` gövdeyi Zod'suz doğrudan servise geçirir · zorlama: insan:sözleşme iki repoda yaşar, tek AST'den ölçülemez · kanıt: `Teks-Erp/src/controllers/base.controller.ts:95-102` (`this.service.create(req.body, req.user?.userId)`) · devralınan: yok
 - **[EL-25]** zod `max(n)` değerini aynası olan Prisma kolonunun `@db.VarChar(n)` uzunluğuna eşitle · zorlama: insan:alan eşlemesi (panel alanı ↔ Prisma kolonu) mekanik çıkarılamaz · kanıt: 12 modül örnekleminde 21 eşleşen alanın 20'si birebir; sapma `pages/Customers/schema.ts:63` `name.max(200)` ↔ `prisma/schema.prisma:2070` `Customer.name @db.VarChar(100)` → 101-200 karakterlik ad panelden geçer, DB'de P2000 olur · devralınan: 1
-- **[EL-26]** Yeni alanı panel şemasına ve backend sözleşmesine BİRLİKTE ekle — [IL-08] · zorlama: insan:[IL-08] gerekçesi · kanıt: `docs/KOD-KURALLARI.md` § yasaklar (istek gövdesini elle kuran istemci katmanı bir allowlist'tir) · devralınan: yok
+- **[EL-26]** Yeni alanı panel şemasına ve backend sözleşmesine BİRLİKTE ekle — [IL-08] · zorlama: insan:[IL-08] gerekçesi · kanıt: `docs/KOD-KURALLARI.md` § Tuzaklar (istek gövdesini elle kuran istemci katmanı bir allowlist'tir) · devralınan: yok
 
 ## 8 · Süreç sınırı
 
 - **[EL-27]** Renderer'da `electron` · `fs` · `path` · `child_process` · `os` import etme · zorlama: eslint:`no-restricted-imports` (`Electron/eslint.config.mjs:267-278`, renderer bloğu) · kanıt: 0 ihlal; kural canlı olduğu `--stdin` negatif sondasıyla doğrulandı (`olcum/eslint-electron.json`) · devralınan: yok
-- **[EL-28]** Native yeteneğe yalnız `window.api` üzerinden eriş; yeni kanalı dört adımda aç (shared contract → `electron/ipc/<domain>.ipc.ts` → `preload.ts` köprüsü → renderer çağrısı) · zorlama: insan:kanal bütünlüğü dört dosyaya yayılır, tek AST kuralı ölçemez · kanıt: `Electron/CLAUDE.md` § Mimari ve süreç sınırı; iskelet `.claude/skills/electron-ipc-handler` · devralınan: yok
+- **[EL-28]** Native yeteneğe yalnız `window.api` üzerinden eriş; yeni kanalı dört adımda aç (shared contract → `electron/ipc/<domain>.ipc.ts` → `preload.ts` köprüsü → renderer çağrısı) · zorlama: insan:kanal bütünlüğü dört dosyaya yayılır, tek AST kuralı ölçemez · kanıt: `Electron/CLAUDE.md` § Mimari sınırlar; iskelet `.claude/skills/electron-ipc-handler` · devralınan: yok
 - **[EL-29]** Token'ı `safeStorage` + `electron-store` üzerinden sakla; `localStorage`/`sessionStorage`'a token/JWT YAZMA · zorlama: eslint:`no-restricted-syntax` dar `setItem` selector'ı (iki biçim: `localStorage.…` ve `window.localStorage.…`) · kanıt: 0 ihlal, negatif sonda koşuldu; kapsamdaki 5 `setItem` çağrısının hiçbiri token yazmıyor, geri kalan `localStorage` kullanımı UI tercihidir; tek belgeli istisna web fallback'i `src/lib/secure-store.ts:22-36` (`secure.` önekli, değişken anahtar) · devralınan: yok
 
 ## 9 · Adlandırma ve dosya

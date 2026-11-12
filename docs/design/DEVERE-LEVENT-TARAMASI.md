@@ -4,7 +4,7 @@
 >
 > **Yöntem:** şema ve kod elle okundu; dört soru paralel ajanlarla kanıtlandı (iş emri motorunda top geçmeyen adım · sektör iddialarının çürütme denemesi, web kaynaklı · modül anahtarı dokunuşları · `YarnMovementKind` etki alanı). Kanıt satırları metinde `dosya:satır` olarak geçer.
 >
-> **Okuma sırası:** saha gerçeği `DOKUMA-DEVERE-SAHA-KAYNAGI.md` → bu belge. Defter doktrini `docs/kurallar/defter.md`; modül kalıbı `docs/kurallar/modul-bayrak.md`.
+> **Okuma sırası:** saha gerçeği `DOKUMA-DEVERE-SAHA-KAYNAGI.md` → bu belge. Defter doktrini `docs/kurallar/defter.md`; modül kalıbı `docs/history/kurallar-2026-09/modul-bayrak.md`.
 >
 > **Bağlayıcı yıkıcı-olmayan kurallar** (yönetici): `devere.enabled` ve dokuma bayrağı AYRI, varsayılan KAPALI · adlandırılmış kapı, jenerik `requireModule` yok · adnansahin'in stok kartı adı ASLA ayrıştırılmaz/taşınmaz · fork yok · rota şablonuna iki istasyon eklenir, mevcut akış bozulmaz.
 
@@ -733,7 +733,7 @@ Taramanın açık bıraktığı beş çelişki `teks-erp-1e` tarafından karara 
 |---|---|---|---|---|
 | 9.1 | Rota ↔ devere adımı | **Öneri kabul.** Dokuma rotada ADIM + topun giriş noktası (Faz 4, tezgah çıkışı motoruyla). Devere yalnız istasyon KATALOĞUNDA (makine, oturum, yetenek); iş emri adımı değil. Levent kendi tablosunu ve defterini alır | ① çözgü/leventleme top doğmadan önceki hazırlıktır, top rotasının adımı değildir ② çekirdek adım kodu (recompute + quickStart) canlı fabrikanın bütün akışını taşıyor; levent için ona dokunmak orantısız risk ③ recompute topsuz adımı PENDING bırakıyor (ölçüldü, §3.3) | §3.3 · §7 Faz 4 |
 | 9.2 | Bayrak adı | **Öneri kabul.** `tezgah.enabled` monitörizasyon olarak KALIR; `dokuma.enabled` Faz 4'te doğar (üretime bağlı). Var olan anahtarın anlamı genişletilmez — DB anahtarı kimliktir | ③ mevcut anahtarın kapsamı kodda ve bekçilerde yazılı | §5 "Dokuma ile ilişki" |
-| 9.3 | Grandfathering kural satırı | **Daraltılacak:** "dünkü davranışı olmayan (yeni doğan) modülde değer = false". Kural satırı `docs/kurallar/modul-bayrak.md`'ye yazılır, ezilen eski cümle `GEÇERSİZ → 2026-09-12` diye işaretlenir, gerekçe arşive girer | ③ kod ve bekçi yer tutucular için zaten sabit `false` yazıyor (`20260902230000` migration'ı); kural satırı düz okununca bunu yasaklıyor görünüyordu | §5 "Grandfathering" |
+| 9.3 | Grandfathering kural satırı | **Daraltılacak:** "dünkü davranışı olmayan (yeni doğan) modülde değer = false". Kural satırı `docs/history/kurallar-2026-09/modul-bayrak.md`'ye yazılır, ezilen eski cümle `GEÇERSİZ → 2026-09-12` diye işaretlenir, gerekçe arşive girer | ③ kod ve bekçi yer tutucular için zaten sabit `false` yazıyor (`20260902230000` migration'ı); kural satırı düz okununca bunu yasaklıyor görünüyordu | §5 "Grandfathering" |
 | 9.4 | Profil | **Mevcut `perde` profili DEĞİŞMEZ** (kumaşı hazır alan kurulum). Hedef kitle için AYRI profil doğar: **`perde-dokuma`** (ticaret + iplik + devere açık; tezgah Faz 4'te). `tam` devere'yi kendiliğinden açık almaya devam eder | ② profil de kimliktir; canlı kurulumun profil içeriğini değiştirmek sessiz davranış değişikliğidir | §5 "Profiller" |
 | 9.5 | Tül / raşel | **Raşel ayrı modül DEĞİL.** `Station.consumesWarpBeam` + `Machine.warpBeamSlots` yeterlidir; levent tüketen makine dokuma tezgahıyla sınırlanmaz. Saha sorusu #21 açık kalır, tasarım iki cevaba da hazırdır | ① raşel (çözgülü örme) da levent tüketir, kılavuz barı başına bir levent ③ yetenek bayrağı kalıbı (`appliesQuality` emsali) makine türünden bağımsızdır | §4.5 · §8 #21 |
 

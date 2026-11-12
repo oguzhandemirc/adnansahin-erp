@@ -3,7 +3,7 @@
 // =============================================================================
 // Her kutu bir `RowFilter`dır: hangi URL anahtarlarını taşıdığını bilir; ✕ ve
 // "Temizle" yalnız bu anahtarları siler. Süzme SUNUCUDA — çubuk yalnız URL yazar,
-// liste/cursor/özet şeridi aynı where'den okur (`docs/kurallar/filtre-liste.md`).
+// liste/cursor/özet şeridi aynı where'den okur (`docs/kurallar/raporlar.md`).
 // =============================================================================
 import type { ReactNode } from "react";
 import type { FilterDef } from "../FilterBar";

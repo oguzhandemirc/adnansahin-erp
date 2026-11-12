@@ -49,6 +49,8 @@ Mekanizma tablosu ve backend karşılığı [`ESZAMANLILIK.md`](ESZAMANLILIK.md)
 ## 6 · UI sözleşmesi
 
 - **[MO-15]** Tıklanabilir her alan Paper bileşenidir: `TouchableRipple` / `Button` / `IconButton` / `List.Item`; `<Card` + `onPress` yazılmaz · zorlama: insan:ESLint kuralı ÖLÇÜMLE reddedildi — `<Card` kullanımı 0, ihlal yüzeyi yok, sıfır koruma değeri üretirdi (`olcum/eslint-mobil.json` § Card+onPress, karar "yazma"), `[IL-12]` · kanıt: `TouchableRipple` 233 kullanım / 81 dosya · devralınan: 9 ham RN dokunma (7 `Pressable` backdrop, `ToastConfig.tsx` 1, `TouchableWithoutFeedback` 1)
+- **[MO-15a]** Dokunma hedefi ≥56dp; operatörün okuduğu birincil metin ≥14, ikincil/etiket ≥12, kritik rakam (metraj, barkod, sayaç) ≥20; her ekran iki yönde çalışır · zorlama: insan · kanıt: devralınan kural (`git show 1eadbd75:mobil/CLAUDE.md`)
+- **[MO-15b]** Ayarlar = menü + alt sayfa: yeni ayar bölümü ana ekrana gömülmez, alt sayfa olur ve menüye satır eklenir (`RootStackParamList` + `RootNavigator`; kabuk `screens/Common/settings/`) · zorlama: insan · kanıt: devralınan kural (`git show 1eadbd75:mobil/CLAUDE.md`)
 - **[MO-16]** Modallar `components/AppModal.tsx`ten doğar · zorlama: insan:ham `<Modal` meşru bir React Native ilkelidir, jenerik yasak yanlış pozitif üretir · kanıt: `AppModal` 54 dosyadan import / 79 JSX kullanım · devralınan: 3 (`Tambur/LabelNamePreview.tsx`, `components/AppMenu.tsx`, `components/labels/LabelPreviewSheet.tsx`)
 - **[MO-17]** Liste `FlashList` + `useInfiniteQuery` (`onEndReached`) ile kurulur; "Önceki/Sonraki" pager yoktur · zorlama: insan:kalıp %100 tutuyor, kapı maliyeti değerini aşar · kanıt: `FlashList` 37 kullanım / 23 dosya, `useInfiniteQuery` 36 çağrı, `<FlatList` 0 · devralınan: yok
 - **[MO-18]** `SegmentedButtons` `flexDirection:'row'` kabının doğrudan çocuğu OLAMAZ · zorlama: bekçi:`src/test/segmented-buttons-row.guard.test.ts` (TS AST, en yakın sarmalayıcı stilini çözer) · kanıt: aynı dosya; vaka `[IL-14]` (2026-08-25) · devralınan: yok
@@ -58,7 +60,7 @@ Mekanizma tablosu ve backend karşılığı [`ESZAMANLILIK.md`](ESZAMANLILIK.md)
 ## 7 · Oturum ve donanım
 
 - **[MO-20]** Oturum kapısı ekran içinde kurulmaz: kayıt `constants/stationScreens.ts`te, sarma navigator'da `withWorkSession` ile yapılır · zorlama: bekçi:`components/session/SessionGate.test.tsx` · kanıt: `MainNavigator.tsx:46`, `SessionGate.tsx:31`, `stationScreens.ts` (4 ekran, 4/4 registry'den; elle saran yer 0) · devralınan: yok
-- **[MO-21]** Çevre birimi oturumdan çözülür (`hooks/useMachinePeripherals`); cihaz-yerel seçim yoktur ve ekran `services/hal/`e doğrudan inmez · zorlama: bekçi:`hooks/useMachinePeripherals.test.ts` · kanıt: 3 tüketici (`TamburScreen.tsx:611` METER, `KK1Screen.tsx:388` METER, `hooks/useSackWeigh.ts:41` SCALE); ekrandan HAL'e inen yer 0; sözleşme `mobil/CLAUDE.md` § Donanım (HAL) · devralınan: yok
+- **[MO-21]** Çevre birimi oturumdan çözülür (`hooks/useMachinePeripherals`); cihaz-yerel seçim yoktur ve ekran `services/hal/`e doğrudan inmez · zorlama: bekçi:`hooks/useMachinePeripherals.test.ts` · kanıt: 3 tüketici (`TamburScreen.tsx:611` METER, `KK1Screen.tsx:388` METER, `hooks/useSackWeigh.ts:41` SCALE); ekrandan HAL'e inen yer 0; sözleşme `mobil/CLAUDE.md` § Mimari sınırlar · devralınan: yok
 
 ## 8 · İzin
 

@@ -196,16 +196,17 @@ describe('kanal derlemesi (TEKSERP_KANAL)', () => {
   });
 
   it('bilinmeyen kanal kodu gürültülü düşer (sessizce varsayılana dönmez)', () => {
-    expect(() => cfg('testfabirka')).toThrow(/BİLİNMEYEN KANAL/);
+    expect(() => cfg('adnansahn')).toThrow(/BİLİNMEYEN KANAL/);
   });
 
   it('kanal derlemesinde başka köke işaret eden EXPO_PUBLIC_UPDATE_URL düşer', () => {
-    const baskasi = kodlar.find((k) => k !== kayit.varsayilan) ?? kayit.varsayilan;
-    expect(() =>
-      ortamla({ TEKSERP_KANAL: baskasi, EXPO_PUBLIC_UPDATE_URL: kayit.kanallar[kayit.varsayilan].yayin.mobilFeed }, () =>
-        appConfig({ config: JSON.parse(JSON.stringify(appJson)) }),
-      ),
-    ).toThrow(/EXPO_PUBLIC_UPDATE_URL/);
+    // Kayıtta tek kanal olabilir: yabancı kök, varsayılan kanalın feed'inden türetilir.
+    const feed = kayit.kanallar[kayit.varsayilan].yayin.mobilFeed;
+    const yabanci = feed.replace(`/${kayit.varsayilan}/`, '/baska-kanal/');
+    expect(yabanci).not.toBe(feed);
+    const ortam = { TEKSERP_KANAL: kayit.varsayilan, EXPO_PUBLIC_UPDATE_URL: yabanci };
+    const kur = () => ortamla(ortam, () => appConfig({ config: JSON.parse(JSON.stringify(appJson)) }));
+    expect(kur).toThrow(/EXPO_PUBLIC_UPDATE_URL/);
   });
 
   it('OTA imza anahtarı yolu sertifika yolunun aynası; iki kanal aynı anahtarı göstermez', () => {

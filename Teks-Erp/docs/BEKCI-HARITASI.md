@@ -2250,7 +2250,7 @@ Kalan atlamalar üç biçimde ve strict hiçbirini görmez:
 | `Teks-Erp/scripts/test_semi_finished_surfaces.ts` | Yarı mamul ayrımının GÖSTERİMDE olup ARZDA olmadığını kilitler: Ürün Dengesi ayrı kova + `malzemeAcigi` ikisini birden düşer, sipariş karşılamada `fre | ✓ | ✓ |  |
 ## dokuma
 
-> Alan 2026-09-13'te doğdu (şema parça parça iniyor: P1 `WeavingOrder` · P2 `MachineRun`). Kural dosyası `docs/kurallar/dokuma.md`.
+> Alan 2026-09-13'te doğdu (şema parça parça iniyor: P1 `WeavingOrder` · P2 `MachineRun`). Kural dosyası `docs/history/kurallar-2026-09/dokuma.md`.
 
 | Dosya | Ne ölçüyor | DB | Negatif sonda | |
 |---|---|---|---|---|
@@ -2320,3 +2320,13 @@ Kalan atlamalar üç biçimde ve strict hiçbirini görmez:
 | `Teks-Erp/scripts/test_item_lifecycle_race.ts` | Eşzamanlı "Pasif'e geç" ↔ top girişi (24 tur, kademeli gecikme): tam bir kazanan, Pasif kartta canlı top 0, 5xx/kilitlenme yok; iki sonucun da gerçekleştiği ölçülür (pencere denendi) | ✓ | ✓B1 (bu commit) | Ölçüldü 2026-09-25: FOR SHARE kaldırılınca 24 turun 5'inde Pasif kartta canlı top → kırmızı |
 | `Teks-Erp/scripts/test_item_lifecycle_migration.ts` | Göç sondası: migration D1 SQL bloğu ↔ TS helper DB'deki HER kartta aynı kümeyi sayar; göç sonrası Pasif+canlı 0, CHECK yerinde, isActive↔durum ayrışması 0, mezar taşı hep ARCHIVED. Prova DB'sinde (fabrika dökümü kopyası) gerçek veriyle koşar | ✓ | ✓B1 (bu commit) | Ölçüldü 2026-09-25: SQL'den iplik koşulu çıkarılınca SQL 1 ↔ TS 3 → kırmızı |
 | `Teks-Erp/scripts/test_item_lifecycle_exit_gate.ts` | Çıkış matrisi: 3 "Tükenene kadar" ayarı × sevk sipariş kuralı = 54 birleşimin her birinde çıkış ≥ 1 (gerçek yüklemler: `assertItemUsable` + `assertOrderLinkAllowed`); KAPALI + block kaydı iki yönde `warnings[]` verir, reddetmez | ✓ | ✓B1 (bu commit) | Ölçüldü 2026-09-25: `orderless` muafiyeti kaldırılınca 6 KAPALI+block birleşimi çıkışsız → kırmızı |
+
+## patron-bulutu
+
+> Alan 2026-11-12'de doğdu (D1: imza + bulut istemcisi + kapatma düğmesi). Kural dosyası `docs/kurallar/patron-bulutu.md`.
+
+| Dosya | Ne ölçüyor | DB | Negatif sonda | |
+|---|---|---|---|---|
+| `Teks-Erp/scripts/test_patron_bulut_imza.ts` | Fabrika imzası → bulut doğrulama zinciri (installation-auth sırası): düz + gzip KABUL; 1 bayt · yanlış anahtar · ±10 dk dışı · yanlış uç → RET; altı protokol dosyası + tel sözleşmesi SHA-256 mühürle bulutla bayt-eşit; anahtar dosyası 0600, geniş izin açılmaz, ezilmez; özel anahtar mesaj/konsol/araç çıktısında yok |  | ✓B3 (bu commit) — gzip imzası ham gövdeye · izin kapısı kaldırıldı · mesaja dosya içeriği | 2026-11-12 |
+| `Teks-Erp/scripts/test_patron_bulut_uygunluk.ts` | Kapatma düğmesi: 16 birleşimin yalnız "adres ∧ anahtar ∧ kimlik ∧ ayar" olanı açık, kapalıda node:http/https/fetch sayacı 0 (açıkta artar); kayıt yok ⇒ kapalı, aralık 5 dk (1–60); adres boşken DB/dosya okunmaz; 60 sn + en fazla 2 tekrar, 4xx tekrar yok, gerçek zaman aşımı |  | ✓B4 (bu commit) — ayar dalı · varsayılan açık · tekrar 3 · 4xx tekrar | 2026-11-12 |
+| `Teks-Erp/scripts/test_patron_bulut_esitleme.ts` | Eşitleme kataloğu + iş: 13 projeksiyon, kaynak kolon DMMF'te, tel/kaynak adında ve gönderilen pakette finans anahtarı yok (kalem birim fiyatı dolu fixture); kapalıyken iş/zamanlayıcı/tetikleyici yok + dış istek 0; dört koşul tamken tetikleyici = toplam ve iş başlar, biri eksikken açılmaz, ayar kapanınca ikisi kapanır, açılış ve `set()` kancası açık kalmış tetikleyiciyi kapatır; 55P03 sahte + gerçek kilit tekrarı; erişilemez/503/fırlatan ön koşulda tık fırlatmaz ve `/health` 200; her paket `PackageSchema`ya uyar, tur filigranı ilerler |  | ✓B3 (bu commit) — fiyat kolonu · uygunluksuz iş · tık try/catch | 2026-11-12 |

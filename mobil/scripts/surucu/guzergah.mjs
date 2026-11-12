@@ -14,7 +14,7 @@
 // ekranından o adrese ayarlanır (kullanıcının 4000'ine istek gitmez).
 //
 // `--seri=<adb seri>` (yoksa tek cihaz), `--paket=<uygulama paketi>` (varsayılan test paketi) ya da
-// `--kanal=<kod>` (paket adı `deploy/kanallar.json`dan; ör. testfabrika),
+// `--kanal=<kod>` (paket adı `deploy/kanallar.json`dan; ör. adnansahin),
 // `--host=<backend host>` (varsayılan emülatörde 10.0.2.2, gerçek cihazda Mac LAN IP).
 // =============================================================================
 import { createRequire } from 'node:module';

@@ -72,7 +72,7 @@ const ORDER_BY_BATCH_NUMBER = {
   // "yenilik" sırasıdır. Parti listeleyen her yer `createdAt` ile sıralar.
   selector: "Property[key.name='orderBy'] Property[key.name='batchNumber']",
   message:
-    "`orderBy: { batchNumber }` YASAK — parti no sarar ve benzersiz değildir; `createdAt` ile sırala. bkz. docs/kurallar/parti.md.",
+    "`orderBy: { batchNumber }` YASAK — parti no sarar ve benzersiz değildir; `createdAt` ile sırala. bkz. docs/kurallar/sevkiyat.md.",
 };
 
 const GENERIC_REQUIRE_MODULE = {
@@ -80,7 +80,7 @@ const GENERIC_REQUIRE_MODULE = {
   // middleware ADINI AST/metin olarak arar; jenerik fabrika onları kör eder.
   selector: "CallExpression[callee.name='requireModule']",
   message:
-    "Jenerik `requireModule(\"x\")` YASAK — adlandırılmış kapı kullan (requireProductionEnabled / requireTicaretEnabled / requireIplikEnabled / requireDepoMultiEnabled / requireFinanceEnabled). bkz. docs/kurallar/modul-bayrak.md.",
+    "Jenerik `requireModule(\"x\")` YASAK — adlandırılmış kapı kullan (requireProductionEnabled / requireTicaretEnabled / requireIplikEnabled / requireDepoMultiEnabled / requireFinanceEnabled). bkz. docs/kurallar/yetki-izin.md.",
 };
 
 const PROCESS_QC_COMPARE = {
@@ -90,7 +90,7 @@ const PROCESS_QC_COMPARE = {
   selector:
     "BinaryExpression[operator=/^[!=]==$/] MemberExpression[property.name='PROCESS_QC'], BinaryExpression[operator=/^[!=]==$/] Literal[value='PROCESS_QC']",
   message:
-    "`kind === PROCESS_QC` karşılaştırması YASAK — soruyu `stepCanApplyQuality` / `QUALITY_STATION_WHERE` cevaplar (boğaz-ikiz). bkz. docs/kurallar/kalite.md.",
+    "`kind === PROCESS_QC` karşılaştırması YASAK — soruyu `stepCanApplyQuality` / `QUALITY_STATION_WHERE` cevaplar (boğaz-ikiz). bkz. docs/kurallar/is-emri.md.",
 };
 
 const CLIENT_TYPE_MOBILE = {
@@ -99,7 +99,7 @@ const CLIENT_TYPE_MOBILE = {
   // okunur ama değildir.
   selector: "BinaryExpression[operator='!=='] Literal[value='mobile']",
   message:
-    '`!== "mobile"` YASAK — `clientType` opsiyoneldir ve güvenlik sınırı DEĞİL; uzak/LAN ayrımı soketten yapılır. bkz. docs/kurallar/kesif-cihaz.md.',
+    '`!== "mobile"` YASAK — `clientType` opsiyoneldir ve güvenlik sınırı DEĞİL; uzak/LAN ayrımı soketten yapılır. bkz. docs/kurallar/genel.md.',
 };
 
 const RESPONSE_BODY_CODE = {
@@ -110,7 +110,7 @@ const RESPONSE_BODY_CODE = {
   // yanlış pozitif olarak yakalıyordu (ölçüldü).
   selector: "MemberExpression[object.property.name='body'][property.name='code']",
   message:
-    "`body.code` okuma YASAK — hata kodu `details.code` altındadır, kök `code` hep undefined döner (sahte yeşil). bkz. docs/kurallar/modul-bayrak.md.",
+    "`body.code` okuma YASAK — hata kodu `details.code` altındadır, kök `code` hep undefined döner (sahte yeşil). bkz. docs/kurallar/yetki-izin.md.",
 };
 
 const APPLIED_STEPS_COUNT = {
@@ -119,7 +119,7 @@ const APPLIED_STEPS_COUNT = {
   selector:
     "Literal[value=/applied_steps_count/], TemplateElement[value.raw=/applied_steps_count/], Identifier[name='applied_steps_count'], Property[key.name='applied_steps_count']",
   message:
-    "`applied_steps_count` ile migration doğrulama YASAK — elle resolve edilmiş migration 0 taşır, SQL'in koştuğunu kanıtlamaz. bkz. docs/kurallar/deploy-kurulum.md.",
+    "`applied_steps_count` ile migration doğrulama YASAK — elle resolve edilmiş migration 0 taşır, SQL'in koştuğunu kanıtlamaz. bkz. docs/kurallar/surum-yayin.md.",
 };
 
 const BARE_DATE_TRUNC = {

@@ -396,7 +396,7 @@ deleteItemColorAlias(customerId: string, itemId: string, colorId: string, userId
   1. `assertValidUuid` ×3.
   2. `prisma.customerItemColorAlias.delete({ where: { customerId_itemId_colorId } })`. Silinen satır audit'e yazılır.
   - Müşteri, kumaş ve renk kapısı YOK. Pasif karttaki adı temizlemek serbesttir (kardeş `deleteItemAlias` de kapı koymuyor).
-- Backend renk ↔ kumaş izin listesini (`allowedColors`) DENETLEMEZ. Renk bir kısıt değil reçetedir (`docs/kurallar/rota-renk.md`); süzme istemcide `ColorPickerModal allowedColorIds` ile yapılır. Kardeş `upsertColorAlias` de denetlemiyor.
+- Backend renk ↔ kumaş izin listesini (`allowedColors`) DENETLEMEZ. Renk bir kısıt değil reçetedir (`docs/history/kurallar-2026-09/rota-renk.md`); süzme istemcide `ColorPickerModal allowedColorIds` ile yapılır. Kardeş `upsertColorAlias` de denetlemiyor.
 
 **Audit:** `tableName: "CUSTOMER_ITEM_COLOR_ALIAS"`.
 - C: `action: existing ? "UPDATE" : "CREATE"`, `oldData: existing ? { alias } : null`, `newData: { customerId, itemId, colorId, alias }`. `existing`, upsert'ten önce en iyi çabayla okunur (§4 Eşzamanlılık).

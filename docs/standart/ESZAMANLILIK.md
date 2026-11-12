@@ -3,7 +3,7 @@
 Bu dosya **hangi yarışa hangi mekanizma** sorusunun cevabıdır. Buradaki tutum sahada mükerrer kayıt, kaybolan yazma ve deadlock demektir; o yüzden her satır ölçülmüş bir emsale dayanır.
 
 Kural biçimi ve zorlama etiketleri: [`README.md`](README.md) · katman-üstü ilkeler: [`ILKELER.md`](ILKELER.md) · bekçi kadansı: [`TEST-VE-DERLEME.md`](TEST-VE-DERLEME.md).
-Yasak listesi (`findUnique→if→update`, `tx.*` + `Promise.all`, `notIn: []`) `docs/KOD-KURALLARI.md`'de; beş sağlamlık sınıfının hikâyesi `docs/kurallar/finans.md`'de; replay'in dört durumu `docs/kurallar/kk1.md`'de. Burada tekrar edilmez, işaret edilir.
+Yasak listesi (`findUnique→if→update`, `tx.*` + `Promise.all`, `notIn: []`) `docs/KOD-KURALLARI.md`'de; beş sağlamlık sınıfının hikâyesi `docs/history/kurallar-2026-09/finans.md`'de; replay'in dört durumu `docs/kurallar/kk1.md`'de. Burada tekrar edilmez, işaret edilir.
 
 ---
 

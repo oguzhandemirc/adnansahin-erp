@@ -239,7 +239,7 @@ Davranışsal (güvenlik/veri) kusur BULUNMADI; asıl sed backend'dir ve ölçü
   → 10; `git show c27dbfd3~1:…` aynı komut → 13. "14/11" `grep -c 'dosya:'`in tip bildirim satırını (`ReadonlyArray<{ dosya: string…`)
   saymasıdır — aracın kendi gürültüsü. Belgede yukarıda düzeltildi; commit mesajı ve arşiv notu (varsa) 1e'de.
 - **D4 · Envanter boşluğu: `Electron/src/pages/Operations/WeavingOrders/weaving-regime.test.ts`** (dilimle YENİ) ne
-  `Teks-Erp/docs/BEKCI-HARITASI.md`de ne `docs/kurallar/modul-bayrak.md` İstemci listesinde ne `dokuma.md`de
+  `Teks-Erp/docs/BEKCI-HARITASI.md`de ne `docs/history/kurallar-2026-09/modul-bayrak.md` İstemci listesinde ne `dokuma.md`de
   (`grep -c weaving-regime` üçünde 0); kardeşleri (`yarn-regime.test` · `production-regime.test` · `tile-visibility.test`) kayıtlı,
   backend bekçisi aynı commit'te İKİ yere yazılmış. Haritada olmayan bekçi koşulmaz ve `test_identity_ledger` yalnız
   `Teks-Erp/scripts/test_*.ts`yi ölçtüğü için hiçbir kapı kırmızı vermez. Kalem (0c): üç dosyaya satır.

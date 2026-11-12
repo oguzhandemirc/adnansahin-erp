@@ -8,7 +8,7 @@
 // ── DEFTERE YAZMAZ ───────────────────────────────────────────────────────────
 // Bu tablo bir DURUM tablosudur; koşum/duruş/doff/top kendi defterlerini tutar.
 // İptal bir durum geçişidir, ters mekanizma KAPSAM DIŞI (reopen yok) — eksiklik
-// değil, kararın kendisi (`docs/kurallar/dokuma.md`).
+// değil, kararın kendisi (`docs/history/kurallar-2026-09/dokuma.md`).
 //
 // ── ÜÇ KAPI ──────────────────────────────────────────────────────────────────
 // • Numara: `DK`+GGAAYY+NNNN, 8032 kilidi `nextWeavingOrderNumberTx`in İLK ifadesi.
@@ -337,7 +337,7 @@ export async function closeWeavingOrder(id: string, userId?: string): Promise<Ap
  * İptal yalnız bu satır üstünde bir DURUM GEÇİŞİDİR: kapanmış koşum, duruş,
  * doff ve doğmuş top DOKUNULMAZ. Açık koşum varken 409 — önce koşum kapanır.
  * Sebep serbest metin, zorunlu (kataloğa bağlanmadı — borç, kapanma koşulu
- * `docs/kurallar/dokuma.md`).
+ * `docs/history/kurallar-2026-09/dokuma.md`).
  */
 export async function cancelWeavingOrder(
   id: string,

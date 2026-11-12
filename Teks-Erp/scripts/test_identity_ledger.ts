@@ -66,7 +66,7 @@
 // ⚠️ KÖRLÜK ZEMİNİ — YÖN A yalnız HENÜZ İTİLMEMİŞ işi ölçer. Taban
 // `merge-base HEAD origin/main`dir; push'tan sonra taban HEAD'e eşitlenir ve
 // YÖN A boş kümeyle YEŞİL döner. Yani A'nın penceresi "push öncesi"dir — ki
-// `npm test` zaten orada koşar (kök CLAUDE.md § Bekçiler). Bir kez itilmiş
+// `npm test` zaten orada koşar (kök CLAUDE.md § Çalışma düzeni). Bir kez itilmiş
 // sessiz düşme bu kapıyla bir daha YAKALANMAZ. Taban dosyası açmadık çünkü
 // ölçüm 55 committe SIFIR gerçek düşme buldu; o sayı bir gün sıfırdan çıkarsa
 // çözüm taban dosyasıdır, eşiği oynatmak değil.

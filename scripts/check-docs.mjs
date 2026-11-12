@@ -66,7 +66,8 @@ const MD_LINK_RE = /\[[^\]]*\]\(([^)\s]+)\)/g;
 /** Dış bağlantı · çapa · mutlak yol — kapının konusu değil. */
 const LINK_SKIP_RE = /^(?:[a-z][a-z0-9+.-]*:|#|\/)/i;
 
-const SKIP_DIRS = new Set(["node_modules", ".git", ".expo", "dist", "build", ".next"]);
+// "worktrees": `.claude/worktrees/` altındaki ajan çalışma kopyaları (git dışı) reponun kendi kopyasıdır, iki kez taranmaz.
+const SKIP_DIRS = new Set(["node_modules", ".git", ".expo", "dist", "build", ".next", "worktrees"]);
 const SKIP_PATHS = ["docs/history/", "docs/akademik/"];
 const SKIP_FILES = new Set(["GEREKSIZ-ADAYLAR.md"]); // geçici karar-aidi (bilerek bayat-sembol tartışır)
 
@@ -205,8 +206,8 @@ if (advisories.length) {
 
 
 // --- GATE: belge boyut tavanı (2026-09-05 — kök 42k token'dan ~6k'ya indi; geri şişmesin) ---
-// Ölçü BAYT (token ≈ bayt/3). Tavanlar bilinçli gevşek: kök 36 KB (~12k tok), alt dosyalar 24 KB.
-const CLAUDE_MD_SIZE_CAPS = { "CLAUDE.md": 36 * 1024, "Teks-Erp/CLAUDE.md": 24 * 1024, "Electron/CLAUDE.md": 24 * 1024, "mobil/CLAUDE.md": 24 * 1024 };
+// Ölçü BAYT (token ≈ bayt/3). Tavanlar: kök 12 KB (~4k tok), alt CLAUDE.md dosyaları 8 KB.
+const CLAUDE_MD_SIZE_CAPS = { "CLAUDE.md": 12 * 1024, "Teks-Erp/CLAUDE.md": 8 * 1024, "Electron/CLAUDE.md": 8 * 1024, "mobil/CLAUDE.md": 8 * 1024 };
 
 // `docs/standart/*.md` aynı tavana bağlanır: standart dosyaları da "her yeni
 // bulguyu buraya da yazayım" baskısı altındadır ve şişince okunmaz olurlar.
