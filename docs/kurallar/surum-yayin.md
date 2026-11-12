@@ -25,6 +25,11 @@ Backend paketinin üretilip fabrika sunucusuna kurulması, panelin (Electron) ve
 - Electron `artifactName` ASCII kalır, `${productName}` kullanılmaz (ad `latest.yml`de URL'dir). [bekçi: update-feed-url.test.ts]
 - Panel güncelleyicisinde `autoUpdater`a modül gövdesinde dokunulmaz (`updater()` getter), `autoInstallOnAppQuit=false` kalır, kontrol zamanlayıcısı yalnız main süreçte koşar. [bekçi: update-check-interval.test.ts]
 
+- Tablet NATIVE sürümü (yeni versionCode) Google Play dahili testten çıkar: `npm run build:apk -- --musteri=adnansahin --aab` → `node deploy/play-yukle.mjs --musteri=adnansahin --aab=<yol>` (kuru) → `--uygula`; ilk paket Console'dan elle, üretim kanalına araç yüklemez. [bekçi: check-kanallar.mjs §5]
+- Tablet JS güncellemesi OTA'dan gelmeye devam eder; Play'e her native turunda `runtimeVersion` artar ki yeni JS eski native'e gitmesin. [bekçi: update-feed-url.test.ts]
+- Uygulama içi Play güncellemesi FAIL-OPEN'dır: Play yok / Play'den kurulmamış / çevrimdışı / hata → sessiz; yalnız boşta (ana menü, kuyruk boş) önerilir, zorunluluğu sunucu politikası (`minVersion`) belirler; Play ikilisinde APK künyesi okunmaz. [bekçi: playUpdate.test.ts]
+- Paket adı değişimi bir KİMLİK GÖÇÜdür: eski uygulama sahada elle kaldırılır, cihaz yeniden eşleşir; `com.teks.erp.mobil` → `com.etkiliyazilim.adnansahin.saha` (2026-11-12, kullanıcı kararı). [bekçi: check-kanallar.mjs DONMUS]
+
 ### Backend paketi ve kurulum
 - Backend paketi `pwsh -NoProfile -File deploy/paketle.ps1` ile geliştirme makinesinde üretilir; `docs/surumler/backend-<sürüm>.md` yoksa paketleme durur, paket adı/SHA256/commit'i makine yazar. [bekçi: test_surum_belgesi]
 - Kurana talimat sohbetten değil `docs/surumler/backend-<sürüm>.md`den yazılır; önceki saha sürümü tahmin edilmez, ölçülür. [bekçi: test_surum_belgesi]

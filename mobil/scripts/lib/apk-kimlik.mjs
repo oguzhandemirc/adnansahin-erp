@@ -143,3 +143,85 @@ export function apkKimligi(apkYolu) {
     appConfig,
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * AAB: `base/manifest/AndroidManifest.xml` aapt2 PROTOBUF biçimidir (Resources.proto XmlNode), AXML değil
+ * (ana ürün Teks-Erp b569c450 mobil/scripts/lib/apk-kimlik.mjs'ten taşındı)
+ * ------------------------------------------------------------------ */
+
+function protoAlanlari(b, bas = 0, son = b.length) {
+  const alanlar = [];
+  let o = bas;
+  const varint = () => {
+    let v = 0;
+    let carpan = 1;
+    for (;;) {
+      if (o >= son) throw new ApkOlculemedi('protobuf varint kesik');
+      const x = b[o++];
+      v += (x & 0x7f) * carpan;
+      if (!(x & 0x80)) return v;
+      carpan *= 128;
+    }
+  };
+  while (o < son) {
+    const anahtar = varint();
+    const no = Math.floor(anahtar / 8);
+    const tur = anahtar % 8;
+    if (tur === 0) alanlar.push({ no, tur, deger: varint() });
+    else if (tur === 2) {
+      const n = varint();
+      if (o + n > son) throw new ApkOlculemedi('protobuf alan uzunluğu taşıyor');
+      alanlar.push({ no, tur, bas: o, son: o + n });
+      o += n;
+    } else if (tur === 5) o += 4;
+    else if (tur === 1) o += 8;
+    else throw new ApkOlculemedi(`protobuf tel türü ${tur} tanınmıyor`);
+  }
+  return alanlar;
+}
+
+export function protoManifestOgeleri(b, kok = 'manifest') {
+  const metin = (a) => b.toString('utf8', a.bas, a.son);
+  const ogeler = [];
+  const derlenmis = (item) => {
+    for (const f of protoAlanlari(b, item.bas, item.son)) {
+      if (f.no === 7 && f.tur === 2) {
+        const bool = protoAlanlari(b, f.bas, f.son).find((p) => p.no === 8 && p.tur === 0);
+        if (bool) return bool.deger ? 'true' : 'false';
+      }
+      if (f.no === 2 && f.tur === 2) {
+        const v = protoAlanlari(b, f.bas, f.son).find((p) => p.no === 1 && p.tur === 2);
+        if (v) return metin(v);
+      }
+    }
+    return null;
+  };
+  const dugum = (bas, son, derinlik) => {
+    if (derinlik > 64) throw new ApkOlculemedi('protobuf manifest çok derin');
+    const el = protoAlanlari(b, bas, son).find((f) => f.no === 1 && f.tur === 2);
+    if (!el) return;
+    const alanlar = protoAlanlari(b, el.bas, el.son);
+    const ad = alanlar.find((f) => f.no === 3 && f.tur === 2);
+    const oznitelik = {};
+    for (const a of alanlar.filter((f) => f.no === 4 && f.tur === 2)) {
+      const ic = protoAlanlari(b, a.bas, a.son);
+      const n = ic.find((f) => f.no === 2 && f.tur === 2);
+      const v = ic.find((f) => f.no === 3 && f.tur === 2);
+      const c = ic.find((f) => f.no === 6 && f.tur === 2);
+      if (!n) continue;
+      // Derlenmiş öğe öncelikli: Android meta-data'yı oradan okur (boolean `getBoolean`, ham "true" dizesi değil).
+      const d = c ? derlenmis(c) : null;
+      oznitelik[metin(n)] = d ?? (v ? metin(v) : null);
+    }
+    ogeler.push({ ad: ad ? metin(ad) : null, oznitelik });
+    for (const c of alanlar.filter((f) => f.no === 5 && f.tur === 2)) dugum(c.bas, c.son, derinlik + 1);
+  };
+  try {
+    dugum(0, b.length, 0);
+  } catch (e) {
+    if (e instanceof ApkOlculemedi) throw e;
+    throw new ApkOlculemedi(`protobuf manifest okunamadı: ${e.message}`);
+  }
+  if (!ogeler.length || ogeler[0].ad !== kok) throw new ApkOlculemedi(`protobuf XML kök öğesi <${kok}> değil`);
+  return ogeler;
+}

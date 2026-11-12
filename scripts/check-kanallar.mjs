@@ -90,6 +90,7 @@ const YAYIN_YOLLARI = {
   'deploy/mobil-yayinla.mjs': { sinif: 'kapili' },
   'mobil/scripts/yayinla-ota.mjs': { sinif: 'kapili' },
   'mobil/scripts/build-apk.mjs': { sinif: 'kapili' },
+  'deploy/play-yukle.mjs': { sinif: 'kapili' },
   'deploy/electron-yayinla.ps1': { sinif: 'saplama' },
   'deploy/paketle.ps1': {
     sinif: 'kanal-disi',

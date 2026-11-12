@@ -396,7 +396,7 @@ export function tabletIsaretciFarki(kod, dosyalar) {
 
 /** Yayın yolu keşfi (check-kanallar §5): deploy/ kökünde yayinla|paketle · mobil/scripts'te yayinla|apk. */
 export const YAYIN_YOLU_DESENLERI = [
-  { dizin: 'deploy', ad: /(yayinla|paketle)/i },
+  { dizin: 'deploy', ad: /(yayinla|paketle|yukle)/i },
   { dizin: 'mobil/scripts', ad: /(yayinla|apk)/i },
 ];
 /**
