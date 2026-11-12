@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { formatAgo, syncIsLate } from "../lib/format";
-import { SURE } from "./hareket/sabitler";
+import { BASMA, SURE } from "./hareket/sabitler";
 import { makeStyles, useReducedMotion, useTokens } from "./theme-context";
 import { TOUCH, space, typography, type StatusKind } from "./tokens";
 
@@ -61,7 +61,7 @@ export function SyncIndicator({ last, offline = false, onPress, testID = "esitle
   );
   if (!onPress) return <View testID={testID} accessible accessibilityLabel={`Eşitleme: ${text}`}>{body}</View>;
   return (
-    <Pressable onPress={onPress} testID={testID} accessibilityRole="button" accessibilityLabel={`Eşitleme: ${text}. Yenile`} style={s.press} hitSlop={SATIR_PAYI}>
+    <Pressable onPress={onPress} testID={testID} accessibilityRole="button" accessibilityLabel={`Eşitleme: ${text}. Yenile`} style={({ pressed }) => [s.press, pressed && { opacity: BASMA.opaklik }]} hitSlop={SATIR_PAYI}>
       {body}
     </Pressable>
   );

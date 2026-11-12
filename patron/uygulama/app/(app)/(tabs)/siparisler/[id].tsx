@@ -85,7 +85,7 @@ export default function OrderDetail() {
             <KademeliGiris sira={1} style={s.ikili}>
               {showOpen ? (
                 <View style={s.yarim}>
-                  <StatCard etiket="Açık miktar" icon="resize-outline" ton="blue" degerler={[{ deger: formatNumber(k.acikMiktar), birim: "m" }]} testID="siparis-acik" />
+                  <StatCard etiket="Açık miktar" icon="resize-outline" ton="blue" layout={tutar ? "stacked" : "row"} degerler={[{ deger: formatNumber(k.acikMiktar), birim: "m" }]} testID="siparis-acik" />
                 </View>
               ) : null}
               {tutar ? (

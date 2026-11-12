@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View, type LayoutChangeEvent } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { haptic } from "./haptics";
-import { SURE, YAY } from "./hareket/sabitler";
+import { BASMA, SURE, YAY } from "./hareket/sabitler";
 import { makeStyles, useReducedMotion, useTokens } from "./theme-context";
 import { FONT_SCALE, TOUCH, space, typography } from "./tokens";
 
@@ -56,7 +56,7 @@ export function SegmentedControl<K extends string>({ items, value, onChange, tes
         accessibilityState={{ selected: on }}
         onPress={() => select(i.key)}
         testID={`${testIDPrefix}${i.key}`}
-        style={[s.part, scroll ? [s.chip, on && { backgroundColor: t.surface }] : s.flex]}
+        style={({ pressed }) => [s.part, scroll ? [s.chip, on && { backgroundColor: t.surface }] : s.flex, pressed && !on && { opacity: BASMA.opaklik }]}
       >
         <Text style={[s.text, on && s.textOn]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>
           {i.label}

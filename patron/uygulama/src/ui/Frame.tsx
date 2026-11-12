@@ -1,5 +1,6 @@
 // Çerçeve: telefonda büyük başlık + alt sekmeler; tablet/web'de (≥ 768) solda kalıcı ray + içerik.
 // Menü yalnız izinli bölümleri gösterir (karar yine sunucuda; izinsiz uç 403 döner).
+import { BASMA } from "./hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import { useState, type ReactNode } from "react";
@@ -35,7 +36,7 @@ export function FacilityName() {
   if (facilities.length < 2) return name;
   return (
     <>
-      <Pressable accessibilityRole="button" accessibilityLabel="Fabrika değiştir" testID="tesis-secici" onPress={() => setOpen(true)} style={s.facilityPress}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Fabrika değiştir" testID="tesis-secici" onPress={() => setOpen(true)} style={({ pressed }) => [s.facilityPress, pressed && { opacity: BASMA.opaklik }]}>
         {name}
         <Ionicons name="swap-horizontal" size={16} color={t.tint} />
         <Text style={s.facilitySwitch}>değiştir</Text>

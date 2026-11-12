@@ -1,5 +1,6 @@
 // Büyük başlık → küçülen başlık (iOS düzeni): içerikteki 34 pt başlık kaydırınca solar, üst bardaki 17 pt başlık
 // ve ince alt çizgi belirir. Kaydırma değeri `useHeaderScroll` ile ekranın kaydırıcısından gelir (UI iş parçacığı).
+import { BASMA } from "./hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -37,7 +38,7 @@ export function LargeHeader({ title, scrollY, topInset, onBack, right }: {
       <View style={s.inner}>
         <View style={s.side}>
           {onBack ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Geri" testID="geri" onPress={onBack} style={s.back} hitSlop={4}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Geri" testID="geri" onPress={onBack} style={({ pressed }) => [s.back, pressed && { opacity: BASMA.opaklik }]} hitSlop={4}>
               <Ionicons name="chevron-back" size={24} color={t.tint} />
               <Text style={s.backText}>Geri</Text>
             </Pressable>

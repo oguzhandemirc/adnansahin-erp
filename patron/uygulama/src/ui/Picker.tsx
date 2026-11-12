@@ -1,5 +1,6 @@
 // Seçici: dokununca DOĞRUDAN tam liste sayfası açılır — kaydırılabilir liste + arama + tek açılır süzgeç.
 // Arama ve süzgeç SUNUCUDA (`LIST_SEARCH`); istemci listeyi süzmez. "Daha fazla" aynı terimle devam eder.
+import { BASMA } from "./hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
@@ -81,12 +82,12 @@ function Sheet(p: { label: string; projection: string; spec: ListSearchSpec | un
     <View style={[s.sheet, { paddingTop: Math.max(insets.top, space.m) }]}>
       <View style={s.inner}>
         <View style={s.head}>
-          <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" testID="secici-kapat" style={s.headBtn}>
+          <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" testID="secici-kapat" style={({ pressed }) => [s.headBtn, pressed && { opacity: BASMA.opaklik }]}>
             <Text style={s.headBtnText}>Kapat</Text>
           </Pressable>
           <Text style={s.title} numberOfLines={1} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{`${p.label} seç`}</Text>
           {p.optional && p.value ? (
-            <Pressable onPress={() => p.onPick(null)} hitSlop={8} accessibilityRole="button" testID="secici-temizle" style={[s.headBtn, s.headRight]}>
+            <Pressable onPress={() => p.onPick(null)} hitSlop={8} accessibilityRole="button" testID="secici-temizle" style={({ pressed }) => [s.headBtn, s.headRight, pressed && { opacity: BASMA.opaklik }]}>
               <Text style={[s.headBtnText, { color: t.status.kritik.fill }]}>Temizle</Text>
             </Pressable>
           ) : <View style={s.headBtn} />}

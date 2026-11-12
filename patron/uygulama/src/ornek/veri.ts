@@ -162,7 +162,7 @@ export function ORNEK_HESAPLAR() {
   ];
 }
 
-const kayit = (id: string, k: Record<string, unknown>, finans?: Record<string, unknown>): ProjectionRecord => ({ id, kayit: k, ...(finans ? { finans } : {}), surum: "1" });
+const kayit = (id: string, k: Record<string, unknown>, finans?: Record<string, unknown>): ProjectionRecord => ({ id, kayit: k, ...(finans ? { finans } : {}), surum: once(0, 0.05) });
 
 const CARILER = [
   { id: "c1", ad: "Örnek Tekstil A.Ş.", kod: "ORN-001", il: "Bursa" },

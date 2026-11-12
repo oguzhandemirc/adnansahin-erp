@@ -1,4 +1,5 @@
 // Süzgeç çipinin açtığı alt sayfa: tek seçim, seçili satırda onay işareti (combobox yok; çip DOĞRUDAN bunu açar).
+import { BASMA } from "../hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,7 +33,7 @@ export function ChoiceSheet<K extends string>(p: {
           <View style={s.grabber} />
           <View style={s.head}>
             <Text style={s.title} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{p.title}</Text>
-            <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" style={s.close}>
+            <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" style={({ pressed }) => [s.close, pressed && { opacity: BASMA.opaklik }]}>
               <Ionicons name="close" size={20} color={t.textSecondary} />
             </Pressable>
           </View>
