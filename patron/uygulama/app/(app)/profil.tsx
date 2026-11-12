@@ -5,15 +5,15 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
-import { moduleDef, moduleTitle } from "../../src/lib/access";
+import { moduleTitle } from "../../src/lib/access";
 import { MODULE_ICON } from "../../src/ui/icons";
 import { ROLE_LABEL, roleOf } from "../../src/ui/RoleBadge";
 import { useSession } from "../../src/state/session";
-import { initials, GroupCaption, GroupNote } from "../../src/ui/diger/parts";
+import { initials } from "../../src/ui/diger/parts";
 import { FacilitySwitchModal } from "../../src/ui/FacilitySwitcher";
 import { Screen } from "../../src/ui/Frame";
 import { Banner, Button, ConfirmButton, Field } from "../../src/ui/kit";
-import { ListGroup, ListRow } from "../../src/ui/ListRow";
+import { ListeBlogu, ListeSatiri } from "../../src/ui/ortak";
 import { MODE_LABEL, PRESET_LABEL, SURFACE_LABEL } from "../../src/ui/appearance";
 import { makeStyles, useAppearance, useTokens } from "../../src/ui/theme-context";
 import { READABLE_MAX, space, typography } from "../../src/ui/tokens";
@@ -38,11 +38,11 @@ function PasswordSheet({ visible, onClose, onDone }: { readonly visible: boolean
   };
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === "ios" ? "formSheet" : undefined} onRequestClose={close}>
-      <View style={[s.sheet, { backgroundColor: t.bg }]} testID="parola-sayfasi">
+      <View style={[s.sheet, { backgroundColor: t.color.background }]} testID="parola-sayfasi">
         <View style={s.sheetBar}>
           <Text style={s.sheetTitle} accessibilityRole="header">Parola değiştir</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Kapat" onPress={close} hitSlop={12} testID="parola-kapat">
-            <Ionicons name="close-circle" size={30} color={t.textMuted} />
+            <Ionicons name="close-circle" size={30} color={t.color.textMuted} />
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={s.sheetBody} keyboardShouldPersistTaps="handled">
@@ -108,32 +108,22 @@ export default function Profile() {
       </View>
       {many ? <FacilitySwitchModal visible={switcher} onClose={() => setSwitcher(false)} /> : null}
 
-      <GroupCaption>Görünüm</GroupCaption>
-      <ListGroup testID="profil-gorunum">
-        <ListRow title="Görünüm" subtitle={`${MODE_LABEL[appearance.mode]} · ${PRESET_LABEL[appearance.preset]} · ${SURFACE_LABEL[appearance.surface]}`} icon="color-palette-outline" domain="genel"
-          onPress={() => router.push("/gorunum" as never)} testID="gorunum-git" />
-      </ListGroup>
+      <ListeBlogu baslik="Görünüm" testID="profil-gorunum">
+        <ListeSatiri birincil="Görünüm" ikincil={`${MODE_LABEL[appearance.mode]} · ${PRESET_LABEL[appearance.preset]} · ${SURFACE_LABEL[appearance.surface]}`} icon="color-palette-outline" ton="violet"
+          ayrac={false} onPress={() => router.push("/gorunum" as never)} testID="gorunum-git" />
+      </ListeBlogu>
+
+      <ListeBlogu baslik="Bildirimler">
+        <ListeSatiri birincil={moduleTitle("bildirimler")} icon={MODULE_ICON.bildirimler.icon} ton="amber"
+          ayrac={false} onPress={() => router.push("/bildirimler" as never)} testID="bildirim-ayarlari" />
+      </ListeBlogu>
 
       {ok ? <Banner tone="off" icon="checkmark-circle" text="Parola değişti" /> : null}
-      <GroupCaption>Güvenlik</GroupCaption>
-      <ListGroup>
-        <ListRow title="Parola değiştir" subtitle="Mevcut parola ve kod gerekir" icon="key-outline" domain="genel" onPress={() => { setOk(false); setSheet(true); }} testID="parola-degistir" />
-        <ListRow title="Doğrulama kodu (TOTP)" subtitle="Her girişte istenir" icon="shield-checkmark-outline" domain="genel" />
-      </ListGroup>
-      <GroupNote>Doğrulama uygulamanızı değiştirmek için tesis yöneticiniz daveti yeniler.</GroupNote>
-
-      <GroupCaption>Bildirimler</GroupCaption>
-      <ListGroup>
-        <ListRow title={moduleTitle("bildirimler")} subtitle={moduleDef("bildirimler").hint} icon={MODULE_ICON.bildirimler.icon} domain={MODULE_ICON.bildirimler.domain}
-          onPress={() => router.push("/bildirimler" as never)} testID="bildirim-ayarlari" />
-      </ListGroup>
-
-      <GroupCaption>Hesap</GroupCaption>
-      <ListGroup>
-        <ListRow title="Hesabımı sil" subtitle="Hesap ve bütün üyelikler kapanır" icon="trash-outline" domain="genel"
-          onPress={() => router.push("/hesap-sil" as never)} testID="hesap-sil-git" />
-      </ListGroup>
-      <GroupNote>Hesabınızı ve bütün fabrika üyeliklerinizi kapatır; kişisel verileriniz 30. günde silinir.</GroupNote>
+      <ListeBlogu baslik="Güvenlik">
+        <ListeSatiri birincil="Parola değiştir" icon="key-outline" ton="blue" ayrac={false} onPress={() => { setOk(false); setSheet(true); }} testID="parola-degistir" />
+        <ListeSatiri birincil="Doğrulama kodu" ikincil="Her girişte istenir" icon="shield-checkmark-outline" ton="green" />
+        <ListeSatiri birincil="Hesabımı sil" icon="trash-outline" ton="danger" onPress={() => router.push("/hesap-sil" as never)} testID="hesap-sil-git" />
+      </ListeBlogu>
       <View style={s.logout}>
         <ConfirmButton label="Çıkış yap" question="Bütün fabrikalardaki oturumunuz kapatılsın ve bu cihazdaki son veri silinsin mi?" onConfirm={() => void logout()} testID="cikis" />
       </View>
@@ -144,7 +134,7 @@ export default function Profile() {
 
 const useStyles = makeStyles((t) => ({
   flex: { flex: 1, minWidth: 0 },
-  hero: { borderRadius: t.radius.card, padding: space.ml, marginTop: space.s, borderWidth: 1, ...t.cardShadow },
+  hero: { borderRadius: t.radius.card, padding: space.ml, marginTop: space.s, marginBottom: space.s, borderWidth: 1, ...t.shadow.card },
   heroTop: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.l },
   avatar: { width: 64, height: 64, borderRadius: 32, alignItems: "center" as const, justifyContent: "center" as const },
   avatarText: { fontSize: 24, fontWeight: "700" as const },
@@ -159,10 +149,10 @@ const useStyles = makeStyles((t) => ({
   facMeta: { ...typography.footnote, marginTop: 1 },
   switch: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, borderRadius: t.radius.chip, paddingHorizontal: space.m, minHeight: 36 },
   switchText: { ...typography.subhead, fontWeight: "600" as const },
-  logout: { marginTop: space.l },
+  logout: { marginTop: space.xl },
   sheet: { flex: 1 },
   sheetBar: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: space.l, paddingTop: space.l, paddingBottom: space.s },
-  sheetTitle: { ...typography.title2, color: t.text },
+  sheetTitle: { ...typography.title2, color: t.color.text },
   sheetBody: { padding: space.l, maxWidth: READABLE_MAX, width: "100%" as const, alignSelf: "center" as const },
-  sheetNote: { ...typography.subhead, color: t.textSecondary, marginBottom: space.l },
+  sheetNote: { ...typography.subhead, color: t.color.textMuted, marginBottom: space.l },
 }));
