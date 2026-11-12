@@ -4,6 +4,7 @@ name: CI
 # Her push + PR'da tip kontrolü + test takımları koşar. Backend testleri yerel
 # PostgreSQL gerektirir (service container + migrate deploy + seed); Electron
 # (Vitest/jsdom) ve mobil (jest-expo) DB'siz çalışır.
+# Tetik: `main`e her push ve `main`e açılan her PR; elle koşum için workflow_dispatch.
 
 on:
   push:
