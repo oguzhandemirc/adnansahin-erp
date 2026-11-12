@@ -88,7 +88,7 @@ export default function UpdateGate() {
           {bekleyen > 0
             ? `Sürümünüz eski · ${bekleyen} kayıt gönderilince güncellenecek`
             : installedFromPlay()
-              ? 'Sürümünüz eski · ana menüye dönünce güncellenecek'
+              ? 'Sürümünüz eski · boşta olduğunuz ilk anda güncellenecek'
               : 'Sürümünüz eski · Google Play’den güncelleyin'}
         </Text>
       </View>

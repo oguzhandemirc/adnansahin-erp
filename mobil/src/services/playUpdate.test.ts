@@ -1,6 +1,9 @@
 // Play uygulama içi güncelleme — saf karar yüklemi + yerel katmanın fail-open sarmalayıcısı.
 import {
+  PLAY_CHECK_INTERVAL_MS,
+  PLAY_IDLE_AFTER_MS,
   isIdle,
+  playCheckDue,
   offeredFlow,
   decidePlayUpdate,
   manualCheckOutcome,
@@ -104,14 +107,49 @@ describe('manualCheckOutcome — Ayarlar elle denetim', () => {
 });
 
 describe('bostaMi', () => {
-  it('ana menü + kuyruk boş → boşta', () => {
-    expect(isIdle('ModuleSelect', 0)).toBe(true);
-    expect(isIdle('Login', 0)).toBe(true);
+  it('ana menü + kuyruk boş → boşta (etkileşim taze olsa da)', () => {
+    expect(isIdle('ModuleSelect', 0, 0)).toBe(true);
+    expect(isIdle('Login', 0, 0)).toBe(true);
   });
   it('iş ekranı, bilinmeyen ekran ya da gönderilmemiş kayıt → boşta değil', () => {
-    expect(isIdle('Paketleme', 0)).toBe(false);
-    expect(isIdle(undefined, 0)).toBe(false);
-    expect(isIdle('ModuleSelect', 2)).toBe(false);
+    expect(isIdle('Paketleme', 0, 0)).toBe(false);
+    expect(isIdle(undefined, 0, 10 * 60_000)).toBe(false);
+    expect(isIdle('ModuleSelect', 2, 0)).toBe(false);
+  });
+  it('boşta eşiği 90 sn', () => {
+    expect(PLAY_IDLE_AFTER_MS).toBe(90_000);
+  });
+  it('iş ekranında ≥ 90 sn etkileşimsizlik + kuyruk boş → boşta', () => {
+    expect(isIdle('Tambur', 0, 90_000)).toBe(true);
+    expect(isIdle('Paketleme', 0, 5 * 60_000)).toBe(true);
+  });
+  it('işlem ortasında (son etkileşim < 90 sn) iş ekranında göstermez', () => {
+    expect(isIdle('Tambur', 0, 89_999)).toBe(false);
+    expect(decidePlayUpdate(input({ idle: isIdle('Tambur', 0, 30_000) }))).toBe('ertele');
+    expect(decidePlayUpdate(input({ idle: isIdle('Tambur', 0, 120_000) }))).toBe('oner');
+  });
+  it('gönderilmemiş kayıt varken 90 sn geçse de boşta değil', () => {
+    expect(isIdle('Tambur', 1, 10 * 60_000)).toBe(false);
+  });
+  it('zorunlu güncelleme de ilk boş anda (işlem ortasında ertele)', () => {
+    expect(decidePlayUpdate(input({ mandatory: true, idle: isIdle('Tambur', 0, 10_000) }))).toBe('ertele');
+    expect(decidePlayUpdate(input({ mandatory: true, idle: isIdle('Tambur', 0, 95_000) }))).toBe('hemen');
+  });
+});
+
+describe('denetim zamanlaması', () => {
+  const t0 = 1_000_000_000;
+  it('aralık 15 dk', () => {
+    expect(PLAY_CHECK_INTERVAL_MS).toBe(15 * 60 * 1000);
+  });
+  it('zamanlayıcı: 15 dk dolmadan sormaz, dolunca sorar', () => {
+    expect(playCheckDue('zamanlayici', t0, t0 + PLAY_CHECK_INTERVAL_MS - 1)).toBe(false);
+    expect(playCheckDue('zamanlayici', t0, t0 + PLAY_CHECK_INTERVAL_MS)).toBe(true);
+  });
+  it('ön plana dönüş, açılış, giriş ve Play olayı aralığa bakmadan hemen sorar', () => {
+    for (const t of ['on-plan', 'acilis', 'giris', 'olay'] as const) {
+      expect(playCheckDue(t, t0, t0 + 1)).toBe(true);
+    }
   });
 });
 

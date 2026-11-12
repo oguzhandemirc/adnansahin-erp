@@ -17,6 +17,20 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-12c",
+      "baslik": "Güncelleme denetimi sıklaştı",
+      "surumler": {
+        "tablet": "1.0.16"
+      },
+      "maddeler": [
+        {
+          "kapsam": "tablet",
+          "tip": "iyilestirme",
+          "metin": "Güncelleme denetimi sıklaştı: uygulama yeni sürümü en geç 15 dakika içinde, boşta olduğunuz bir anda bildirir."
+        }
+      ]
+    },
+    {
       "id": "2026-11-12b",
       "baslik": "Saha uygulaması artık Google Play'den",
       "surumler": {

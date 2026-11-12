@@ -94,7 +94,7 @@ export interface PlayDecisionInput {
   query: PlayQuery | null;
   /** Sunucu politikası bu sürümü zorunlu güncelleme sayıyor mu (`/api/client-policy/mobil`). */
   mandatory: boolean;
-  /** Operatör boşta mı: ana menü/giriş/ayar ekranı ve gönderilmemiş kayıt yok. */
+  /** Operatör boşta mı (`isIdle`): boşta ekranı ya da ≥ 90 sn etkileşimsizlik, ve gönderilmemiş kayıt yok. */
   idle: boolean;
 }
 
@@ -154,7 +154,7 @@ export function manualCheckOutcome(fromPlay: boolean, s: PlayQuery): ManualCheck
   }
 }
 
-/** Operatörün boşta sayıldığı ekranlar — bir form/okutma açık olamaz. */
+/** Operatörün her zaman boşta sayıldığı ekranlar — bir form/okutma açık olamaz. */
 export const IDLE_SCREENS: ReadonlySet<string> = new Set([
   'Pairing',
   'Login',
@@ -165,9 +165,28 @@ export const IDLE_SCREENS: ReadonlySet<string> = new Set([
   'SettingsSurumNotlari',
 ]);
 
-export function isIdle(screen: string | undefined, pendingWrites: number): boolean {
-  return pendingWrites === 0 && screen !== undefined && IDLE_SCREENS.has(screen);
+/** Herhangi bir ekranda bu kadar etkileşimsizlik de boşta sayılır (tartı ortasında araya girmesin). */
+export const PLAY_IDLE_AFTER_MS = 90_000;
+
+/**
+ * Boşta: gönderilmemiş kayıt yok VE (boşta ekranı YA DA son dokunma/klavye/okutmadan beri ≥ 90 sn).
+ * `msSinceActivity` kök etkileşim damgasından (`lockStore.getLastActivity`) gelir.
+ */
+export function isIdle(screen: string | undefined, pendingWrites: number, msSinceActivity: number): boolean {
+  if (pendingWrites > 0 || screen === undefined) return false;
+  return IDLE_SCREENS.has(screen) || msSinceActivity >= PLAY_IDLE_AFTER_MS;
 }
 
-/** Play'e en fazla bu aralıkla sorulur (ön plana dönüşte). */
-export const PLAY_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
+/** Uygulama öndeyken Play'e bu aralıkla sorulur; arka planda zamanlayıcı durur. */
+export const PLAY_CHECK_INTERVAL_MS = 15 * 60 * 1000;
+
+/**
+ * Denetim tetiği: açılış, ön plana dönüş, oturum açılışı ve Play olayı HEMEN sorar;
+ * zamanlayıcı yalnız aralık dolunca (kalp atışı sık, sorgu seyrek).
+ */
+export type PlayCheckTrigger = 'acilis' | 'on-plan' | 'giris' | 'olay' | 'zamanlayici';
+
+export function playCheckDue(trigger: PlayCheckTrigger, lastCheckAt: number, now: number): boolean {
+  if (trigger !== 'zamanlayici') return true;
+  return now - lastCheckAt >= PLAY_CHECK_INTERVAL_MS;
+}
