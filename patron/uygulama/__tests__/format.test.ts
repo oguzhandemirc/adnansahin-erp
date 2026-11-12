@@ -1,8 +1,17 @@
-import { formatAgo, formatDate, formatDateTime, formatMoney, formatNumber, syncIsLate } from "../src/lib/format";
+import { formatAgo, formatCountPossessive, formatDate, formatDateTime, formatMoney, formatNumber, syncIsLate } from "../src/lib/format";
 import { formatValue, humanize, recordTitle, scalarEntries } from "../src/lib/present";
 import { DEFAULT_FACTORY_TIMEZONE, setFactoryTimezone } from "../src/lib/factory-time";
 
 describe("TR biçimleri", () => {
+  it("sayı + iyelik eki okunuştaki son kelimeye uyar", () => {
+    const cases: Array<[number, string]> = [
+      [0, "0'ı"], [1, "1'i"], [2, "2'si"], [3, "3'ü"], [4, "4'ü"], [5, "5'i"], [6, "6'sı"], [7, "7'si"], [8, "8'i"], [9, "9'u"],
+      [10, "10'u"], [12, "12'si"], [18, "18'i"], [20, "20'si"], [30, "30'u"], [40, "40'ı"], [50, "50'si"], [60, "60'ı"],
+      [70, "70'i"], [80, "80'i"], [90, "90'ı"], [100, "100'ü"], [1000, "1.000'i"], [1500, "1.500'ü"], [2_000_000, "2.000.000'u"],
+    ];
+    for (const [n, want] of cases) expect(formatCountPossessive(n)).toBe(want);
+    expect(formatCountPossessive(undefined)).toBe("—");
+  });
   it("sayılar nokta binlik, virgül ondalık", () => {
     expect(formatNumber(1234567.891)).toBe("1.234.567,89");
     expect(formatNumber("1250.5")).toBe("1.250,5");

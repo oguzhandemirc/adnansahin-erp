@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import type { Snapshot } from "../../api/wire";
 import { can } from "../../lib/access";
-import { formatDate, formatMoney } from "../../lib/format";
+import { formatCountPossessive, formatDate, formatMoney } from "../../lib/format";
 import { lookup } from "../../lib/labels";
 import { ORDER_STATUS } from "../../lib/labels/siparis";
 import { PERIOD_LABEL, SHIPMENT_STATUS, UNIT, type PeriodKey } from "../../lib/labels/uretim";
@@ -208,7 +208,13 @@ export const KUTU_CIZICI: Readonly<Record<KutuAnahtari, (b: KutuBaglami) => Reac
     <Gosterge b={b} a="fason" git="/uretim" degerler={(v) => [{ deger: qty(period(v, b.donem).acikMiktar), birim: UNIT.metre }]} ipucu={(v) => `${qty(period(v, b.donem).acikKalem)} açık ${UNIT.kalem}`} />
   ),
   fasonTop: (b) => (
-    <Gosterge b={b} a="fasonTop" git="/uretim" degerler={(v) => { const k = arr(obj(v).kolonlar).find((c) => c.anahtar === "fason"); return k ? [{ deger: qty(k.adet), birim: UNIT.top }] : []; }} ipucu={() => "şu an fasonda"} />
+    <Gosterge
+      b={b}
+      a="fasonTop"
+      git="/uretim"
+      degerler={(v) => (num(obj(v).acikTop) === null ? [] : [{ deger: qty(obj(v).acikTop), birim: UNIT.top }])}
+      ipucu={(v) => (num(obj(v).boyahanedeTop) === null ? "şu an fasonda" : `${formatCountPossessive(obj(v).boyahanedeTop)} boyahanede`)}
+    />
   ),
   alacak: (b) => (
     <Gosterge
