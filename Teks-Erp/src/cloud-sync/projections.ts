@@ -89,6 +89,12 @@ export const SNAPSHOT_PROJECTIONS: readonly SnapshotProjection[] = [
   { name: "fason-acik", kind: "ANLIK", source: "fason-open-dispatch.helper outstandingItemOfOpenDispatch (açık sevk + fasonda kalan top metresi)", permission: "bulut:uretim:oku" },
   { name: "rapor-katalogu", kind: "ANLIK", source: "constants/report-catalog ∩ uzak 6 rapor − reports.closedKeys", permission: "bulut:oturum" },
   { name: "tesis", kind: "ANLIK", source: "constants/time FACTORY_TIMEZONE (tek dilim, dönem yok)", permission: "bulut:oturum" },
+  // M2a (Adnan'a özgü): müşteri → özet haritası; bulut yalnız tek müşterinin girdisini süzerek sunar.
+  {
+    name: "cari-ozeti", kind: "ANLIK",
+    source: "cloud-sync/snapshot-cari-ozeti: reports/_shipped collectShipped + collectShippedWeight · return-scorecard getReturnScorecard.byCustomer · order-line-scope + order-deadline helpers",
+    permission: "bulut:siparis:oku",
+  },
 ];
 export const PROJECTIONS: readonly Projection[] = [...RECORD_PROJECTIONS, ...SNAPSHOT_PROJECTIONS];
 

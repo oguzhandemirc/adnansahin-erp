@@ -50,8 +50,9 @@ async function orderDerived(rows: readonly RawRow[], nowMs: number): Promise<Der
   const out: DerivedValues = new Map();
   for (const r of rows) {
     const acc = byOrder.get(r.id) ?? { open: D0(), count: 0 };
-    const late = isDeadlineOpenStatus(String(r.status)) && daysPastDeadline(r.deadline as Date | null, nowMs) !== null;
-    out.set(r.id, { acikMiktar: acc.open, kalemSayisi: acc.count, gecikmis: late, musteriAdi: customers.get(r.customerId as string) ?? null });
+    const open = isDeadlineOpenStatus(String(r.status));
+    const late = open && daysPastDeadline(r.deadline as Date | null, nowMs) !== null;
+    out.set(r.id, { acikMiktar: acc.open, kalemSayisi: acc.count, gecikmis: late, acik: open, musteriAdi: customers.get(r.customerId as string) ?? null });
   }
   return out;
 }
@@ -117,6 +118,26 @@ async function sackDerived(rows: readonly RawRow[]): Promise<DerivedValues> {
   return out;
 }
 
+/** İade satırı görünen adları; sebep katalog adıdır (serbest metin ve not buluta gitmez). */
+async function returnDerived(rows: readonly RawRow[]): Promise<DerivedValues> {
+  const customers = await displayNames("customer", rows.map((r) => r.customerId));
+  const items = await displayNames("item", rows.map((r) => r.itemId));
+  const colors = await displayNames("color", rows.map((r) => r.colorId));
+  const reasonIds = [...new Set(rows.map((r) => r.reasonId).filter((k): k is string => typeof k === "string"))];
+  const reasons = reasonIds.length === 0 ? [] : await prisma.returnReason.findMany({ where: { id: { in: reasonIds } }, select: { id: true, name: true } });
+  const reasonName = new Map(reasons.map((r) => [r.id, r.name]));
+  const out: DerivedValues = new Map();
+  for (const r of rows) {
+    out.set(r.id, {
+      musteriAdi: customers.get(r.customerId as string) ?? null,
+      urunAdi: items.get(r.itemId as string) ?? null,
+      renkAdi: colors.get(r.colorId as string) ?? null,
+      sebepAdi: reasonName.get(r.reasonId as string) ?? null,
+    });
+  }
+  return out;
+}
+
 /** `withProductionMeters` liste ekranıyla AYNI sayıyı versin diye o yöntem çağrılır (formül kopyalanmaz). */
 type MetersFn = WorkOrderService["withProductionMeters"];
 
@@ -158,6 +179,7 @@ export const DERIVERS: Readonly<Record<string, Deriver>> = {
   sevkiyat: shipmentDerived,
   cuval: sackDerived,
   "is-emri": workOrderDerived,
+  iade: returnDerived,
 };
 
 /**
@@ -168,5 +190,6 @@ export const DERIVER_ROW_FIELDS: Readonly<Record<string, readonly string[]>> = {
   siparis: ["status", "deadline", "customerId"],
   "siparis-kalemi": ["quantity", "shippedQty", "unit", "cancelledAt", "itemId", "colorId"],
   sevkiyat: ["customerId"],
+  iade: ["reasonId"],
 };
 

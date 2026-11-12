@@ -134,7 +134,7 @@ async function main(): Promise<void> {
     await switchTriggers(false);
     // ── §1 Katalog ────────────────────────────────────────────────────────
     console.log("\n§1 katalog: ad kümesi · kaynak kolon · finans alanı yok");
-    check("13 kayıt projeksiyonu", RECORD_PROJECTIONS.length === 13, RECORD_PROJECTIONS.map((p) => p.name).join(","));
+    check("14 kayıt projeksiyonu (M2a: + iade)", RECORD_PROJECTIONS.length === 14, RECORD_PROJECTIONS.map((p) => p.name).join(","));
     const models = Prisma.dmmf.datamodel.models;
     const missing: string[] = [];
     const financeNames: string[] = [];

@@ -2,7 +2,7 @@
 // BEKÇİ — PATRON BULUTU ANLIK PROJEKSİYONLARI (D3b): sözleşme · finans/termin yok · doğruluk · kapalı · sıklık
 // =============================================================================
 // ÖLÇTÜĞÜ:
-//  §1 Katalog (DB'siz): 7 anlık (`ozet` 5 bölümlü) — tel adları = katı şema anahtarları ⊂ bulut kataloğunun
+//  §1 Katalog (DB'siz): 8 anlık (`ozet` 5 bölümlü) — tel adları = katı şema anahtarları ⊂ bulut kataloğunun
 //     ANLIK adları; izinler bulut okuma izinleri; şemalarda hiçbir alan adı finans (fiyat · tutar · bakiye ·
 //     döviz …) ya da termin (geciken · zamanında · gecikme · termin) sözcüğü taşımaz; finans/emanet/sağlık
 //     anlıkları katalogda YOK.
@@ -57,7 +57,7 @@ const DEADLINE = /gecik|zamaninda|termin|vade/i;
 /** Bulut kataloğunun ANLIK adları (`patron/sunucu/src/catalog/projections.ts`, sözleşme SABİT). */
 const CLOUD_SNAPSHOT_NAMES = new Set([
   "ozet.stok", "ozet.siparis", "ozet.uretim", "ozet.sevkiyat", "ozet.fason", "ozet-finans", "ozet-masraf", "karlilik-ozet",
-  "emanet-bakiye", "fason-acik", "hizmet-geliri", "stok-karnesi", "acik-siparis-karsilama", "rapor-katalogu", "uretim-akisi", "saglik", "tesis",
+  "emanet-bakiye", "fason-acik", "hizmet-geliri", "stok-karnesi", "acik-siparis-karsilama", "rapor-katalogu", "uretim-akisi", "saglik", "tesis", "cari-ozeti",
 ]);
 const STAMP = `TEST-D3B-${Date.now()}-`;
 const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[] };
@@ -88,7 +88,7 @@ function wireNames(): string[] {
 
 async function main(): Promise<void> {
   console.log("\n§1 Katalog ve tel şemaları");
-  check("7 anlık projeksiyon", SNAPSHOT_PROJECTIONS.length === 7, SNAPSHOT_PROJECTIONS.map((p) => p.name).join(","));
+  check("8 anlık projeksiyon (M2a: + cari-ozeti)", SNAPSHOT_PROJECTIONS.length === 8, SNAPSHOT_PROJECTIONS.map((p) => p.name).join(","));
   const names = wireNames();
   const schemaNames = Object.keys(SNAPSHOT_WIRE_SCHEMAS);
   check("tel adları = katı şema anahtarları", names.length === schemaNames.length && names.every((n) => schemaNames.includes(n)), names.join(","));

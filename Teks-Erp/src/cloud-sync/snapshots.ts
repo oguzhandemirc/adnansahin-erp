@@ -14,6 +14,7 @@ import { STANDARD_PERIODS, periodRange, type StandardPeriod } from "./periods";
 import { SNAPSHOT_PROJECTIONS } from "./projections";
 import { SNAPSHOT_WIRE_SCHEMAS, type SnapshotWireName } from "./snapshot-schemas";
 import { buildSubcontractOpenData } from "./snapshot-fason";
+import { buildCustomerSummaryData } from "./snapshot-cari-ozeti";
 import { remoteReportCatalog } from "./remote-reports";
 import { snapshotDigest } from "./digest";
 import { toWireValue } from "./wire";
@@ -214,6 +215,7 @@ export async function buildSnapshots(ctx: SnapshotContext): Promise<SnapshotBuil
         case "fason-acik": out.push(seal("fason-acik", await buildSubcontractOpenData())); break;
         case "rapor-katalogu": out.push(seal("rapor-katalogu", { raporlar: await remoteReportCatalog() })); break;
         case "tesis": out.push(buildFacility()); break;
+        case "cari-ozeti": out.push(seal("cari-ozeti", await buildCustomerSummaryData(ctx.now))); break;
         default: throw new Error(`Anlık kurucu yok: ${p.name}`);
       }
     } catch (err) {

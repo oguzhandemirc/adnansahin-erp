@@ -20,7 +20,11 @@ const ORDERS_OF_CUSTOMERS = 'SELECT o."id" AS root_id FROM "orders" o WHERE o."c
 const SHIPMENTS_OF_CUSTOMERS = 'SELECT s."id" AS root_id FROM "shipments" s WHERE s."customerId" = ANY($1::uuid[])';
 const LINES_OF_ITEMS = 'SELECT l."id" AS root_id FROM "order_lines" l WHERE l."itemId" = ANY($1::uuid[])';
 const LINES_OF_COLORS = 'SELECT l."id" AS root_id FROM "order_lines" l WHERE l."colorId" = ANY($1::uuid[])';
-const NAME_OF = (model: string): string => `cloud-sync/derived displayNames: ${model}.name (BOYUT \`ad\` ile aynı kolon)`;
+const RETURNS_OF_CUSTOMERS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHERE r."customerId" = ANY($1::uuid[])';
+const RETURNS_OF_ITEMS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHERE r."itemId" = ANY($1::uuid[])';
+const RETURNS_OF_COLORS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHERE r."colorId" = ANY($1::uuid[])';
+const RETURNS_OF_REASONS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHERE r."reasonId" = ANY($1::uuid[])';
+const NAME_OF =(model: string): string => `cloud-sync/derived displayNames: ${model}.name (BOYUT \`ad\` ile aynı kolon)`;
 
 export const FACTS: readonly RecordProjection[] = [
   {
@@ -34,11 +38,14 @@ export const FACTS: readonly RecordProjection[] = [
       derived("acikMiktar", "helpers/order-line-scope.helper isActiveLine + isMeasuredLine: Σ(quantity − shippedQty)", ["order_lines"]),
       derived("kalemSayisi", "helpers/order-line-scope.helper isActiveLine", ["order_lines"]),
       derived("gecikmis", "helpers/order-deadline.helper daysPastDeadline ≠ null ∧ açık durum (PENDING · APPROVED · PARTIAL_SHIPPED)", ["orders"], { timeBound: true }),
+      // M2a: telefonun "açık siparişler" süzgeci — açık durum kümesi tek kaynaktan (bulut durum listesi bilmez).
+      derived("acik", "helpers/order-deadline.helper isDeadlineOpenStatus (açık durum kümesi: PENDING · APPROVED · PARTIAL_SHIPPED)", ["orders"]),
       derived("musteriAdi", NAME_OF("Customer"), ["customers"]),
     ],
     sources: [self("orders"), via("order_lines", "orderId"), lookup("customers", "id", ORDERS_OF_CUSTOMERS, "cari adı değişince siparişleri yeniden gider")],
     crossings: [{ name: "termin", sql: 'SELECT o."id" AS root_id FROM "orders" o WHERE o."deadline" >= $1 AND o."deadline" < $2' }],
-    deletion: "YOK", permission: "bulut:siparis:oku", retention: { wireFields: ["siparisTarihi"], sql: 't."orderDate"' }, catalogVersion: 1,
+    // 2 (M2a): `acik` eklendi — TAM gönderim eski satırları doldurur.
+    deletion: "YOK", permission: "bulut:siparis:oku", retention: { wireFields: ["siparisTarihi"], sql: 't."orderDate"' }, catalogVersion: 2,
   },
   {
     name: "siparis-kalemi", kind: "KAYIT", role: "OLGU", root: { table: "order_lines", model: "OrderLine" },
@@ -98,6 +105,27 @@ export const FACTS: readonly RecordProjection[] = [
     ],
     sources: [self("sacks"), via("rolls", "sackId", "ESKİ çuval ayrılmada görünmez → rolls_sync_parent_moved tetikleyicisi")],
     deletion: "DAMGA", permission: "bulut:sevkiyat:oku", retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 1,
+  },
+  {
+    // M2a (Adnan'a özgü sözleşme genişletmesi): iade satırı — top başına bir satır, `metre` iade anındaki metre;
+    // BRÜT sevkten DÜŞÜLMEZ (iade ayrı belgedir). İptal edilen iade `iptalTarihi` ile gelir (storno ≠ iade).
+    // Satır hiç silinmez (iptal damgadır) ⇒ silme tetikleyicisi gerekmez, migration yok.
+    name: "iade", kind: "KAYIT", role: "OLGU", root: { table: "roll_returns", model: "RollReturn" },
+    columns: [col("id", "id"), col("iadeNo", "returnNo"), col("cariKartId", "customerId"), col("siparisId", "orderId"),
+      col("sevkiyatId", "fromShipmentId"), col("urunId", "itemId"), col("renkId", "colorId"), col("en", "width"),
+      col("metre", "qty"), col("grupId", "returnGroupId"), col("iptalTarihi", "cancelledAt"), col("olusturulma", "createdAt")],
+    derived: [
+      derived("musteriAdi", NAME_OF("Customer"), ["customers"]),
+      derived("urunAdi", NAME_OF("Item"), ["items"]),
+      derived("renkAdi", NAME_OF("Color"), ["colors"]),
+      derived("sebepAdi", "cloud-sync/derived returnDerived: ReturnReason.name (serbest metin ve not GİTMEZ)", ["return_reasons"]),
+    ],
+    sources: [self("roll_returns"),
+      lookup("customers", "id", RETURNS_OF_CUSTOMERS, "cari adı değişince iadeleri yeniden gider"),
+      lookup("items", "id", RETURNS_OF_ITEMS, "ürün adı değişince iadeleri yeniden gider"),
+      lookup("colors", "id", RETURNS_OF_COLORS, "renk adı değişince iadeleri yeniden gider"),
+      lookup("return_reasons", "id", RETURNS_OF_REASONS, "sebep adı değişince iadeleri yeniden gider")],
+    deletion: "YOK", permission: "bulut:sevkiyat:oku", retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 1,
   },
   {
     name: "is-emri", kind: "KAYIT", role: "OLGU", root: { table: "work_orders", model: "WorkOrder" },

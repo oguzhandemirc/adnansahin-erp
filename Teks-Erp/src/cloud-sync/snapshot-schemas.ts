@@ -16,6 +16,21 @@ const CoverageBucket = z.strictObject({
   anahtar: Str, etiket: Str, kalem: Num, acikMiktar: Num, depodanMiktar: Num, uretimdenMiktar: Num, karsilanmayanMiktar: Num, karsilanmaYuzde: Num,
 });
 
+// M2a cari özeti: birim başına ayrı satır (farklı birim toplanmaz); para alanı yok; iade sevkten düşülmemiş ayrı toplam.
+const UnitQty = z.strictObject({ birim: Str, miktar: Num });
+const IsoOrNull = z.string().datetime().nullable();
+const CariPeriod = z.strictObject({
+  siparisSayisi: Num, kalemSayisi: Num, siparisMiktari: z.array(UnitQty),
+  sevk: z.strictObject({ metre: Num, top: Num, kg: Num, tartiliCuval: Num, cuval: Num }),
+  iade: z.strictObject({ adet: Num, metre: Num }),
+  enCokUrun: z.array(z.strictObject({ urunId: z.string().uuid(), urunAdi: Str, renkId: z.string().uuid().nullable(), renkAdi: Str.nullable(), birim: Str, miktar: Num, siparisSayisi: Num })),
+});
+const CariSummary = z.strictObject({
+  tumZamanlar: CariPeriod, son12Ay: CariPeriod,
+  acik: z.strictObject({ siparisSayisi: Num, kalemSayisi: Num, acikMiktar: z.array(UnitQty) }),
+  sonSiparisTarihi: IsoOrNull, sonSevkTarihi: IsoOrNull,
+});
+
 export const SNAPSHOT_WIRE_SCHEMAS = {
   "ozet.stok": z.strictObject({ hamMiktar: Num, yariMamulMiktar: Num, bitmisMiktar: Num, oluMiktar: Num, oluStokGun: Num, enCokUrun: z.array(Label) }),
   "ozet.siparis": z.strictObject({ acikKalem: Num, acikMiktar: Num, karsilanmayanMiktar: Num, karsilanmaYuzde: Num, enCokCari: z.array(Label) }),
@@ -56,6 +71,7 @@ export const SNAPSHOT_WIRE_SCHEMAS = {
     raporlar: z.array(z.strictObject({ anahtar: Str, baslik: Str, soru: Str, aile: Str, izin: Str, parametreler: z.array(Str), standartDonemler: z.array(Str) })),
   }),
   tesis: TesisVerisiSchema.required(),
+  "cari-ozeti": z.strictObject({ son12AyBaslangic: z.string().datetime(), cariler: z.record(z.string().uuid(), CariSummary) }),
 } as const satisfies Readonly<Record<string, z.ZodType>>;
 
 export type SnapshotWireName = keyof typeof SNAPSHOT_WIRE_SCHEMAS;
