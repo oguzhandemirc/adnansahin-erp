@@ -42,20 +42,15 @@ function check(label: string, ok: boolean, detail = ""): void {
   }
 }
 
-type Handle = (req: Request, res: Response, next: NextFunction) => void;
-type Layer = {
-  name: string;
-  handle: Handle;
-  route?: { path: string; methods: Record<string, boolean>; stack: Array<{ name: string; handle: Handle }> };
-};
 
 /**
  * `/active` ucuna giden zinciri (router düzeyi toplu kapı + uç kapıları)
  * verifyToken ve handler HARİÇ koşturur; status kodunu döner (200 = geçti).
  */
 function gateStatus(permissions: string[]): number | null {
-  const stack = (sessionRouter as unknown as { stack: Layer[] }).stack;
-  const at = stack.findIndex((l) => l.route?.path === "/active" && l.route.methods.get);
+  // Router'da tek uç var (GET /active); yöntem ayrımı gerekmez, tipli `stack` yeter.
+  const stack = sessionRouter.stack;
+  const at = stack.findIndex((l) => l.route?.path === "/active");
   if (at < 0) return null;
   const chain = [
     ...stack.slice(0, at).filter((l) => !l.route),
