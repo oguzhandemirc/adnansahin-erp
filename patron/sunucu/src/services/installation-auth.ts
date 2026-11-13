@@ -1,10 +1,9 @@
 // FABRİKA KANALI KAPISI — imzalı İSTEK (protokol LISANS-PROTOKOLU.md §4 sırası, amaç `esitle`):
-//   ① readRequestIdentity (imzasız) → kurulum dizini (açık anahtar + hak; satıcı cevabı henüz YAZILMAZ) ② verifyRequest (typ ·
+//   ① readRequestIdentity (imzasız) → kurulum dizini (açık anahtar + hak) ② verifyRequest (typ ·
 //   imza · kurulum · amaç · ±10 dk · HAM gövde özeti) ③ nonce ATOMİK (tesis kapsamında UNIQUE) ④ hak
 //   kapısı: yalnız URETIM sınıfı + `patron-bulut` modülü + bitmemiş abonelik + DEVREDİLMEMİŞ ⑤ tesisin
 //   hizmet aşaması ACIK (tesis kapatıldıysa kanal da kapalı — `service-lifecycle.ts`).
 // Kiracı İSTEKTEN değil kurulumdan çözülür (`tesisId` gövdeden ALINMAZ — sözleşme §9.2).
-// Satıcıdan YENİ gelen kurulum yalnız imza ve hak doğrulandıktan sonra yazılır (sıra imza → hak → DB; B5s).
 // Kayıtsız kurulum ile yabancı anahtar imzadan önce AYNI 401'i alır (var/yok kâhini yok; B5).
 import { CLOCK_SKEW_MS, UuidSchema, isCloudSenderClass, isoToMs, readRequestIdentity, verifyRequest, type RequestDoc } from "../lisans-protokol";
 import { CloudError, requestRejected } from "../lib/errors";
@@ -71,8 +70,7 @@ async function authenticate(ctx: CloudContext, g: { header: unknown; rawBody: Bu
   if (installationId === null || !UuidSchema.safeParse(installationId).success) {
     throw new CloudError(401, "ISTEK_GECERSIZ", "İstekteki kurulum kimliği yok ya da biçimsiz");
   }
-  const found = await ctx.directory.lookup(installationId, g.nowMs);
-  const candidate = found.record;
+  const candidate = await ctx.directory.lookup(installationId);
   if (!candidate?.publicKeyX || safeKeyId(candidate.publicKeyX) !== identity.value.kid) {
     console.warn(`[patron] imzalı istek reddi: kurulum ${installationId.slice(0, 8)}… ${candidate ? "anahtarı tutmuyor" : "bilinmiyor"}`);
     throw new CloudError(401, "KURULUM_BILINMIYOR", "Bu kurulum bu anahtarla patron bulutunda kayıtlı değil");
@@ -86,18 +84,7 @@ async function authenticate(ctx: CloudContext, g: { header: unknown; rawBody: Bu
     path: g.path,
   });
   if (!verified.ok) throw requestRejected(verified.code, verified.message, g.nowMs);
-  let inst = candidate;
-  if (found.pending) {
-    // Önbellekte olmayan kurulum: pasif ya da hakkı yoksa yönlendirme bağı ve tesis DB isteği DOĞMAZ.
-    if (!found.cached) {
-      if (!candidate.active) throw new CloudError(403, "KURULUM_IPTAL", "Bu kurulumun kaydı pasif; patron bulutu kanalı kapalı");
-      const early = cloudEntitlementError(candidate, g.nowMs);
-      if (early) throw early;
-    }
-    const committed = await ctx.directory.commit(found.pending, g.nowMs);
-    if (!committed) throw new CloudError(401, "KURULUM_BILINMIYOR", "Bu kurulum bu anahtarla patron bulutunda kayıtlı değil");
-    inst = committed;
-  }
+  const inst = candidate;
   await recordNonce(ctx, inst, verified.value, g.nowMs);
   if (!inst.active) throw new CloudError(403, "KURULUM_IPTAL", "Bu kurulumun kaydı pasif; patron bulutu kanalı kapalı");
   const denied = cloudEntitlementError(inst, g.nowMs);

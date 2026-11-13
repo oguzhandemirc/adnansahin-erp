@@ -52,14 +52,14 @@ async function main(): Promise<void> {
     app,
     sync,
     secrets: SecretBox.load(config.ANAHTAR_DIZINI, { create: true }),
-    directory: new InstallationDirectory(sync, config),
-    doorbell: createDoorbell(config),
+    directory: new InstallationDirectory(sync),
+    doorbell: createDoorbell(),
     now: () => Date.now(),
     notifications: createNotificationRuntime(config),
   };
   const server = http.createServer(createApp(ctx));
   const address = await listen(server, config.PORT, config.BIND);
-  console.log(`PATRON_DINLIYOR port=${address.port} kurulumKaynagi=${config.KURULUM_KAYNAGI} web=${config.PATRON_WEB_DIZINI ? "acik" : "yok"}`);
+  console.log(`PATRON_DINLIYOR port=${address.port} web=${config.PATRON_WEB_DIZINI ? "acik" : "yok"}`);
 
   const maintenance = new MaintenanceScheduler(ctx);
   maintenance.start();

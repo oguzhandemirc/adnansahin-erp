@@ -131,7 +131,7 @@ export async function ortamKur(
     app,
     sync,
     secrets: ezme.secrets ?? SecretBox.load(dizin, { create: true }),
-    directory: new InstallationDirectory(sync, config, fetchImpl),
+    directory: new InstallationDirectory(sync),
     doorbell: doorbell ?? zil,
     now: saat.simdi,
     notifications: createNotificationRuntime(config),

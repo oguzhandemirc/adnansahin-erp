@@ -19,6 +19,6 @@ export async function assertFacilityCloudOpen(ctx: CloudContext, tesisId: string
       saltOkunurBitis: state.readOnlyUntil?.toISOString() ?? null,
     });
   }
-  const open = installations.some((i) => cloudEntitlementError({ ...i, stale: false }, nowMs) === null);
+  const open = installations.some((i) => cloudEntitlementError({ ...i }, nowMs) === null);
   if (!state || !open) throw new CloudError(403, "PATRON_BULUT_KAPALI", "Tesisin Adnan Şahin Yönetim aboneliği açık değil; fabrika bu isteği alamaz");
 }

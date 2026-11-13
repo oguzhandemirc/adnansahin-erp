@@ -1,7 +1,6 @@
 // Patron bulutu yapılandırması — ortamdan okunur, Zod ile doğrulanır; geçersiz değer açılışı
 // DURDURUR (fail-closed). Üç DB URL'i üç ayrı roldür: göç (tablo sahibi; yalnız migration/CLI),
-// uygulama (hesap API'si; projeksiyona YAZAMAZ) ve eşitleme (fabrika kanalı). Sır (iç API belirteci,
-// DB parolaları) günlüğe yazılmaz.
+// uygulama (hesap API'si; projeksiyona YAZAMAZ) ve eşitleme (fabrika kanalı). Sır (DB parolaları) günlüğe yazılmaz.
 import { isIPv4, isIPv6 } from "node:net";
 import path from "node:path";
 import { z } from "zod";
@@ -37,14 +36,6 @@ const EnvSchema = z
     TESIS_ROL_ANAHTARI_DOSYASI: z.preprocess((v) => (v === "" ? undefined : v), z.string().min(1).optional()),
     /** Web sürümünün derlenmiş çıktısı (`expo export --platform web`); verilirse `/` altında sunulur, yoksa yalnız API. */
     PATRON_WEB_DIZINI: z.string().min(1).optional(),
-    /** Kurulum kaydının kaynağı: `kayit` (satıcı CLI'siyle DB'ye yazılmış) · `satici` (iç API + önbellek). */
-    KURULUM_KAYNAGI: z.enum(["kayit", "satici"]).default("kayit"),
-    SATICI_IC_API_URL: z.url().optional(),
-    SATICI_IC_API_BELIRTECI: z.string().min(32).optional(),
-    /** Satıcı iç API önbelleğinin TAZELİK süresi; süre dolunca yeniden sorulur, ulaşılamazsa bayat kayıt kullanılır. */
-    KURULUM_ONBELLEK_DK: positiveInt(1, 1440).default(5),
-    /** Önbellekte OLMAYAN kurulum kimliği için satıcıya dakikada en çok bu kadar soru (rastgele kimlik seli iç API yükü üretmesin). */
-    KURULUM_SORGU_BUTCE_DK: positiveInt(1, 10_000).default(60),
     /** İstemci adresini taşıyan vekil başlığı; YALNIZ güvenilen kenar ağından gelen bağlantıda okunur. */
     VEKIL_IP_BASLIGI: z.string().min(1).optional(),
     /** Başlığa güvenilen kenar vekilleri (CIDR, virgüllü); verilmezse yerleşik Cloudflare aralıkları. */
@@ -89,9 +80,6 @@ const EnvSchema = z
   .superRefine((c, ctx) => {
     if (c.BILDIRIM_KIPI === "gercek" && !c.BILDIRIM_VAPID_KONU) {
       ctx.addIssue({ code: "custom", message: "BILDIRIM_KIPI=gercek için BILDIRIM_VAPID_KONU zorunlu", path: ["BILDIRIM_VAPID_KONU"] });
-    }
-    if (c.KURULUM_KAYNAGI === "satici" && (!c.SATICI_IC_API_URL || !c.SATICI_IC_API_BELIRTECI)) {
-      ctx.addIssue({ code: "custom", message: "KURULUM_KAYNAGI=satici için SATICI_IC_API_URL ve SATICI_IC_API_BELIRTECI zorunlu", path: ["KURULUM_KAYNAGI"] });
     }
   });
 
