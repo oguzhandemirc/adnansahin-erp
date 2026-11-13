@@ -28,6 +28,9 @@
 //    kodu (`shipping:repair-allocation`) çıkarıldı → "Her izin en az bir DAR
 //    rolde" KIRMIZI. Geri konunca 21/21 yeşil. Yani bekçi "yeni izin hiçbir role
 //    girmedi, kimse atayamıyor" sınıfını yakalıyor.
+// ⭐ NEGATİF SONDA §2d (2026-11-13, ölçüldü): WEB_BOSS_READONLY'ye `order:write`
+//    eklendi → "yazma kodu yok", "okuma ≡ WEB_BOSS", "bulut yazma türemez" ❌ (32/3);
+//    md5 ile geri alındı → 35/0.
 // =============================================================================
 import prisma, { pool } from "../src/lib/prisma";
 import { PERMISSION_CATALOG } from "../src/constants/permission-catalog";
@@ -41,6 +44,7 @@ import {
 } from "../src/constants/role-template-catalog";
 import { reconcileRoleTemplates } from "../src/jobs/role-template-catalog.job";
 import { foldNameForCompare } from "../src/services/helpers/name-normalize.helper";
+import { CLOUD_PERMISSION_CODES, PATRON_LOGIN_PERMISSION, deriveCloudPermissions } from "../src/cloud-sync/user-permission-map";
 
 let pass = 0;
 let fail = 0;
@@ -202,6 +206,30 @@ async function main(): Promise<void> {
   check("⭐ türetim ≡ ekran kataloğu: codes = ∪ mobil ekran `requires` (elle liste değil; yeni karo gelince kendiliğinden genişler)", !!saha && JSON.stringify([...saha.codes].sort()) === JSON.stringify([...karoIzinleri].sort()) && JSON.stringify([...saha.codes]) === JSON.stringify(mobileScreenPermissionCodes()));
   check("⭐ YETENEK izni sızmadı (tambur-duzelt · dokuma-geri-al · devere-iptal · kk1-desen · kk1-yari-mamul …) ve wildcard yok", !!saha && saha.codes.every((c) => !yetenekIzinleri.has(c) && c !== "mobile:*") && yetenekIzinleri.size >= 5, `${yetenekIzinleri.size} yetenek`);
   check("her kod izin kataloğunda var (şablon ölü izin taşımaz)", !!saha && saha.codes.every((c) => izinKodlari.has(c)));
+
+  console.log("\n=== §2d PATRON (YALNIZ GÖRME): WEB_BOSS'un okuması, yazma YOK, telefonda yazma türemez ===");
+  // Mağaza inceleme hesabı / salt izleyici (2026-11-13). Okuma kodu = `*:read` ya da `report:*`; gerisi yazma sayılır.
+  const okumaKodu = (c: string): boolean => c.endsWith(":read") || c.startsWith("report:");
+  const boss = ROLE_TEMPLATE_CATALOG.find((r) => r.code === "WEB_BOSS");
+  const izleyici = ROLE_TEMPLATE_CATALOG.find((r) => r.code === "WEB_BOSS_READONLY");
+  check("WEB_BOSS_READONLY şablonu var, mode list", !!izleyici && izleyici.mode === "list", izleyici?.name ?? "yok");
+  const yazma = izleyici ? izleyici.codes.filter((c) => !okumaKodu(c)) : ["<şablon yok>"];
+  check("⭐ hiçbir yazma kodu yok (order:write · customer:write · mobile:siparis · admin:* …)", yazma.length === 0, yazma.join(", ") || `${izleyici?.codes.length} okuma kodu`);
+  const bossOkuma = boss ? [...boss.codes].filter(okumaKodu).sort() : [];
+  check("Körlük zemini: WEB_BOSS hem okuma hem yazma taşıyor (yüklem ayırt ediyor)", !!boss && bossOkuma.length >= 10 && boss.codes.some((c) => !okumaKodu(c)));
+  check(
+    "okuma kümesi ≡ WEB_BOSS'un okuma kümesi (patron neyi görüyorsa izleyici de görür)",
+    !!izleyici && JSON.stringify([...izleyici.codes].sort()) === JSON.stringify(bossOkuma),
+  );
+  check("patron:giris şablonda YOK (yönetici elle verir)", !!izleyici && !izleyici.codes.includes(PATRON_LOGIN_PERMISSION));
+  const bulut = new Set(deriveCloudPermissions([...(izleyici?.codes ?? []), PATRON_LOGIN_PERMISSION]));
+  const yazmaBulut = [CLOUD_PERMISSION_CODES.siparisYaz, CLOUD_PERMISSION_CODES.cariYaz, CLOUD_PERMISSION_CODES.hesapYonet];
+  check("⭐ telefonda bulut:siparis:yaz · bulut:cari:yaz · bulut:hesap:yonet TÜREMEZ", yazmaBulut.every((c) => !bulut.has(c)), [...bulut].join(","));
+  const okumaBulut = (["ozetOku", "siparisOku", "sevkiyatOku", "uretimOku", "stokOku", "cariOku", "raporOku"] as const).map((k) => CLOUD_PERMISSION_CODES[k]);
+  const eksikOkuma = okumaBulut.filter((c) => !bulut.has(c));
+  check("telefonda özet/sipariş/sevkiyat/üretim/stok/cari/rapor OKUMA türer", eksikOkuma.length === 0, eksikOkuma.join(",") || `${bulut.size} bulut izni`);
+  const bossBulut = new Set(deriveCloudPermissions([...(boss?.codes ?? []), PATRON_LOGIN_PERMISSION]));
+  check("Körlük zemini: aynı türetme WEB_BOSS'ta sipariş + cari yazmayı VERİYOR", bossBulut.has(CLOUD_PERMISSION_CODES.siparisYaz) && bossBulut.has(CLOUD_PERMISSION_CODES.cariYaz));
 
   console.log("\n=== §3 DB UZLAŞTIRMASI ===");
   // ⚠️ ÖN KOŞULU TEST KENDİSİ KURAR — "backend'i yeniden başlatın" beklemez.

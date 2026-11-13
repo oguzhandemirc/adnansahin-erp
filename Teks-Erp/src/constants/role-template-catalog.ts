@@ -402,6 +402,33 @@ const WEB_ROLES: readonly RoleTemplateEntry[] = [
     ],
   },
   {
+    // ── PATRON / SALT İZLEYİCİ (2026-11-13) ───────────────────────────────
+    // Mağaza inceleme hesabı ve "yalnız görsün" kişisi: WEB_BOSS'un OKUMA kodlarının
+    // birebir aynısı, HİÇBİR yazma kodu yok → patron telefonunda bulut:siparis:yaz /
+    // bulut:cari:yaz TÜREMEZ (`cloud-sync/user-permission-map.ts`). `patron:giris`
+    // burada da YOK: telefona girişi yönetici kişi kişi verir (`ALL_MODE_EXCLUDED`).
+    code: "WEB_BOSS_READONLY",
+    name: "Patron (Yalnız Görme)",
+    description:
+      "Stok, sipariş, üretim, sevkiyat, cari ve rapor takibi — HİÇBİR yazma yetkisi yok (yeni sipariş/müşteri açamaz)",
+    mode: "list",
+    codes: [
+      "report:production",
+      "report:sales",
+      "report:quality",
+      "report:inventory",
+      "report:subcontract",
+      "report:customer",
+      "roll:read",
+      "order:read",
+      "workorder:read",
+      "shipping:read",
+      "customer:read",
+      "item:read",
+      "station:read",
+    ],
+  },
+  {
     // ── TİCARET KURULUMU: TEK ŞABLON (2026-08-14) ─────────────────────────
     // Persona denetimi ölçtü: "birkaç depo + mal kabul + depodan satış + sevk,
     // üretim ve mobil YOK" kullanıcısını kurmak için ÜÇ şablon (Depo&Sevkiyat +

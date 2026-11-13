@@ -32,6 +32,7 @@ Kim neyi görür ve yazar: izin kataloğu ve rol şablonları, süperadmin (sist
 - READ ile açılan ekranda yazma eylemi çizilmez (gri buton değil). [inceleme]
 - Tablette `usePermissions().has()` üç jokeri tanır: `*`, `mobile:*`, `admin:*`. [bekçi: usePermission.test.ts]
 - `patron:giris` (modül ADMIN, kategori web; panel ekranı yok) patron telefonuna giriş iznidir ve yalnız BİREBİR atamayla geçer: `*`/`patron:*` jokeri vermez, `mode:"all"` kuralının tek istisnası olarak (`ALL_MODE_EXCLUDED`) "Admin (Tam Yetki)" şablonu da taşımaz — parola özetini buluta götürdüğü için panelin Kullanıcılar ekranından kişi kişi atanır. [bekçi: test_role_template_catalog, test_patron_bulut_kullanicilar]
+- "Patron (Yalnız Görme)" (`WEB_BOSS_READONLY`) `WEB_BOSS`un okuma kodlarının birebir aynısıdır, yazma kodu taşımaz (telefonda `bulut:siparis:yaz`/`bulut:cari:yaz` türemez); `WEB_BOSS`a okuma kodu eklenirse buna da eklenir. [bekçi: test_role_template_catalog]
 
 ### Süperadmin ve ayar şifresi
 
