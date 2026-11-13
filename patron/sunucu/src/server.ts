@@ -1,11 +1,10 @@
 // PATRON BULUTU SUNUCUSU — tek süreç, tek dinleyici (`/v1/*` fabrika kanalı + `/api/*` hesap API'si).
-// Açılış (fail-closed): yapılandırma → giriş dizini anahtarı → iki bağlantı (uygulama · eşitleme; TEK veritabanı)
+// Açılış (fail-closed): yapılandırma → iki bağlantı (uygulama · eşitleme; TEK veritabanı)
 // → iki rol de RLS'i ATLAYAMAZ (süper kullanıcı ya da BYPASSRLS ise sunucu KALKMAZ) → TOTP sır anahtarı →
 // dinleyici → bakım işi.
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { FacilityDbKey, facilityDbKeyPath } from "./auth/facility-db-key";
 import { SecretBox } from "./auth/secret-box";
 import { loadConfig } from "./config";
 import { roleBypassesRls } from "./lib/db";
@@ -37,10 +36,8 @@ async function main(): Promise<void> {
   loadEnvFile();
   const config = loadConfig();
   mkdirSync(config.ANAHTAR_DIZINI, { recursive: true, mode: 0o700 });
-  const keyPath = facilityDbKeyPath({ TESIS_ROL_ANAHTARI_DOSYASI: config.TESIS_ROL_ANAHTARI_DOSYASI, ANAHTAR_DIZINI: config.ANAHTAR_DIZINI }, process.cwd());
-  const key = FacilityDbKey.load(keyPath.file, { create: !keyPath.explicit });
-  const app = new TesisDbRouter({ role: "uygulama", url: config.DATABASE_URL, key });
-  const sync = new TesisDbRouter({ role: "esitleme", url: config.ESITLEME_DATABASE_URL, key });
+  const app = new TesisDbRouter({ role: "uygulama", url: config.DATABASE_URL });
+  const sync = new TesisDbRouter({ role: "esitleme", url: config.ESITLEME_DATABASE_URL });
   for (const router of [app, sync]) {
     const r = await roleBypassesRls(router.db);
     if (r.bypass) throw new Error(`${router.db.label} rolü (${r.role}) RLS'i atlayabiliyor (süper kullanıcı/BYPASSRLS/tablo sahibi) — kiracı yalıtımı yok, açılış DURDU`);

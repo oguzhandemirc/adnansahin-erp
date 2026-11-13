@@ -23,7 +23,7 @@ rolle KALKMAZ.
 
 Sırlar `/opt/adnan/patron/sirlar/`, HEPSİ root:10001 0440 (db kapsayıcısı ek grup 10001 ile yalnız kendine bağlanan iki
 sırrı okur): `db_kok_parolasi` · `goc_parolasi` · `uygulama_parolasi` · `esitleme_parolasi` (yalnız harf/rakam) ·
-`tesis_rol_anahtari` (giriş dizini anahtarı, 32 bayt base64url) · isteğe bağlı `guvenlik_telegram_bot_token` / `guvenlik_telegram_chat_id`. TOTP sarma
+isteğe bağlı `guvenlik_telegram_bot_token` / `guvenlik_telegram_chat_id`. TOTP sarma
 anahtarı `anahtarlar/patron-totp.key` (10001 0600). `.env` (0600, PAROLA TAŞIMAZ): `POSTGRES_USER`, `POSTGRES_DB`,
 `PATRON_IMAJ`, `ADNAN_AG_ALT_AGI`; `proxy/.env`: `PATRON_ALAN_ADI`, `ACME_EPOSTA`, `ADNAN_AG_ALT_AGI` (aynı değer).
 
@@ -38,7 +38,8 @@ anahtarı `anahtarlar/patron-totp.key` (10001 0600). `.env` (0600, PAROLA TAŞIM
 3. `cd /opt/adnan/patron && docker compose --profile goc run --rm goc` (db ilk kez açılır → `patron_goc` kurulur →
    `migrate deploy` → `db-rolleri`).
 4. `docker compose up -d api` → `docker ps` sağlıklı; `curl -fsS https://<alan>/saglik`.
-5. Tesis + fabrika kaydı + ilk yönetici (CLI, aşağıda).
+5. Tesis + fabrika kaydı (CLI, aşağıda). Hesaplar fabrikadan gelir (üyelik = Electron şifresi): panelde kullanıcıya
+   `patron:giris` atanır, eşitleme açıkken kullanıcı listesi `POST /v1/kullanicilar` ile ≤ 10 dk'da buluta düşer.
 
 ## Tesis CLI'si (tek tesis; tesis kimliği komutlarda verilmez)
 
@@ -47,30 +48,34 @@ R="docker compose --profile goc run --rm goc node dist-cli/scripts/tesis.js"
 $R tesis-ac --ad="Adnan Şahin"                                  # kimlik üretilir; yeniden koşum adı günceller
 $R kurulum-kaydet --kurulum=<fabrika kurulum uuid> --acik-anahtar=<Ed25519 x>   # fabrikada patron-bulut-anahtar.ts çıktısı
 $R durum                                                         # tesis + kurulum kayıtları (sırsız)
-$R yonetici-davet --eposta=<e-posta> --ad="<Ad Soyad>" > /root/davet.txt && chmod 600 /root/davet.txt   # belirteç BİR KEZ
 ```
 
 Kurulum kaydı olmadan (ya da `--pasif` kayıtta) `/v1/*` fabrika eşitlemesi 401/403 alır, telefondan yazma 403
 `PATRON_BULUT_KAPALI` döner. Lisans sınıfı, modül, bitiş tarihi YOKTUR (bulut süresiz).
 
-İlk yöneticinin daveti `/api/davet/incele → kabul (parola)` ile tamamlanır, hesap hemen AKTİF olur. Kimlik modeli
-ayrı dilimde ("Electron şifresi") değişecek; o dilime dek davet yolu geçerli.
+Bulutta davet, hesap yaratma, parola değişimi ve hesap silme YOKTUR: hesap, ad, izin ve parola fabrikada değişir;
+kullanıcıyı fabrikada pasifleştirmek bulut hesabını kapatır. Eski `sirlar/tesis_rol_anahtari` dosyası artık okunmaz
+(silinebilir).
 
-## Kurtarma (her biri talep no + gerekçe ister, bulut denetimine yazılır; e-postayı çıktıyla paylaşma)
+## Acil durum (gerekçe denetime yazılır; kullanıcı adı çıktıya basılmaz)
 
 ```bash
-$R dogrulama-kapat --eposta=<e-posta> --talep=<no> --gerekce="<neden>"            # telefon kaybı: TOTP kapanır, parola kalır
-$R kimlik-sifirla --eposta=<e-posta> --zorla --talep=<no> --gerekce="<neden>"      # kayıp parola: yeni davet, izinler korunur
-$R yonetici-yeniden-davet --eposta=<e-posta> [--zorla --talep=<no> --gerekce="…"]  # yönetici kalmadı: yönetici olarak yeniden davet
-$R ozet-yenile [--apply]                                                           # giriş dizini anahtarı değişti
+$R kullanici-kilitle --kullanici=<ad> --gerekce="<neden>" [--talep=<no>]   # fabrika kapalıyken de: giriş 401, açık oturumlar kapanır
+$R kullanici-ac --kullanici=<ad> [--gerekce="<neden>"]                      # bulut kilidi + kaba kuvvet kilidi kalkar
+$R dogrulama-kapat --kullanici=<ad> --gerekce="<neden>" [--talep=<no>]     # telefon kaybı: TOTP kapanır, parola kalır
+$R kullanici-yeniden-iste [--gerekce="<neden>"]                             # sır anahtarı kaybı: sonraki fabrika gönderimine dek yeni giriş 503
 ```
+
+Kalıcı kapatma ve parola sıfırlama fabrikada (panel) yapılır.
 
 ## Giriş akışı
 
-- `POST /api/oturum/ac` `{eposta, parola}`: doğrulama kodu kapalı hesapta oturum hemen açılır.
+- `POST /api/oturum/ac` `{kullaniciAdi, parola}` (fabrika kullanıcı adı + fabrika parolası): doğrulama kodu kapalı
+  hesapta oturum hemen açılır. Kullanıcı listesi 7 günden bayatsa yeni giriş 503 `FABRIKA_BAGLANTISI_YOK`.
 - Kodu AÇIK hesapta kod yoksa YALNIZ doğru paroladan sonra 401 `DOGRULAMA_KODU_GEREKLI` döner; uygulama kod alanını
-  açar ve `{eposta, parola, totp}` ile yeniden dener. Yanlış parola her hesapta aynı 401'dir (durum sızmaz).
-- Kilit: hesap + kaynak başına 5 yanlış denemede 15 dk (süreç belleğinde; yeniden başlatma sıfırlar).
+  açar ve `{kullaniciAdi, parola, totp}` ile yeniden dener. Yanlış parola her hesapta aynı 401'dir (durum sızmaz).
+- Kilit: hesap + kaynak başına 5 yanlış denemede 15 dk (süreç belleğinde; yeniden başlatma sıfırlar); hesap başına
+  24 sa'te 50 başarısız → 1 sa yeni giriş kilidi (DB'de; `kullanici-ac` sıfırlar).
 - Hız sınırları (IP başına, sunucuda): `/api` geneli 600/dk · geçersiz belirteç 30/dk (aşılınca oturumlu istekler DB'ye
   inmeden 429) · giriş 20/dk · `/v1` 600/dk. Kenarda (Caddy) yalnız `/api`, `/v1`, `/saglik` geçer; gerisi 404.
 

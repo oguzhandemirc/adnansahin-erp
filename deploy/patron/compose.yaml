@@ -6,8 +6,8 @@
 # Sırlar `sirlar/` altında dosya (HEPSİ root:10001 0440; db ek grup 10001 ile yalnız kendine bağlanan ikisini okur),
 # hepsi yalnız harf/rakam:
 #   db_kok_parolasi · goc_parolasi (göç rolü patron_goc — süper kullanıcı DEĞİL, db-init/10-goc-rolu.sh kurar) ·
-#   uygulama_parolasi · esitleme_parolasi · tesis_rol_anahtari (giriş dizini = kimlik e-posta özeti HMAC anahtarı,
-#   32 bayt base64url; ad eski düzenden kalır) · isteğe bağlı guvenlik_telegram_bot_token / guvenlik_telegram_chat_id.
+#   uygulama_parolasi · esitleme_parolasi · isteğe bağlı guvenlik_telegram_bot_token / guvenlik_telegram_chat_id.
+#   (Eski `tesis_rol_anahtari` — e-posta özeti anahtarı — üyelik C4'te KALKTI; VDS'teki dosya silinebilir.)
 # TOTP sarma anahtarı `anahtarlar/patron-totp.key` (10001 0600, 32 bayt base64url); birim salt okunur bağlanır — sunucu
 # onu ÜRETEMEZ, ilk açılıştan önce elle konur (README § İlk kurulum 1; yoksa api EROFS ile açılmaz).
 #
@@ -100,7 +100,7 @@ services:
       # Cloudflare yok: Caddy (adnan-ag) iç vekildir; istemci adresi onun X-Forwarded-For son halkasından.
       IC_VEKIL_AGLARI: ${ADNAN_AG_ALT_AGI:?ADNAN_AG_ALT_AGI gerekli (adnan-ag alt ağı)}
       BILDIRIM_KIPI: kapali
-    secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]
+    secrets: [uygulama_parolasi, esitleme_parolasi]
     volumes:
       - ./anahtarlar:/anahtarlar:ro
     tmpfs:
@@ -129,7 +129,7 @@ services:
       PATRON_ROL: goc
       DB_ADI: ${POSTGRES_DB}
     command: ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node dist-cli/scripts/db-rolleri.js"]
-    secrets: [goc_parolasi, uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]
+    secrets: [goc_parolasi, uygulama_parolasi, esitleme_parolasi]
     volumes:
       - ./anahtarlar:/anahtarlar:ro
     tmpfs:
@@ -148,8 +148,6 @@ secrets:
     file: ./sirlar/uygulama_parolasi
   esitleme_parolasi:
     file: ./sirlar/esitleme_parolasi
-  tesis_rol_anahtari:
-    file: ./sirlar/tesis_rol_anahtari
 
 volumes:
   pgdata:

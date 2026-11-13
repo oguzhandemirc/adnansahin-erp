@@ -16,7 +16,6 @@ import { SecretBox } from "../../src/auth/secret-box";
 import { hotp, totpStep } from "../../src/auth/totp";
 import { loadConfig } from "../../src/config";
 import { createApp } from "../../src/http/app";
-import { FacilityDbKey, FACILITY_DB_KEY_FILE } from "../../src/auth/facility-db-key";
 import { TesisDbRouter } from "../../src/lib/tesis-db";
 import { loadEnvFile } from "../../src/lib/env";
 import { withTesis } from "../../src/lib/tenant";
@@ -86,31 +85,18 @@ export interface Ortam {
   readonly goc: TesisDbRouter;
   readonly app: TesisDbRouter;
   readonly sync: TesisDbRouter;
-  /** Bu ortamın giriş dizini anahtarı (kimlik e-posta özeti; sunucu ve CLI aynısını kullanır). */
-  readonly anahtar: FacilityDbKey;
   readonly saat: Saat;
   readonly zil: KayitliZil;
   readonly adres: string;
   kapat(): Promise<void>;
 }
 
-let ortakAnahtar: FacilityDbKey | null = null;
-
-/** Süreç başına TEK giriş dizini anahtarı: aynı bekçideki iki ortam (ör. iki bildirim kipi) aynı kimlikleri çözer. */
-function surecAnahtari(): FacilityDbKey {
-  if (ortakAnahtar) return ortakAnahtar;
-  const dizin = mkdtempSync(path.join(os.tmpdir(), "patron-bekci-anahtar-"));
-  process.on("exit", () => rmSync(dizin, { recursive: true, force: true }));
-  ortakAnahtar = FacilityDbKey.load(path.join(dizin, FACILITY_DB_KEY_FILE), { create: true });
-  return ortakAnahtar;
-}
-
-/** `ezme`: giriş dizini anahtarı değişimini ölçen bekçi için (sır kutusu önceki ortamınki). */
+/** `ezme.secrets`: sır kutusu anahtarı değişimini ölçen bekçi için (önceki ortamın kutusu). */
 export async function ortamKur(
   ekOrtam: Record<string, string> = {},
   fetchImpl?: typeof fetch,
   doorbell?: Doorbell,
-  ezme: { anahtar?: FacilityDbKey; secrets?: SecretBox } = {},
+  ezme: { secrets?: SecretBox } = {},
 ): Promise<Ortam> {
   hedefDbKapisi();
   await applyRoles(process.env);
@@ -118,10 +104,9 @@ export async function ortamKur(
   const config = loadConfig({ ...process.env, ANAHTAR_DIZINI: dizin, ...ekOrtam }, PATRON_KOKU);
   const saat = new Saat();
   const zil = new KayitliZil();
-  const anahtar = ezme.anahtar ?? surecAnahtari();
-  const goc = new TesisDbRouter({ role: "goc", url: process.env.GOC_DATABASE_URL!, key: anahtar });
-  const app = new TesisDbRouter({ role: "uygulama", url: config.DATABASE_URL, key: anahtar });
-  const sync = new TesisDbRouter({ role: "esitleme", url: config.ESITLEME_DATABASE_URL, key: anahtar });
+  const goc = new TesisDbRouter({ role: "goc", url: process.env.GOC_DATABASE_URL! });
+  const app = new TesisDbRouter({ role: "uygulama", url: config.DATABASE_URL });
+  const sync = new TesisDbRouter({ role: "esitleme", url: config.ESITLEME_DATABASE_URL });
   const ctx: CloudContext = {
     config,
     app,
@@ -140,7 +125,6 @@ export async function ortamKur(
     goc,
     app,
     sync,
-    anahtar,
     saat,
     zil,
     adres,

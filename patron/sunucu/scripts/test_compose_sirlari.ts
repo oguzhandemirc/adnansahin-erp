@@ -8,7 +8,8 @@
 //   §2 Adnan compose (deploy/patron/compose.yaml): her servis rolünün sırlarını eksiksiz/fazlasız alır, db yalnız
 //      kök + göç parolasını alır, hiçbir serviste `ports:` yok, satıcı/çok tesis kalıntısı (ic_api_belirteci,
 //      KURULUM_KAYNAGI, tesis-db, GOC_DATABASE_URL ortamda, POSTGRES_PASSWORD .env'de) YOK, göç profilli ve elle
-//   §3 kalıcı negatif sondalar (sentetik): api'den tesis anahtarı düşer → EKSİK · göç rolü eşitleme parolasını okumaz
+//   §3 kalıcı negatif sondalar (sentetik): api'den eşitleme parolası düşer → EKSİK · sökülen `tesis_rol_anahtari`
+//      geri gelir → tanınmayan sır · göç rolü eşitleme parolasını okumaz
 //      → FAZLA · göçten goc_parolasi düşer → EKSİK · api'ye ports: → YASAK · tanınmayan PATRON_ROL · db'ye fazla sır
 //   §4 sertlik (güvenlik denetimi D11/D13): patron + proxy compose'unda her servis read_only · cap_drop ALL ·
 //      no-new-privileges · root DEĞİL (Caddy hariç: yeteneksiz root, yalnız NET_BIND_SERVICE) · dış imajlar özetle
@@ -46,25 +47,25 @@ function baslat(rol: string | null, sirlar: readonly string[], betik = BASLAT): 
 }
 
 kontrol("§1 betik `S=/run/secrets` satırını taşır (sonda onu geçici dizine çevirir)", /^S=\/run\/secrets$/m.test(BASLAT));
-const SUNUCU = ["uygulama_parolasi", "esitleme_parolasi", "tesis_rol_anahtari", "guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id"];
+const SUNUCU = ["uygulama_parolasi", "esitleme_parolasi", "guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id"];
 {
   const r = baslat(null, SUNUCU);
-  kontrol("§1 rol verilmezse sunucu: beş sırla açılır, DB + eşitleme URL'i + tesis anahtarı + güvenlik bildirimi yolları kurulur, göç URL'i YOK", r.status === 0 && !!r.env.DATABASE_URL && !!r.env.ESITLEME_DATABASE_URL && !!r.env.TESIS_ROL_ANAHTARI_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_BOT_TOKEN_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_CHAT_ID_DOSYASI && !r.env.GOC_DATABASE_URL, r.hata.trim());
+  kontrol("§1 rol verilmezse sunucu: dört sırla açılır, DB + eşitleme URL'i + güvenlik bildirimi yolları kurulur, göç URL'i ve eski tesis anahtarı yolu YOK", r.status === 0 && !!r.env.DATABASE_URL && !!r.env.ESITLEME_DATABASE_URL && !r.env.TESIS_ROL_ANAHTARI_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_BOT_TOKEN_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_CHAT_ID_DOSYASI && !r.env.GOC_DATABASE_URL, r.hata.trim());
   kontrol("§1 sunucu satıcı iç API belirtecini KURMAZ", !("SATICI_IC_API_BELIRTECI" in r.env));
 }
 {
-  const r = baslat("goc", ["goc_parolasi", "uygulama_parolasi", "esitleme_parolasi", "tesis_rol_anahtari"]);
-  kontrol("§1 göç dört sırla açılır (göç + iki çalışma URL'i + anahtar)", r.status === 0 && !!r.env.GOC_DATABASE_URL && !!r.env.DATABASE_URL && !!r.env.ESITLEME_DATABASE_URL && !!r.env.TESIS_ROL_ANAHTARI_DOSYASI, r.hata.trim());
+  const r = baslat("goc", ["goc_parolasi", "uygulama_parolasi", "esitleme_parolasi"]);
+  kontrol("§1 göç üç sırla açılır (göç + iki çalışma URL'i)", r.status === 0 && !!r.env.GOC_DATABASE_URL && !!r.env.DATABASE_URL && !!r.env.ESITLEME_DATABASE_URL && !r.env.TESIS_ROL_ANAHTARI_DOSYASI, r.hata.trim());
   kontrol("§1 göç URL'i süper kullanıcı OLMAYAN patron_goc rolüyle", /^postgresql:\/\/patron_goc:/.test(r.env.GOC_DATABASE_URL ?? ""));
 }
 {
   // Güvenlik bildirimi sırları İSTEĞE BAĞLI: yoksa sunucu açılır, yol verilmez (kanal KAPALI), uyarı stderr'e.
-  const r = baslat("sunucu", SUNUCU.slice(0, 3));
+  const r = baslat("sunucu", SUNUCU.slice(0, 2));
   kontrol("§1 güvenlik bildirimi sırları YOKKEN sunucu açılır, güvenlik yolları kurulmaz, uyarı basılır", r.status === 0 && !!r.env.DATABASE_URL && !r.env.GUVENLIK_TELEGRAM_BOT_TOKEN_DOSYASI && !r.env.GUVENLIK_TELEGRAM_CHAT_ID_DOSYASI && /guvenlik_telegram_bot_token okunamıyor[^\n]*KAPALI/.test(r.hata), `${r.status} · ${r.hata.trim()}`);
 }
-kontrol("§1 sunucu tesis anahtarı sırrı yoksa çıkış 1", baslat("sunucu", SUNUCU.slice(0, 2)).status === 1);
-kontrol("§1 göç parolası yoksa çıkış 1", baslat("goc", ["uygulama_parolasi", "esitleme_parolasi", "tesis_rol_anahtari"]).status === 1);
-kontrol("§1 tanınmayan PATRON_ROL çıkış 1 (eski `hazirla` dahil)", baslat("yedek", SUNUCU).status === 1 && baslat("hazirla", ["goc_parolasi", "tesis_rol_anahtari"]).status === 1);
+kontrol("§1 sunucu eşitleme parolası sırrı yoksa çıkış 1", baslat("sunucu", SUNUCU.slice(0, 1)).status === 1);
+kontrol("§1 göç parolası yoksa çıkış 1", baslat("goc", ["uygulama_parolasi", "esitleme_parolasi"]).status === 1);
+kontrol("§1 tanınmayan PATRON_ROL çıkış 1 (eski `hazirla` dahil)", baslat("yedek", SUNUCU).status === 1 && baslat("hazirla", ["goc_parolasi"]).status === 1);
 
 // §2–§3 Adnan compose (deploy/patron/compose.yaml) ↔ rol tablosu. DB'siz ve docker'sız: compose akış listesiyle
 // (`secrets: [a, b]`) yazılır, servis blokları girintiden ayrılır. Ortamda hazır verilen URL sırrın yerine geçer
@@ -74,7 +75,6 @@ const ORTAM_KARSILIGI: Record<string, string> = {
   uygulama_parolasi: "DATABASE_URL",
   esitleme_parolasi: "ESITLEME_DATABASE_URL",
   goc_parolasi: "GOC_DATABASE_URL",
-  tesis_rol_anahtari: "TESIS_ROL_ANAHTARI_DOSYASI",
 };
 
 function rolTablosu(betik: string): Map<string, string[]> {
@@ -131,8 +131,8 @@ const COMPOSE = readFileSync(path.join(D, "compose.yaml"), "utf8");
   const sorun = denetle(COMPOSE, BASLAT);
   kontrol("§2 ⭐ her servis rolünün sırlarını eksiksiz ve fazlasız alır, hiçbir serviste ports: yok", sorun.length === 0, sorun.join(" | ") || "uyumlu");
   const api = ss.find((s) => s.ad === "api");
-  const kalinti = ["ic_api_belirteci", "KURULUM_KAYNAGI", "SATICI_IC", "tesis-db", "hazirla", "GOC_DATABASE_URL", "POSTGRES_PASSWORD:"].filter((x) => COMPOSE.includes(x));
-  kontrol("§2 satıcı/çok tesis kalıntısı ve ortamda parola YOK", kalinti.length === 0, kalinti.join(","));
+  const kalinti = ["ic_api_belirteci", "KURULUM_KAYNAGI", "SATICI_IC", "tesis-db", "hazirla", "GOC_DATABASE_URL", "POSTGRES_PASSWORD:"].filter((x) => COMPOSE.includes(x)).concat(["tesis_rol_anahtari:", "TESIS_ROL_ANAHTARI"].filter((x) => COMPOSE.includes(x) || BASLAT.includes(x)));
+  kontrol("§2 satıcı/çok tesis kalıntısı, sökülen e-posta özeti anahtarı ve ortamda parola YOK (compose + betik)", kalinti.length === 0, kalinti.join(","));
   const goc = ss.find((s) => s.ad === "goc");
   kontrol("§2 göç servisi profilli (elle, tek seferlik), yalnız migrate deploy + db-rolleri koşar", !!goc && /profiles:\s*\["goc"\]/.test(goc.metin) && /migrate deploy && node dist-cli\/scripts\/db-rolleri\.js"\]/.test(goc.metin) && !!api);
   const db = ss.find((s) => s.ad === "db");
@@ -143,11 +143,13 @@ const COMPOSE = readFileSync(path.join(D, "compose.yaml"), "utf8");
 
 // §3 kalıcı negatif sondalar (sentetik; her koşumda)
 {
-  const apiSirsiz = COMPOSE.replace("secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]", "secrets: [uygulama_parolasi, esitleme_parolasi]");
-  kontrol("§3 api'den tesis anahtarı düşer → EKSİK ❌", apiSirsiz !== COMPOSE && denetle(apiSirsiz, BASLAT).some((x) => x === "api: EKSİK tesis_rol_anahtari"));
-  const gocEsitlemesiz = BASLAT.replace('goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi tesis_rol_anahtari"', 'goc) echo "goc_parolasi uygulama_parolasi tesis_rol_anahtari"');
+  const apiSirsiz = COMPOSE.replace("secrets: [uygulama_parolasi, esitleme_parolasi]", "secrets: [uygulama_parolasi]");
+  kontrol("§3 api'den eşitleme parolası düşer → EKSİK ❌", apiSirsiz !== COMPOSE && denetle(apiSirsiz, BASLAT).some((x) => x === "api: EKSİK esitleme_parolasi"));
+  const eskiAnahtar = COMPOSE.replace("secrets: [uygulama_parolasi, esitleme_parolasi]", "secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]");
+  kontrol("§3 sökülen tesis_rol_anahtari compose'a geri gelir → FAZLA ❌", eskiAnahtar !== COMPOSE && denetle(eskiAnahtar, BASLAT).some((x) => x === "api: FAZLA tesis_rol_anahtari"));
+  const gocEsitlemesiz = BASLAT.replace('goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi"', 'goc) echo "goc_parolasi uygulama_parolasi"');
   kontrol("§3 göç rolü eşitleme parolasını okumaz, compose verir → FAZLA ❌", gocEsitlemesiz !== BASLAT && denetle(COMPOSE, gocEsitlemesiz).some((x) => x === "goc: FAZLA esitleme_parolasi"));
-  const gocParolasiz = COMPOSE.replace("secrets: [goc_parolasi, uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]", "secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]");
+  const gocParolasiz = COMPOSE.replace("secrets: [goc_parolasi, uygulama_parolasi, esitleme_parolasi]", "secrets: [uygulama_parolasi, esitleme_parolasi]");
   kontrol("§3 göçten goc_parolasi düşer → EKSİK ❌", gocParolasiz !== COMPOSE && denetle(gocParolasiz, BASLAT).some((x) => x === "goc: EKSİK goc_parolasi"));
   const dbFazla = COMPOSE.replace("secrets: [db_kok_parolasi, goc_parolasi]", "secrets: [db_kok_parolasi, goc_parolasi, uygulama_parolasi]");
   kontrol("§3 db'ye fazla sır → ❌", dbFazla !== COMPOSE && denetle(dbFazla, BASLAT).some((x) => x.startsWith("db: rolsüz servisin sırları")));

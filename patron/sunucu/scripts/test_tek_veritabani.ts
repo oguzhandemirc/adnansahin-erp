@@ -134,7 +134,7 @@ function tesisAcCli(tesisId: string, anahtarDizini: string): { code: number; out
   const r = spawnSync("npx", ["tsx", "scripts/tesis.ts", "tesis-ac", `--tesis=${tesisId}`, "--ad=Bekçi Tek Tesis"], {
     cwd: PATRON_KOKU,
     encoding: "utf8",
-    env: { ...process.env, ANAHTAR_DIZINI: anahtarDizini, TESIS_ROL_ANAHTARI_DOSYASI: "" },
+    env: { ...process.env, ANAHTAR_DIZINI: anahtarDizini },
   });
   return { code: r.status ?? -1, out: `${r.stdout}${r.stderr}` };
 }

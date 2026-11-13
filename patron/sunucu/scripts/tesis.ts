@@ -22,7 +22,6 @@
 // =============================================================================
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { FacilityDbKey, facilityDbKeyPath } from "../src/auth/facility-db-key";
 import { loadEnvFile } from "../src/lib/env";
 import { listReadyFacilities, withTesis } from "../src/lib/tenant";
 import { TesisDbRouter } from "../src/lib/tesis-db";
@@ -79,8 +78,7 @@ async function main(): Promise<number> {
   loadEnvFile();
   const [komut, ...rest] = process.argv.slice(2);
   const a = args(rest);
-  const k = facilityDbKeyPath(process.env, process.cwd());
-  const db = new TesisDbRouter({ role: "goc", url: gocUrl(process.env), key: FacilityDbKey.load(k.file, { create: !k.explicit }), poolMax: 2 });
+  const db = new TesisDbRouter({ role: "goc", url: gocUrl(process.env), poolMax: 2 });
   try {
     switch (komut) {
       case "tesis-ac": {

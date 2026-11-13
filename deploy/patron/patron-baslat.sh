@@ -3,8 +3,8 @@
 # komutu çalıştırır — sırlar imaj yapılandırmasına ve `docker inspect`e girmez. Rol (PATRON_ROL) hangi sırların
 # okunacağını belirler; her rol YALNIZ kendi sırlarını okur ve hepsini ZORUNLU sayar (en az yetki) — tek istisna
 # güvenlik bildirimi sırları (guvenlik_telegram_*): İSTEĞE BAĞLI, okunamazsa kanal KAPALI:
-#   sunucu  → uygulama + eşitleme parolası · tesis rol anahtarı (giriş dizini anahtarı; ad eski düzenden)
-#   goc     → göç (patron_goc, süper kullanıcı DEĞİL) + uygulama + eşitleme parolası · tesis rol anahtarı
+#   sunucu  → uygulama + eşitleme parolası
+#   goc     → göç (patron_goc, süper kullanıcı DEĞİL) + uygulama + eşitleme parolası
 #             (migrate deploy · db-rolleri · tesis CLI'si)
 # ROL TABLOSU test_compose_sirlari §2'nin tek kaynağıdır: compose'un `secrets:` listesi bununla birebir eşleşmeli.
 # Parolalar URL güvenli olmalı (onaltılık üretilir; runbook §3). Ortamda hazır verilen değer sırrın yerine geçer.
@@ -15,8 +15,8 @@ DB="${DB_HOST:-patron-db}:5432/${DB_ADI:-patron}?schema=public"
 
 rol_sirlari() {
   case "$1" in
-    sunucu) echo "uygulama_parolasi esitleme_parolasi tesis_rol_anahtari guvenlik_telegram_bot_token guvenlik_telegram_chat_id" ;;
-    goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi tesis_rol_anahtari" ;;
+    sunucu) echo "uygulama_parolasi esitleme_parolasi guvenlik_telegram_bot_token guvenlik_telegram_chat_id" ;;
+    goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi" ;;
     *) return 1 ;;
   esac
 }
@@ -63,13 +63,6 @@ for sir in $SIRLAR; do
       if [ -z "${GOC_DATABASE_URL:-}" ]; then
         GOC_DATABASE_URL="postgresql://patron_goc:$(parola goc_parolasi)@$DB"
         export GOC_DATABASE_URL
-      fi ;;
-    tesis_rol_anahtari)
-      # Yolu verilir; anahtarın kendisi ortama girmez.
-      if [ -z "${TESIS_ROL_ANAHTARI_DOSYASI:-}" ]; then
-        sir_var tesis_rol_anahtari
-        TESIS_ROL_ANAHTARI_DOSYASI="$S/tesis_rol_anahtari"
-        export TESIS_ROL_ANAHTARI_DOSYASI
       fi ;;
     guvenlik_telegram_bot_token)
       # Güvenlik bildirimi (B3) İSTEĞE BAĞLI: sır okunamazsa yol verilmez → kanal KAPALI, sunucu yine açılır.

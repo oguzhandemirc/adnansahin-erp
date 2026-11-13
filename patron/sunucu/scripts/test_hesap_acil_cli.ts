@@ -152,7 +152,7 @@ function cli(argv: string[], anahtarDizini: string): { code: number; out: string
   const r = spawnSync("npx", ["tsx", "scripts/tesis.ts", ...argv], {
     cwd: PATRON_KOKU,
     encoding: "utf8",
-    env: { ...process.env, ANAHTAR_DIZINI: anahtarDizini, TESIS_ROL_ANAHTARI_DOSYASI: "" },
+    env: { ...process.env, ANAHTAR_DIZINI: anahtarDizini },
   });
   return { code: r.status ?? -1, out: `${r.stdout}${r.stderr}` };
 }

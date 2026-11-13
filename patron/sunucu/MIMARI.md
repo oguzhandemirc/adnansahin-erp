@@ -20,11 +20,10 @@ npx prisma migrate deploy && npx prisma generate && npx tsx scripts/db-rolleri.t
 npx tsx scripts/tesis.ts tesis-ac --ad="Adnan Şahin" [--tesis=<uuid>] [--saklama=13|3|25|tumu]   # kimlik verilmezse üretilir; tek tesis
 npx tsx scripts/tesis.ts durum                                       # tesis + kurulum kayıtları (sırsız)
 npx tsx scripts/tesis.ts kurulum-kaydet --kurulum=<uuid> --acik-anahtar=<x> [--pasif]   # fabrikanın patron-bulut-anahtar.ts çıktısı
-npx tsx scripts/tesis.ts yonetici-davet --eposta=<e-posta> --ad="Ad Soyad"   # davet belirteci BİR KEZ basılır
-npx tsx scripts/tesis.ts yonetici-yeniden-davet --eposta=<e-posta> [--zorla --talep=<no> --gerekce="…"]   # aktif yönetici varken yalnız zorlamayla
-npx tsx scripts/tesis.ts kimlik-sifirla --eposta=<e-posta> --zorla --talep=<no> --gerekce="…"   # kayıp parola: sırlar silinir, izinler korunarak yeni davet
-npx tsx scripts/tesis.ts dogrulama-kapat --eposta=<e-posta> --talep=<no> --gerekce="…"   # doğrulama kodunu (TOTP) kapatır; TEK kurtarma yolu, e-posta basılmaz
-npx tsx scripts/tesis.ts ozet-yenile [--apply]   # giriş dizini anahtarı değişince kimlik e-posta özetleri; kuru koşum varsayılan
+npx tsx scripts/tesis.ts kullanici-kilitle --kullanici=<ad> --gerekce="…" [--talep=<no>]   # acil bulut kilidi; açık oturumlar kapanır
+npx tsx scripts/tesis.ts kullanici-ac --kullanici=<ad> [--gerekce="…"]   # bulut kilidi + kaba kuvvet kilidi kalkar
+npx tsx scripts/tesis.ts dogrulama-kapat --kullanici=<ad> --gerekce="…" [--talep=<no>]   # TOTP kapanır; TEK kurtarma yolu, ad basılmaz
+npx tsx scripts/tesis.ts kullanici-yeniden-iste [--gerekce="…"]   # damga sıfır: sonraki fabrika gönderimine dek yeni giriş 503
 npm run typecheck:scripts && npm run lint        # commit kapısı altıncı proje olarak aynısını ölçer (tip + eslint + lint-baseline.json tavanı)
 node ../../scripts/agir-is.mjs -- npx tsx scripts/run-all-tests.ts [ad-parçası]   # yalnız *_test DB
 ```
@@ -56,8 +55,8 @@ node ../../scripts/agir-is.mjs -- npx tsx scripts/run-all-tests.ts [ad-parçası
 - **Giriş = fabrika parolası** (üyelik C3, 2026-11-14; göç `20261114090000_bulut_girisi`): `POST /api/oturum/ac {kullaniciAdi, parola, totp?}` (`auth/factory-login.ts`) — ad ön-kiracı aramayla bulunur (politika `kullanici_arama`), mühürlü bcrypt özeti açılıp `bcryptjs` ile karşılaştırılır. Bilinmeyen/PASİF/bulut kilitli/geçici kilitli/yanlış parola/yanlış kod AYNI 401 (uygun olmayan dalda sahte bcrypt, ≥ 500 ms taban); `DOGRULAMA_KODU_GEREKLI` yalnız doğru paroladan sonra. Kaba kuvvet: kaynak kilidi (bellek) + hesap başına küresel sayaç `account_factors.basarisiz_*` (sabit 24 sa pencere, `GIRIS_HESAP_TAVANI` = 50 → `GIRIS_HESAP_KILIT_DK` = 60 dk `gecici_kilit_bitis`; güvenlik olayı `GIRIS_KILIT`, denetim `HESAP_GECICI_KILIT` kapsam HESAP); kilit açık oturumu düşürmez. Bayatlık: `sync_state.kullanici_son_esitleme` (kabul edilen her `/v1/kullanicilar` damgalar; satırı ilk paket doğurur) `FABRIKA_BAYATLIK_GUN` = 7'den eskiyse yeni giriş 503 `FABRIKA_BAGLANTISI_YOK` (parola sorulmadan). Oturum `kimlik_surumu` taşır; `resolveSession` farklıysa ya da bulut kilidi açıksa 401. TOTP kuralları `account_factors`ta (`auth/factory-factors.ts`); fabrika hesabında parola değişimi ve hesap silme 409. Eski `{eposta}` gövdesi GEÇİCİ UYUMLULUKtur (C4'te kalkar). Bekçi `test_giris_fabrika_parolasi`.
 - **Fabrika kullanıcı kümesi** (üyelik C2): `POST /v1/kullanicilar` (`services/user-sync.service.ts`, eşitleme rolü) TAM kümeyi uygular — tel özetini gövdeden yeniden hesaplar (tutmazsa 400), bilinmeyen bulut izni 400; tek tx, ilk ifade 9205 `KULLANICI_ESITLEME`; önce kapatma (PASİF + özet NULL + kapanış + oturum `HESAP_KAPANDI`), sonra güncelleme (satır başına `kimlik_surumu` claim'i; parola farkı mühür AÇILARAK ölçülür, fark varsa yeni mühür + sürüm +1 + oturum `SIFIRLAMA`), en son açık kolon listeli INSERT (Prisma `createMany` kolon yetkisine takılır). Denetim tx dışında `HESAP_EKLENDI/GUNCELLENDI/KAPATILDI` (alan adları + izinler; özet/mühür yok), log tek satır sayı. Bulut kapanan hesabın push cihazlarına dokunmaz (eşitleme rolünün yetkisi yok; C3/C4). Sunucu açılışta rolleri ölçer: RLS'i atlayabilen rolle KALKMAZ.
 - `app.tesis_id` ayarsız/sıfırlanmış bağlantıda sorgu HATA verir (fail-closed) ve RLS + `app.projeksiyonlar` RESTRICTIVE politikası geçerlidir ("sipariş görür, tutar görmez"); `*` projeksiyon YASAK. Yeni tablonun yetkisi `db-grants.ts`e AYNI dilimde girer — girmezse roller erişemez.
-- **Giriş dizini anahtarı** (`ANAHTAR_DIZINI/patron-tesis-db.key`; üretimde `TESIS_ROL_ANAHTARI_DOSYASI`): yalnız kimlik e-posta özetinin HMAC anahtarıdır (ad eski düzenden kalır; rol parolası türetmez). Değişirse `tesis.ts ozet-yenile`.
-- `tesis_id` kolonu ve `tesis_yalitimi` RLS'i ile `login_routes`/`installation_routes` şimdilik KALIR; kimlik dilimi söker.
+- E-posta özeti anahtarı (`patron-tesis-db.key`, `TESIS_ROL_ANAHTARI_DOSYASI`, compose sırrı `tesis_rol_anahtari`) üyelik C4'te KALKTI; tek sunucu anahtarı `ANAHTAR_DIZINI/patron-totp.key` (TOTP + parola özeti mührü).
+- `tesis_id` kolonu ve `tesis_yalitimi` RLS'i ile `installation_routes` KALIR (`login_routes`/`identities` C4'te düştü).
 
 ### Budama beyanı — tam metin
 
