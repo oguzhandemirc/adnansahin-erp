@@ -81,6 +81,7 @@ export const SNAPSHOT_PROJECTIONS: readonly SnapshotProjection[] = [
     ],
   },
   { name: "stok-karnesi", kind: "ANLIK", source: "reports/stock-scorecard.report.service getStockScorecard", permission: "bulut:stok:oku" },
+  { name: "stok-kalem", kind: "ANLIK", source: "reports/stock-kalem.report.service getStockKalem + getStockKalemRolls (tek raf okuması)", permission: "bulut:stok:oku" },
   { name: "acik-siparis-karsilama", kind: "ANLIK", source: "reports/open-order-coverage.report.service getOpenOrderCoverage", permission: "bulut:siparis:oku" },
   {
     name: "uretim-akisi", kind: "ANLIK", source: "inventory.service getProductionFlow + DashboardService.getStationsLiveState",

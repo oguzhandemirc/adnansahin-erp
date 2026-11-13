@@ -14,7 +14,8 @@ import {
   resolveDateRange,
 } from "../../services/reports/_shared";
 import { getStockScorecard } from "../../services/reports/stock-scorecard.report.service";
-import { getStockKalem } from "../../services/reports/stock-kalem.report.service";
+import { getStockKalem, getStockKalemRolls } from "../../services/reports/stock-kalem.report.service";
+import { z } from "zod";
 
 const router = Router();
 /**
@@ -55,6 +56,31 @@ router.get("/scorecard/kalem", ...reportGate("inventory/scorecard"), async (req:
   try {
     emptyQuerySchema.parse(req.query);
     const data = await getStockKalem();
+    res.status(200).json(reportEnvelope(data, resolveDateRange({})));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * @swagger
+ * /api/reports/inventory/scorecard/kalem/toplar:
+ *   get:
+ *     summary: Stok & Ölü Stok — kalem bazında sekmesinin TOPLARI (aynı raf kümesi; `kalem` verilirse yalnız o kalem)
+ *     tags: [Reports]
+ *     parameters:
+ *       - { in: query, name: bolum, schema: { type: string, enum: [ham, bitmis] } }
+ *       - { in: query, name: kalem, schema: { type: string }, description: "Kalem satırının key'i" }
+ *     responses:
+ *       200: { description: "ham[] + bitmis[] top satırları; kalem toplamlarıyla birebir" }
+ */
+// Rulo listesi ucu bu kümeyi veremez (çuvaldaki/sevkteki top ve yarı mamul ayrımı karnenin tanımı); top listesi
+// kalem satırıyla aynı fonksiyondan doğar ki "kaleme dokun → toplar" sayısı satırdakiyle hep eşit olsun.
+const kalemRollsQuery = z.strictObject({ bolum: z.enum(["ham", "bitmis"]).optional(), kalem: z.string().min(1).max(200).optional() });
+router.get("/scorecard/kalem/toplar", ...reportGate("inventory/scorecard"), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = kalemRollsQuery.parse(req.query);
+    const data = await getStockKalemRolls({ section: q.bolum, kalemKey: q.kalem });
     res.status(200).json(reportEnvelope(data, resolveDateRange({})));
   } catch (e) {
     next(e);

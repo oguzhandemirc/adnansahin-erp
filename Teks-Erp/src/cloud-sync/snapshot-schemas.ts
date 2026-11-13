@@ -31,6 +31,18 @@ const CariSummary = z.strictObject({
   sonSiparisTarihi: IsoOrNull, sonSevkTarihi: IsoOrNull,
 });
 
+// Stok kalem listesi: kalem (ham = kumaş; bitmiş = kumaş + en + renk + kat) ve raftaki toplar; metre ile kg ayrı (toplanmaz).
+const StockKalemSection = z.strictObject({
+  toplamTop: Num, toplamMetre: Num,
+  kalemler: z.array(z.strictObject({
+    anahtar: Str, urun: Str, en: Num.nullable(), renk: Str.nullable(), kat: Str.nullable(),
+    top: Num, metre: Num, kg: Num.nullable(), enEskiGun: Num.nullable(),
+  })),
+  toplar: z.array(z.strictObject({
+    id: z.string().uuid(), topNo: Str.nullable(), kalem: Str, metre: Num, kg: Num.nullable(), parti: Str.nullable(), depo: Str.nullable(), gun: Num.nullable(),
+  })),
+});
+
 export const SNAPSHOT_WIRE_SCHEMAS = {
   "ozet.stok": z.strictObject({ hamMiktar: Num, yariMamulMiktar: Num, bitmisMiktar: Num, oluMiktar: Num, oluStokGun: Num, enCokUrun: z.array(Label) }),
   "ozet.siparis": z.strictObject({ acikKalem: Num, acikMiktar: Num, karsilanmayanMiktar: Num, karsilanmaYuzde: Num, enCokCari: z.array(Label) }),
@@ -49,6 +61,7 @@ export const SNAPSHOT_WIRE_SCHEMAS = {
     yasKovalari: z.array(z.strictObject({ anahtar: Str, etiket: Str, adet: Num, miktar: Num, yuzde: Num })),
     urunler: z.array(z.strictObject({ anahtar: Str, etiket: Str, adet: Num, miktar: Num, enEskiGun: Num.nullable(), siparissizMiktar: Num })),
   }),
+  "stok-kalem": z.strictObject({ ham: StockKalemSection, bitmis: StockKalemSection }),
   "acik-siparis-karsilama": z.strictObject({
     ozet: z.strictObject({
       acikKalem: Num, acikMiktar: Num, depodanMiktar: Num, uretimdenMiktar: Num, karsilanmayanMiktar: Num, hamEksikMiktar: Num,

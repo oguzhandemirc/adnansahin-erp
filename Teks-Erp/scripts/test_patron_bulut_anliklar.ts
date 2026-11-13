@@ -2,7 +2,7 @@
 // BEKÇİ — PATRON BULUTU ANLIK PROJEKSİYONLARI (D3b): sözleşme · finans/termin yok · doğruluk · kapalı · sıklık
 // =============================================================================
 // ÖLÇTÜĞÜ:
-//  §1 Katalog (DB'siz): 8 anlık (`ozet` 5 bölümlü) — tel adları = katı şema anahtarları ⊂ bulut kataloğunun
+//  §1 Katalog (DB'siz): 9 anlık (`ozet` 5 bölümlü; + `stok-kalem`) — tel adları = katı şema anahtarları ⊂ bulut kataloğunun
 //     ANLIK adları; izinler bulut okuma izinleri; şemalarda hiçbir alan adı finans (fiyat · tutar · bakiye ·
 //     döviz …) ya da termin (geciken · zamanında · gecikme · termin) sözcüğü taşımaz; finans/emanet/sağlık
 //     anlıkları katalogda YOK.
@@ -12,7 +12,7 @@
 //     yalıtılır — istasyon hatası yalnız `ozet.uretim`i düşürür, diğer dört bölüm gider.
 //  §3 Doğruluk: anlık ↔ bağımsız SQL ↔ panel servisi (açık sipariş · bugün brüt sevk · mamul stok · istasyon
 //     kuyruk/bugün · fason açık · fasondaki/boyahanedeki top ↔ üretim akışı "Fason'da" kolonu · firma başına top +
-//     kategori) — `scripts/lib/anlik-bagimsiz.ts`; fixture: boyahaneye 2 top + zımparaya 1 top açık fason sevki.
+//     kategori · stok-kalem top listesi/kalem toplamı ↔ raf kümesi) — `scripts/lib/anlik-bagimsiz.ts`; fixture: boyahaneye 2 top + zımparaya 1 top açık fason sevki.
 //  §4 KAPALI: ön koşul yokken tur `GONDERILMEDI`, anlık hesabı yok (`snapshotRun` null), dış istek yok; iş tıkı
 //     da hesap yapmaz (`lastSnapshotAt` null); `snapshots:false` turunda da hesap yok.
 //  §5 Sıklık: anlıklar aralık başına EN ÇOK bir kez hesaplanır (devam turu hesaplamaz); içerik özeti aynıysa
@@ -26,6 +26,8 @@
 //   · iş tıkında `const snapshots = true` (her turda hesap) → §5 "devam turu hesaplamaz" ✗
 //   · `stok-karnesi` `bitmisMiktar` ← `s.rawQty` (yanlış eşleme) → §3 mamul stok ✗
 //   · `ozet` bölümleri tek try içinde kuruldu (eski davranış) → §2 "ozet bölüm yalıtımı" ✗
+// NEGATİF SONDA (2026-11-13, stok-kalem): şemaya `tutar` eklendi → §1 finans adı ✗; bitmiş
+//   top listesinden ilk top düşürüldü → §3 "stok-kalem: bitmiş top listesi" + "kalem top sayısı ≠ topları" ✗.
 // NEGATİF SONDA (2026-11-13, kırmızı verdi, geri alındı):
 //   · `boyahanedeTop` ← tüm açık toplar (kategori süzgeci yok) → §3 fixture farkı + "boyahanedeki top" ✗
 //   · firma `kategoriler` boş dizi → §3 "firma başına top + kategori uyuşmazlığı" ✗
@@ -62,7 +64,7 @@ const DEADLINE = /gecik|zamaninda|termin|vade/i;
 /** Bulut kataloğunun ANLIK adları (`patron/sunucu/src/catalog/projections.ts`, sözleşme SABİT). */
 const CLOUD_SNAPSHOT_NAMES = new Set([
   "ozet.stok", "ozet.siparis", "ozet.uretim", "ozet.sevkiyat", "ozet.fason", "ozet-finans", "ozet-masraf", "karlilik-ozet",
-  "emanet-bakiye", "fason-acik", "hizmet-geliri", "stok-karnesi", "acik-siparis-karsilama", "rapor-katalogu", "uretim-akisi", "saglik", "tesis", "cari-ozeti",
+  "emanet-bakiye", "fason-acik", "hizmet-geliri", "stok-karnesi", "stok-kalem", "acik-siparis-karsilama", "rapor-katalogu", "uretim-akisi", "saglik", "tesis", "cari-ozeti",
 ]);
 const STAMP = `TEST-D3B-${Date.now()}-`;
 const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[], wos: [] as string[], dispatches: [] as string[] };
@@ -93,7 +95,7 @@ function wireNames(): string[] {
 
 async function main(): Promise<void> {
   console.log("\n§1 Katalog ve tel şemaları");
-  check("8 anlık projeksiyon (M2a: + cari-ozeti)", SNAPSHOT_PROJECTIONS.length === 8, SNAPSHOT_PROJECTIONS.map((p) => p.name).join(","));
+  check("9 anlık projeksiyon (M2a: + cari-ozeti; + stok-kalem)", SNAPSHOT_PROJECTIONS.length === 9, SNAPSHOT_PROJECTIONS.map((p) => p.name).join(","));
   const names = wireNames();
   const schemaNames = Object.keys(SNAPSHOT_WIRE_SCHEMAS);
   check("tel adları = katı şema anahtarları", names.length === schemaNames.length && names.every((n) => schemaNames.includes(n)), names.join(","));

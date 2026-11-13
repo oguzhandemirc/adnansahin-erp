@@ -125,6 +125,8 @@ export interface StockCell {
   status: string;
   entrySource: string;
   qty: number;
+  /** Tartılmışsa kg (metreyle toplanmaz; ayrı birim). */
+  weightKg: number | null;
   days: number | null;
 }
 
@@ -153,7 +155,7 @@ export async function loadShelfCells(): Promise<StockCell[]> {
     Array<{
       rollId: string; barcode: string | null; itemId: string; itemName: string;
       colorId: string | null; colorName: string | null; width: number | null; foldType: string | null;
-      status: string; entrySource: string; qty: number; days: number | null;
+      status: string; entrySource: string; qty: number; weightKg: number | null; days: number | null;
     }>
   >(Prisma.sql`
     SELECT
@@ -165,6 +167,7 @@ export async function loadShelfCells(): Promise<StockCell[]> {
       r.status::text AS "status",
       r."entrySource"::text AS "entrySource",
       r."currentQty"::float AS "qty",
+      r."weightKg"::float AS "weightKg",
       -- tz-ok: raftaki bekleme YAŞI iki an arası mutlak farktır, takvim günü değil.
       CASE WHEN r."statusChangedAt" IS NULL THEN NULL
            -- tz-ok: raf yaşı mutlak farktır (yukarıdaki satırın devamı).
@@ -188,8 +191,23 @@ export async function loadShelfCells(): Promise<StockCell[]> {
     status: r.status,
     entrySource: r.entrySource,
     qty: Number(r.qty),
+    weightKg: r.weightKg === null ? null : Number(r.weightKg),
     days: r.days === null ? null : Number(r.days),
   }));
+}
+
+/** Raf topunun parti/depo/statü damgası — `loadShelfCells` sorgusuna eklenmez (karne her turda koşar); yalnız kalem sekmesinin top listesi okur. */
+export interface ShelfRollExtras { batchNumber: string | null; warehouseName: string | null; statusChangedAt: Date | null }
+export async function loadShelfRollExtras(ids: string[]): Promise<Map<string, ShelfRollExtras>> {
+  if (ids.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<Array<ShelfRollExtras & { id: string }>>(Prisma.sql`
+    SELECT r.id, b."batchNumber" AS "batchNumber", w.name AS "warehouseName", r."statusChangedAt" AS "statusChangedAt"
+    FROM rolls r
+    LEFT JOIN batches b    ON b.id = r."batchId"
+    LEFT JOIN warehouses w ON w.id = r."warehouseId"
+    WHERE r.id = ANY(${ids}::uuid[])
+  `);
+  return new Map(rows.map((r) => [r.id, { batchNumber: r.batchNumber, warehouseName: r.warehouseName, statusChangedAt: r.statusChangedAt }]));
 }
 
 export async function getStockScorecard(): Promise<StockScorecard> {

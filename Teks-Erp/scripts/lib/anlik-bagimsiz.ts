@@ -80,6 +80,22 @@ export async function accuracyRows(now: Date): Promise<{ rows: AccuracyRow[]; sn
   rows.push({ soru: "mamul stok top sayısı", anlik: n(karne.bitmisAdet), sql: n(st?.cnt), panel: stockSvc.finishedCount, tol: 0 });
   rows.push({ soru: "pano: mamul stok metresi", anlik: n(get(s, "ozet.stok").bitmisMiktar), sql: n(st?.qty), panel: stockSvc.finishedQty, tol: 0.05 });
 
+  // 3b) Stok kalem anlığı: top listesi = raf kümesi; kalem satırlarının toplamı = toplam; ham yarı mamulü içermez.
+  const [rawSql] = await prisma.$queryRaw<Array<{ qty: number; cnt: number }>>(Prisma.sql`
+    SELECT COALESCE(SUM("currentQty"), 0)::float AS qty, COUNT(*)::int AS cnt FROM rolls
+    WHERE status::text = 'STOCK' AND "entrySource"::text <> 'SEMI_FINISHED' AND "shipmentId" IS NULL AND "sackId" IS NULL`);
+  const kalem = get(s, "stok-kalem") as Record<"ham" | "bitmis", { toplamTop: number; toplamMetre: number; kalemler: Obj[]; toplar: Obj[] }>;
+  const kalemSum = (k: "ham" | "bitmis", f: string) => kalem[k].kalemler.reduce((a, r) => a + n(r[f]), 0);
+  rows.push({ soru: "stok-kalem: bitmiş top listesi", anlik: kalem.bitmis.toplar.length, sql: n(st?.cnt), panel: stockSvc.finishedCount, tol: 0 });
+  rows.push({ soru: "stok-kalem: bitmiş kalemlerin top toplamı", anlik: kalemSum("bitmis", "top"), sql: n(st?.cnt), panel: stockSvc.finishedCount, tol: 0 });
+  rows.push({ soru: "stok-kalem: bitmiş metre", anlik: kalem.bitmis.toplamMetre, sql: n(st?.qty), panel: stockSvc.finishedQty, tol: 0.05 });
+  rows.push({ soru: "stok-kalem: ham top listesi", anlik: kalem.ham.toplar.length, sql: n(rawSql?.cnt), panel: stockSvc.rawCount, tol: 0 });
+  rows.push({ soru: "stok-kalem: ham metre", anlik: kalem.ham.toplamMetre, sql: n(rawSql?.qty), panel: stockSvc.rawQty, tol: 0.05 });
+  const topByKalem = new Map<string, number>();
+  for (const t of [...kalem.ham.toplar, ...kalem.bitmis.toplar]) topByKalem.set(String(t.kalem), (topByKalem.get(String(t.kalem)) ?? 0) + 1);
+  const kalemOff = [...kalem.ham.kalemler, ...kalem.bitmis.kalemler].filter((r) => topByKalem.get(String(r.anahtar)) !== n(r.top)).length;
+  rows.push({ soru: "stok-kalem: kalem top sayısı ≠ topları", anlik: kalemOff, sql: 0, panel: null, tol: 0 });
+
   // 4) İstasyon bazında üretim: kuyruk (anlık) ve bugün tamamlanan (iç istasyon: bugün çıkışı olan top).
   const stations = await DashboardService.getStationsLiveState();
   const flow = get(s, "uretim-akisi").istasyonlar as Obj[];

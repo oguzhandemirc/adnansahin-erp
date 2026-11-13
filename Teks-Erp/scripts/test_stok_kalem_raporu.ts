@@ -10,6 +10,11 @@
 //   §4 Kat adı katalogdan; katalogda olmayan kod aynen; katsız top `null`.
 //   §5 İKİNCİ TANIM YOK: servis statü/giriş kaynağı literali yazmaz, ortak
 //      yüklemleri (`isRawCell`/`isFinishedCell`/`loadShelfCells`) çağırır.
+//   §6 Kalem toplamları BAĞIMSIZ SQL ile aynı; kg metreden ayrı toplanır
+//      (tartısız kalem `null`); en eski yaş dolu.
+//   §7 Top listesi (`getStockKalemRolls`) aynı raf kümesi: sayısı = toplam,
+//      her kalemin topları satırın top/metre'sini verir; kalem süzgeci yalnız
+//      o kalemi döner.
 // Negatif sonda (commit mesajında): servisteki `isRawCell` → statü==="STOCK"
 // süzgeci yapıldı → §1/§2 (yarı mamul sızdı) ve §5 kırmızı.
 // =============================================================================
@@ -17,7 +22,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import prisma, { pool } from "../src/lib/prisma";
 import { getStockScorecard } from "../src/services/reports/stock-scorecard.report.service";
-import { getStockKalem } from "../src/services/reports/stock-kalem.report.service";
+import { getStockKalem, getStockKalemRolls } from "../src/services/reports/stock-kalem.report.service";
 import { loadFoldTypeCatalog } from "../src/services/helpers/fold-type";
 
 let pass = 0;
@@ -53,7 +58,7 @@ async function main(): Promise<void> {
   const mkRoll = async (o: {
     itemId: string; qty: number; status?: "WAREHOUSE" | "A1_STOCK" | "STOCK";
     colorId?: string; width?: number; foldType?: string | null;
-    entrySource?: "SUPPLIER_RECEIPT" | "SEMI_FINISHED"; shipmentId?: string;
+    entrySource?: "SUPPLIER_RECEIPT" | "SEMI_FINISHED"; shipmentId?: string; weightKg?: number;
   }) => {
     const r = await prisma.roll.create({
       data: {
@@ -61,6 +66,7 @@ async function main(): Promise<void> {
         status: o.status ?? "WAREHOUSE", entrySource: o.entrySource ?? "SUPPLIER_RECEIPT",
         barcode: `${TAG}-R${ids.rolls.length}`, colorId: o.colorId ?? null,
         width: o.width ?? null, foldType: o.foldType ?? null, shipmentId: o.shipmentId ?? null,
+        weightKg: o.weightKg ?? null,
       },
       select: { id: true },
     });
@@ -84,8 +90,8 @@ async function main(): Promise<void> {
   // Bitmiş: A/280/kırmızı/bilinen kat ×2 (WAREHOUSE + A1_STOCK aynı satır) · aynı spec katsız · aynı spec bilinmeyen kat
   //         A/300/kırmızı/bilinen kat (en farkı) · A/280/mavi/bilinen kat (renk farkı) · B ensiz renksiz katsız
   const knownCode = known?.code ?? "2-KAT";
-  await mkRoll({ itemId: itA, qty: 40, width: 280, colorId: red, foldType: knownCode });
-  await mkRoll({ itemId: itA, qty: 60, status: "A1_STOCK", width: 280, colorId: red, foldType: knownCode });
+  await mkRoll({ itemId: itA, qty: 40, width: 280, colorId: red, foldType: knownCode, weightKg: 8.5 });
+  await mkRoll({ itemId: itA, qty: 60, status: "A1_STOCK", width: 280, colorId: red, foldType: knownCode, weightKg: 12 });
   await mkRoll({ itemId: itA, qty: 25, width: 280, colorId: red, foldType: null });
   await mkRoll({ itemId: itA, qty: 15, width: 280, colorId: red, foldType: `${TAG}-KX` });
   await mkRoll({ itemId: itA, qty: 35, width: 300, colorId: red, foldType: knownCode });
@@ -93,7 +99,7 @@ async function main(): Promise<void> {
   await mkRoll({ itemId: itB, qty: 12 });
   await mkRoll({ itemId: itB, qty: 999, shipmentId: ship.id }); // sevkte → girmez
 
-  const [sc, k] = await Promise.all([getStockScorecard(), getStockKalem()]);
+  const [sc, k, tops] = await Promise.all([getStockScorecard(), getStockKalem(), getStockKalemRolls()]);
 
   // ── §1 Kutularla eşitlik (TÜM DB) ─────────────────────────────────────────
   console.log("── §1 Toplamlar Stok & Ölü Stok kutularıyla aynı ──");
@@ -147,6 +153,51 @@ async function main(): Promise<void> {
   const literals = ["\"WAREHOUSE\"", "\"A1_STOCK\"", "\"STOCK\"", "SEMI_FINISHED", "K18_DEAD_STATUSES", "$queryRaw", "prisma."].filter((l) => src.includes(l));
   check("§5a servis statü/giriş kaynağı literali ve kendi sorgusu yazmıyor", literals.length === 0, literals.join(", "));
   check("§5b ortak yüklemleri çağırıyor", ["loadShelfCells()", "filter(isRawCell)", "filter(isFinishedCell)"].every((s) => src.includes(s)));
+
+  // ── §6 Bağımsız SQL · kg · yaş ────────────────────────────────────────────
+  console.log("\n── §6 Kalem toplamları bağımsız SQL ile aynı ──");
+  const sqlRows = await prisma.$queryRaw<Array<{ sec: string; key: string; n: number; m: number }>>`
+    SELECT CASE WHEN r.status::text = 'STOCK' THEN 'ham' ELSE 'bitmis' END AS sec,
+           CASE WHEN r.status::text = 'STOCK' THEN r."itemId"::text
+                ELSE r."itemId"::text || '|' || COALESCE((r.width::float)::text, '') || '|' || COALESCE(r."colorId"::text, '') || '|' || COALESCE(r."foldType", '') END AS key,
+           COUNT(*)::int AS n, ROUND(SUM(r."currentQty")::numeric, 1)::float AS m
+    FROM rolls r
+    WHERE r."sackId" IS NULL AND r."shipmentId" IS NULL
+      AND (r.status::text IN ('WAREHOUSE', 'A1_STOCK') OR (r.status::text = 'STOCK' AND r."entrySource"::text <> 'SEMI_FINISHED'))
+    GROUP BY 1, 2`;
+  const sqlMap = new Map(sqlRows.map((r) => [`${r.sec}#${r.key}`, r]));
+  const svcRows = [...k.ham.map((r) => ({ sec: "ham", ...r })), ...k.bitmis.map((r) => ({ sec: "bitmis", ...r }))];
+  const mismatch = svcRows.filter((r) => { const q = sqlMap.get(`${r.sec}#${r.key}`); return !q || q.n !== r.count || q.m !== r.qty; });
+  check("§6a her kalem satırı bağımsız SQL'deki grupla aynı top/metre", mismatch.length === 0 && sqlRows.length === svcRows.length,
+    `${svcRows.length} satır · SQL ${sqlRows.length} · fark ${mismatch.length}${mismatch[0] ? " " + JSON.stringify(mismatch[0]) : ""}`);
+  check("§6b kg metreden ayrı toplanır (8,5 + 12 = 20,5)", main1?.kg === 20.5, `${main1?.kg}`);
+  check("§6c tartısız kalemin kg'si null (sıfır değil)", find(300, red, knownCode)?.kg === null);
+  check("§6d en eski yaş dolu (yeni top ≈ 0 gün)", main1?.oldestDays != null && main1.oldestDays >= 0 && main1.oldestDays < 1, `${main1?.oldestDays}`);
+
+  // ── §7 Top listesi ────────────────────────────────────────────────────────
+  console.log("\n── §7 Top listesi aynı raf kümesi ──");
+  check("§7a top sayısı = toplam (ham)", tops.ham.length === k.totals.hamCount, `${tops.ham.length} / ${k.totals.hamCount}`);
+  check("§7b top sayısı = toplam (bitmiş)", tops.bitmis.length === k.totals.bitmisCount, `${tops.bitmis.length} / ${k.totals.bitmisCount}`);
+  const sumBy = (xs: typeof tops.bitmis) => {
+    const m = new Map<string, { n: number; q: number }>();
+    for (const t of xs) {
+      const e = m.get(t.kalemKey) ?? { n: 0, q: 0 };
+      e.n += 1;
+      e.q += t.qty;
+      m.set(t.kalemKey, e);
+    }
+    return m;
+  };
+  const hamBy = sumBy(tops.ham);
+  const bitBy = sumBy(tops.bitmis);
+  const off = [...k.ham.map((r) => [r, hamBy.get(r.key)] as const), ...k.bitmis.map((r) => [r, bitBy.get(r.key)] as const)]
+    .filter(([r, t]) => !t || t.n !== r.count || r1(t.q) !== r.qty);
+  check("§7c her kalemin topları satırın top/metre'sini verir", off.length === 0, `${off.length} fark`);
+  const only = await getStockKalemRolls({ section: "bitmis", kalemKey: main1?.key });
+  check("§7d kalem süzgeci yalnız o kalemin 2 topunu döner (ham boş)",
+    only.ham.length === 0 && only.bitmis.length === 2 && only.bitmis.every((t) => t.kalemKey === main1?.key), `${only.ham.length}/${only.bitmis.length}`);
+  check("§7e top satırı fikstür barkodunu ve kg'yi taşır", only.bitmis.some((t) => (t.barcode ?? "").startsWith(TAG) && t.weightKg === 12));
+  check("§7f yarı mamul/sevkteki top listede yok", !tops.ham.concat(tops.bitmis).some((t) => t.qty === 77 || t.qty === 999));
 }
 
 main()
