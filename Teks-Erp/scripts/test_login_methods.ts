@@ -119,7 +119,7 @@ async function main() {
     await systemSettingService.setFeatureFlags(
       { loginMethods: { enabled: ["list", "pin", "card"], primary: "pin" } }, admin.id);
     const auto = await PermissionManagementService.createUser(
-      { username: `test-qpin-auto-${ts}`, fullName: "TEST Auto", password: "123456" },
+      { username: `test-qpin-auto-${ts}`, fullName: "TEST Auto", password: "Bekci-Parola-2026x" },
       admin.id,
     );
     created.push(auto.id);
@@ -131,7 +131,7 @@ async function main() {
     await systemSettingService.setFeatureFlags(
       { loginMethods: { enabled: ["list", "card"], primary: "card" } }, admin.id);
     const cardOnly = await PermissionManagementService.createUser(
-      { username: `test-qpin-card-${ts}`, fullName: "TEST CardOnly", password: "123456" },
+      { username: `test-qpin-card-${ts}`, fullName: "TEST CardOnly", password: "Bekci-Parola-2026x" },
       admin.id,
     );
     created.push(cardOnly.id);
@@ -142,7 +142,7 @@ async function main() {
     // 12) generateMobileCredentials=false → kimlik üretilmez (web kullanıcısı)
     const web = await PermissionManagementService.createUser(
       {
-        username: `test-qpin-web-${ts}`, fullName: "TEST Web", password: "123456",
+        username: `test-qpin-web-${ts}`, fullName: "TEST Web", password: "Bekci-Parola-2026x",
         grantOperatorDefaults: false, generateMobileCredentials: false,
       },
       admin.id,

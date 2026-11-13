@@ -8,7 +8,6 @@
 import prisma from "../lib/prisma";
 import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
-import bcrypt from "bcryptjs";
 import { AppError } from "../utils/app-error";
 import { AuditService } from "./audit.service";
 import { AuthService } from "./auth.service";
@@ -16,6 +15,7 @@ import { readLoginMethods } from "./system-setting.service";
 import { SessionRegistryService } from "./session-registry.service";
 import { foldNameForCompare } from "./helpers/name-normalize.helper";
 import { readPatronCloudUserId } from "./helpers/patron-cloud-user.helper";
+import { hashNewPassword } from "./helpers/password-policy.helper";
 
 /** Yetki (son-admin) guard'ı advisory lock namespace'i (F-KIM-GUV-003). Tek anahtar:
  *  guard sistem geneli tek bir seri kapıdır, kullanıcı başına DEĞİL. */
@@ -457,14 +457,15 @@ export class PermissionManagementService {
   ) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, username: true },
+      select: { id: true, username: true, fullName: true },
     });
     if (!user) throw AppError.notFound("Kullanıcı bulunamadı");
-    if (newPassword.length < 6) {
-      throw AppError.badRequest("Şifre en az 6 karakter olmalı");
-    }
 
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+    // Parola kuralı TEK helper'da (≥ 10 karakter + yaygın/kişisel parola yasağı).
+    const passwordHash = await hashNewPassword(newPassword, {
+      username: user.username,
+      fullName: user.fullName,
+    });
     // Şifre sıfırlandı → mevcut tüm oturumları düşür (tokenVersion bump).
     await prisma.user.update({
       where: { id: userId },
@@ -524,7 +525,11 @@ export class PermissionManagementService {
         })
       : [];
 
-    const passwordHash = await bcrypt.hash(input.password, 10);
+    // Parola kuralı TEK helper'da — kullanıcı yaratılmadan ÖNCE.
+    const passwordHash = await hashNewPassword(input.password, {
+      username: input.username,
+      fullName: input.fullName,
+    });
     const user = await prisma.user.create({
       data: {
         // ⚠️ SELF-RELATION: "bu hesabı KİM açtı" — ISO 27001 açısından anlamlı.

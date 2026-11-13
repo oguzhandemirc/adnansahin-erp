@@ -293,7 +293,9 @@ const createUserSchema = z.object({
     .max(40)
     .regex(/^[a-zA-Z0-9]+$/, "Yalnız İngilizce harf ve rakam kullanılabilir (özel karakter, boşluk ve Türkçe karakter yok)"),
   fullName: z.string().trim().min(1, "Ad-soyad gerekli").max(120),
-  password: z.string().min(6, "Şifre en az 6 karakter"),
+  // Uzunluk/yaygın parola kuralı serviste TEK helper'dadır (`password-policy.helper.ts`);
+  // burada yalnız şekil — iki ayrı eşik ayrışmasın.
+  password: z.string().min(1, "Parola gerekli").max(200),
   isActive: z.boolean().optional(),
   // Varsayılan üretim istasyon izinlerini (KK1/KK2/Tambur) ver — default true (saha
   // operatörü). Web/admin kullanıcısı açarken false gönderilir (temiz başlar).
@@ -697,7 +699,8 @@ router.delete(
 );
 
 const resetPasswordSchema = z.object({
-  password: z.string().min(6, "Şifre en az 6 karakter olmalı"),
+  // Kural serviste TEK helper'da (`password-policy.helper.ts`); burada yalnız şekil.
+  password: z.string().min(1, "Parola gerekli").max(200),
 });
 
 /**

@@ -509,7 +509,11 @@ export class AuthService {
   }
 
   /**
-   * Hash a plain-text password.
+   * KURALSIZ parola hash'i — YALNIZ bekçi/geliştirme fixture'ları içindir
+   * (`scripts/test_*`, `e2e-ortam.ts`). Üretim yolu kullanıcı parolasını
+   * `helpers/password-policy.helper.ts` → `hashNewPassword` ile yazar (kural +
+   * hash tek çağrı); `src/` içinden bu fonksiyonu çağırmak bekçi
+   * `test_password_policy` ile KIRMIZIDIR.
    */
   static async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 10);

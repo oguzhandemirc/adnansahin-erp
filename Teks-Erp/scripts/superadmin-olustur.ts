@@ -43,7 +43,7 @@ import { createInterface } from "node:readline/promises";
 import bwipjs from "bwip-js";
 
 import prisma, { pool } from "../src/lib/prisma";
-import { AuthService } from "../src/services/auth.service";
+import { checkPasswordPolicy, hashNewPassword } from "../src/services/helpers/password-policy.helper";
 import { buildOtpauthUri, generateTotpSecret } from "../src/services/totp.service";
 import {
   SYSTEM_ACCOUNT_FULLNAME,
@@ -59,9 +59,6 @@ const TOTP_ISSUER = "TeksERP";
 const PIN_RE = /^\d{6}$/;
 /** Kullanıcı adı: boşluksuz, ASCII, giriş kutusuna elle yazılabilir. */
 const USERNAME_RE = /^[A-Za-z0-9._-]{3,50}$/;
-/** bcrypt 72 BAYT'tan sonrasını sessizce kırpar → sınır BAYT cinsinden. */
-const PASSWORD_MIN = 8;
-const PASSWORD_MAX_BYTES = 72;
 /** PIN üretim denemesi — `quickPin` sistem genelinde `@unique`. */
 const PIN_TRY = 60;
 
@@ -119,7 +116,9 @@ export type ProvisionResult =
   | { kind: "error"; code: ProvisionErrorCode; message: string };
 
 export const defaultProvisionDeps: ProvisionDeps = {
-  hashPassword: (plain) => AuthService.hashPassword(plain),
+  // Kural + hash TEK helper'da (`password-policy.helper.ts`) — kural `parolaKusuru`nda
+  // kullanıcı adıyla ZATEN ölçüldü; burada ikinci kez (kullanıcı adısız) ölçülmesi zararsız.
+  hashPassword: (plain) => hashNewPassword(plain),
   // 6 hane — baştaki sıfır da meşru (PIN bir SAYI değil, bir dizidir).
   randomPin: () =>
     String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0"),
@@ -132,18 +131,13 @@ function hata(code: ProvisionErrorCode, message: string): ProvisionResult {
   return { kind: "error", code, message };
 }
 
-/** Parola sözleşmesi — bcrypt'in sessiz kırpması yüzünden ÜST sınır da var. */
-function parolaKusuru(password: string): string | null {
-  if (password.length < PASSWORD_MIN) {
-    return `Parola en az ${PASSWORD_MIN} karakter olmalı.`;
-  }
-  if (Buffer.byteLength(password, "utf8") > PASSWORD_MAX_BYTES) {
-    return (
-      `Parola ${PASSWORD_MAX_BYTES} BAYT'ı aşıyor — bcrypt fazlasını SESSİZCE kırpar ` +
-      "(Türkçe harfler 2 bayt sayılır)."
-    );
-  }
-  return null;
+/**
+ * Parola sözleşmesi — fabrikanın TEK parola kuralı (`password-policy.helper.ts`):
+ * ≥ 10 karakter, ≤ 72 bayt (bcrypt sessiz kırpar), yaygın/kişisel parola yasak.
+ * Mesaj parolayı taşımaz.
+ */
+function parolaKusuru(password: string, username: string): string | null {
+  return checkPasswordPolicy(password, { username })?.message ?? null;
 }
 
 /**
@@ -211,7 +205,7 @@ export async function provisionSuperadmin(
         "Kurulu satıcı hesabı yok — önce `--rotate` olmadan çalıştırın.",
       );
     }
-    const parolaHata = parolaKusuru(input.password);
+    const parolaHata = parolaKusuru(input.password, mevcut.username);
     if (parolaHata) return hata("PASSWORD_INVALID", parolaHata);
 
     const pinSonuc = await pinCoz(input.pin, deps, mevcut.id);
@@ -291,7 +285,7 @@ export async function provisionSuperadmin(
     );
   }
 
-  const parolaHata = parolaKusuru(input.password);
+  const parolaHata = parolaKusuru(input.password, username);
   if (parolaHata) return hata("PASSWORD_INVALID", parolaHata);
 
   const pinSonuc = await pinCoz(input.pin, deps, null);

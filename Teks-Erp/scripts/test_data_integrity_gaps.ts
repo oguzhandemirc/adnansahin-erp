@@ -88,11 +88,11 @@ async function main() {
 
     // --- 4) Kullanıcı adı harf-duyarsız ---
     const u1 = await PermissionManagementService.createUser(
-      { username: `TdgUser${sfx}`, fullName: "TDG User", password: "test123", grantOperatorDefaults: false, generateMobileCredentials: false }, undefined);
+      { username: `TdgUser${sfx}`, fullName: "TDG User", password: "Bekci-Parola-2026x", grantOperatorDefaults: false, generateMobileCredentials: false }, undefined);
     made.userIds.push((u1 as { id: string }).id);
     await expectReject("Kullanıcı adı: harf-duyarsız mükerrer 409",
       () => PermissionManagementService.createUser(
-        { username: `tdguser${sfx}`, fullName: "TDG User 2", password: "test123", grantOperatorDefaults: false, generateMobileCredentials: false }, undefined), "kullanıcı adı");
+        { username: `tdguser${sfx}`, fullName: "TDG User 2", password: "Bekci-Parola-2026x", grantOperatorDefaults: false, generateMobileCredentials: false }, undefined), "kullanıcı adı");
 
     // --- 5) Şube: salt-boşluk ad + kod mükerrer ---
     await expectReject("Şube: salt-boşluk ad reddi",
