@@ -47,7 +47,7 @@ async function resolveLinked(router: TesisDbRouter, key: FacilityDbKey, identity
   const emails = new Set<string>();
   const accounts: Route[] = [];
   for (const r of [...routes].sort((x, y) => x.tesisId.localeCompare(y.tesisId))) {
-    let a: { status: string; identityId: string | null; email: string } | null;
+    let a: { status: string; identityId: string | null; email: string | null } | null;
     try {
       a = await withTesis(router, { tesisId: r.tesisId }, (tx) => tx.account.findUnique({ where: { id: r.accountId }, select: { status: true, identityId: true, email: true } }));
     } catch (err) {
@@ -56,7 +56,8 @@ async function resolveLinked(router: TesisDbRouter, key: FacilityDbKey, identity
       throw err;
     }
     if (!accountEngagedTo(a, identityId)) continue;
-    emails.add(normalizeEmail(a!.email));
+    if (a?.email == null) continue; // fabrika hesabı kimliğe bağlanmaz
+    emails.add(normalizeEmail(a.email));
     accounts.push(r);
   }
   if (accounts.length === 0) return { kind: "bagsiz" };

@@ -8,8 +8,9 @@
 //   §3 tesis A kapsamında B'nin satırı görünmez (liste, kimlikle doğrudan, projeksiyon) · WITH CHECK:
 //      A kapsamında B'ye yazılamaz · ön-kiracı arama yalnız TEK anahtarlı satırı açar.
 //   §4 alan izni (RESTRICTIVE): izinsiz alt satır (`cari-kart.kisisel`) doğrudan SQL'le de 0 satır.
-//   §5 rol ayrımı: uygulama rolü projeksiyona YAZAMAZ; eşitleme rolü hesap tablosunu OKUYAMAZ — tek istisna gelen
-//      kutusu claim'inin yazar sorgusu (`accounts`ta yalnız kimlik · tesis · durum · izin; e-posta, ad ve sırlar RED);
+//   §5 rol ayrımı: uygulama rolü projeksiyona YAZAMAZ; eşitleme rolü hesap tablosunu bütünüyle OKUYAMAZ — yalnız
+//      fabrika kolonlarını (gelen kutusu yazar sorgusu + kullanıcı kümesi, C1) okur; e-posta, kimlik bağı, davet
+//      sırrı, son giriş RED;
 //      uygulama rolü denetim satırında yalnız `summary`yi (IP alanı silmesi) güncelleyebilir.
 //   §6 kapsam yardımcısı: sıfır UUID / biçimsiz tesis / `*` projeksiyon REDDEDİLİR.
 //   §7 açılış kapısı: RLS'i atlayabilen rol (göç rolü = süper kullanıcı) ile sunucu KALKMAZ.
@@ -190,12 +191,12 @@ async function rolAyrimi(o: Ortam, a: { tesisId: string }): Promise<void> {
     kontrol("§5b eşitleme rolü hesap tablosunu OKUYAMAZ", oku.hata && /permission denied/i.test(oku.mesaj), oku.mesaj.slice(0, 60));
     const yazar = await kapsamda(sync, { "app.tesis_id": a.tesisId }, () => hataVerir(sync, "SELECT id, tesis_id, status, permissions FROM accounts"));
     const kimlik: string[] = [];
-    for (const kolon of ["email", "name", "identity_id", "invite_token_hash", "last_login_at"]) {
+    for (const kolon of ["email", "identity_id", "invite_token_hash", "last_login_at", "invite_expires_at", "created_by_id"]) {
       const r = await kapsamda(sync, { "app.tesis_id": a.tesisId }, () => hataVerir(sync, `SELECT ${kolon} FROM accounts`));
       if (!(r.hata && /permission denied/i.test(r.mesaj))) kimlik.push(kolon);
     }
     kontrol(
-      "§5b2 ⭐ eşitleme rolü `accounts`ta YALNIZ kimlik · tesis · durum · izin okur (gelen kutusu yazar sorgusu); e-posta · ad · kimlik bağı · davet sırrı · son giriş RED",
+      "§5b2 ⭐ eşitleme rolü `accounts`ta YALNIZ fabrika kolonlarını okur (gelen kutusu yazar sorgusu + kullanıcı kümesi); e-posta · kimlik bağı · davet sırrı · son giriş RED",
       !yazar.hata && yazar.satir >= 1 && kimlik.length === 0,
       yazar.hata ? yazar.mesaj.slice(0, 60) : kimlik.join(",") || `${yazar.satir} satır`,
     );

@@ -4,7 +4,8 @@
 //   §1 şema: eski çok-DB/destek nesneleri YOK (`facility_databases` · `facility_destructions` · `support_access`
 //      tabloları, `destek_*` fonksiyonları, `destek_kapisi` politikası).
 //   §2 göç · uygulama · eşitleme rolü AYNI DB'ye bağlanır; uygulama ve eşitleme rolü göç rolünden FARKLIDIR.
-//   §3 rol ayrımı: uygulama rolü `projection_rows`a YAZAMAZ; eşitleme rolü `accounts`a INSERT/UPDATE YAPAMAZ ve
+//   §3 rol ayrımı: uygulama rolü `projection_rows`a YAZAMAZ; eşitleme rolü `accounts`ın UYGULAMA kolonlarına (e-posta)
+//      INSERT/UPDATE YAPAMAZ (fabrika kolonları onundur — C1, bekçi test_kullanici_esitleme) ve
 //      `identities`i OKUYAMAZ / YAZAMAZ (hepsi permission denied).
 //   §4 tek tesis: `assertSingleFacility` başka tesis kayıtlıyken 409 `DURUM_CAKISMASI`, aynı tesisle geçer; CLI
 //      `tesis.ts tesis-ac` ikinci tesiste çıkış 1 + satır DOĞMAZ, aynı tesisle yeniden koşum 0.
@@ -112,9 +113,9 @@ async function rolAyrimi(o: Ortam, tesisId: string): Promise<void> {
   const sync = await istemci(tesisUrl(o, tesisId, "esitleme"));
   try {
     const ekle = await dene(sync, tesisId, "INSERT INTO accounts (id, tesis_id, email, name, permissions, status) VALUES (gen_random_uuid(), $1, 'sonda@ornek.invalid', 'Sonda', '{}', 'AKTIF')", [tesisId]);
-    kontrol("§3b eşitleme rolü accounts'a INSERT YAPAMAZ", yetkisiz(ekle), ekle.mesaj.slice(0, 70) || "EKLEDİ");
-    const guncelle = await dene(sync, tesisId, "UPDATE accounts SET status = status WHERE tesis_id = $1", [tesisId]);
-    kontrol("§3c eşitleme rolü accounts'u UPDATE EDEMEZ", yetkisiz(guncelle), guncelle.mesaj.slice(0, 70) || "GÜNCELLEDİ");
+    kontrol("§3b eşitleme rolü accounts'a e-postalı satır INSERT YAPAMAZ", yetkisiz(ekle), ekle.mesaj.slice(0, 70) || "EKLEDİ");
+    const guncelle = await dene(sync, tesisId, "UPDATE accounts SET email = email WHERE tesis_id = $1", [tesisId]);
+    kontrol("§3c eşitleme rolü accounts'un e-posta kolonunu UPDATE EDEMEZ", yetkisiz(guncelle), guncelle.mesaj.slice(0, 70) || "GÜNCELLEDİ");
     const oku = await dene(sync, tesisId, "SELECT id FROM identities LIMIT 1");
     kontrol("§3d eşitleme rolü identities'i OKUYAMAZ", yetkisiz(oku), oku.mesaj.slice(0, 70) || "OKUDU");
     const kimlikEkle = await dene(sync, tesisId, "INSERT INTO identities (id, email_digest) VALUES (gen_random_uuid(), 'sonda')");

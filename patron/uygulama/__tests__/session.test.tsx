@@ -53,7 +53,7 @@ function server(url: string, init: RequestInit): Promise<Response> {
   const key = `${init.method} ${path}`;
   if (key === "POST /oturum/ac") {
     if (oldServer && body.tesisId !== undefined) return reply(400, null, "GECERSIZ_ISTEK");
-    const kimlik = body.eposta === "baska@x.test" ? "h2" : "h1";
+    const kimlik = body.kullaniciAdi === "baska" ? "h2" : "h1";
     const r = { belirtec: kimlik === "h2" ? "c1" : "b1", bitis: "2026-10-16T00:00:00Z", hesap: hesap(kimlik), tesisId: "t1" };
     return reply(200, oldServer ? r : { ...r, tesisler: TESISLER });
   }
@@ -84,8 +84,8 @@ async function boot() {
   render(<SessionProvider><Probe /></SessionProvider>);
   await waitFor(() => expect(cur.phase).toBe("giris"));
 }
-async function login(eposta = "patron@x.test") {
-  await act(async () => cur.login({ eposta, parola: "p", totp: "123456" }));
+async function login(kullaniciAdi = "patron") {
+  await act(async () => cur.login({ kullaniciAdi, parola: "p", totp: "123456" }));
 }
 const cacheKeys = () => [...mockPlain.m.keys()].filter((k) => k.startsWith("patron:onbellek:"));
 
@@ -140,7 +140,7 @@ describe("çok tesisli oturum", () => {
     await boot();
     mockPlain.m.set("patron:onbellek:t9:h9:pano", "{}");
     mockPlain.m.set("patron:onbellek:t2:h1:oturum", "{}");
-    await login("baska@x.test");
+    await login("baska");
     expect(cacheKeys().filter((k) => !k.startsWith("patron:onbellek:t1:h2:"))).toEqual([]);
   });
 

@@ -200,8 +200,18 @@ model Account {
   tesisId          String        @map("tesis_id") @db.Uuid
   /// Tekillik kısmi indekslerle (temel göç): AKTIF · KILITLI hesapta (bulut geneli tekillik `identities.email_digest`);
   /// tesis içinde PASİF olmayan hesapta. Davet ve arşiv e-postayı tutmaz.
-  email            String        @map("email") @db.VarChar(254)
-  name             String        @map("name") @db.VarChar(120)
+  /// Eski e-posta hesabı (C4'te kalkar); fabrika hesabında NULL. CHECK: e-posta ya da kullanıcı adı dolu.
+  email            String?       @map("email") @db.VarChar(254)
+  name             String        @map("name") @db.VarChar(200)
+  /// FABRİKA HESABI (üyelik = Electron şifresi): id = fabrika `users.id`; kullanıcı adı küçük harf, PASİF olmayan
+  /// hesaplarda tekil (ertelenmiş dışlama, göç `20261113220000`). Bu kolonları + ad · izin · durum · kapanış YALNIZ
+  /// eşitleme rolü yazar (`POST /v1/kullanicilar`); uygulama rolü okur, yalnız `last_login_at` yazar (eski hesap C4'e dek hariç).
+  kullaniciAdi     String?       @map("kullanici_adi") @db.VarChar(50)
+  /// Fabrikanın bcrypt özeti, SecretBox ile MÜHÜRLÜ (AAD = hesap id). PASİF ⇒ NULL. Log/denetime GİRMEZ.
+  passwordSealed   String?       @map("parola_ozeti") @db.VarChar(300)
+  /// Parola özeti her değiştiğinde +1; oturum açıldığı sürümü taşır (C3: küçükse 401). Varsayılan DB'de
+  /// (`dbgenerated`): istemci INSERT'e koymaz — uygulama rolünün bu kolona INSERT yetkisi yoktur.
+  identityVersion  Int           @default(dbgenerated("0")) @map("kimlik_surumu")
   /// Kimlik (`identities.id`; FK yok). CHECK: AKTIF · KILITLI ⇒ dolu. Parola/TOTP kimliktedir.
   identityId       String?       @map("identity_id") @db.Uuid
   permissions      String[]      @map("permissions")
@@ -217,28 +227,54 @@ model Account {
   createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-  facility Facility  @relation(fields: [tesisId], references: [tesisId], onDelete: Restrict)
+  facility Facility       @relation(fields: [tesisId], references: [tesisId], onDelete: Restrict)
   sessions Session[]
+  factors  AccountFactor?
 
   @@index([tesisId])
   @@index([email])
   @@map("accounts")
 }
 
+/// Hesabın ikinci etkeni — UYGULAMANIN MALI (eşitleme rolü HİÇ erişemez): TOTP sırrı SecretBox ile mühürlü (AAD =
+/// hesap id), son adım, açılış anı; `bulut_kilidi` = bulutta acil kilit (fabrika kapalıyken CLI). CHECK: açık TOTP ⇒ sır + adım.
+model AccountFactor {
+  accountId          String    @id @map("account_id") @db.Uuid
+  tesisId            String    @map("tesis_id") @db.Uuid
+  totpSecretSealed   String?   @map("totp_secret_sealed") @db.VarChar(300)
+  totpLastStep       Int?      @map("totp_last_step")
+  totpEnabledAt      DateTime? @map("totp_enabled_at") @db.Timestamptz
+  cloudLock          Boolean   @default(false) @map("bulut_kilidi")
+  /// Kaba kuvvet tavanı (C3): `failureWindowStart`tan bu yana başarısız giriş sayısı (sabit 24 sa pencere; tavanı
+  /// aşınca sayaç sıfırlanır ve `tempLockUntil` dolar). Açık oturumlara dokunmaz (uzaktan oturum düşürme olmasın).
+  failureCount       Int       @default(0) @map("basarisiz_sayisi")
+  failureWindowStart DateTime? @map("basarisiz_pencere") @db.Timestamptz
+  tempLockUntil      DateTime? @map("gecici_kilit_bitis") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([tesisId])
+  @@map("account_factors")
+}
+
 /// Oturum — TELEMETRİ sınıfı (iş kararı okumaz; kapanış/bitişten sonra budanır). Belirteç düz
 /// saklanmaz (sha256). Taşıma: `Authorization: Bearer` (çerez yok → CSRF yüzeyi yok).
 model Session {
-  id          String              @id @default(uuid()) @db.Uuid
-  tesisId     String              @map("tesis_id") @db.Uuid
-  accountId   String              @map("account_id") @db.Uuid
-  tokenHash   String              @unique @map("token_hash") @db.VarChar(64)
-  client      String?             @map("client") @db.VarChar(20)
-  lastUsedAt  DateTime            @map("last_used_at") @db.Timestamptz
-  expiresAt   DateTime            @map("expires_at") @db.Timestamptz
-  closedAt    DateTime?           @map("closed_at") @db.Timestamptz
-  closeReason SessionCloseReason? @map("close_reason")
-  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+  id              String              @id @default(uuid()) @db.Uuid
+  tesisId         String              @map("tesis_id") @db.Uuid
+  accountId       String              @map("account_id") @db.Uuid
+  tokenHash       String              @unique @map("token_hash") @db.VarChar(64)
+  client          String?             @map("client") @db.VarChar(20)
+  lastUsedAt      DateTime            @map("last_used_at") @db.Timestamptz
+  expiresAt       DateTime            @map("expires_at") @db.Timestamptz
+  closedAt        DateTime?           @map("closed_at") @db.Timestamptz
+  closeReason     SessionCloseReason? @map("close_reason")
+  /// Açıldığı andaki `accounts.kimlik_surumu` (parola değişince eski oturum geçersiz).
+  identityVersion Int                 @default(0) @map("kimlik_surumu")
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
@@ -497,20 +533,22 @@ model PackageReceipt {
 
 /// Tesisin eşitleme durumu ("son eşitleme" damgası, sözleşme uyarısı, takılan ufuk).
 model SyncState {
-  tesisId            String   @id @map("tesis_id") @db.Uuid
-  lastPackageAt      DateTime @map("last_package_at") @db.Timestamptz
-  lastInstallationId String   @map("last_installation_id") @db.Uuid
-  contractVersion    Int      @map("contract_version")
-  appVersion         String?  @map("app_version") @db.VarChar(40)
-  horizon            DateTime @map("horizon") @db.Timestamptz
-  horizonChangedAt   DateTime @map("horizon_changed_at") @db.Timestamptz
-  contractWarning    String?  @map("contract_warning") @db.VarChar(40)
+  tesisId            String    @id @map("tesis_id") @db.Uuid
+  lastPackageAt      DateTime  @map("last_package_at") @db.Timestamptz
+  lastInstallationId String    @map("last_installation_id") @db.Uuid
+  contractVersion    Int       @map("contract_version")
+  appVersion         String?   @map("app_version") @db.VarChar(40)
+  horizon            DateTime  @map("horizon") @db.Timestamptz
+  horizonChangedAt   DateTime  @map("horizon_changed_at") @db.Timestamptz
+  contractWarning    String?   @map("contract_warning") @db.VarChar(40)
   /// Değişim sayacı (iş hesabı DEĞİL): kabul edilen veriyle biten her pakette +1; uzun yoklamanın `sayac`ı.
-  changeCounter      BigInt   @default(0) @map("change_counter")
+  changeCounter      BigInt    @default(0) @map("change_counter")
   /// Son artıştaki projeksiyon adları (tekil); içerik taşımaz, okuyan hesabın izniyle süzülür.
-  changedProjections Json     @default("[]") @map("changed_projections")
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  changedProjections Json      @default("[]") @map("changed_projections")
+  /// Fabrikanın son kullanıcı kümesi gönderimi (`POST /v1/kullanicilar`, C3 bayatlık tavanı). NULL ⇒ giriş yok.
+  usersPushedAt      DateTime? @map("kullanici_son_esitleme") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("sync_state")
 }

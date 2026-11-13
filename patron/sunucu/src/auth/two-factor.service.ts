@@ -1,12 +1,14 @@
 // İKİ ADIMLI DOĞRULAMA (TOTP) — İSTEĞE BAĞLI, kimliğin kendi seçimi. Aç: parola → sır (YALNIZ yanıtta) → ilk kodla ONAY;
 // onaysız açık sayılmaz. Kapat: parola + güncel kod. Telefon kaybında tek yol satıcı CLI'si (`tesis.ts dogrulama-kapat`).
-// Her adım denetime yazılır; sır ve kod denetime/günlüğe girmez.
+// Her adım denetime yazılır; sır ve kod denetime/günlüğe girmez. FABRİKA HESABI (C3, `kullaniciAdi` dolu) aynı kurallarla
+// `account_factors`ta yürür (`factory-factors.ts`); eski e-posta kimliği C4'te kalkar.
 import type { Identity } from "@prisma/client";
 import { accountActor, recordAudit } from "../lib/audit";
 import { CloudError, stateConflict } from "../lib/errors";
 import { withCentral } from "../lib/tenant";
 import type { CloudContext } from "../services/context";
 import type { TwoFactorSetup, TwoFactorStatus } from "../wire/api";
+import { beginFactoryTwoFactor, confirmFactoryTwoFactor, disableFactoryTwoFactor, factoryTwoFactorStatus } from "./factory-factors";
 import { totpStepClaim, twoFactorOn, verifyOwnFactors, wrongFactors, type SessionContext } from "./session.service";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "./totp";
 
@@ -27,11 +29,13 @@ const audit = (ctx: CloudContext, s: SessionContext, event: string) =>
   recordAudit(ctx.app, { tesisId: s.tesisId, actor: accountActor(s.accountId), event, entity: "Account", entityId: s.accountId });
 
 export async function twoFactorStatus(ctx: CloudContext, s: SessionContext): Promise<TwoFactorStatus> {
+  if (s.kullaniciAdi !== null) return factoryTwoFactorStatus(ctx, s);
   return statusOf(await ownIdentity(ctx, s));
 }
 
 /** Kurulumu başlatır (parola): yeni sır onay bekler; tekrar başlatma önceki onaysız sırrı değiştirir. */
 export async function beginTwoFactor(ctx: CloudContext, s: SessionContext, g: { password: string; ip: string | null }): Promise<TwoFactorSetup> {
+  if (s.kullaniciAdi !== null) return beginFactoryTwoFactor(ctx, s, g);
   if (twoFactorOn(await ownIdentity(ctx, s))) throw alreadyOn();
   const { identity } = await verifyOwnFactors(ctx, s, { password: g.password, ip: g.ip });
   const secret = generateTotpSecret();
@@ -45,6 +49,7 @@ export async function beginTwoFactor(ctx: CloudContext, s: SessionContext, g: { 
 
 /** İlk kodla onay: doğrulanınca AÇIK olur (atomik claim — onaylanan sır, kurulum sırasında değişmediyse). */
 export async function confirmTwoFactor(ctx: CloudContext, s: SessionContext, g: { totp: string }): Promise<TwoFactorStatus> {
+  if (s.kullaniciAdi !== null) return confirmFactoryTwoFactor(ctx, s, g);
   const identity = await ownIdentity(ctx, s);
   if (twoFactorOn(identity)) throw alreadyOn();
   if (!identity.totpSecretSealed) throw stateConflict("Önce iki adımlı doğrulama kurulumunu başlatın");
@@ -66,6 +71,7 @@ export async function confirmTwoFactor(ctx: CloudContext, s: SessionContext, g: 
 
 /** Kapatma: parola + güncel kod (adım iddiası atomik — aynı kod ikinci kez geçmez). */
 export async function disableTwoFactor(ctx: CloudContext, s: SessionContext, g: { password: string; totp?: string | undefined; ip: string | null }): Promise<TwoFactorStatus> {
+  if (s.kullaniciAdi !== null) return disableFactoryTwoFactor(ctx, s, g);
   if (!twoFactorOn(await ownIdentity(ctx, s))) throw stateConflict("İki adımlı doğrulama zaten kapalı");
   const { identity, step } = await verifyOwnFactors(ctx, s, { password: g.password, totp: g.totp, ip: g.ip });
   if (step === null) throw stateConflict("İki adımlı doğrulama zaten kapalı");

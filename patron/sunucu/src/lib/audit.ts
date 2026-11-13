@@ -23,7 +23,8 @@ export interface AuditEntry {
 export async function recordAudit(db: TesisDbRouter, entry: AuditEntry): Promise<void> {
   try {
     await withTesis(db, { tesisId: entry.tesisId }, (tx) =>
-      tx.accountAudit.create({
+      // createMany (RETURNING yok): eşitleme rolü denetime yalnız EKLER, okuyamaz.
+      tx.accountAudit.createMany({
         data: {
           tesisId: entry.tesisId,
           actor: entry.actor,
@@ -37,6 +38,28 @@ export async function recordAudit(db: TesisDbRouter, entry: AuditEntry): Promise
   } catch (err) {
     failures++;
     console.error(`[patron] denetim yazılamadı (${entry.event}): ${(err as Error).message}`);
+  }
+}
+
+/** Toplu ayak izi (fabrika kullanıcı kümesi): tek kiracı kapsamında tek INSERT; best-effort, iş tx'inin DIŞINDA. */
+export async function recordAuditMany(db: TesisDbRouter, tesisId: string, entries: readonly AuditEntry[]): Promise<void> {
+  if (entries.length === 0) return;
+  try {
+    await withTesis(db, { tesisId }, (tx) =>
+      tx.accountAudit.createMany({
+        data: entries.map((e) => ({
+          tesisId,
+          actor: e.actor,
+          event: e.event,
+          entity: e.entity,
+          entityId: e.entityId ?? null,
+          ...(e.summary === undefined ? {} : { summary: e.summary }),
+        })),
+      }),
+    );
+  } catch (err) {
+    failures++;
+    console.error(`[patron] denetim yazılamadı (${entries.length} satır): ${(err as Error).message}`);
   }
 }
 

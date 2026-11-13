@@ -10,6 +10,11 @@ import { assertSecretFileMode } from "../lib/secret-file-mode";
 export const SECRET_KEY_FILE = "patron-totp.key";
 const PREFIX = "v1";
 
+/** Mühür sınıfı: `totp` (ikinci etken sırrı) · `parola` (fabrikanın bcrypt özeti, `accounts.parola_ozeti`). */
+export type SealPurpose = "totp" | "parola";
+/** `totp` eski biçimle aynıdır (mevcut mühürler açılır); `parola` ayrı etiket taşır. */
+const aad = (alan: SealPurpose, accountId: string): Buffer => Buffer.from(`tekserp/patron-${alan}|${accountId}`, "utf8");
+
 export class SecretBox {
   private constructor(private readonly key: Buffer) {}
 
@@ -26,21 +31,22 @@ export class SecretBox {
     return new SecretBox(key);
   }
 
-  seal(plain: string, accountId: string): string {
+  /** `alan`: mühürün sınıfı AAD'ye girer — TOTP sırrı parola özeti yerine (ya da tersi) açılamaz. */
+  seal(plain: string, accountId: string, alan: SealPurpose = "totp"): string {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv("aes-256-gcm", this.key, iv);
-    cipher.setAAD(Buffer.from(`tekserp/patron-totp|${accountId}`, "utf8"));
+    cipher.setAAD(aad(alan, accountId));
     const body = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
     return [PREFIX, iv.toString("base64url"), body.toString("base64url"), cipher.getAuthTag().toString("base64url")].join(".");
   }
 
-  /** Çözülemezse null (yanlış anahtar, kurcalanmış ya da başka hesabın sırrı). */
-  open(sealed: string, accountId: string): string | null {
+  /** Çözülemezse null (yanlış anahtar, kurcalanmış, başka hesabın ya da başka sınıfın sırrı). */
+  open(sealed: string, accountId: string, alan: SealPurpose = "totp"): string | null {
     const parts = sealed.split(".");
     if (parts.length !== 4 || parts[0] !== PREFIX) return null;
     try {
       const decipher = crypto.createDecipheriv("aes-256-gcm", this.key, Buffer.from(parts[1]!, "base64url"));
-      decipher.setAAD(Buffer.from(`tekserp/patron-totp|${accountId}`, "utf8"));
+      decipher.setAAD(aad(alan, accountId));
       decipher.setAuthTag(Buffer.from(parts[3]!, "base64url"));
       return Buffer.concat([decipher.update(Buffer.from(parts[2]!, "base64url")), decipher.final()]).toString("utf8");
     } catch {

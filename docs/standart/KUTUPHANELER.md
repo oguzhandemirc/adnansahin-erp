@@ -99,7 +99,7 @@ Ayrıca kayıtta duran iki küçük borç: OFL-1.1 font lisans metninin dağıt�
 
 ## 9 · Kayıt defteri
 
-Yeni **npm paketi** eklenmedi (tek native Maven bağımlılığı aşağıda, 2026-11-12). Bir karar da "paket YOK"tur:
+Yeni **npm paketi** yalnız patron bulutuna eklendi (`bcryptjs`, 2026-11-14; tek native Maven bağımlılığı 2026-11-12) — kayıtlar aşağıda. Bir karar da "paket YOK"tur:
 **backend log kanalı** (2026-09-07) — `pino`/`winston` yerine **elle yazmak**
 seçildi ([KU-07]), çünkü taşımayı pm2 ve rotasyonu `pm2-logrotate` zaten
 yapıyordu; kalan tek eksik seviye + alan etiketiydi. Altı satırlık kayıt, ölçüm
@@ -114,3 +114,11 @@ ve sonuç arşivde: `docs/history/CLAUDE-NOT-ARSIVI.md` (2026-09-07) ve
 4. Bakım        : Google Play Core app-update, sabit sürüm (2.1.0) — Play kuralı değişince elle yükseltilir
 5. Lisans       : Android SDK Lisansı (Play Core) — kapalı dağıtımda kullanım serbest; kullanıcı onayı 2026-11-12
 6. Dağıtım      : yerel modül + Maven bağımlılığı → APK/AAB ister (runtimeVersion 54.4), OTA yetmez; yeni izin yok
+
+### bcryptjs@^3.0.3 · patron/sunucu · 2026-11-14 (kullanıcı onayı)
+1. Problem      : bulut girişi fabrika (Electron) parolasıyla — fabrikanın bcrypt özeti bulutta doğrulanır (üyelik C3) · §2.4 "Fabrika parolası doğrulaması"
+2. Alternatifler: native `bcrypt` (derleme + ABI riski, slim kapsayıcıda araç zinciri → red); elle bcrypt (Blowfish EksBlowfish kripto kodu elle yazılmaz → red); özeti bulutta scrypt'e çevirmek (fabrika düz parolayı bilmez → olanaksız); `bcryptjs` (SEÇİLDİ — fabrika backend'iyle aynı kitaplık ve sürüm)
+3. Boyut/biçim  : saf JS, bağımlılıksız (~50 KB); `require()` ile yüklenir (CJS + ESM ihracı); doğrulama ana iş parçacığında (maliyet 10 ≈ 50–100 ms)
+4. Bakım        : 3.0.3; caret (fabrikadaki `^3.0.3` ile hizalı — iki uç aynı özet biçimini okur)
+5. Lisans       : BSD-3-Clause
+6. Dağıtım      : yalnız bulut kapsayıcısı (`npm ci`); mobil/Electron etkilenmez

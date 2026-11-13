@@ -45,6 +45,12 @@ const EnvSchema = z
     OTURUM_AZAMI_GUN: positiveInt(1, 90).default(30),
     GIRIS_ESIGI: positiveInt(3, 50).default(5),
     KILIT_DK: positiveInt(1, 1440).default(15),
+    /** Fabrika hesabı girişi (C3) — hesap başına KÜRESEL tavan: 24 saatlik pencerede bu kadar başarısız deneme → hesap
+     *  `GIRIS_HESAP_KILIT_DK` dakika yeni girişe kapanır (kaynaktan bağımsız; açık oturumlar sürer). */
+    GIRIS_HESAP_TAVANI: positiveInt(3, 1000).default(50),
+    GIRIS_HESAP_KILIT_DK: positiveInt(1, 1440).default(60),
+    /** Fabrikanın son kullanıcı kümesi gönderimi bundan eskiyse yeni giriş 503 `FABRIKA_BAGLANTISI_YOK` (gün). */
+    FABRIKA_BAYATLIK_GUN: positiveInt(1, 30).default(7),
     GIRIS_HIZ_DK: positiveInt(1, 1000).default(20),
     /** Hesap API'si (/api/*) geneli IP başına dakikalık sınır (O8; telefon kullanımı dakikada onlarca istektir). */
     API_HIZ_DK: positiveInt(30, 100000).default(600),

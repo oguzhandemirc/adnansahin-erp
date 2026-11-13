@@ -78,3 +78,11 @@ Paket `deploy/` ve `scripts/`yi TAŞIMAZ (`docs/KOD-KURALLARI.md` § deploy) —
 - **[KU-04]** Bir paketi bu tabloya yazmadan `package.json`a ekleme; tablo ile `dependencies` arasındaki fark bir arızadır · zorlama: bekçi:`test_dependency_contract.ts §(c)` (üç projede `dependencies` ∖ tablo = ∅ + iki yönlü: tabloda olup `package.json`da olmayan da kırmızı; `devDependencies` gerekçeli muaf) · kanıt: `Teks-Erp/scripts/test_dependency_contract.ts:210-243`, körlük zeminleri `EN_AZ_TABLO_TOKEN` / `EN_AZ_DEPS` · devralınan: `KAYIT_BEKLEYEN` donmuş listesi (bayatlaması da ölçülüyor)
 - **[KU-05]** mobilde oturum/interceptor taşıyan her çağrı `axios`, kimliksiz sonda ve manifest okuması ham `fetch`tir · zorlama: insan:iki HTTP yolu meşru, ayrımı "istek kimlik taşıyor mu" sorusu belirler ve AST bunu göremez · kanıt: `services/api.ts` axios; `services/discovery.service.ts:125`, `services/appUpdate.service.ts:267`, `offline/serverReachability.ts:90` fetch (ölçüm: 3 site) · devralınan: yok
 - **[KU-06]** Electron'da ham `fetch` yazılmaz; HTTP `axios` + `services/apiClient.ts` üzerindendir · zorlama: insan:ham `fetch` yasağının KAPISI YOK — `api-path-prefix.test.ts` yol ÖNEKİNİ ölçer, HTTP istemcisinin kimliğini değil; kimliksiz sunucu yoklaması ([EL-10]) meşru istisnadır ve selector'dan ayrılamaz · kanıt: ölçüm 2026-09-05 — `Electron/src|electron|shared`ta `fetch(` 0; kural gerçeği DONDURUR, düzeltmez · devralınan: yok
+
+### 2.4 Patron bulutu sunucusu (`patron/sunucu/`) — CommonJS, Adnan'a özel VDS
+
+| İhtiyaç | Paket | Not / reddedilen |
+|---|---|---|
+| HTTP · ORM · şema · ortam | `express` 5 · `@prisma/client` + `prisma` + `pg` + `@prisma/adapter-pg` · `zod` · `dotenv` | sürümler TAM SABİT (projenin kendi düzeni) |
+| Telefon bildirimi | `web-push` | Expo push paketsiz (`fetch`) |
+| Fabrika parolası doğrulaması | `bcryptjs` ^3.0.3 (fabrikayla aynı) | §9 kaydı (2026-11-14); bulutun kendi parolası `node:crypto` scrypt'tir, bcrypt yalnız fabrikanın özetini doğrular |

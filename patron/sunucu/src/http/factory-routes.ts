@@ -11,6 +11,7 @@ import { claimInbox, recordInboxResults } from "../services/inbox.service";
 import { authenticateFactory, type FactoryCaller } from "../services/installation-auth";
 import { claimReports, recordReportResult } from "../services/report.service";
 import { applyPackage, decodeBody } from "../services/sync.service";
+import { applyUserSet } from "../services/user-sync.service";
 import {
   AccountLockRequestSchema,
   AccountsRequestSchema,
@@ -20,6 +21,7 @@ import {
   ReportClaimRequestSchema,
   ReportResultRequestSchema,
   SYNC_PATHS,
+  UsersPushRequestSchema,
 } from "../wire/esitleme";
 import { rateLimit } from "./rate-limit";
 import { readRawBody } from "./raw-body";
@@ -87,6 +89,11 @@ export function createFactoryRouter(ctx: CloudContext): Router {
     const r = await authenticated(ctx, req, SYNC_PATHS.ACCOUNT_LOCK);
     const out = await lockAccountFromFactory(ctx, r.caller, strictJson(AccountLockRequestSchema, r, req));
     res.status(out.status).json(out.data);
+  });
+
+  router.post(SYNC_PATHS.USERS.replace("/v1", ""), async (req: Request, res: Response) => {
+    const r = await authenticated(ctx, req, SYNC_PATHS.USERS);
+    res.json(await applyUserSet(ctx, r.caller, strictJson(UsersPushRequestSchema, r, req), r.nowMs));
   });
 
   router.post(SYNC_PATHS.REPORT_CLAIM.replace("/v1", ""), async (req: Request, res: Response) => {

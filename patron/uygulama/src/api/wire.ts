@@ -23,7 +23,10 @@ export interface Page<T> {
 export interface AccountSummary {
   readonly id: string;
   readonly ad: string;
+  /** Eski e-posta hesabı (C4'te kalkar); fabrika hesabında boş dize. */
   readonly eposta: string;
+  /** Fabrika hesabının kullanıcı adı (küçük harf; giriş bununla). Eski sunucu/eski hesap göndermez. */
+  readonly kullaniciAdi?: string;
   readonly izinler: readonly string[];
 }
 
@@ -35,9 +38,21 @@ export interface FacilityChoice {
 }
 
 /**
- * `POST /oturum/ac` — e-posta + parola; `totp` İSTEĞE BAĞLI (yalnız doğrulaması açık hesapta denetlenir). Açık hesapta kod
- * eksikse 401 `DOGRULAMA_KODU_GEREKLI` (yalnız doğru paroladan sonra); yanlış kod/parola 401 `GIRIS_BASARISIZ`. `tesisId` ipucu opsiyonel.
+ * `POST /oturum/ac` — FABRİKA kullanıcı adı + fabrika (Electron) parolası; `totp` İSTEĞE BAĞLI (yalnız doğrulaması açık
+ * hesapta denetlenir). Açık hesapta kod eksikse 401 `DOGRULAMA_KODU_GEREKLI` (yalnız doğru paroladan sonra); yanlış
+ * kod/parola, bilinmeyen ad, kapalı/kilitli hesap AYNI 401 `GIRIS_BASARISIZ`. Fabrika uzun süredir bağlanmadıysa 503
+ * `FABRIKA_BAGLANTISI_YOK` (açık oturum sürer). Kullanıcı adı büyük-küçük duyarsız.
  */
+export interface LoginRequest {
+  readonly kullaniciAdi: string;
+  readonly parola: string;
+  readonly totp?: string;
+  readonly istemci?: "mobil" | "web";
+  /** Eski çok tesisli sunucunun ipucu; fabrika hesabında yok sayılır. */
+  readonly tesisId?: string;
+}
+
+/** `POST /oturum/ac` yanıtı. */
 export interface LoginResponse {
   readonly belirtec: string;
   readonly bitis: string;
