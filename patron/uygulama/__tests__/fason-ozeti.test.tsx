@@ -24,7 +24,8 @@ jest.mock("expo-router", () => ({
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 const Stock = (require("../app/(app)/(tabs)/stok") as { default: () => React.ReactElement }).default;
-const Production = (require("../app/(app)/fason/index") as { default: () => React.ReactElement }).default;
+const Subcontract = (require("../app/(app)/fason/index") as { default: () => React.ReactElement }).default;
+const Firm = (require("../app/(app)/fason/[firmaId]") as { default: () => React.ReactElement }).default;
 const Finance = (require("../app/(app)/finans") as { default: () => React.ReactElement }).default;
 const view = require("../src/lib/fason-summary") as typeof import("../src/lib/fason-summary");
 const { areaSummary } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
@@ -45,8 +46,14 @@ const EMANET = {
   cariler: [{ cariKartId: C1, etiket: "Akın Tekstil", topAdet: 15, topMiktar: 1540.5, iplikKg: "120.000", leventAdet: 2 }],
 };
 const FASON = {
-  acikSevk: 7, geciken: 2, yaklasan: 1, kalanMiktar: "3456.000", kirpildi: false,
-  firmalar: [{ fasonFirmaId: F1, etiket: "Boyahane A", acikSevk: 4, geciken: 2, kalanMiktar: "2000.000", iplikKg: "0.000", leventAdet: 0 }],
+  acikSevk: 7, kalanMiktar: "3456.000", acikTop: 30, boyahanedeTop: 22, isEmriSayisi: 4, musteriSayisi: 3,
+  kategoriler: [{ kod: "BOYAHANE", ad: "Boyahane", acikTop: 22, kalanMiktar: "2000.000" }, { kod: "APRE", ad: "Apre", acikTop: 0, kalanMiktar: "0" }],
+  firmalar: [{
+    fasonFirmaId: F1, etiket: "Boyahane A", acikSevk: 4, kalanMiktar: "2000.000", acikTop: 22, kategoriler: ["Boyahane"],
+    enEskiGonderim: new Date(Date.now() - 9 * 86_400_000 - 3_600_000).toISOString(), isEmriSayisi: 2,
+    musteriler: [{ cariKartId: C1, ad: "Akın Tekstil", top: 15, metre: 1400 }, { cariKartId: null, ad: null, top: 7, metre: 600 }],
+    urunler: [{ urunId: null, urunAdi: "Saten 280", renkId: null, renkAdi: "Krem", top: 22, metre: 2000 }],
+  }],
 };
 const blok = (toplamTl: string) => ({ toplamTl, kalemler: toplamTl === "0.00" ? [] : [{ hizmetId: H1, etiket: "Kurşun 30 gr", miktar: "1500.000", birim: "m", tutarTl: toplamTl }] });
 const GELIR = { bugun: blok("0.00"), buAy: blok("45000.00"), gecenAy: blok("38000.50"), son30Gun: blok("52000.00") };
@@ -95,31 +102,46 @@ describe("§1 Stok › müşteri malı", () => {
   });
 });
 
-describe("§2 Fason ekranı › fasondaki işler", () => {
-  it("açık sevk, kalan ve firma satırı fabrikanın; gecikme yazılmaz", async () => {
+describe("§2 Fason ekranı › fasonda ne var, kimde", () => {
+  it("toplam top/metre, iş emri/müşteri sayısı, kategoriler 0'lılar dahil, firma 'X gündür' (gecikme/termin yok)", async () => {
     mockSession.permissions = ["bulut:uretim:oku"];
-    render(<Production />);
+    render(<Subcontract />);
     await flush();
-    expect(screen.getByText("7 açık sevk")).toBeTruthy();
-    expect(screen.queryByTestId("fason-acik-geciken")).toBeNull();
-    expect(screen.queryByText(/gecik/)).toBeNull();
-    expect(screen.getByTestId("fason-acik-kalan").props.children).toBe("Fasonda 3.456 m kumaş");
-    expect(screen.getByText("Boyahane A")).toBeTruthy();
-    expect(screen.getByText("4 açık sevk")).toBeTruthy();
+    expect(screen.getByTestId("fason-top")).toHaveTextContent("30", { exact: false });
+    expect(screen.getByTestId("fason-metre")).toHaveTextContent("3.456", { exact: false });
+    expect(screen.getByTestId("fason-kimler")).toHaveTextContent("4 iş emri · 3 müşteri", { exact: false });
+    expect(screen.getByTestId("fason-kategori-APRE")).toHaveTextContent("0 top", { exact: false });
+    expect(screen.getByTestId(`fason-firma-${F1}`)).toHaveTextContent("9 gündür", { exact: false });
+    expect(screen.queryByText(/gecik|termin/i)).toBeNull();
+    fireEvent.press(screen.getByTestId(`fason-firma-${F1}`));
+    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/fason/[firmaId]", params: { firmaId: F1, ad: "Boyahane A" } });
   });
 
-  it("izinsiz hesapta istenmez; eski fabrika 404 → boş durum", async () => {
+  it("firma ayrıntısı: müşteriler (müşterisiz satır adıyla) ve kumaşlar fabrikanın kırılımı; eski sunucuda İş emirleri sekmesi yok", async () => {
+    mockSession.permissions = ["bulut:uretim:oku"];
+    jest.spyOn(require("expo-router") as { useLocalSearchParams: () => unknown }, "useLocalSearchParams").mockReturnValue({ firmaId: F1, ad: "Boyahane A" });
+    render(<Firm />);
+    await flush();
+    expect(screen.getByTestId("fason-firma-bilgi")).toHaveTextContent("Boyahane · 2 iş emri · en eskisi 9 gündür", { exact: false });
+    expect(screen.getByTestId("fason-musteri-0")).toHaveTextContent("Akın Tekstil", { exact: false });
+    expect(screen.getByTestId("fason-musteri-1")).toHaveTextContent("Müşterisiz", { exact: false });
+    expect(screen.queryByText("İş emirleri")).toBeNull();
+    fireEvent.press(screen.getByText("Kumaşlar"));
+    expect(screen.getByTestId("fason-kumas-0")).toHaveTextContent("Saten 280 · Krem", { exact: false });
+  });
+
+  it("izinsiz hesapta istenmez; eski fabrika (kırılımsız şekil) çökmez", async () => {
     mockSession.permissions = [];
-    const first = render(<Production />);
+    const first = render(<Subcontract />);
     await flush();
     expect(mockApi.snapshot).not.toHaveBeenCalledWith("fason-acik");
     first.unmount();
     mockSession.permissions = ["bulut:uretim:oku"];
-    serve(["fason-acik"]);
-    render(<Production />);
+    DATA["fason-acik"] = { acikSevk: 7, kalanMiktar: "3456.000", firmalar: [] };
+    render(<Subcontract />);
     await flush();
-    expect(screen.getByTestId("fason-acik-bos")).toBeTruthy();
-    expect(screen.queryByTestId("fason-acik-hata")).toBeNull();
+    expect(screen.getByText("Fabrika güncellenince gelir")).toBeTruthy();
+    DATA["fason-acik"] = FASON;
   });
 });
 
@@ -151,7 +173,6 @@ describe("§3 Finans › Fatura › hizmet geliri", () => {
 describe("§4 bozuk / eksik şekil çökmez", () => {
   it("görünümler tanınmayan veride null", () => {
     expect(view.consignedView({ x: 1 })).toBeNull();
-    expect(view.subcontractOpenView(null)).toBeNull();
     expect(view.serviceRevenueView({ buAy: {} }, "buAy")).toBeNull();
     expect(view.scorecardConsignedLines({})).toBeNull();
     expect(view.stockConsignedText({ bitmisMiktar: 1 })).toBeNull();
@@ -167,7 +188,6 @@ describe("§5 görünüm hesap yapmaz", () => {
     const v = view.consignedView({ toplam: { topAdet: 2, topMiktar: 10, iplikKg: null, leventAdet: null }, cariler: [] })!;
     expect(v.totalLine).toBe("2 top");
     expect(v.totalValue).toBe("10 m");
-    expect(view.subcontractOpenView({ ...FASON, geciken: 0 })!.openText).toBe("7 açık sevk");
   });
 });
 

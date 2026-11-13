@@ -1,4 +1,4 @@
-// Fason · emanet görünümleri (genel fason PB1): `ozet.stok.emanet`, `emanet-bakiye`, `fason-acik`, `hizmet-geliri`
+// Fason · emanet görünümleri (genel fason PB1): `ozet.stok.emanet`, `emanet-bakiye`, `hizmet-geliri`
 // anlıkları. Rakamlar FABRİKANIN; burada toplama, çıkarma, sıralama YOK (fabrika bekçisi `test_bulut_fason_ozeti` §2d
 // ölçer) — yalnız savunmalı okuma ve günlük dilde etiket. Eski fabrika alanı/anlığı göndermezse `null` döner, ekran
 // boş durum çizer; çökmez.
@@ -72,30 +72,6 @@ export function scorecardConsignedLines(ozet: unknown): readonly { readonly labe
     { label: "Yarı mamul", value: `${amount(e.yariMamulMiktar)} m · ${formatNumber(e.yariMamulAdet, 0)} top` },
     { label: "Bitmiş", value: `${amount(e.bitmisMiktar)} m · ${formatNumber(e.bitmisAdet, 0)} top` },
   ];
-}
-
-export interface SubcontractOpenView {
-  readonly openText: string;
-  readonly remainingText: string;
-  readonly clipped: boolean;
-  readonly firms: readonly ConsignedRowView[];
-}
-
-/** `fason-acik` → "fasonda ne var". Termin/gecikme yazılmaz (fabrika göndermez; patron istemiyor). Tanınmayan şekil `null`. */
-export function subcontractOpenView(veri: unknown): SubcontractOpenView | null {
-  const d = obj(veri);
-  if (!d || !isNum(d.acikSevk)) return null;
-  return {
-    openText: `${formatNumber(d.acikSevk, 0)} açık sevk`,
-    remainingText: `Fasonda ${amount(d.kalanMiktar)} m kumaş`,
-    clipped: d.kirpildi === true,
-    firms: list(d.firmalar).map((f, i) => {
-      const parts = [`${formatNumber(f.acikSevk, 0)} açık sevk`];
-      if (positive(f.iplikKg)) parts.push(`${amount(f.iplikKg)} kg iplik`);
-      if (positive(f.leventAdet)) parts.push(`${formatNumber(f.leventAdet, 0)} levent`);
-      return { key: text(f.fasonFirmaId) ?? String(i), title: text(f.etiket) ?? "—", value: `${amount(f.kalanMiktar)} m`, lines: [parts.join(" · ")] };
-    }),
-  };
 }
 
 export interface ServiceRevenueView {

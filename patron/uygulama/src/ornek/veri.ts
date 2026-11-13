@@ -66,7 +66,7 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
       kolonlar: [
         { anahtar: "hamStok", etiket: "Ham stok", adet: 310 },
         { anahtar: "yariMamul", etiket: "Yarı mamul", adet: 126 },
-        { anahtar: "fason", etiket: "Fasonda", adet: 18 },
+        { anahtar: "fason", etiket: "Fasonda", adet: 32 },
         { anahtar: "depo", etiket: "Depo", adet: 240 },
       ],
     },
@@ -76,7 +76,7 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
       kolonlar: [
         { anahtar: "hamStok", etiket: "Ham stok", adet: 310 },
         { anahtar: "yariMamul", etiket: "Yarı mamul", adet: 126 },
-        { anahtar: "fason", etiket: "Fasonda", adet: 18 },
+        { anahtar: "fason", etiket: "Fasonda", adet: 32 },
         { anahtar: "kursun", etiket: "Kurşun", adet: 34 },
         { anahtar: "tambur", etiket: "Tambur", adet: 22 },
         { anahtar: "depo", etiket: "Depo", adet: 240 },
@@ -91,11 +91,31 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
     "fason-acik": {
       acikSevk: 4,
       kalanMiktar: "4200.000",
-      acikTop: 18,
-      boyahanedeTop: 12,
+      acikTop: 32,
+      boyahanedeTop: 24,
+      isEmriSayisi: 3,
+      musteriSayisi: 2,
+      kategoriler: [
+        { kod: "BOYAHANE", ad: "Boyahane", acikTop: 24, kalanMiktar: "2900.000" },
+        { kod: "ZIMPARA", ad: "Zımpara", acikTop: 8, kalanMiktar: "1300.000" },
+        { kod: "APRE", ad: "Apre", acikTop: 0, kalanMiktar: "0" },
+      ],
       firmalar: [
-        { fasonFirmaId: "00000000-0000-4000-8000-0000000000f1", etiket: "Örnek Boyahane", acikSevk: 2, kalanMiktar: "2800.000", acikTop: 12, kategoriler: ["Boyahane"] },
-        { fasonFirmaId: "00000000-0000-4000-8000-0000000000f2", etiket: "Deneme Zımpara", acikSevk: 2, kalanMiktar: "1400.000", acikTop: 6, kategoriler: ["Zımpara"] },
+        {
+          fasonFirmaId: "00000000-0000-4000-8000-0000000000f1", etiket: "Örnek Boyahane", acikSevk: 2, kalanMiktar: "2900.000", acikTop: 24, kategoriler: ["Boyahane"],
+          enEskiGonderim: once(11), isEmriSayisi: 2,
+          musteriler: [{ cariKartId: "00000000-0000-4000-8000-0000000000c1", ad: "Örnek Tekstil A.Ş.", top: 24, metre: 2900 }],
+          urunler: [
+            { urunId: "00000000-0000-4000-8000-0000000000a1", urunAdi: "Örnek Saten 280 cm", renkId: null, renkAdi: "Krem", top: 14, metre: 1690 },
+            { urunId: "00000000-0000-4000-8000-0000000000a2", urunAdi: "Deneme Keten 150 cm", renkId: null, renkAdi: "Bej", top: 10, metre: 1210 },
+          ],
+        },
+        {
+          fasonFirmaId: "00000000-0000-4000-8000-0000000000f2", etiket: "Deneme Zımpara", acikSevk: 2, kalanMiktar: "1300.000", acikTop: 8, kategoriler: ["Zımpara"],
+          enEskiGonderim: once(2), isEmriSayisi: 1,
+          musteriler: [{ cariKartId: "00000000-0000-4000-8000-0000000000c3", ad: "Numune Perde San. ve Tic.", top: 8, metre: 940 }],
+          urunler: [{ urunId: "00000000-0000-4000-8000-0000000000a3", urunAdi: "Numune Tül 320 cm", renkId: null, renkAdi: "Ekru", top: 8, metre: 940 }],
+        },
       ],
     },
     "stok-karnesi": {
