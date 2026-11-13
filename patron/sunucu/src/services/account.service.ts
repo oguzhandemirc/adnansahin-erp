@@ -25,7 +25,7 @@ export const ADMIN_PERMISSION = "bulut:hesap:yonet";
 export function accountView(a: Account): AccountWire {
   return {
     id: a.id,
-    eposta: a.email,
+    eposta: a.email ?? "",
     ad: a.name,
     durum: a.status,
     izinler: [...a.permissions].sort(),

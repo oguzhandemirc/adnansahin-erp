@@ -23,7 +23,8 @@ export interface AuditEntry {
 export async function recordAudit(db: TesisDbRouter, entry: AuditEntry): Promise<void> {
   try {
     await withTesis(db, { tesisId: entry.tesisId }, (tx) =>
-      tx.accountAudit.create({
+      // createMany (RETURNING yok): eşitleme rolü denetime yalnız EKLER, okuyamaz.
+      tx.accountAudit.createMany({
         data: {
           tesisId: entry.tesisId,
           actor: entry.actor,

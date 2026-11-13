@@ -48,7 +48,9 @@ async function findInvited(ctx: CloudContext, token: string, nowMs: number) {
   const digest = tokenDigest(token);
   const account = await withLookup(ctx.app, { kind: "davet", value: digest, tesisId }, (tx) => tx.account.findUnique({ where: { inviteTokenHash: digest } }));
   if (!account || account.tesisId !== tesisId || account.status !== "DAVETLI" || !account.inviteExpiresAt || account.inviteExpiresAt.getTime() <= nowMs) throw invalidInvite();
-  return { account, digest };
+  // Davetli hesap hep eski e-posta hesabıdır (fabrika hesabı DAVETLI doğmaz — göç CHECK'i); C4'te davet kalkar.
+  if (account.email === null) throw invalidInvite();
+  return { account: { ...account, email: account.email }, digest };
 }
 
 export async function inspectInvite(ctx: CloudContext, token: string): Promise<InviteInfo> {

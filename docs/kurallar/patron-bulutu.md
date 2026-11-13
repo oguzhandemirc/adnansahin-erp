@@ -77,6 +77,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Kullanıcı listesi işi ve `--kuru` aracı log'a, audit'e ve hata özetine yalnız SAYI yazar; parola özeti ve küme özeti basılmaz. [bekçi: test_patron_bulut_kullanicilar]
 - Kullanıcı listesi işinin (`jobs/cloud-users.job.ts`) ayrı düğmesi yoktur: eşitleme ön koşulu açıkken başlar, kapanınca durur; her tur önce ön koşulu sorar ve kapalıyken ne DB okur ne istek atar. [bekçi: test_patron_bulut_kullanicilar]
 - Liste her gönderimde TAM kümedir: 30 sn'de bir kurulur, özet değiştiyse ya da 10 dk geçtiyse gönderilir; kümede olmayan hesabı bulut kapatır. [bekçi: test_patron_bulut_kullanicilar]
+- Bulut hesabı fabrikanın malıdır: hesabın fabrika kolonlarını (kullanıcı adı, ad, izin, durum, mühürlü parola özeti, kimlik sürümü, kapanış) yalnız eşitleme rolü yazar, uygulama rolü yalnız son giriş anını yazar; ikinci etken (`account_factors`) uygulamanındır ve eşitleme rolü ona erişemez. [bekçi: patron/sunucu test_kullanici_esitleme]
 - Eski bulut (`/v1/kullanicilar` 404) hata değildir: tek satır log + 60 dk geri çekilme; kurulum sırası önce bulut, sonra fabrikadır. [bekçi: test_patron_bulut_kullanicilar]
 
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)

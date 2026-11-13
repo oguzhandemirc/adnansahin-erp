@@ -125,7 +125,8 @@ function contextOf(account: Account, sessionId: string, expiresAt: Date): Sessio
     tesisId: account.tesisId,
     accountId: account.id,
     accountName: account.name,
-    email: account.email,
+    // Fabrika hesabının e-postası yoktur (geçici uyumluluk, C3'te giriş kullanıcı adına geçer).
+    email: account.email ?? "",
     permissions,
     projections: sessionProjections(permissions),
     identityId: account.identityId,

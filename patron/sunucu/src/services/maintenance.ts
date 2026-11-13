@@ -244,7 +244,9 @@ async function pruneAccountTables(ctx: CloudContext, f: { tesisId: string; reten
 /** Tek tx, `ACCOUNT_ADMIN` kilidi (İLK ifade); hesap başına atomik claim (`PASIF ∧ silinmemiş ∧ kapanış ≤ sınır`). */
 export async function purgeClosedIdentities(ctx: CloudContext, tesisId: string, nowMs: number): Promise<number> {
   const cutoff = new Date(nowMs - IDENTITY_PURGE_DAYS * DAY_MS);
-  const due = { tesisId, status: "PASIF" as const, identityPurgedAt: null, closedAt: { lte: cutoff } };
+  // Fabrika hesabı (kullanıcı adı dolu) kapsam DIŞI: satırı fabrikanın malıdır, uygulama rolü yazamaz (göç
+  // 20261113220000 tetikleyicisi) ve fabrika onu yeniden açabilir. Fabrika hesabının saklama kuralı C4'te.
+  const due = { tesisId, status: "PASIF" as const, identityPurgedAt: null, closedAt: { lte: cutoff }, kullaniciAdi: null };
   const ids = await withTesis(ctx.app, { tesisId }, (tx) => tx.account.findMany({ where: due, select: { id: true } }));
   if (ids.length === 0) return 0;
   const purged = await withTesis(ctx.app, { tesisId, lock: { name: "ACCOUNT_ADMIN", key: tesisId } }, async (tx) => {
