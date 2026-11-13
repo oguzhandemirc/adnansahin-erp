@@ -3,7 +3,7 @@
 // `POST /v1/kullanicilar` ucuyla, fabrikanın bcrypt özetiyle gelir):
 //   §0 varsayılanlar: hesap tavanı 50 / 24 sa · geçici kilit 60 dk · bayatlık 7 gün
 //   §1 S1 izin verilen kişi Electron parolasıyla girer (ad büyük-küçük duyarsız; yanıtta `hesap.kullaniciAdi`); küme hiç
-//      gelmediyse giriş 503; gövdede fazla alan 400
+//      gelmediyse giriş 503 (ilk paketten önce gelen küme girişi açar); tesis listesi ucu yok; gövdede fazla alan 400
 //   §2 S2 oturum açıldığı `kimlik_surumu`nu taşır: hesabınki artınca (oturum kapanmasa da) 401; fabrikada parola
 //      değişince eski oturum 401, eski parola girmez, yenisi girer
 //   §3 S3 PASİF (kümeden çıktı) · bulut kilidi · bilinmeyen ad · yanlış parola → AYNI 401 gövdesi, her biri ≥ 500 ms;
@@ -13,7 +13,7 @@
 //   §5 S9 kaba kuvvet: kaynak eşiğinin altında kalan denemeler hesap tavanına varınca hesap geçici kilitli (doğru parola
 //      da 401; denetim `HESAP_GECICI_KILIT` kapsam HESAP; açık oturum sürer); süre bitince girer; 24 sa pencere söner
 //   §6 TOTP (`account_factors`): aç (fabrika parolası → sır → onay) · kod eksikse YALNIZ doğru paroladan sonra
-//      `DOGRULAMA_KODU_GEREKLI` · yanlış kod 401 · aynı kod ikinci kez geçmez · kapat; parola değişimi/hesap silme 409
+//      `DOGRULAMA_KODU_GEREKLI` · yanlış kod 401 · aynı kod ikinci kez geçmez · kapat; parola değişimi/hesap silme ucu yok (404)
 // NEGATİF SONDALAR (2026-11-14, dosya DIŞI, her biri geri alındı; geri yüklenince 40/40): `resolveSession`dan sürüm
 // karşılaştırması kaldırıldı → §2a ❌ (39/40) · hesap tavanı (`countAccountFailure` hep null) → §5b §5c §5e ❌ (37/40) ·
 // bayatlık denetimi kaldırıldı → §1a §4a §4b ❌ (37/40) · uygun olmayan dalda süre tabanı atlandı → §3d ❌ (39/40).
@@ -88,22 +88,18 @@ interface Durum {
 async function girisBolumu(d: Durum): Promise<string> {
   console.log("\n§1 S1 Electron parolasıyla giriş");
   const { o, k, ali } = d;
-  const now = new Date(o.saat.simdi());
-  await withTesis(o.goc, { tesisId: k.tesisId }, (tx) =>
-    tx.syncState.create({ data: { tesisId: k.tesisId, lastPackageAt: now, lastInstallationId: k.kurulumId, contractVersion: 1, horizon: now, horizonChangedAt: now } }),
-  );
   const once = await giris(o, "ali", P1);
   kontrol("§1a küme hiç gelmediyse doğru parola da 503 FABRIKA_BAGLANTISI_YOK", once.status === 503 && kod(once) === "FABRIKA_BAGLANTISI_YOK", `${once.status} ${kod(once)}`);
   await kumeGonder(o, k, [d.ali, d.veli, d.ayse]);
   const r = await giris(o, "  ALI ", P1);
   const hesap = (r.json.data as { hesap?: { kullaniciAdi?: string; eposta?: string; izinler?: string[] } } | undefined)?.hesap;
-  kontrol("§1b kullanıcı adı (büyük harf + boşluk) + fabrika parolası → 200", r.status === 200, `${r.status} ${JSON.stringify(r.json).slice(0, 120)}`);
-  kontrol("§1c yanıtta hesap.kullaniciAdi küçük harf, e-posta boş, izinler fabrikanınki", hesap?.kullaniciAdi === "ali" && hesap.eposta === "" && (hesap.izinler ?? []).includes("bulut:siparis:oku"), JSON.stringify(hesap));
+  kontrol("§1b kullanıcı adı (büyük harf + boşluk) + fabrika parolası → 200 (küme ilk paketten ÖNCE geldi; damga tesis satırında)", r.status === 200, `${r.status} ${JSON.stringify(r.json).slice(0, 120)}`);
+  kontrol("§1c yanıtta hesap.kullaniciAdi küçük harf, e-posta alanı YOK, izinler fabrikanınki", hesap?.kullaniciAdi === "ali" && !("eposta" in hesap) && (hesap.izinler ?? []).includes("bulut:siparis:oku"), JSON.stringify(hesap));
   const b = r.status === 200 ? belirtec(r) : "";
   const st = await api(o, "GET", "/api/oturum", { belirtec: b });
   kontrol("§1d GET /oturum 200 ve hesap.kullaniciAdi", st.status === 200 && (st.json.data as { hesap: { kullaniciAdi?: string } }).hesap.kullaniciAdi === "ali", String(st.status));
   const tes = await api(o, "GET", "/api/oturum/tesisler", { belirtec: b });
-  kontrol("§1e tesis listesi: tek tesis", tes.status === 200 && (tes.json.data as { id: string }[]).map((t) => t.id).join() === k.tesisId, JSON.stringify(tes.json.data));
+  kontrol("§1e tesis listesi ucu KALKTI (tek tesis; C4) → 404", tes.status === 404, String(tes.status));
   const fazla = await api(o, "POST", "/api/oturum/ac", { govde: { kullaniciAdi: "ali", parola: P1, rol: "admin" } });
   kontrol("§1f gövdede bilinmeyen alan → 400", fazla.status === 400, String(fazla.status));
   return b;
@@ -223,7 +219,7 @@ async function totpBolumu(d: Durum): Promise<void> {
   const ob = belirtec(ok);
   const parola = await api(o, "POST", "/api/oturum/parola", { belirtec: ob, govde: { mevcutParola: P2, yeniParola: "Bulutta-Yeni-Parola-99" } });
   const sil = await api(o, "POST", "/api/oturum/hesap-sil", { belirtec: ob, govde: { parola: P2 } });
-  kontrol("§6i parola değişimi ve hesap silme fabrika hesabında 409", parola.status === 409 && sil.status === 409, `${parola.status} ${sil.status}`);
+  kontrol("§6i parola değişimi ve hesap silme ucu KALKTI (C4) → 404", parola.status === 404 && sil.status === 404, `${parola.status} ${sil.status}`);
   o.saat.ilerlet(31_000);
   const kapat = await api(o, "POST", "/api/oturum/dogrulama/kapat", { belirtec: ob, govde: { parola: P2, totp: totpKodu(sir.totpSirri!, o.saat.simdi()) } });
   kontrol("§6j parola + kodla kapanır", kapat.status === 200 && (kapat.json.data as { acik: boolean }).acik === false, `${kapat.status} ${JSON.stringify(kapat.json).slice(0, 100)}`);

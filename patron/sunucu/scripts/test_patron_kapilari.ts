@@ -7,8 +7,8 @@
 //   §3 kapsamsız sorgu yok: istemci (`ctx.app` · `ctx.sync` · `this.db` · `db`) üzerinden doğrudan model
 //      ya da ham sorgu çağrısı YOK — hepsi `withTesis/withLookup/withMaintenanceList` tx'inde
 //   §4 silme beyanı: `src`teki HER silme (`<herhangi alıcı>.<model>.deleteMany|delete(` — `tx`/`central`/… · `DELETE FROM`)
-//      iki beyanlı dosyadan birinde: `maintenance.ts` (yaşa göre; hedef `PRUNED_TABLES`ta, ölü beyan da KIRMIZI) ·
-//      `auth/membership.ts` (üyelik devri; YALNIZ `login_routes`). Tesis imhası YOKTUR (Adnan, tek tesis).
+//      YALNIZ beyanlı `maintenance.ts`te (yaşa göre; hedef `PRUNED_TABLES`ta, ölü beyan da KIRMIZI). Üyelik devri
+//      (`auth/membership.ts`, `login_routes`) C4'te söküldü — dosya geri gelirse KIRMIZI. Tesis imhası YOKTUR.
 //   §5 rota tablosu: yöntem+yol tekil · her yazma rotası işlem kimliği ya da GEREKÇELİ muafiyet beyan
 //      eder, her okuma rotası OKUMA · muafiyet gerekçesi boş olamaz
 //   §6 katalog: izin kodları tekil · her okuma izni en az bir projeksiyon/rapor açar · yazma ve
@@ -131,17 +131,16 @@ export function silmeHedefleri(metin: string, modeller: ReadonlyMap<string, stri
 }
 
 function budama(): void {
-  console.log("\n§4 silme beyanı (budama + üyelik devri)");
+  console.log("\n§4 silme beyanı (budama)");
   const modeller = modelTablolari();
   const beyan = new Set(Object.keys(PRUNED_TABLES));
   const bakim = path.join(SRC, "services", "maintenance.ts");
-  const uyelik = path.join(SRC, "auth", "membership.ts");
-  const baskaYer = kaynaklar.filter((f) => f !== bakim && f !== uyelik && silmeHedefleri(readFileSync(f, "utf8"), modeller).tablolar.size > 0).map(goreli);
-  kontrol("§4a silme YALNIZ services/maintenance.ts ve auth/membership.ts'te", baskaYer.length === 0, baskaYer.join(", ") || "temiz");
-  const uyelikHedef = silmeHedefleri(readFileSync(uyelik, "utf8"), modeller);
-  kontrol("§4i auth/membership.ts YALNIZ üyelik satırı (`login_routes`) siler", [...uyelikHedef.tablolar].join(",") === "login_routes" && uyelikHedef.bilinmeyen.length === 0, [...uyelikHedef.tablolar].join(",") || "yok");
-  const merkezSonda = silmeHedefleri("await central.loginRoute.deleteMany({}); this.entries.delete(k);", modeller);
-  kontrol("§4j ✓K sonda: merkez tx alıcısıyla (`central.`) silme `login_routes` olarak ısırır · Map `.delete(` susar", merkezSonda.tablolar.has("login_routes") && merkezSonda.tablolar.size === 1 && merkezSonda.bilinmeyen.length === 0);
+  const baskaYer = kaynaklar.filter((f) => f !== bakim && silmeHedefleri(readFileSync(f, "utf8"), modeller).tablolar.size > 0).map(goreli);
+  kontrol("§4a silme YALNIZ services/maintenance.ts'te", baskaYer.length === 0, baskaYer.join(", ") || "temiz");
+  const sokulen = ["membership.ts", "invite.service.ts", "password.ts", "two-factor.service.ts"].filter((d) => existsSync(path.join(SRC, "auth", d)));
+  kontrol("§4i üyelik devri/davet/scrypt dosyaları söküldü (C4; `login_routes`/`identities` modeli de yok)", sokulen.length === 0 && !modeller.has("loginRoute") && !modeller.has("identity"), sokulen.join(",") || "temiz");
+  const merkezSonda = silmeHedefleri("await central.session.deleteMany({}); this.entries.delete(k);", modeller);
+  kontrol("§4j ✓K sonda: serbest adlı alıcıyla (`central.`) silme `sessions` olarak ısırır · Map `.delete(` susar", merkezSonda.tablolar.has("sessions") && merkezSonda.tablolar.size === 1 && merkezSonda.bilinmeyen.length === 0);
   const h = silmeHedefleri(readFileSync(bakim, "utf8"), modeller);
   const beyansiz = [...h.tablolar].filter((t) => !beyan.has(t));
   const olu = [...beyan].filter((t) => !h.tablolar.has(t));
@@ -173,7 +172,9 @@ function rotalar(): void {
   kontrol("§5c ✓K sonda: gerekçesiz muafiyet ısırır", rotaIhlalleri([{ method: "post", path: "/y", kimlik: { muaf: "" } }]).length === 1);
   kontrol("§5d ✓K sonda: temiz tablo susar", rotaIhlalleri([{ method: "get", path: "/z", kimlik: "OKUMA" }, { method: "post", path: "/z", kimlik: "ISLEM_KIMLIGI" }]).length === 0);
   const isk = API_ROUTES.filter((r) => r.kimlik === "ISLEM_KIMLIGI").map((r) => `${r.method} ${r.path}`);
-  kontrol("§5e kayıt yaratan uçlar işlem kimliği taşır (gelen kutusu · rapor · hesap)", ["post /gelen-kutusu", "post /raporlar", "post /hesaplar"].every((x) => isk.includes(x)), isk.join(", "));
+  kontrol("§5e kayıt yaratan uçlar işlem kimliği taşır (gelen kutusu · rapor)", ["post /gelen-kutusu", "post /raporlar"].every((x) => isk.includes(x)), isk.join(", "));
+  const eski = API_ROUTES.filter((r) => /^\/(davet|hesaplar|izinler)(\/|$)|^\/oturum\/(tesisler|gecis|parola|hesap-sil)$/.test(r.path)).map((r) => `${r.method} ${r.path}`);
+  kontrol("§5f hesap yönetimi/davet/parola/tesis geçişi rotası YOK (hesap fabrikanın malı, C4)", eski.length === 0, eski.join(", ") || "temiz");
 }
 
 function katalog(): void {

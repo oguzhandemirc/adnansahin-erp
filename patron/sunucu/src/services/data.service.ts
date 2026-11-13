@@ -286,7 +286,7 @@ export async function facilityStatus(ctx: CloudContext, s: SessionContext): Prom
   const stuckMs = state ? nowMs - state.horizonChangedAt.getTime() : 0;
   return {
     tesis: { id: s.tesisId, ad: facility?.name ?? null, saklamaAy: facility?.retentionMonths ?? null },
-    hesap: { id: s.accountId, ad: s.accountName, eposta: s.email, ...(s.kullaniciAdi !== null ? { kullaniciAdi: s.kullaniciAdi } : {}), izinler: [...s.permissions].sort() },
+    hesap: { id: s.accountId, ad: s.accountName, kullaniciAdi: s.kullaniciAdi, izinler: [...s.permissions].sort() },
     projeksiyonlar: s.projections,
     esitleme: state
       ? {

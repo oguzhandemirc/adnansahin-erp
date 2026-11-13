@@ -14,7 +14,7 @@
 // =============================================================================
 import { randomUUID } from "node:crypto";
 import { withTesis } from "../src/lib/tenant";
-import { TEST_PAROLASI, api, girdi, girisYap, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, totpKodu, type Ortam, type TestKurulumu } from "./lib/test-ortam";
+import { api, girdi, girisYap, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
 
 const GUN = 86_400_000;
 const TUM_OKUMA = ["bulut:siparis:oku", "bulut:cari:oku", "bulut:ozet:oku", "bulut:hesap:yonet", "bulut:siparis:yaz", "bulut:cari:yaz", "bulut:rapor:oku"];
@@ -44,7 +44,7 @@ async function indir(o: Ortam, belirtec: string, yol: string): Promise<{ status:
   return { status: res.status, text: bytes.subarray(bom ? 3 : 0).toString("utf8"), bom, headers: res.headers };
 }
 
-async function hepAcik(o: Ortam, k: TestKurulumu, yonetici: { belirtec: string; eposta: string; sir: string }): Promise<void> {
+async function hepAcik(o: Ortam, k: TestKurulumu, yonetici: TestHesabi): Promise<void> {
   console.log("\n§1 hizmet hep ACIK (süresiz)");
   const oturum = await api(o, "GET", "/api/oturum", { belirtec: yonetici.belirtec });
   kontrol("§1a oturum şeridi: hizmet sabit ACIK, bitiş yok", JSON.stringify((oturum.json.data as { hizmet: unknown }).hizmet) === ACIK, JSON.stringify((oturum.json.data as { hizmet: unknown }).hizmet));
@@ -75,15 +75,14 @@ async function pasifKurulum(o: Ortam): Promise<void> {
     kontrol("§2c fabrika kanalı 403 KURULUM_IPTAL", fabrika.status === 403 && fabrika.json.details?.code === "KURULUM_IPTAL");
     const oturum = await api(o, "GET", "/api/oturum", { belirtec: h.belirtec });
     kontrol("§2d okuma (oturum şeridi) açık, hizmet yine ACIK", oturum.status === 200 && JSON.stringify((oturum.json.data as { hizmet: unknown }).hizmet) === ACIK);
-    o.saat.ilerlet(31_000);
-    const g = await api(o, "POST", "/api/oturum/ac", { govde: { eposta: h.eposta, parola: TEST_PAROLASI, totp: totpKodu(h.sir, o.saat.simdi()) } });
-    kontrol("§2e giriş açık", g.status === 200, `${g.status} ${g.json.details?.code ?? ""}`);
+    const g = await girisYap(o, h).then(() => true, () => false);
+    kontrol("§2e giriş açık", g);
   } finally {
     await temizleTesis(o, k.tesisId);
   }
 }
 
-async function disaAktarma(o: Ortam, a: TestKurulumu, ids: { siparisId: string }, yonetici: { belirtec: string }, sinirli: { belirtec: string }, digerAd: string): Promise<void> {
+async function disaAktarma(o: Ortam, a: TestKurulumu, ids: { siparisId: string }, yonetici: TestHesabi, sinirli: { belirtec: string }, digerAd: string): Promise<void> {
   console.log("\n§5 dışa aktarma");
   const m = await api(o, "GET", "/api/disa-aktar", { belirtec: yonetici.belirtec });
   const kumeler = (m.json.data as { kumeler: { ad: string; tur: string; adet: number; bicimler: string[] }[] }).kumeler;
@@ -110,7 +109,10 @@ async function disaAktarma(o: Ortam, a: TestKurulumu, ids: { siparisId: string }
   const anlik = JSON.parse((await indir(o, yonetici.belirtec, "/api/disa-aktar/ozet.siparis")).text) as { veri: { acikSiparis: number } };
   kontrol("§5l anlık özet JSON", anlik.veri.acikSiparis === 3);
   const hesaplar = await indir(o, yonetici.belirtec, "/api/disa-aktar/hesaplar?bicim=json");
-  kontrol("§5m hesaplar sırsız (parola/TOTP/davet alanı yok)", hesaplar.status === 200 && !/password|totp|invite|parola|sirri|belirtec/i.test(hesaplar.text), hesaplar.text.slice(0, 120));
+  kontrol("§5m hesaplar sırsız (parola özeti/TOTP/davet alanı yok)", hesaplar.status === 200 && !/password|totp|invite|parola|sirri|belirtec|\$2[aby]\$/i.test(hesaplar.text), hesaplar.text.slice(0, 120));
+  const hesapCsv = await indir(o, yonetici.belirtec, "/api/disa-aktar/hesaplar?bicim=csv");
+  const hesapBaslik = hesapCsv.text.split("\r\n")[0];
+  kontrol("§5m2 hesaplar CSV başlığı fabrika hesabı sütunları (kullaniciAdi; eposta/davetBitis YOK)", hesapBaslik === "id,kullaniciAdi,ad,durum,izinler,sonGiris,olusturulma" && hesapCsv.text.includes(yonetici.kullaniciAdi), hesapBaslik);
   const yetkisiz = await api(o, "GET", "/api/disa-aktar", { belirtec: (await hesapKur(o, a.tesisId, ["bulut:siparis:oku"])).belirtec });
   kontrol("§5n hesap yöneticisi olmayan 403", yetkisiz.status === 403 && yetkisiz.json.details?.code === "YETKISIZ");
   const iz = await withTesis(o.goc, { tesisId: a.tesisId }, (tx) => tx.accountAudit.count({ where: { tesisId: a.tesisId, event: "DISA_AKTARIM" } }));

@@ -3,7 +3,6 @@
 // AYNI veritabanına kendi URL'iyle bağlanır. Servisler DB'ye yalnız `lib/tenant.ts` üzerinden ve bu nesneyle
 // ulaşır; düz PrismaClient almazlar. Ad (`TesisDbRouter`) çağrı yerleri değişmesin diye korunur.
 import type { PrismaClient } from "@prisma/client";
-import type { FacilityDbKey } from "../auth/facility-db-key";
 import { closeDatabase, createDatabase, type Database } from "./db";
 
 export type RouterRole = "uygulama" | "esitleme" | "goc";
@@ -14,20 +13,16 @@ export interface RouterOptions {
   readonly role: RouterRole;
   /** Bu rolün bağlantı URL'i (`DATABASE_URL` · `ESITLEME_DATABASE_URL` · `GOC_DATABASE_URL`). */
   readonly url: string;
-  /** Giriş dizini e-posta özetinin anahtarı (kimlik akışları). */
-  readonly key: FacilityDbKey;
   readonly poolMax?: number;
 }
 
 export class TesisDbRouter {
   readonly role: RouterRole;
   readonly db: Database;
-  readonly key: FacilityDbKey;
   private closed = false;
 
   constructor(o: RouterOptions) {
     this.role = o.role;
-    this.key = o.key;
     this.db = createDatabase(o.url, o.role, o.poolMax ?? POOL_MAX);
   }
 

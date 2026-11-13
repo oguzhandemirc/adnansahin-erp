@@ -85,7 +85,7 @@ export default function Profile() {
           </View>
           <View style={s.flex}>
             <Text style={[s.heroName, { color: t.color.onPrimary }]} numberOfLines={2}>{hesap?.ad ?? ""}</Text>
-            <Text style={[s.heroMail, { color: t.color.onPrimary }]} numberOfLines={1}>{hesap?.eposta ?? ""}</Text>
+            <Text style={[s.heroMail, { color: t.color.onPrimary }]} numberOfLines={1}>{hesap?.kullaniciAdi ?? ""}</Text>
           </View>
         </View>
         <View style={s.heroBadges}>

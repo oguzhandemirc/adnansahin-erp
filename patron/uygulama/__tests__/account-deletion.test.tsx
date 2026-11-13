@@ -2,7 +2,7 @@
 // silinme günü ve "Tamam" → yerel çıkış · ret (409 SON_YONETICI) iletisi gösterilir, çıkış yapılmaz · profil bağlantısı.
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { ApiError } from "../src/api/client";
-import type { AccountDeletion } from "../src/api/wire";
+import type { AccountDeletion } from "../src/api/eski-uyelik";
 import { DELETION_EFFECTS, DELETION_SUPPORT_EMAIL, deletionDoneText } from "../src/lib/account-deletion";
 
 const deleteOwnAccount = jest.fn<Promise<AccountDeletion>, [{ parola: string; totp?: string }]>();

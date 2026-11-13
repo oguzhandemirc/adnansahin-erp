@@ -2,14 +2,14 @@
 // ölçer). Tek veritabanı (Adnan, tek tesis): üç rol aynı DB'de — göç (tablo sahibi; yalnız migration + CLI) ve iki
 // çalışma rolü, ikisi de NOSUPERUSER NOBYPASSRLS ve tablo sahibi DEĞİL (RLS ikisine de uygulanır):
 //   · uygulama (hesap API'si): projeksiyonu ve eşitleme tablolarını YALNIZ OKUR — API katmanındaki bir
-//     hata fabrikanın verisini yazamaz ya da taklit edemez. Kimlik (`identities`) ve üyelik (`login_routes`)
-//     tablolarının tek çalışma yazarıdır.
+//     hata fabrikanın verisini yazamaz ya da taklit edemez. Hesap satırına YAZAMAZ (yalnız son giriş anı).
 //   · eşitleme (fabrika kanalı + bakım): hesabın FABRİKA kolonlarının (kullanici_adi · name · permissions · status ·
 //     parola_ozeti · kimlik_surumu · closed_at) TEK yazarıdır (`POST /v1/kullanicilar`, kolon düzeyi); uygulamanın malı
-//     olan ikinci etkene (`account_factors`), e-posta kimliğine, davet sırrına ve oturum belirtecine ULAŞAMAZ. Oturumda
-//     yalnız kapatma kolonlarını yazar (hesap kapanınca/parola değişince). Kurulum yönünü yazar, bayat üyeliği siler.
-//   · Uygulama rolü `accounts`ı okur; YALNIZ eski (e-posta) hesap kolonlarına yazar (C4'e dek geçici uyumluluk) —
-//     fabrika kolonlarına yazamaz, fabrika hesabının satırında yalnız `last_login_at` değişir (göç tetikleyicisi).
+//     olan ikinci etkene (`account_factors`) ve oturum belirtecine ULAŞAMAZ. Oturumda yalnız kapatma kolonlarını yazar
+//     (hesap kapanınca/parola değişince). Kurulum yönünü yazar. Kapanıştan 30 gün sonra adı tombstone'a çeken bakım
+//     adımı da bu roldedir (`maintenance.ts` `purgeClosedIdentities`; kolon `identity_purged_at`).
+//   · Uygulama rolü `accounts`ı okur; satırda YALNIZ `last_login_at` yazar (eski e-posta üyeliği C4'te söküldü; göç
+//     tetikleyicisi `fabrika_hesabi_korumasi` ikinci sedde).
 // Migration yeni tablo eklerse buraya satırı AYNI dilimde girer (girmezse iki rol de erişemez: fail-closed).
 export type Privilege = "SELECT" | "INSERT" | "UPDATE" | "DELETE";
 /** Kolon düzeyi yetki: tablo düzeyindekine EK, yalnız adı geçen kolonlarda (aynı yetki iki düzeyde birden verilmez). */
@@ -37,22 +37,14 @@ export const APP_GRANTS: Readonly<Record<string, readonly Privilege[]>> = {
   notifications: ["SELECT", "INSERT", "UPDATE", "DELETE"],
   projection_rows: ["SELECT"],
   sync_state: ["SELECT"],
-  // Kimlik + üyelik (kiracı verisi değil, RLS yok): davet yazar, giriş doğrular, bakım kapatır/siler (kimlik soft).
-  login_routes: ["SELECT", "INSERT", "UPDATE", "DELETE"],
-  identities: ["SELECT", "INSERT", "UPDATE"],
 };
 
 /** Fabrikanın yazdığı hesap kolonları — yalnız eşitleme rolü (`SYNC_COLUMN_GRANTS`); uygulama rolüne VERİLMEZ. */
 export const FACTORY_ACCOUNT_COLUMNS: readonly string[] = ["kullanici_adi", "name", "permissions", "status", "parola_ozeti", "kimlik_surumu", "closed_at"];
 
 export const APP_COLUMN_GRANTS: ColumnGrants = {
-  // GEÇİCİ UYUMLULUK (C4'te daralır): eski e-posta hesabının yaşam döngüsü (davet · izin · kilit · pasif · kimlik silme)
-  // bu kolonlarla sürer. `name/permissions/status/closed_at` eski hesap içindir; fabrika hesabının satırını göç
-  // tetikleyicisi (`fabrika_hesabi_korumasi`) korur. `kullanici_adi`, `parola_ozeti`, `kimlik_surumu` HİÇ yok.
-  accounts: {
-    INSERT: ["id", "tesis_id", "email", "name", "permissions", "status", "invite_token_hash", "invite_expires_at", "created_by_id", "identity_id", "created_at", "updated_at"],
-    UPDATE: ["email", "name", "permissions", "status", "invite_token_hash", "invite_expires_at", "last_login_at", "closed_at", "identity_purged_at", "identity_id", "updated_at"],
-  },
+  // Hesap fabrikanın malıdır (C4): uygulama rolü hesap DOĞURAMAZ, yalnız giriş anını yazar.
+  accounts: { UPDATE: ["last_login_at", "updated_at"] },
   // Yaşa göre silinen alan (`maintenance.ts` `AGED_FIELDS`: giriş olayının IP'si); olay, aktör, zaman yazılamaz.
   account_audit: { UPDATE: ["summary"] },
   // Kimlik silmesi makbuz yanıtındaki ad/e-postayı tombstone'a çevirir (`maintenance.ts` `purgeClosedIdentities`);
@@ -62,13 +54,13 @@ export const APP_COLUMN_GRANTS: ColumnGrants = {
 
 export const SYNC_COLUMN_GRANTS: ColumnGrants = {
   // Gelen kutusu claim'i yazarın GÜNCEL durumunu ve yazma iznini sorar (`inbox.service.ts` `authorEligibleSql`);
-  // e-posta, ad, parola/TOTP/davet sırları OKUNAMAZ — kanal katmanı hesap kimliğine ulaşmaz.
+  // TOTP sırrı (`account_factors`) ve son giriş OKUNAMAZ — kanal katmanı ikinci etkene ulaşmaz.
   // Kullanıcı kümesi (`services/user-sync.service.ts`) kendi yazdığı kolonları okur (değişim tespiti; mühürlü özet
-  // SecretBox ile açılır). E-posta, kimlik bağı, davet sırrı, son giriş OKUNAMAZ; RETURNING'li yazım yoktur.
+  // SecretBox ile açılır); RETURNING'li yazım yoktur. `identity_purged_at`: bakımın kimlik silmesi + yeniden açılış.
   accounts: {
-    SELECT: ["id", "tesis_id", "status", "permissions", "kullanici_adi", "name", "parola_ozeti", "kimlik_surumu", "closed_at"],
+    SELECT: ["id", "tesis_id", "status", "permissions", "kullanici_adi", "name", "parola_ozeti", "kimlik_surumu", "closed_at", "identity_purged_at"],
     INSERT: ["id", "tesis_id", "kullanici_adi", "name", "permissions", "status", "parola_ozeti", "kimlik_surumu", "closed_at", "updated_at"],
-    UPDATE: ["kullanici_adi", "name", "permissions", "status", "parola_ozeti", "kimlik_surumu", "closed_at", "updated_at"],
+    UPDATE: ["kullanici_adi", "name", "permissions", "status", "parola_ozeti", "kimlik_surumu", "closed_at", "identity_purged_at", "updated_at"],
   },
   // Hesap kapanınca / parola değişince açık oturumlar kapanır; belirteç özeti ve istemci OKUNAMAZ.
   sessions: { SELECT: ["id", "tesis_id", "account_id", "closed_at"], UPDATE: ["closed_at", "close_reason", "updated_at"] },
@@ -88,9 +80,8 @@ export const SYNC_GRANTS: Readonly<Record<string, readonly Privilege[]>> = {
   request_nonces: ["SELECT", "INSERT", "DELETE"],
   // Kullanıcı kümesinin ayak izi (yalnız EKLER; okuyamaz — `lib/audit.ts` RETURNING'siz yazar).
   account_audit: ["INSERT"],
-  // Kurulum yönü (ilk yazan bağlar, bağ değişmez) + bayat üyelik budaması; kimliğe (`identities`) ERİŞEMEZ.
+  // Kurulum yönü (ilk yazan bağlar, bağ değişmez).
   installation_routes: ["SELECT", "INSERT"],
-  login_routes: ["SELECT", "DELETE"],
 };
 
 /** Şemadaki bütün uygulama tabloları (bekçi: şema ↔ bu liste birebir). */
@@ -117,9 +108,7 @@ export const CLOUD_TABLES: readonly string[] = [
   "full_sync_runs",
   "request_nonces",
   "installation_routes",
-  "login_routes",
-  "identities",
 ];
 
-/** Kiracı verisi OLMAYAN tablolar: RLS TAŞIMAZ, yalnız rol yetkisiyle korunur (kimlik + kurulum yönü). */
-export const ROUTING_TABLES: readonly string[] = ["installation_routes", "login_routes", "identities"];
+/** Kiracı verisi OLMAYAN tablolar: RLS TAŞIMAZ, yalnız rol yetkisiyle korunur (kurulum yönü). */
+export const ROUTING_TABLES: readonly string[] = ["installation_routes"];

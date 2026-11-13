@@ -32,8 +32,6 @@ const EnvSchema = z
     BIND: z.string().min(1).default("127.0.0.1"),
     /** TOTP sırlarının sarma anahtarı burada (`patron-totp.key`, 0600) — DB'de DEĞİL. */
     ANAHTAR_DIZINI: z.string().min(1).default("anahtarlar"),
-    /** Giriş dizini e-posta özetinin anahtarı (üretim sırrı, salt okunur); yoksa `ANAHTAR_DIZINI/patron-tesis-db.key`. */
-    TESIS_ROL_ANAHTARI_DOSYASI: z.preprocess((v) => (v === "" ? undefined : v), z.string().min(1).optional()),
     /** İstemci adresini taşıyan vekil başlığı; YALNIZ güvenilen kenar ağından gelen bağlantıda okunur. */
     VEKIL_IP_BASLIGI: z.string().min(1).optional(),
     /** Başlığa güvenilen kenar vekilleri (CIDR, virgüllü); verilmezse yerleşik Cloudflare aralıkları. */
@@ -56,7 +54,6 @@ const EnvSchema = z
     API_HIZ_DK: positiveInt(30, 100000).default(600),
     /** IP başına dakikada geçersiz Bearer çözümlemesi; aşılınca o IP'nin oturumlu istekleri DB'ye inmeden 429. */
     OTURUM_RED_HIZ_DK: positiveInt(5, 10000).default(30),
-    DAVET_GECERLILIK_SAAT: positiveInt(1, 720).default(72),
     /** Fabrika kanalı (/v1/*) IP başına dakikalık hız sınırı. */
     V1_HIZ_DK: positiveInt(10, 100000).default(600),
     GELEN_KUTUSU_CLAIM_DK: positiveInt(1, 60).default(10),

@@ -16,7 +16,6 @@ import { SecretBox } from "../../src/auth/secret-box";
 import { hotp, totpStep } from "../../src/auth/totp";
 import { loadConfig } from "../../src/config";
 import { createApp } from "../../src/http/app";
-import { FacilityDbKey, FACILITY_DB_KEY_FILE } from "../../src/auth/facility-db-key";
 import { TesisDbRouter } from "../../src/lib/tesis-db";
 import { loadEnvFile } from "../../src/lib/env";
 import { withTesis } from "../../src/lib/tenant";
@@ -25,8 +24,8 @@ import type { CloudContext } from "../../src/services/context";
 import type { Doorbell, DoorbellTopic } from "../../src/services/doorbell";
 import { InstallationDirectory } from "../../src/services/installation-directory";
 import { createNotificationRuntime } from "../../src/services/notification-scheduler";
-import { inviteFacilityAdmin, openFacility, registerInstallation } from "../../src/services/vendor-admin.service";
-import { acceptInvite } from "../../src/auth/invite.service";
+import { openFacility, registerInstallation } from "../../src/services/vendor-admin.service";
+import bcrypt from "bcryptjs";
 import { applyRoles } from "../db-rolleri";
 import { temizleTesisSatirlari } from "./test-temizlik";
 
@@ -86,31 +85,18 @@ export interface Ortam {
   readonly goc: TesisDbRouter;
   readonly app: TesisDbRouter;
   readonly sync: TesisDbRouter;
-  /** Bu ortamın giriş dizini anahtarı (kimlik e-posta özeti; sunucu ve CLI aynısını kullanır). */
-  readonly anahtar: FacilityDbKey;
   readonly saat: Saat;
   readonly zil: KayitliZil;
   readonly adres: string;
   kapat(): Promise<void>;
 }
 
-let ortakAnahtar: FacilityDbKey | null = null;
-
-/** Süreç başına TEK giriş dizini anahtarı: aynı bekçideki iki ortam (ör. iki bildirim kipi) aynı kimlikleri çözer. */
-function surecAnahtari(): FacilityDbKey {
-  if (ortakAnahtar) return ortakAnahtar;
-  const dizin = mkdtempSync(path.join(os.tmpdir(), "patron-bekci-anahtar-"));
-  process.on("exit", () => rmSync(dizin, { recursive: true, force: true }));
-  ortakAnahtar = FacilityDbKey.load(path.join(dizin, FACILITY_DB_KEY_FILE), { create: true });
-  return ortakAnahtar;
-}
-
-/** `ezme`: giriş dizini anahtarı değişimini ölçen bekçi için (sır kutusu önceki ortamınki). */
+/** `ezme.secrets`: sır kutusu anahtarı değişimini ölçen bekçi için (önceki ortamın kutusu). */
 export async function ortamKur(
   ekOrtam: Record<string, string> = {},
   fetchImpl?: typeof fetch,
   doorbell?: Doorbell,
-  ezme: { anahtar?: FacilityDbKey; secrets?: SecretBox } = {},
+  ezme: { secrets?: SecretBox } = {},
 ): Promise<Ortam> {
   hedefDbKapisi();
   await applyRoles(process.env);
@@ -118,10 +104,9 @@ export async function ortamKur(
   const config = loadConfig({ ...process.env, ANAHTAR_DIZINI: dizin, ...ekOrtam }, PATRON_KOKU);
   const saat = new Saat();
   const zil = new KayitliZil();
-  const anahtar = ezme.anahtar ?? surecAnahtari();
-  const goc = new TesisDbRouter({ role: "goc", url: process.env.GOC_DATABASE_URL!, key: anahtar });
-  const app = new TesisDbRouter({ role: "uygulama", url: config.DATABASE_URL, key: anahtar });
-  const sync = new TesisDbRouter({ role: "esitleme", url: config.ESITLEME_DATABASE_URL, key: anahtar });
+  const goc = new TesisDbRouter({ role: "goc", url: process.env.GOC_DATABASE_URL! });
+  const app = new TesisDbRouter({ role: "uygulama", url: config.DATABASE_URL });
+  const sync = new TesisDbRouter({ role: "esitleme", url: config.ESITLEME_DATABASE_URL });
   const ctx: CloudContext = {
     config,
     app,
@@ -140,7 +125,6 @@ export async function ortamKur(
     goc,
     app,
     sync,
-    anahtar,
     saat,
     zil,
     adres,
@@ -190,9 +174,23 @@ export const TEST_PAROLASI = "bekci-bulut-parolasi-2026";
 
 export interface TestHesabi {
   readonly accountId: string;
-  readonly eposta: string;
+  readonly tesisId: string;
+  /** Fabrika kullanıcı adı (küçük harf, `bekci-<12hex>`). */
+  readonly kullaniciAdi: string;
   readonly sir: string;
   belirtec: string;
+}
+
+/** Fikstür parolasının bcrypt özeti (maliyet 10 — fabrikanınkiyle aynı); süreç başına bir kez hesaplanır. */
+let parolaOzeti: string | null = null;
+export function testParolaOzeti(): string {
+  parolaOzeti ??= bcrypt.hashSync(TEST_PAROLASI, 10);
+  return parolaOzeti;
+}
+
+/** Kullanıcı listesi bayatlık damgası (`facilities.kullanici_son_esitleme`) = enjekte saat — yeni giriş 503 almasın. */
+export async function damgaTazele(o: Ortam, tesisId: string): Promise<void> {
+  await withTesis(o.goc, { tesisId }, (tx) => tx.facility.updateMany({ where: { tesisId }, data: { usersPushedAt: new Date(o.saat.simdi()) } }));
 }
 
 /** TOTP kodu (verilen anda); aynı adımı ikinci kez kullanmamak için saat ≥ 30 sn ilerletilir. */
@@ -212,26 +210,30 @@ export async function dogrulamaAc(o: Ortam, belirtec: string, parola: string = T
 }
 
 /**
- * Hesap: satıcı daveti → kabul (hesap AKTİF) → giriş → (varsayılan) doğrulama AÇ (gerçek servis yolu). İzinler sonradan
- * GÖÇ rolüyle ayarlanır. `dogrulama: false` ⇒ kodsuz hesap (`sir` boş; giriş yalnız parola).
+ * Hesap: FABRİKA HESABI (üyelik = Electron şifresi) göç rolüyle doğrudan yazılır — fabrikanın `POST /v1/kullanicilar`
+ * gönderiminin bıraktığı satırın aynısı (mühürlü bcrypt özeti, AKTİF, izinler) + bayatlık damgası; sonra gerçek giriş
+ * (HTTP) ve (varsayılan) doğrulama AÇ. Eşitleme ucunun kendisini `test_kullanici_esitleme` ölçer.
+ * `dogrulama: false` ⇒ kodsuz hesap (`sir` boş; giriş yalnız parola).
  */
 export async function hesapKur(o: Ortam, tesisId: string, izinler: readonly string[], g: { dogrulama?: boolean } = {}): Promise<TestHesabi> {
-  const eposta = `bekci-${randomUUID().slice(0, 12)}@ornek.test`;
-  // Fikstür hesabı satıcı yolundan doğar; tesiste aktif yönetici olabileceği için açık zorlamayla (denetime yazılır).
-  const zorla = { talep: "BEKCI-FIKSTUR", gerekce: "bekçi fikstürü: test hesabı" };
-  const davet = await inviteFacilityAdmin(o.goc, { tesisId, email: eposta, name: "Bekçi Hesabı", validHours: 24, zorla }, o.saat.simdi());
-  await acceptInvite(o.ctx, { token: davet.token, password: TEST_PAROLASI });
-  await withTesis(o.goc, { tesisId }, (tx) => tx.account.update({ where: { id: davet.accountId }, data: { permissions: [...izinler] } }));
-  const hesap: TestHesabi = { accountId: davet.accountId, eposta, sir: "", belirtec: "" };
+  const id = randomUUID();
+  const kullaniciAdi = `bekci-${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+  await withTesis(o.goc, { tesisId }, (tx) =>
+    tx.account.create({
+      data: { id, tesisId, kullaniciAdi, name: "Bekçi Hesabı", permissions: [...izinler], passwordSealed: o.ctx.secrets.seal(testParolaOzeti(), id, "parola") },
+    }),
+  );
+  const hesap: TestHesabi = { accountId: id, tesisId, kullaniciAdi, sir: "", belirtec: "" };
   hesap.belirtec = await girisYap(o, hesap);
   if (g.dogrulama === false) return hesap;
   const sir = await dogrulamaAc(o, hesap.belirtec);
   return { ...hesap, sir };
 }
 
-export async function girisYap(o: Ortam, h: Pick<TestHesabi, "eposta" | "sir">): Promise<string> {
+export async function girisYap(o: Ortam, h: Pick<TestHesabi, "tesisId" | "kullaniciAdi" | "sir">): Promise<string> {
   o.saat.ilerlet(31_000);
-  const r = await api(o, "POST", "/api/oturum/ac", { govde: { eposta: h.eposta, parola: TEST_PAROLASI, ...(h.sir ? { totp: totpKodu(h.sir, o.saat.simdi()) } : {}) } });
+  await damgaTazele(o, h.tesisId);
+  const r = await api(o, "POST", "/api/oturum/ac", { govde: { kullaniciAdi: h.kullaniciAdi, parola: TEST_PAROLASI, ...(h.sir ? { totp: totpKodu(h.sir, o.saat.simdi()) } : {}) } });
   if (r.status !== 200) throw new Error(`giriş başarısız: ${r.status} ${JSON.stringify(r.json)}`);
   return (r.json.data as { belirtec: string }).belirtec;
 }

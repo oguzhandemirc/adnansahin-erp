@@ -2,7 +2,8 @@
 // gelen kutusu süzgeci sunucuya gider (istemci süzmez) · Diğer'de bekleyen rozeti · gövde özeti · kısa yoklama.
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
-import type { Account, InboxItem } from "../src/api/wire";
+import type { InboxItem } from "../src/api/wire";
+import type { LegacyAccount as Account } from "../src/api/eski-uyelik";
 
 const mockApi = {
   inboxList: jest.fn(async (_p: unknown) => ({ kayitlar: [], sonraki: null })),

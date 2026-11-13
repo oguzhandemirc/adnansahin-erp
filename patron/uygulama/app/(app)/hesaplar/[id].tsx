@@ -3,7 +3,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
-import type { Account, AccountInviteResult } from "../../../src/api/wire";
+import type { LegacyAccount as Account, AccountInviteResult } from "../../../src/api/eski-uyelik";
 import { formatDateTime } from "../../../src/lib/format";
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";

@@ -29,21 +29,13 @@ enum FacilityStatus {
   PASIF
 }
 
-enum IdentityStatus {
-  /// Davet kabul edildi (parola + TOTP sırrı var), ilk kod henüz onaylanmadı — giriş YOK.
-  DAVETLI
-  AKTIF
-  /// Kapandı — giriş YOK.
-  PASIF
-}
-
+/// Fabrika hesabının durumu: DB CHECK `accounts_durum_check` yalnız AKTIF/PASIF'e izin verir (C4). DAVETLI/KILITLI
+/// eski e-posta üyeliğinden tipte kalan değerlerdir; hiçbir satır taşıyamaz.
 enum AccountStatus {
-  /// Davet belirteci bekliyor (parola + TOTP kurulumu yapılmadı) — giriş YOK.
   DAVETLI
   AKTIF
-  /// Tesis yöneticisi ya da satıcı kilitledi — giriş YOK, oturumlar kapanır.
   KILITLI
-  /// Arşiv (soft delete) — giriş YOK.
+  /// Fabrika kümesinde yok (kapandı) — giriş YOK, parola özeti NULL.
   PASIF
 }
 
@@ -95,7 +87,7 @@ enum NotificationStatus {
 }
 
 // -----------------------------------------------------------------------------
-// KİMLİK VE YÖNLENDİRME — kiracı verisi değil (RLS yok; yetki `src/lib/db-grants.ts`)
+// KURULUM YÖNÜ — kiracı verisi değil (RLS yok; yetki `src/lib/db-grants.ts`)
 // -----------------------------------------------------------------------------
 
 /// Kurulum → tesis (değişmez). İmzalı isteğin tesisi buradan çözülür; satır yoksa kurulum bilinmiyor (401).
@@ -110,45 +102,6 @@ model InstallationRoute {
   @@map("installation_routes")
 }
 
-/// Bulut KİMLİĞİ: tek e-posta (yalnız ANAHTARLI özet, HMAC-SHA256 `patron-tesis-db.key`) + tek parola + tek
-/// TOTP (İSTEĞE BAĞLI); birden çok tesise üyelikle (`login_routes`) erişir. Kimlik tablosu düz e-posta TAŞIMAZ. TOTP sırrı kimlik
-/// id'siyle mühürlü. CHECK: AKTIF ⇒ parola; açık TOTP ⇒ sır + son adım; PASIF ⇔ kapanış anı; silinmişte sır yok.
-model Identity {
-  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  emailDigest      String         @unique @map("email_digest") @db.VarChar(64)
-  passwordHash     String?        @map("password_hash") @db.VarChar(200)
-  totpSecretSealed String?        @map("totp_secret_sealed") @db.VarChar(300)
-  totpLastStep     Int?           @map("totp_last_step")
-  /// Doğrulama kodu AÇIK (onaylanmış kurulum anı). NULL ⇒ kapalı; sır doluysa kurulum onay bekliyor (açık SAYILMAZ).
-  totpEnabledAt    DateTime?      @map("totp_enabled_at") @db.Timestamptz
-  status           IdentityStatus @default(DAVETLI) @map("status")
-  closedAt         DateTime?      @map("closed_at") @db.Timestamptz
-  identityPurgedAt DateTime?      @map("identity_purged_at") @db.Timestamptz
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-
-  memberships LoginRoute[]
-
-  @@map("identities")
-}
-
-/// Üyelik (giriş dizini): kimlik → (tesis, hesap). Kimlik tesis başına en çok bir hesaba, hesap tek kimliğe bağlıdır.
-/// Yalnız davet onayında yazılır; hedefi etkin olmayan satırı bakım siler.
-model LoginRoute {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  identityId String   @map("identity_id") @db.Uuid
-  tesisId    String   @map("tesis_id") @db.Uuid
-  accountId  String   @unique @map("account_id") @db.Uuid
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-
-  identity Identity @relation(fields: [identityId], references: [id], onDelete: Restrict)
-
-  @@unique([identityId, tesisId])
-  @@index([tesisId])
-  @@map("login_routes")
-}
-
 // -----------------------------------------------------------------------------
 // TESİS · KURULUM (tek tesis: CLI `scripts/tesis.ts tesis-ac` + `kurulum-kaydet`)
 // -----------------------------------------------------------------------------
@@ -160,6 +113,10 @@ model Facility {
   name            String         @map("name") @db.VarChar(200)
   retentionMonths Int?           @default(13) @map("retention_months")
   status          FacilityStatus @default(AKTIF) @map("status")
+  /// Fabrikanın son kullanıcı kümesi gönderimi (`POST /v1/kullanicilar`; eşitleme rolü yazar). Bayatlık tavanını
+  /// (`FABRIKA_BAYATLIK_GUN`) aşınca yeni giriş 503 `FABRIKA_BAGLANTISI_YOK`. NULL = hiç gönderilmedi (giriş yok). C4'te
+  /// `sync_state`ten taşındı: tesis satırı `tesis-ac` ile doğar, ilk küme eşitleme paketinden önce de damgalar.
+  usersPushedAt   DateTime?      @map("kullanici_son_esitleme") @db.Timestamptz
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -198,32 +155,25 @@ model Installation {
 model Account {
   id               String        @id @default(uuid()) @db.Uuid
   tesisId          String        @map("tesis_id") @db.Uuid
-  /// Tekillik kısmi indekslerle (temel göç): AKTIF · KILITLI hesapta (bulut geneli tekillik `identities.email_digest`);
-  /// tesis içinde PASİF olmayan hesapta. Davet ve arşiv e-postayı tutmaz.
-  /// Eski e-posta hesabı (C4'te kalkar); fabrika hesabında NULL. CHECK: e-posta ya da kullanıcı adı dolu.
-  email            String?       @map("email") @db.VarChar(254)
   name             String        @map("name") @db.VarChar(200)
   /// FABRİKA HESABI (üyelik = Electron şifresi): id = fabrika `users.id`; kullanıcı adı küçük harf, PASİF olmayan
   /// hesaplarda tekil (ertelenmiş dışlama, göç `20261113220000`). Bu kolonları + ad · izin · durum · kapanış YALNIZ
-  /// eşitleme rolü yazar (`POST /v1/kullanicilar`); uygulama rolü okur, yalnız `last_login_at` yazar (eski hesap C4'e dek hariç).
-  kullaniciAdi     String?       @map("kullanici_adi") @db.VarChar(50)
+  /// eşitleme rolü yazar (`POST /v1/kullanicilar`); uygulama rolü okur, yalnız `last_login_at` yazar.
+  kullaniciAdi     String        @map("kullanici_adi") @db.VarChar(50)
   /// Fabrikanın bcrypt özeti, SecretBox ile MÜHÜRLÜ (AAD = hesap id). PASİF ⇒ NULL. Log/denetime GİRMEZ.
   passwordSealed   String?       @map("parola_ozeti") @db.VarChar(300)
-  /// Parola özeti her değiştiğinde +1; oturum açıldığı sürümü taşır (C3: küçükse 401). Varsayılan DB'de
-  /// (`dbgenerated`): istemci INSERT'e koymaz — uygulama rolünün bu kolona INSERT yetkisi yoktur.
+  /// Parola özeti her değiştiğinde +1; oturum açıldığı sürümü taşır (C3: farklıysa 401). Varsayılan DB'de
+  /// (`dbgenerated`): istemci INSERT'e koymaz.
   identityVersion  Int           @default(dbgenerated("0")) @map("kimlik_surumu")
-  /// Kimlik (`identities.id`; FK yok). CHECK: AKTIF · KILITLI ⇒ dolu. Parola/TOTP kimliktedir.
-  identityId       String?       @map("identity_id") @db.Uuid
   permissions      String[]      @map("permissions")
-  status           AccountStatus @default(DAVETLI) @map("status")
-  inviteTokenHash  String?       @unique @map("invite_token_hash") @db.VarChar(64)
-  inviteExpiresAt  DateTime?     @map("invite_expires_at") @db.Timestamptz
+  /// CHECK `accounts_durum_check`: yalnız AKTIF/PASIF.
+  status           AccountStatus @default(AKTIF) @map("status")
   lastLoginAt      DateTime?     @map("last_login_at") @db.Timestamptz
   /// Kapanış anı (PASIF geçişiyle aynı claim'de; CHECK: PASIF ⇔ dolu).
   closedAt         DateTime?     @map("closed_at") @db.Timestamptz
-  /// Kimlik silme anı (Ek-6/A §2.5: kapanıştan 30 gün sonra ad/e-posta/parola/TOTP silinir; satır ve id KALIR).
+  /// Kimlik silme anı (kapanıştan 30 gün sonra ad + kullanıcı adı tombstone, uygulamanın etkenleri silinir; satır ve
+  /// id KALIR). Fabrika hesabı yeniden açarsa eşitleme AYNI ifadede NULL'a çeker.
   identityPurgedAt DateTime?     @map("identity_purged_at") @db.Timestamptz
-  createdById      String?       @map("created_by_id") @db.Uuid
   createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -232,7 +182,6 @@ model Account {
   factors  AccountFactor?
 
   @@index([tesisId])
-  @@index([email])
   @@map("accounts")
 }
 
@@ -545,8 +494,6 @@ model SyncState {
   changeCounter      BigInt    @default(0) @map("change_counter")
   /// Son artıştaki projeksiyon adları (tekil); içerik taşımaz, okuyan hesabın izniyle süzülür.
   changedProjections Json      @default("[]") @map("changed_projections")
-  /// Fabrikanın son kullanıcı kümesi gönderimi (`POST /v1/kullanicilar`, C3 bayatlık tavanı). NULL ⇒ giriş yok.
-  usersPushedAt      DateTime? @map("kullanici_son_esitleme") @db.Timestamptz
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 

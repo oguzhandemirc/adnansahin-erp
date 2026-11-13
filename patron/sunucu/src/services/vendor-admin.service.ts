@@ -1,20 +1,15 @@
-// SATICI YÖNETİMİ (CLI — `scripts/tesis.ts`; göç rolüyle, VDS'te konteyner içinden) — satıcının
-// Müşteri → Tesis → Kurulum ağacının buluttaki yansıması (`KURULUM_KAYNAGI=kayit` kipinde) ve İLK
-// tesis yöneticisinin daveti. Tesis yöneticisi ekibini kendisi yönetir; satıcı yalnız ilk yöneticiyi
-// açar ve yönetici kalmadığında sıfırlar — tesiste AKTİF yönetici varken yönetici daveti/yükseltmesi RED,
-// yalnız açık zorlama (talep no + gerekçe) ile ve denetime yazılarak. Her eylem `satici-cli` aktörüyle düşer.
-// Paylaşımlı (birden çok tesise üye) kimliğin sırrını YALNIZ satıcı sıfırlar (`resetIdentity`, her zaman zorlamayla).
-import { createInvite } from "../auth/invite.service";
-import { closeIdentitySessions, identityEngagedOutside, membershipRoutes } from "../auth/membership";
-import { normalizeEmail } from "../auth/session.service";
-import { ROLE_TEMPLATES } from "../catalog/permissions";
+// SATICI YÖNETİMİ (CLI — `scripts/tesis.ts`; göç rolüyle, VDS'te konteyner içinden) — tesis kaydı, kurulum kaydı ve
+// FABRİKA HESABININ ACİL DURUM ARAÇLARI (üyelik = Electron şifresi, C4). Hesap fabrikanın malıdır: yaratma, ad, izin,
+// parola ve kapanış YALNIZ fabrikadan gelir (`POST /v1/kullanicilar`). CLI yalnız uygulamanın malı olan ikinci etkene
+// dokunur — bulut kilidi (kilitle/aç), doğrulama kodu kapatma (telefon kaybı kurtarması) — ve kullanıcı listesinin
+// damgasını sıfırlar (anahtar kaybı: fabrikanın sonraki gönderimi mühürleri yeniden yazar). Her eylem `satici-cli`
+// aktörüyle `account_audit`e düşer (gerekçe + isteğe bağlı talep no); sır, parola özeti ve kullanıcı adı basılmaz.
+import { Prisma } from "@prisma/client";
+import { normalizeUsername } from "../auth/factory-login";
 import { publicKeyFromX } from "../lisans-protokol";
 import { recordAudit } from "../lib/audit";
-import { CloudError, notFound, stateConflict } from "../lib/errors";
-import { uniqueViolationOn } from "../lib/prisma-errors";
-import { listReadyFacilities, withCentral, withTesis } from "../lib/tenant";
-import type { Tx } from "../lib/db";
-import { ADMIN_PERMISSION, assertEmailFreeInFacility, emailInUseHere } from "./account.service";
+import { CloudError, notFound } from "../lib/errors";
+import { listReadyFacilities, withTesis } from "../lib/tenant";
 import { bindInstallationRoute, safeKeyId } from "./installation-directory";
 import type { TesisDbRouter } from "../lib/tesis-db";
 
@@ -73,159 +68,109 @@ export async function registerInstallation(db: TesisDbRouter, g: InstallationInp
   return row;
 }
 
-/** Satıcının yönetim kapısını aşması: talep numarası + gerekçe zorunlu; ikisi de denetime yazılır. */
-export interface VendorOverride {
-  readonly talep: string;
+// ---------------------------------------------------------------- fabrika hesabının acil durum araçları (C4)
+
+/** CLI gerekçesi (denetime yazılır): gerekçe 10–500 karakter; talep no isteğe bağlı 3–60. */
+export interface VendorReason {
   readonly gerekce: string;
+  readonly talep?: string;
 }
 
-/** CLI bayrakları → zorlama: `--zorla` yalnız `--talep` ve `--gerekce` ile; bayraksız talep/gerekçe de RED (açıklık). */
-export function overrideFromArgs(a: Readonly<Record<string, string | undefined>>): VendorOverride | undefined {
-  const zorla = a.zorla === "true";
-  if (!zorla && (a.talep !== undefined || a.gerekce !== undefined)) throw new CloudError(400, "GOVDE_GECERSIZ", "--talep/--gerekce yalnız --zorla ile verilir");
-  if (!zorla) return undefined;
-  const talep = (a.talep ?? "").trim();
+/** CLI bayrakları → gerekçe. `required` ise `--gerekce` zorunlu; verilmediyse undefined. */
+export function reasonFromArgs(a: Readonly<Record<string, string | undefined>>, required: boolean): VendorReason | undefined {
   const gerekce = (a.gerekce ?? "").trim();
-  if (talep.length < 3 || talep.length > 60) throw new CloudError(400, "GOVDE_GECERSIZ", "--zorla için --talep=<talep no> (3–60 karakter) zorunlu");
-  if (gerekce.length < 10 || gerekce.length > 500) throw new CloudError(400, "GOVDE_GECERSIZ", "--zorla için --gerekce=\"…\" (10–500 karakter) zorunlu");
-  return { talep, gerekce };
+  const talep = (a.talep ?? "").trim();
+  if (!gerekce) {
+    if (required) throw new CloudError(400, "GOVDE_GECERSIZ", "--gerekce=\"…\" (10–500 karakter) zorunlu — denetime yazılır");
+    if (talep) throw new CloudError(400, "GOVDE_GECERSIZ", "--talep yalnız --gerekce ile verilir");
+    return undefined;
+  }
+  if (gerekce.length < 10 || gerekce.length > 500) throw new CloudError(400, "GOVDE_GECERSIZ", "--gerekce 10–500 karakter olmalı");
+  if (talep && (talep.length < 3 || talep.length > 60)) throw new CloudError(400, "GOVDE_GECERSIZ", "--talep 3–60 karakter olmalı");
+  return { gerekce, ...(talep ? { talep } : {}) };
+}
+
+const reasonSummary = (r: VendorReason | undefined) => (r ? { gerekce: r.gerekce, ...(r.talep ? { talep: r.talep } : {}) } : {});
+
+/** Kullanıcı adı → AÇIK (PASİF olmayan) fabrika hesabının kimliği; yoksa 404 (ad çıktıya/hataya basılmaz). */
+async function openAccountId(db: TesisDbRouter, tesisId: string, rawUsername: string): Promise<string> {
+  const username = normalizeUsername(rawUsername);
+  if (!username) throw new CloudError(400, "GOVDE_GECERSIZ", "--kullanici biçimsiz (harf, rakam, . _ -; en çok 50)");
+  const row = await withTesis(db, { tesisId }, (tx) => tx.account.findFirst({ where: { tesisId, kullaniciAdi: username, status: { not: "PASIF" } }, select: { id: true } }));
+  if (!row) throw notFound("Açık fabrika hesabı");
+  return row.id;
+}
+
+export interface VendorAccountResult {
+  readonly accountId: string;
+  readonly changed: boolean;
+  readonly sessions?: number;
 }
 
 /**
- * Tesiste AKTİF hesap yöneticisi varsa satıcı yönetici açamaz/yükseltemez (yönetim tesisindedir).
- * Zorlama yalnız açık talep + gerekçeyle; dönen sayı denetim özetine girer.
+ * Bulut kilidi (acil durum; fabrika kapalıyken de çalışır): kilitle → yeni giriş 401 ve açık oturumlar KAPANIR (kilit
+ * açılınca eski oturum dirilmez); aç → bulut kilidi + geçici kaba kuvvet kilidi ve sayaç sıfırlanır. Atomik claim;
+ * zaten o durumdaysa değişiklik yok (denetim yazılmaz).
  */
-async function assertNoActiveAdmin(tx: Tx, tesisId: string, override: VendorOverride | undefined): Promise<number> {
-  const active = await tx.account.count({ where: { tesisId, status: "AKTIF", permissions: { has: ADMIN_PERMISSION } } });
-  if (active > 0 && !override) {
-    throw new CloudError(409, "AKTIF_YONETICI_VAR", "Tesiste aktif bir hesap yöneticisi var; hesap yönetimi tesis yöneticisindedir. Zorunluysa --zorla --talep=<no> --gerekce=\"…\" ile (denetime yazılır)");
-  }
-  return active;
-}
-
-const overrideSummary = (override: VendorOverride | undefined, active: number) =>
-  override ? { zorla: true, talep: override.talep, gerekce: override.gerekce, aktifYonetici: active } : undefined;
-
-/** İlk tesis yöneticisi (Patron şablonu). Davet belirteci BİR KEZ döner; repoya/loga yazılmaz. */
-export async function inviteFacilityAdmin(db: TesisDbRouter, g: { tesisId: string; email: string; name: string; validHours: number; zorla?: VendorOverride }, nowMs: number = Date.now()) {
-  const invite = createInvite(g.tesisId, nowMs, g.validHours);
-  const email = normalizeEmail(g.email);
-  try {
-    const { account, active } = await withTesis(db, { tesisId: g.tesisId, lock: { name: "ACCOUNT_ADMIN", key: g.tesisId } }, async (tx) => {
-      if (!(await tx.facility.findUnique({ where: { tesisId: g.tesisId } }))) throw notFound("Tesis");
-      const active = await assertNoActiveAdmin(tx, g.tesisId, g.zorla);
-      await assertEmailFreeInFacility(tx, g.tesisId, email);
-      const account = await tx.account.create({
-        data: { tesisId: g.tesisId, email, name: g.name, permissions: [...ROLE_TEMPLATES.PATRON], status: "DAVETLI", inviteTokenHash: invite.digest, inviteExpiresAt: invite.expiresAt },
-      });
-      return { account, active };
-    });
-    const summary = overrideSummary(g.zorla, active);
-    await recordAudit(db, { tesisId: g.tesisId, actor: VENDOR_ACTOR, event: "YONETICI_DAVET", entity: "Account", entityId: account.id, ...(summary ? { summary } : {}) });
-    return { accountId: account.id, token: invite.token, expiresAt: invite.expiresAt };
-  } catch (err) {
-    if (uniqueViolationOn(err, "tesis_email")) throw emailInUseHere();
-    throw err;
-  }
-}
-
-/** Yönetici kalmadığında kurtarma: hesabı sıfırlayıp yönetici olarak yeniden davet eder (oturumlar kapanır). */
-export async function reinviteAdmin(db: TesisDbRouter, g: { tesisId: string; email: string; validHours: number; zorla?: VendorOverride }, nowMs: number = Date.now()) {
-  const invite = createInvite(g.tesisId, nowMs, g.validHours);
-  const email = normalizeEmail(g.email);
-  const { account, active } = await withTesis(db, { tesisId: g.tesisId, lock: { name: "ACCOUNT_ADMIN", key: g.tesisId } }, async (tx) => {
-    // Aynı tesiste aynı e-postalı PASİF satır(lar) da olabilir; hedef PASİF OLMAYAN tek hesaptır.
-    const a = await tx.account.findFirst({ where: { tesisId: g.tesisId, email, status: { not: "PASIF" } } });
-    if (!a) {
-      if (await tx.account.findFirst({ where: { tesisId: g.tesisId, email }, select: { id: true } })) throw stateConflict("Arşivdeki hesap yeniden davet edilemez");
-      throw notFound("Hesap");
+export async function setCloudLock(db: TesisDbRouter, g: { tesisId: string; username: string; lock: boolean; reason?: VendorReason }, nowMs: number = Date.now()): Promise<VendorAccountResult> {
+  const accountId = await openAccountId(db, g.tesisId, g.username);
+  const now = new Date(nowMs);
+  const out = await withTesis(db, { tesisId: g.tesisId }, async (tx) => {
+    if (g.lock) {
+      const n = await tx.$executeRaw(Prisma.sql`
+        INSERT INTO account_factors (account_id, tesis_id, bulut_kilidi, updated_at) VALUES (${accountId}::uuid, ${g.tesisId}::uuid, true, ${now})
+        ON CONFLICT (account_id) DO UPDATE SET bulut_kilidi = true, updated_at = EXCLUDED.updated_at WHERE account_factors.bulut_kilidi = false`);
+      const closed = await tx.session.updateMany({ where: { tesisId: g.tesisId, accountId, closedAt: null }, data: { closedAt: now, closeReason: "SIFIRLAMA" } });
+      return { changed: n > 0, sessions: closed.count };
     }
-    const active = await assertNoActiveAdmin(tx, g.tesisId, g.zorla);
-    // Paylaşımlı kimlik bu yoldan sıfırlanmaz (kabul yeniden sırlamaz, davet ölü kalırdı): `kimlik-sifirla` kullanılır.
-    if (a.identityId && (await identityEngagedOutside({ app: db }, a.identityId, { tesisId: g.tesisId }))) {
-      throw new CloudError(409, "KIMLIK_PAYLASIMLI", "Hesabın bulut kimliği başka tesise de bağlı; sırrı `kimlik-sifirla --zorla --talep=<no> --gerekce=\"…\"` ile sıfırlayın");
-    }
-    // Atomik claim: hedef okunduğu durumda değilse (bu arada değişti) dokunulmaz.
-    const claimed = await tx.account.updateMany({
-      where: { id: a.id, tesisId: g.tesisId, status: a.status },
-      data: {
-        status: "DAVETLI",
-        identityId: null,
-        inviteTokenHash: invite.digest,
-        inviteExpiresAt: invite.expiresAt,
-        permissions: [...new Set([...a.permissions, ADMIN_PERMISSION])],
-      },
+    const r = await tx.accountFactor.updateMany({
+      where: { accountId, OR: [{ cloudLock: true }, { tempLockUntil: { not: null } }, { failureCount: { gt: 0 } }] },
+      data: { cloudLock: false, tempLockUntil: null, failureCount: 0, failureWindowStart: null },
     });
-    if (claimed.count === 0) throw stateConflict("Hesap bu arada değişti; tekrar deneyin");
-    await tx.session.updateMany({ where: { accountId: a.id, closedAt: null }, data: { closedAt: new Date(nowMs), closeReason: "SIFIRLAMA" } });
-    return { account: await tx.account.findUniqueOrThrow({ where: { id: a.id } }), active };
+    return { changed: r.count > 0, sessions: 0 };
   });
-  const summary = overrideSummary(g.zorla, active);
-  await recordAudit(db, { tesisId: g.tesisId, actor: VENDOR_ACTOR, event: "YONETICI_YENIDEN_DAVET", entity: "Account", entityId: account.id, ...(summary ? { summary } : {}) });
-  return { accountId: account.id, token: invite.token, expiresAt: invite.expiresAt };
+  if (out.changed || out.sessions > 0) {
+    await recordAudit(db, {
+      tesisId: g.tesisId,
+      actor: VENDOR_ACTOR,
+      event: g.lock ? "HESAP_BULUT_KILIDI" : "HESAP_BULUT_KILIDI_KALKTI",
+      entity: "Account",
+      entityId: accountId,
+      summary: { ...reasonSummary(g.reason), ...(g.lock ? { oturum: out.sessions } : {}) },
+    });
+  }
+  return { accountId, ...out };
 }
 
 /**
- * Kimlik sırrı sıfırlaması (satıcı; telefon/parola kaybı, kimlik birden çok tesise üye): HER ZAMAN zorlamayla. Kimlik
- * DAVETLİ'ye iner ve sırları silinir (bütün tesislerde giriş durur, bütün üyeliklerin oturumları kapanır); `tesisId`teki
- * üyelik hesabı kimliğe BAĞLI kalarak yeni davet alır — yalnız bu davetin kabulü kimliği yeniden sırlar (`identityReclaimable`
- * (b)); öteki tesislerin hesapları AKTİF kalır ve onayla yeniden açılır. Her üyelik tesisinin denetimine yazılır.
- * Kilit sırası: merkez LOGIN_ROUTE → tesis ACCOUNT_ADMIN.
+ * Doğrulama kodunu (TOTP) kapatma — telefonunu kaybeden kişinin TEK kurtarma yolu (uygulamada yok). Sır silinir;
+ * parola (fabrikanın) ve oturumlar kalır. Gerekçe ZORUNLU. Zaten kapalıysa değişiklik yok.
  */
-export async function resetIdentity(db: TesisDbRouter, g: { tesisId: string; email: string; validHours: number; zorla?: VendorOverride }, nowMs: number = Date.now()) {
-  const zorla = g.zorla;
-  if (!zorla) throw new CloudError(400, "GOVDE_GECERSIZ", "Kimlik sıfırlaması yalnız --zorla --talep=<talep no> --gerekce=\"…\" ile yapılır (denetime yazılır)");
-  const emailDigest = db.key.emailDigest(normalizeEmail(g.email));
-  const invite = createInvite(g.tesisId, nowMs, g.validHours);
-  const { identityId, accountId } = await withCentral(db, { lock: { name: "LOGIN_ROUTE", key: emailDigest } }, async (central) => {
-    const identity = await central.identity.findUnique({ where: { emailDigest } });
-    if (!identity || identity.identityPurgedAt) throw notFound("Kimlik");
-    const route = await central.loginRoute.findUnique({ where: { identityId_tesisId: { identityId: identity.id, tesisId: g.tesisId } } });
-    if (!route) throw notFound("Kimliğin bu tesisteki üyeliği");
-    const ir = await central.identity.updateMany({
-      where: { id: identity.id, status: identity.status, updatedAt: identity.updatedAt },
-      data: { status: "DAVETLI", passwordHash: null, totpSecretSealed: null, totpLastStep: null, totpEnabledAt: null, closedAt: null },
-    });
-    if (ir.count === 0) throw stateConflict("Kimlik bu arada değişti; tekrar deneyin");
-    await withTesis(db, { tesisId: g.tesisId, lock: { name: "ACCOUNT_ADMIN", key: g.tesisId } }, async (tx) => {
-      const claimed = await tx.account.updateMany({
-        where: { id: route.accountId, tesisId: g.tesisId, identityId: identity.id, status: { in: ["AKTIF", "KILITLI", "DAVETLI"] } },
-        data: { status: "DAVETLI", inviteTokenHash: invite.digest, inviteExpiresAt: invite.expiresAt },
-      });
-      if (claimed.count === 0) throw stateConflict("Üyeliğin hesabı bu tesiste etkin değil; kimlik sıfırlanamaz");
-    });
-    return { identityId: identity.id, accountId: route.accountId };
-  });
-  const closed = await closeIdentitySessions({ app: db }, identityId, { nowMs, reason: "SIFIRLAMA" });
-  const summary = { zorla: true, talep: zorla.talep, gerekce: zorla.gerekce };
-  for (const r of await membershipRoutes({ app: db }, identityId)) {
-    const own = r.tesisId === g.tesisId;
-    const oturum = closed.find((c) => c.tesisId === r.tesisId)?.count ?? 0;
-    await recordAudit(db, { tesisId: r.tesisId, actor: VENDOR_ACTOR, event: "KIMLIK_SIFIRLANDI", entity: "Account", entityId: r.accountId, summary: own ? { ...summary, oturum } : { zorla: true, talep: zorla.talep, oturum } });
+export async function disableAccountTwoFactor(db: TesisDbRouter, g: { tesisId: string; username: string; reason: VendorReason }, nowMs: number = Date.now()): Promise<VendorAccountResult> {
+  const accountId = await openAccountId(db, g.tesisId, g.username);
+  const r = await withTesis(db, { tesisId: g.tesisId }, (tx) =>
+    tx.accountFactor.updateMany({
+      where: { accountId, OR: [{ totpEnabledAt: { not: null } }, { totpSecretSealed: { not: null } }] },
+      data: { totpSecretSealed: null, totpLastStep: null, totpEnabledAt: null, updatedAt: new Date(nowMs) },
+    }),
+  );
+  if (r.count > 0) {
+    await recordAudit(db, { tesisId: g.tesisId, actor: VENDOR_ACTOR, event: "DOGRULAMA_KAPATILDI", entity: "Account", entityId: accountId, summary: reasonSummary(g.reason) });
   }
-  return { accountId, token: invite.token, expiresAt: invite.expiresAt };
+  return { accountId, changed: r.count > 0 };
 }
 
 /**
- * Doğrulama kodunu (TOTP) kapatma (satıcı; telefonunu kaybeden kişinin TEK kurtarma yolu): talep + gerekçe ZORUNLU.
- * Kimliğin sırrı silinir, parola ve oturumlar kalır; her üyelik tesisinin denetimine yazılır. Zaten kapalıysa değişiklik yok.
+ * Kullanıcı listesini yeniden iste (anahtar kaybı / şüpheli liste): bayatlık damgası sıfırlanır ⇒ fabrikanın bir sonraki
+ * gönderimine (≤ 10 dk; fabrika bağlantıyı kendi başlatır) dek YENİ giriş 503 `FABRIKA_BAGLANTISI_YOK`, açık oturum
+ * sürer. Gönderim mühürleri geçerli anahtarla yeniden yazar (açılamayan mühür "parola değişti" sayılır). Döner: AKTİF
+ * hesap sayısı.
  */
-export async function disableIdentityTwoFactor(db: TesisDbRouter, g: { email: string; zorla?: VendorOverride }): Promise<{ changed: boolean; facilities: number }> {
-  const zorla = g.zorla;
-  if (!zorla) throw new CloudError(400, "GOVDE_GECERSIZ", "Doğrulama kapatma yalnız --talep=<talep no> --gerekce=\"…\" ile yapılır (denetime yazılır)");
-  const emailDigest = db.key.emailDigest(normalizeEmail(g.email));
-  const identity = await withCentral(db, { lock: { name: "LOGIN_ROUTE", key: emailDigest } }, async (central) => {
-    const found = await central.identity.findUnique({ where: { emailDigest } });
-    if (!found || found.identityPurgedAt) throw notFound("Kimlik");
-    if (found.totpEnabledAt === null && found.totpSecretSealed === null) return null;
-    const r = await central.identity.updateMany({ where: { id: found.id, updatedAt: found.updatedAt }, data: { totpSecretSealed: null, totpLastStep: null, totpEnabledAt: null } });
-    if (r.count === 0) throw stateConflict("Kimlik bu arada değişti; tekrar deneyin");
-    return found;
-  });
-  if (!identity) return { changed: false, facilities: 0 };
-  const routes = await membershipRoutes({ app: db }, identity.id);
-  for (const r of routes) {
-    await recordAudit(db, { tesisId: r.tesisId, actor: VENDOR_ACTOR, event: "DOGRULAMA_KAPATILDI", entity: "Account", entityId: r.accountId, summary: { zorla: true, talep: zorla.talep, gerekce: zorla.gerekce } });
-  }
-  return { changed: true, facilities: routes.length };
+export async function requestUserResend(db: TesisDbRouter, g: { tesisId: string; reason?: VendorReason }): Promise<{ accounts: number; changed: boolean }> {
+  const out = await withTesis(db, { tesisId: g.tesisId }, async (tx) => ({
+    changed: (await tx.facility.updateMany({ where: { tesisId: g.tesisId, usersPushedAt: { not: null } }, data: { usersPushedAt: null } })).count > 0,
+    accounts: await tx.account.count({ where: { tesisId: g.tesisId, status: "AKTIF" } }),
+  }));
+  await recordAudit(db, { tesisId: g.tesisId, actor: VENDOR_ACTOR, event: "KULLANICI_LISTESI_ISTENDI", entity: "Facility", entityId: g.tesisId, summary: { ...reasonSummary(g.reason), aktifHesap: out.accounts } });
+  return out;
 }

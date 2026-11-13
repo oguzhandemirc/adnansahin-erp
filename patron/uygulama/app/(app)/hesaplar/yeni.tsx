@@ -2,7 +2,7 @@
 // yanıtta gelir ve bir kez gösterilir (depoya yazılmaz).
 import { useCallback, useState } from "react";
 import { View } from "react-native";
-import type { AccountInviteResult } from "../../../src/api/wire";
+import type { AccountInviteResult } from "../../../src/api/eski-uyelik";
 import { ACCOUNT_TEMPLATE, ACCOUNT_TEMPLATES, type AccountTemplate } from "../../../src/lib/labels/diger";
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";

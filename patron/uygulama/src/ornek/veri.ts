@@ -23,7 +23,7 @@ export const ORNEK_IZINLER: readonly string[] = [
   "bulut:hesap:yonet",
 ];
 
-const hesap = { id: "ornek-hesap", ad: "Örnek Patron", eposta: "ornek@ornek.invalid", izinler: ORNEK_IZINLER };
+const hesap = { id: "ornek-hesap", ad: "Örnek Patron", kullaniciAdi: "ornek", izinler: ORNEK_IZINLER };
 
 export function ornekOturum(): FacilityStatus {
   return {

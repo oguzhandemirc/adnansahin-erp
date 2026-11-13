@@ -1,5 +1,4 @@
-// FABRİKA HESABININ İKİ ADIMLI DOĞRULAMASI (C3) — eski kimlik akışının (`two-factor.service.ts`) kurallarının AYNISI,
-// etken `account_factors`ta (uygulamanın malı; eşitleme rolü erişemez): İSTEĞE BAĞLI; aç = parola → sır (YALNIZ yanıtta)
+// FABRİKA HESABININ İKİ ADIMLI DOĞRULAMASI (C3; C4'ten beri tek doğrulama yolu) — etken `account_factors`ta (uygulamanın malı; eşitleme rolü erişemez): İSTEĞE BAĞLI; aç = parola → sır (YALNIZ yanıtta)
 // → ilk kodla ONAY (onaysız açık sayılmaz); kapat = parola + güncel kod (adım iddiası atomik, aynı kod iki kez geçmez).
 // Parola FABRİKANIN parolasıdır (bcrypt, mühürlü özet). Yanlış parola/kod girişle aynı sayaçlara yazılır (kaynak +
 // hesap tavanı) ve 400 `GIRIS_BASARISIZ`; kilitliyken doğru üçlü de geçmez. Sır ve kod denetime/günlüğe girmez.
@@ -18,7 +17,7 @@ const alreadyOn = (): CloudError => stateConflict("İki adımlı doğrulama zate
 
 async function ownAccount(ctx: CloudContext, s: SessionContext): Promise<FactoryAccount> {
   const a = await loadFactoryAccount(ctx, s.tesisId, s.accountId);
-  if (!a || a.status !== "AKTIF" || a.kullaniciAdi === null) throw sessionGone();
+  if (!a || a.status !== "AKTIF") throw sessionGone();
   return a;
 }
 
@@ -64,7 +63,7 @@ export async function beginFactoryTwoFactor(ctx: CloudContext, s: SessionContext
   );
   if (n === 0) throw alreadyOn();
   await audit(ctx, s, "DOGRULAMA_KURULUMU_BASLADI");
-  return { totpSirri: secret, otpauth: otpauthUri(account.kullaniciAdi ?? s.accountName, secret) };
+  return { totpSirri: secret, otpauth: otpauthUri(account.kullaniciAdi, secret) };
 }
 
 /** İlk kodla onay: doğrulanınca AÇIK olur (atomik claim — onaylanan sır kurulum sırasında değişmediyse). */

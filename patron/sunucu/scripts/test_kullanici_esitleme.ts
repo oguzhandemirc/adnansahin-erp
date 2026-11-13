@@ -5,7 +5,7 @@
 // Ham `pg` ile (uygulama katmanı atlanarak) ölçer; kapı SQL'dedir:
 //   §1 rol ayrımı: uygulama rolü `parola_ozeti`/`kullanici_adi`/`kimlik_surumu` UPDATE → permission denied, parola
 //      özetli INSERT → denied; fabrika hesabında ad/izin/durum değişimi tetikleyiciyle 42501, `last_login_at` serbest;
-//      eşitleme rolü `account_factors` SELECT/INSERT → denied, e-posta/davet sırrı/son giriş/oturum belirteci → denied.
+//      eşitleme rolü `account_factors` SELECT/INSERT → denied, son giriş/oturum belirteci → denied; eski e-posta/davet kolonları yok.
 //   §2 DB seddi: fabrika hesabı AKTİF parolasız, PASİF parolalı, KILITLI doğamaz; büyük harfli ad RED; aynı ad iki
 //      etkin hesapta COMMIT'te RED (ertelenmiş dışlama), takas (A↔B) tek tx'te GEÇER; kapanan hesabın adı yer kaplamaz.
 //   §3 `POST /v1/kullanicilar` (C2, gerçek HTTP + kurulum imzası): imzasız 401 · kök/kullanıcıda fazla alan 400 ·
@@ -24,7 +24,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { ident } from "../src/lib/db-roles";
-import { hesapKur, imzali, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, tesisUrl, type Ortam, type TestKurulumu } from "./lib/test-ortam";
+import { imzali, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, tesisUrl, type Ortam, type TestKurulumu } from "./lib/test-ortam";
 
 async function istemci(url: string): Promise<Client> {
   const c = new Client({ connectionString: url, options: "-c timezone=UTC" });
@@ -87,7 +87,7 @@ async function uygulamaParolaYazamaz(o: Ortam, tesisId: string, hesapId: string)
   }
 }
 
-async function rolAyrimi(o: Ortam, tesisId: string, fabrikaId: string, eskiId: string): Promise<void> {
+async function rolAyrimi(o: Ortam, tesisId: string, fabrikaId: string): Promise<void> {
   console.log("\n§1 rol ayrımı (kolon yetkisi + tetikleyici)");
   const app = await istemci(tesisUrl(o, tesisId, "uygulama"));
   const sync = await istemci(tesisUrl(o, tesisId, "esitleme"));
@@ -110,23 +110,29 @@ async function rolAyrimi(o: Ortam, tesisId: string, fabrikaId: string, eskiId: s
     }
     const giris = await dene(app, tesisId, [["UPDATE accounts SET last_login_at = now(), updated_at = now() WHERE id = $1", [fabrikaId]]]);
     kontrol("§1e uygulama rolü fabrika hesabında YALNIZ last_login_at yazar (geçer)", !giris.hata, ayrinti(giris));
-    const eski = await dene(app, tesisId, [["UPDATE accounts SET name = 'Eski Hesap Yeni Ad', updated_at = now() WHERE id = $1", [eskiId]]]);
-    kontrol("§1f geçici uyumluluk: uygulama rolü ESKİ (e-posta) hesabın adını yazar (C4'e dek)", !eski.hata, ayrinti(eski));
+    const ad = await dene(app, tesisId, [["UPDATE accounts SET name = 'Ele Geçirildi' WHERE id = $1", [fabrikaId]]]);
+    kontrol("§1f geçici uyumluluk KALKTI (C4): uygulama rolünün accounts.name kolon yetkisi yok (permission denied)", yetkisiz(ad) && /permission denied for table accounts/.test(ad.mesaj), ayrinti(ad));
 
     const etken = await dene(sync, tesisId, [["SELECT * FROM account_factors", []]]);
     kontrol("§1g ⭐ eşitleme rolü account_factors SELECT → HATA (permission denied)", yetkisiz(etken), ayrinti(etken));
     const etkenEkle = await dene(sync, tesisId, [["INSERT INTO account_factors (account_id, tesis_id, updated_at) VALUES ($1, $2, now())", [fabrikaId, tesisId]]]);
     kontrol("§1h eşitleme rolü account_factors INSERT → HATA", yetkisiz(etkenEkle), ayrinti(etkenEkle));
     const sizan: string[] = [];
-    for (const kolon of ["email", "identity_id", "invite_token_hash", "last_login_at"]) {
+    for (const kolon of ["last_login_at"]) {
       const r = await dene(sync, tesisId, [[`SELECT ${kolon} FROM accounts`, []]]);
       if (!yetkisiz(r)) sizan.push(kolon);
     }
-    kontrol("§1i eşitleme rolü hesabın uygulama kolonlarını (e-posta · kimlik bağı · davet · son giriş) OKUYAMAZ", sizan.length === 0, sizan.join(",") || "hepsi RED");
+    kontrol("§1i eşitleme rolü hesabın uygulama kolonunu (son giriş) OKUYAMAZ", !sizan.includes("last_login_at"), sizan.join(",") || "hepsi RED");
+    const eskiKolon: string[] = [];
+    for (const kolon of ["email", "identity_id", "invite_token_hash", "created_by_id"]) {
+      const r = await dene(sync, tesisId, [[`SELECT ${kolon} FROM accounts`, []]]);
+      if (!(r.hata && r.kod === "42703")) eskiKolon.push(kolon);
+    }
+    kontrol("§1i2 eski üyelik kolonları (e-posta · kimlik bağı · davet · oluşturan) DÜŞTÜ (42703)", eskiKolon.length === 0, eskiKolon.join(",") || "hepsi yok");
     const belirtec = await dene(sync, tesisId, [["SELECT token_hash FROM sessions", []]]);
     kontrol("§1j eşitleme rolü oturum belirteç özetini OKUYAMAZ", yetkisiz(belirtec), ayrinti(belirtec));
-    const epostaYaz = await dene(sync, tesisId, [["UPDATE accounts SET email = 'x@y.z' WHERE id = $1", [eskiId]]]);
-    kontrol("§1k eşitleme rolü e-posta kolonuna YAZAMAZ", yetkisiz(epostaYaz), ayrinti(epostaYaz));
+    const sonGirisYaz = await dene(sync, tesisId, [["UPDATE accounts SET last_login_at = now() WHERE id = $1", [fabrikaId]]]);
+    kontrol("§1k eşitleme rolü son giriş kolonuna YAZAMAZ", yetkisiz(sonGirisYaz), ayrinti(sonGirisYaz));
     const uygEtken = await dene(app, tesisId, [["INSERT INTO account_factors (account_id, tesis_id, bulut_kilidi, updated_at) VALUES ($1, $2, true, now())", [fabrikaId, tesisId]]]);
     kontrol("§1l uygulama rolü kendi malı account_factors'a yazar (geçer)", !uygEtken.hata, ayrinti(uygEtken));
   } finally {
@@ -413,7 +419,6 @@ async function main(): Promise<void> {
     const k4 = await tesisKur(o, { ad: "Bekçi Kullanıcı Ucu Diğer" });
     ekTesisler.push(k3.tesisId, k4.tesisId);
     await kullaniciUcu(o, k3, k4);
-    const eski = await hesapKur(o, tesisId, ["bulut:siparis:oku"], { dogrulama: false });
     const sync = await istemci(tesisUrl(o, tesisId, "esitleme"));
     let fabrikaId: string;
     try {
@@ -421,7 +426,7 @@ async function main(): Promise<void> {
     } finally {
       await sync.end();
     }
-    await rolAyrimi(o, tesisId, fabrikaId, eski.accountId);
+    await rolAyrimi(o, tesisId, fabrikaId);
     await dbSeddi(o, tesisId);
     await negatifSonda(o, tesisId, fabrikaId);
   } finally {
