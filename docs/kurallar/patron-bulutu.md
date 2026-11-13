@@ -58,6 +58,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Sevk BRÜT'tür, iade ayrı sayıdır ve çıkıştan düşülmez; iptal edilen iade sayılmaz. [bekçi: test_patron_bulut_cari_ozeti]
 - "Son 12 ay"ın başı fabrika gününe hizalanır; veri değişmedikçe anlığın içerik özeti gün içinde değişmez. [bekçi: test_patron_bulut_cari_ozeti]
 - İş emri satırının aşama/fason/müşteri alanları ve `fason-acik` kırılımı ortak okumalardan gelir (`cloud-sync/work-order-facts.ts`: İE'nin topları `whereRollsOfWorkOrders`, Kurşun/Tambur kuyruğu akış panosuyla aynı `production-flow-where.helper`, müşteri `rollupWorkOrderCustomers`, kapanış anı defterden); ikinci tanım yazılmaz. [bekçi: test_patron_bulut_is_emri]
+- Sipariş satırının `uretim` alanı ({tur, metin}) panelin "Nerede?" yükleyicisi ve yer ayrımından gelir (`loadNeredeContext` · `placesOf` + kaba ad `uretimStepName` = İE `asama` sınıflayıcısı · cümle `deriveOrderUretim`); iptal/devredilmiş İE ve koparılmış bağ sayılmaz, bütün bağlı İE'ler bittiyse "Tamamlandı", metne gün/top sayısı girmez. [bekçi: test_patron_bulut_siparis_uretim]
 - Tel sözleşmesi yalnız EKLEYEREK genişler: var olan uç, alan, projeksiyon adı değişmez; yeni alan katalog sürümünü artırır. [inceleme]
 - Sözleşme genişletmesinde kurulum sırası önce bulut, sonra fabrikadır; eski bulut bilinmeyen projeksiyonu yalnız o girdide reddeder (tur KISMI, düşmez) ama reddedilen kayıt her turda baştan, anlık her aralıkta yeniden gönderilir. [inceleme]
 
@@ -106,7 +107,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ## Bekçiler
 
-Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_patron_cloud_switch_superadmin` · `test_password_policy_version` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
+Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_patron_cloud_switch_superadmin` · `test_password_policy_version` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_patron_bulut_siparis_uretim` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
 Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_giris_fabrika_parolasi` (giriş · TOTP · kaba kuvvet · bayatlık) · `test_hesap_acil_cli` (acil CLI · üyelik sökümü) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
 

@@ -55,6 +55,17 @@ export function workOrderStage(station: { kind: StationKind; appliesQuality: boo
   return "diger";
 }
 
+/** `workOrderStage` kodunun sipariş "Üretim" cümlesindeki kaba adı (uygulamanın `ASAMA_ETIKET` dili). */
+const STAGE_NAME: Readonly<Record<string, string>> = { kk1: "Giriş kalite", kursun: "Kurşun", tambur: "Tambur" };
+
+/**
+ * Üretimdeki (IN_PRODUCTION) topun kaba aşama adı — İE `asama`sıyla AYNI sınıflayıcı (`workOrderStage`); sınıfı
+ * kaba adı olmayan adımda (fason adımında bekleyen, diğer) istasyon adı kalır. Fasondaki/hazır top bu yoldan geçmez.
+ */
+export function uretimStepName(r: { station: { kind: StationKind; appliesQuality: boolean } | null; stationName: string | null }): string {
+  return STAGE_NAME[workOrderStage(r.station)] ?? r.stationName ?? "Üretim";
+}
+
 const STATUS_STAGE: Partial<Record<RollStatus, FlowStageKey>> = {
   [RollStatus.AT_SUBCONTRACTOR]: "fason",
   [RollStatus.WAREHOUSE]: "depo",

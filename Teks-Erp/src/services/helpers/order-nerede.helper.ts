@@ -146,6 +146,41 @@ export function deriveOrderNerede(
     : gray("NOT_STARTED", "İşe başlanmadı");
 }
 
+// ── Patron telefonu "Üretim" (sipariş listesi sütunu) ────────────────────────
+// "Nerede?" ile AYNI yükleyici + yer ayrımı + sıralama (`placesOf` · `comparePlaces`); fark yalnız şudur: sipariş
+// durumuna bakmaz (sütun üretimi anlatır), bütün bağlı İE'ler bittiyse "Tamamlandı" der, aşama adı kabadır
+// (çağıran `placesOf`a kaba adlandırıcı verir) ve metne GÜN ya da top sayısı girmez (kayıt her gün yeniden gitmesin).
+export type UretimTur = "IS_EMRI_YOK" | "TAMAMLANDI" | "HAZIR" | "FASON" | "ASAMA" | "GONDERILDI" | "BASLAMADI";
+export interface Uretim {
+  tur: UretimTur;
+  metin: string;
+}
+
+const URETIM_TUR: Record<NeredePlace["kind"], UretimTur> = { READY: "HAZIR", FASON: "FASON", STEP: "ASAMA" };
+
+function uretimPlaceText(p: NeredePlace): string {
+  if (p.kind === "READY") return "Sevke hazır";
+  if (p.kind === "FASON") return p.name ? `Fasonda – ${p.name}` : "Fasonda";
+  return p.name;
+}
+
+/**
+ * Siparişin üretim cümlesi. `woStatuses`: aktif bağlı İE'lerin durumları (`NEREDE_ACTIVE_WO` — iptal/devredilmiş
+ * yok, koparılmış bağ yok). Öncelik: İE yok → hepsi tamamlandı → en kalabalık yer (+N yerde daha) → top yok.
+ */
+export function deriveOrderUretim(ctx: { woStatuses: readonly WorkOrderStatus[]; places: readonly NeredePlace[]; anyRoll: boolean }): Uretim {
+  const active = ctx.woStatuses.filter((s) => NEREDE_ACTIVE_WO.includes(s));
+  if (active.length === 0) return { tur: "IS_EMRI_YOK", metin: "İş emri yok" };
+  if (active.every((s) => s === WorkOrderStatus.COMPLETED)) return { tur: "TAMAMLANDI", metin: "Tamamlandı" };
+  if (ctx.places.length > 0) {
+    const sorted = [...ctx.places].sort(comparePlaces);
+    const top = sorted[0]!;
+    const extra = sorted.length - 1;
+    return { tur: URETIM_TUR[top.kind], metin: uretimPlaceText(top) + (extra > 0 ? ` · +${extra} yerde daha` : "") };
+  }
+  return ctx.anyRoll ? { tur: "GONDERILDI", metin: "Üretilen toplar gönderildi" } : { tur: "BASLAMADI", metin: "İşe başlanmadı" };
+}
+
 export interface NeredeLineInput {
   quantity: Prisma.Decimal | number | string;
   shippedQty: Prisma.Decimal | number | string;

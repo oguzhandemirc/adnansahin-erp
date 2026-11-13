@@ -1,8 +1,9 @@
 // SİPARİŞ "NEREDE?" — YÜKLEYİCİ (liste sayfası). Saf türetme `order-nerede.helper.ts`te;
 // sorgu bütçesi sayfa başına SABİT (İE/sipariş sayısından bağımsız).
-import { Prisma, RollStatus, WorkOrderStatus } from "@prisma/client";
+import { Prisma, RollStatus, StationKind, WorkOrderStatus } from "@prisma/client";
 import prisma from "../../lib/prisma";
 import { outstandingItemOfOpenDispatch } from "./fason-open-dispatch.helper";
+import { STEP_QUALITY_SELECT } from "./quality-station.helper";
 import { whereRollsOfWorkOrders, workOrderHasRollWhere } from "./workorder-rolls.helper";
 import {
   NEREDE_ACTIVE_WO,
@@ -24,6 +25,11 @@ export interface NeredeOrderRow extends NeredeOrderInput {
   id: string;
   lines?: Array<NeredeLineInput & { workOrderLinks?: Array<{ workOrder: { id: string; status: WorkOrderStatus } }> }>;
 }
+/** Yükleyicinin okuduğu parça: yalnız sipariş kimliği + aktif bağların İE durumu (patron bulutu `siparis.uretim` de bunu verir). */
+export interface NeredeLoadRow {
+  id: string;
+  lines?: Array<{ workOrderLinks?: Array<{ workOrder: { id: string; status: WorkOrderStatus } }> }>;
+}
 
 export interface LiveRoll {
   id: string;
@@ -33,6 +39,8 @@ export interface LiveRoll {
   stepWoId: string | null;
   sequence: number;
   stationName: string | null;
+  /** Bulunduğu adımın istasyon türü + kalite yeteneği (kaba aşama adı için; `STEP_QUALITY_SELECT`). */
+  station: { kind: StationKind; appliesQuality: boolean } | null;
   woIds: string[];
   firmId: string | null;
   firmName: string | null;
@@ -47,7 +55,7 @@ export interface NeredeLoad {
   woWithAnyRoll: Set<string>;
 }
 
-function activeWoIdsOf(row: NeredeOrderRow): string[] {
+function activeWoIdsOf(row: NeredeLoadRow): string[] {
   const set = new Set<string>();
   for (const l of row.lines ?? []) {
     for (const link of l.workOrderLinks ?? []) {
@@ -58,7 +66,7 @@ function activeWoIdsOf(row: NeredeOrderRow): string[] {
 }
 
 /** Sayfadaki bütün siparişler için SABİT sayıda sorgu (en çok 3). */
-export async function loadNeredeContext(rows: NeredeOrderRow[]): Promise<NeredeLoad> {
+export async function loadNeredeContext(rows: readonly NeredeLoadRow[]): Promise<NeredeLoad> {
   const woIdsByOrder = new Map<string, string[]>();
   const allWo = new Set<string>();
   for (const r of rows) {
@@ -79,7 +87,7 @@ export async function loadNeredeContext(rows: NeredeOrderRow[]): Promise<NeredeL
       currentQty: true,
       currentStepId: true,
       producedInStep: { select: { workOrderId: true } },
-      currentStep: { select: { workOrderId: true, stepSequence: true, station: { select: { name: true } } } },
+      currentStep: { select: { workOrderId: true, stepSequence: true, station: { select: { name: true, ...STEP_QUALITY_SELECT } } } },
       batch: { select: { workOrderId: true } },
     },
   });
@@ -115,6 +123,7 @@ export async function loadNeredeContext(rows: NeredeOrderRow[]): Promise<NeredeL
       if (w && wanted.has(w)) ws.add(w);
     }
     const f = firmByRoll.get(r.id);
+    const st = r.currentStep?.station;
     const roll: LiveRoll = {
       id: r.id,
       status: r.status,
@@ -122,7 +131,8 @@ export async function loadNeredeContext(rows: NeredeOrderRow[]): Promise<NeredeL
       stepId: r.currentStepId,
       stepWoId: r.currentStep?.workOrderId ?? null,
       sequence: r.currentStep?.stepSequence ?? 0,
-      stationName: r.currentStep?.station.name ?? null,
+      stationName: st?.name ?? null,
+      station: st ? { kind: st.kind, appliesQuality: st.appliesQuality } : null,
       woIds: [...ws],
       firmId: f?.firmId ?? null,
       firmName: f?.firmName ?? null,
@@ -148,8 +158,15 @@ export async function loadNeredeContext(rows: NeredeOrderRow[]): Promise<NeredeL
   return { woIdsByOrder, liveRolls, rollsByWo, woWithAnyRoll };
 }
 
-/** Bir top kümesini yerlere ayırır (sipariş satırı ve İE kartı aynı ayrımı kullanır). */
-export function placesOf(rolls: LiveRoll[], now: Date = new Date()): NeredePlace[] {
+/**
+ * Bir top kümesini yerlere ayırır (sipariş satırı ve İE kartı aynı ayrımı kullanır). `stepName` aşama yerinin
+ * adını verir: panel istasyon adını (varsayılan), patron bulutu kaba aşama adını (`work-order-facts uretimStepName`).
+ */
+export function placesOf(
+  rolls: LiveRoll[],
+  now: Date = new Date(),
+  stepName: (r: LiveRoll) => string = (r) => r.stationName ?? "Üretim",
+): NeredePlace[] {
   const m = new Map<string, NeredePlace>();
   for (const r of rolls) {
     let kind: NeredePlace["kind"];
@@ -160,7 +177,7 @@ export function placesOf(rolls: LiveRoll[], now: Date = new Date()): NeredePlace
     } else if (r.status === RollStatus.AT_SUBCONTRACTOR) {
       kind = "FASON"; key = `FASON:${r.firmId ?? "?"}`; name = r.firmName ?? "";
     } else {
-      kind = "STEP"; name = r.stationName ?? "Üretim"; key = `STEP:${name}`;
+      kind = "STEP"; name = stepName(r); key = `STEP:${name}`;
     }
     const p = m.get(key) ?? { kind, key, name, rollCount: 0, sequence: kind === "READY" ? Number.MAX_SAFE_INTEGER : 0, days: null };
     p.rollCount += 1;
@@ -174,7 +191,7 @@ export function placesOf(rolls: LiveRoll[], now: Date = new Date()): NeredePlace
 }
 
 /** Siparişin canlı topları (bir top birden çok İE yoluyla gelse de bir kez sayılır). */
-function rollsOfOrder(ctx: NeredeLoad, orderId: string): LiveRoll[] {
+export function rollsOfOrder(ctx: NeredeLoad, orderId: string): LiveRoll[] {
   const seen = new Map<string, LiveRoll>();
   for (const w of ctx.woIdsByOrder.get(orderId) ?? []) {
     for (const r of ctx.rollsByWo.get(w) ?? []) seen.set(r.id, r);

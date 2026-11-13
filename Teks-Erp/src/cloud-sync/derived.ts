@@ -1,7 +1,7 @@
 // TÜRETİLMİŞ ALANLAR — fabrika hesaplar, bulut saklar (§1.1). Her alan katalogda adı geçen
 // TEK KAYNAK yardımcıyı çağırır; formül burada yeniden yazılmaz (liste ekranı ile
 // projeksiyon aynı sayıyı basmak zorunda — "ayrışan yüzey" sınıfı).
-import { ItemUnit, Prisma, type WorkOrderStatus } from "@prisma/client";
+import { ItemUnit, Prisma, WorkOrderStatus } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { isActiveLine, isMeasuredLine } from "../services/helpers/order-line-scope.helper";
 import { daysPastDeadline, isDeadlineOpenStatus } from "../services/helpers/order-deadline.helper";
@@ -11,9 +11,11 @@ import { currentWorkOrderStep } from "../services/helpers/work-order-current-ste
 import { ACTIVE_ORDER_LINK } from "../services/helpers/order-link.helper";
 import { WorkOrderService } from "../services/workorder.service";
 import { sortLinksByLinkedAt } from "../services/helpers/work-order-customers.helper";
+import { deriveOrderUretim, type Uretim } from "../services/helpers/order-nerede.helper";
+import { loadNeredeContext, placesOf, rollsOfOrder, type NeredeLoad, type NeredeLoadRow } from "../services/helpers/order-nerede-load.helper";
 import {
   isOpenWorkOrderStatus, loadCloseDates, loadOpenFasonOfWorkOrders, loadRollStagesOfWorkOrders, metreNumber, NO_FASON,
-  STAGE_STATION_SELECT, workOrderStage, WO_ORDER_LINKS_SELECT,
+  STAGE_STATION_SELECT, uretimStepName, workOrderStage, WO_ORDER_LINKS_SELECT,
 } from "./work-order-facts";
 
 type RawRow = Record<string, unknown> & { id: string };
@@ -37,10 +39,50 @@ async function displayNames(model: "customer" | "item" | "color", keys: readonly
   return new Map(found.map((r) => [r.id, r.name]));
 }
 
+/**
+ * Sipariş "Üretim" cümlesi (`uretim`) — panelin "Nerede?" yükleyicisi ve yer ayrımı (`loadNeredeContext` · `placesOf`),
+ * kaba aşama adı `uretimStepName`, cümle `deriveOrderUretim`. Top okuması yalnız açık (bitmemiş) İE'si olan
+ * siparişler için yapılır: bütün İE'leri tamamlanmış sipariş "Tamamlandı"dır ve topa bakmaz (TAM gönderim ucuz kalır).
+ */
+async function orderUretim(
+  orderIds: readonly string[],
+  links: ReadonlyArray<{ orderId: string; workOrderLinks: Array<{ workOrder: { id: string; status: WorkOrderStatus } }> }>,
+): Promise<Map<string, Uretim>> {
+  const byOrder = new Map<string, NeredeLoadRow & { lines: NonNullable<NeredeLoadRow["lines"]> }>();
+  for (const id of orderIds) byOrder.set(id, { id, lines: [] });
+  for (const l of links) byOrder.get(l.orderId)?.lines.push({ workOrderLinks: l.workOrderLinks });
+  // Durum süzgeci (iptal/devredilmiş sayılmaz) YALNIZ `deriveOrderUretim`te; burada bağlı İE başına durum toplanır.
+  const statusesOf = (r: NeredeLoadRow): WorkOrderStatus[] => {
+    const m = new Map<string, WorkOrderStatus>();
+    for (const l of r.lines ?? []) for (const k of l.workOrderLinks ?? []) m.set(k.workOrder.id, k.workOrder.status);
+    return [...m.values()];
+  };
+  // Topsuz karar verilebilen sipariş (İE yok · hepsi tamamlandı) yükleyiciye girmez.
+  const settled = (r: NeredeLoadRow): boolean => {
+    const tur = deriveOrderUretim({ woStatuses: statusesOf(r), places: [], anyRoll: false }).tur;
+    return tur === "IS_EMRI_YOK" || tur === "TAMAMLANDI";
+  };
+  const ctx: NeredeLoad = await loadNeredeContext([...byOrder.values()].filter((r) => !settled(r)));
+  const out = new Map<string, Uretim>();
+  for (const r of byOrder.values()) {
+    const wos = ctx.woIdsByOrder.get(r.id) ?? [];
+    out.set(r.id, deriveOrderUretim({
+      woStatuses: statusesOf(r),
+      places: placesOf(rollsOfOrder(ctx, r.id), new Date(), uretimStepName),
+      anyRoll: wos.some((w) => ctx.woWithAnyRoll.has(w)),
+    }));
+  }
+  return out;
+}
+
 async function orderDerived(rows: readonly RawRow[], nowMs: number): Promise<DerivedValues> {
   const lines = await prisma.orderLine.findMany({
     where: { orderId: { in: ids(rows) } },
-    select: { orderId: true, quantity: true, shippedQty: true, unit: true, cancelledAt: true },
+    select: {
+      orderId: true, quantity: true, shippedQty: true, unit: true, cancelledAt: true,
+      // Aktif bağ yüklemi tek kaynaktan (koparılmış bağ girmez) — panelin liste `defaultInclude`uyla aynı seçim.
+      workOrderLinks: { where: ACTIVE_ORDER_LINK, select: { workOrder: { select: { id: true, status: true } } } },
+    },
   });
   const byOrder = new Map<string, { open: Prisma.Decimal; total: Prisma.Decimal; count: number }>();
   for (const l of lines) {
@@ -56,12 +98,13 @@ async function orderDerived(rows: readonly RawRow[], nowMs: number): Promise<Der
     byOrder.set(l.orderId, acc);
   }
   const customers = await displayNames("customer", rows.map((r) => r.customerId));
+  const uretim = await orderUretim(ids(rows), lines);
   const out: DerivedValues = new Map();
   for (const r of rows) {
     const acc = byOrder.get(r.id) ?? { open: D0(), total: D0(), count: 0 };
     const open = isDeadlineOpenStatus(String(r.status));
     const late = open && daysPastDeadline(r.deadline as Date | null, nowMs) !== null;
-    out.set(r.id, { acikMiktar: acc.open, toplamMiktar: acc.total, kalemSayisi: acc.count, gecikmis: late, acik: open, musteriAdi: customers.get(r.customerId as string) ?? null });
+    out.set(r.id, { acikMiktar: acc.open, toplamMiktar: acc.total, kalemSayisi: acc.count, gecikmis: late, acik: open, musteriAdi: customers.get(r.customerId as string) ?? null, uretim: uretim.get(r.id) ?? null });
   }
   return out;
 }

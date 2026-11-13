@@ -35,6 +35,21 @@ const WOS_OF_SUBCONTRACTOR_CATEGORIES = wosOfRollSet(
   rollsAtFirms('ARRAY(SELECT k."subcontractorId" FROM "subcontractor_category_links" k WHERE k."categoryId" = ANY($1::uuid[]))'),
 );
 
+// Sipariş `uretim` (patron "Üretim" sütunu): bağlı İE'lerin topu/durumu/bağı değişince sipariş yeniden gider. Bağ
+// yüklemi `ACTIVE_ORDER_LINK` ile aynı (`unlinkedAt IS NULL`); top → İE üç yolu `WO_OF_ROLLS` ile aynı.
+const ordersOfWos = (wos: string): string =>
+  'SELECT DISTINCT ol."orderId" AS root_id FROM "work_order_to_order_lines" l JOIN "order_lines" ol ON ol."id" = l."orderLineId" ' +
+  `WHERE l."unlinkedAt" IS NULL AND l."workOrderId" IN (${wos})`;
+const ORDERS_OF_ROLLS = ordersOfWos(`SELECT w.root_id FROM (${WO_OF_ROLLS}) w`);
+const ORDERS_OF_WORK_ORDERS = ordersOfWos("SELECT unnest($1::uuid[])");
+// Bağ eklenince/koparılınca (koparılmış bağ DAHİL: eski cümle düzelsin) bağın siparişi.
+const ORDERS_OF_LINK_LINES = 'SELECT DISTINCT ol."orderId" AS root_id FROM "order_lines" ol WHERE ol."id" = ANY($1::uuid[])';
+// İstasyon adı/türü: yalnız o istasyonun adımında ŞU AN üretimde duran topların siparişleri (bütün geçmiş değil).
+const ORDERS_OF_STATIONS = ordersOfWos(
+  `SELECT s."workOrderId" FROM "rolls" r JOIN "work_order_steps" s ON s."id" = r."currentStepId" WHERE s."stationId" = ANY($1::uuid[]) AND r."status" = 'IN_PRODUCTION'`,
+);
+const ORDERS_OF_SUBCONTRACTORS = ordersOfWos(`SELECT w.root_id FROM (${WOS_OF_SUBCONTRACTORS}) w`);
+
 // Görünen ad (cari/ürün/renk) olgu satırında türetilir: ad değişince bağlı kökler yeniden gider.
 const ORDERS_OF_CUSTOMERS = 'SELECT o."id" AS root_id FROM "orders" o WHERE o."customerId" = ANY($1::uuid[])';
 const SHIPMENTS_OF_CUSTOMERS = 'SELECT s."id" AS root_id FROM "shipments" s WHERE s."customerId" = ANY($1::uuid[])';
@@ -62,11 +77,21 @@ export const FACTS: readonly RecordProjection[] = [
       // M2a: telefonun "açık siparişler" süzgeci — açık durum kümesi tek kaynaktan (bulut durum listesi bilmez).
       derived("acik", "helpers/order-deadline.helper isDeadlineOpenStatus (açık durum kümesi: PENDING · APPROVED · PARTIAL_SHIPPED)", ["orders"]),
       derived("musteriAdi", NAME_OF("Customer"), ["customers"]),
+      // 4: patron "Üretim" sütunu — {tur, metin}; panel "Nerede?" yükleyicisi + yer ayrımı, kaba aşama adı, gün/top sayısı YOK.
+      derived("uretim", "helpers/order-nerede-load.helper loadNeredeContext + placesOf(uretimStepName) → order-nerede.helper deriveOrderUretim (aktif bağ, NEREDE_ACTIVE_WO)",
+        ["order_lines", "work_order_to_order_lines", "work_orders", "rolls", "batches", "work_order_steps", "stations",
+          "subcontractor_dispatch_items", "subcontractor_dispatches", "subcontractor_receipt_items", "subcontractor_receipts", "subcontractors"]),
     ],
-    sources: [self("orders"), via("order_lines", "orderId"), lookup("customers", "id", ORDERS_OF_CUSTOMERS, "cari adı değişince siparişleri yeniden gider")],
+    sources: [self("orders"), via("order_lines", "orderId"), lookup("customers", "id", ORDERS_OF_CUSTOMERS, "cari adı değişince siparişleri yeniden gider"),
+      lookup("rolls", "id", ORDERS_OF_ROLLS, "top hareketi bağlı siparişin üretim cümlesini yeniler (ESKİ İE'nin siparişi ayrılmada görünmez; o İE'nin sonraki top hareketinde düzelir)"),
+      lookup("work_orders", "id", ORDERS_OF_WORK_ORDERS, "İE durumu (tamamlandı/iptal) değişince bağlı siparişler"),
+      lookup("work_order_to_order_lines", "orderLineId", ORDERS_OF_LINK_LINES, "bağ eklenince/koparılınca"),
+      lookup("stations", "id", ORDERS_OF_STATIONS, "istasyon adı/türü değişince yalnız o adımda üretimde topu olan siparişler"),
+      lookup("subcontractors", "id", ORDERS_OF_SUBCONTRACTORS, "fason firma adı değişince açık kalemli siparişler")],
     crossings: [{ name: "termin", sql: 'SELECT o."id" AS root_id FROM "orders" o WHERE o."deadline" >= $1 AND o."deadline" < $2' }],
     // 2 (M2a): `acik` eklendi — TAM gönderim eski satırları doldurur. 3: `toplamMiktar` eklendi (aynı yol).
-    deletion: "YOK", permission: "bulut:siparis:oku", retention: { wireFields: ["siparisTarihi"], sql: 't."orderDate"' }, catalogVersion: 3,
+    // 4 (2026-11-13): `uretim` eklendi (patron "Üretim" sütunu) — aynı yol.
+    deletion: "YOK", permission: "bulut:siparis:oku", retention: { wireFields: ["siparisTarihi"], sql: 't."orderDate"' }, catalogVersion: 4,
   },
   {
     name: "siparis-kalemi", kind: "KAYIT", role: "OLGU", root: { table: "order_lines", model: "OrderLine" },
