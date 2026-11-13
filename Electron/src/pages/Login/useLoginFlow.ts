@@ -16,7 +16,7 @@ import {
   isTotpRequired,
 } from "@/lib/totp-auth";
 import { useAuthStore } from "@/store/auth";
-import { canEnterApp, type ExistingSessionInfo } from "@/types/auth";
+import { canEnterApp, type ExistingSessionInfo, type JwtPayload } from "@/types/auth";
 
 /**
  * GİRİŞ AKIŞI — `LoginPage`ten AYRILDI (sayfa 200 satır kuralını aşıyordu).
@@ -27,6 +27,8 @@ import { canEnterApp, type ExistingSessionInfo } from "@/types/auth";
  *   ② 409 SESSION_EXISTS → "hesap başka yerde açık" onayı
  *   ③ 409/401 TOTP     → ikinci faktör adımı (yalnız uzak girişte)
  *   ④ 403 TOTP_ENROLLMENT → "yöneticinden kurulum iste" ekranı
+ *   ⑤ 200 + passwordChangeRequired → zorunlu "Parolanı değiştir" adımı
+ *      (kısıtlı token YALNIZ bellekte; değişimden dönen tam token ① yolundan girer)
  */
 const schema = z.object({
   username: z.string().min(1, "Kullanıcı adı gerekli"),
@@ -46,11 +48,53 @@ export function useLoginFlow() {
   // hiç kurulmamış hesabın ekranını açar. LAN'da üçü de hep null/false kalır.
   const [totp, setTotp] = useState<{ values: LoginFormValues; invalid: boolean } | null>(null);
   const [enrollmentNeeded, setEnrollmentNeeded] = useState(false);
+  // Zayıf parola: backend kısıtlı token döndü. Token diske YAZILMAZ — uygulama
+  // kapanırsa açılış giriş ekranıdır; kısıtlı oturumla hiçbir ekran çizilmez.
+  const [passwordChange, setPasswordChange] = useState<{ username: string; token: string } | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(schema),
     defaultValues: { username: "", password: "" },
   });
+
+  /**
+   * ① Tam token'la uygulamaya gir — normal giriş ve zorunlu parola değişiminden
+   * dönen yeni token AYNI yoldan geçer (izin kontrolü, kimlik tazeleme, Anasayfa).
+   */
+  const enterWithToken = async (token: string, fallbackUser?: JwtPayload) => {
+    await tokenStore.set(token);
+    const decoded = decodeJwt(token) ?? fallbackUser;
+    if (!decoded || !canEnterApp(decoded.permissions)) {
+      await tokenStore.clear();
+      toast.error("Bu uygulamayı kullanma yetkin yok. Yöneticine başvur.");
+      return;
+    }
+    setPasswordChange(null);
+    setUser(decoded);
+    // Token'da OLMAYAN kimlik alanları (sistem hesabı / kurulumda var mı)
+    // `/auth/me`den gelir — arka planda; navigasyonu bekletmez.
+    void useAuthStore.getState().refreshSystemAccount();
+    // Kimlik sabitleme: insan bu sunucuya GİRDİ, yani "bu benim sunucum" dedi.
+    // Bundan sonraki keşiflerde kimlik tutmazsa kullanıcıya sorulur.
+    void pinServerIdentityAfterLogin();
+    // Her giriş Anasayfa'ya: eski "gidilmek istenen yol" sekme açmaz (kullanıcı kararı 2026-11-07).
+    void navigate("/", { replace: true });
+  };
+
+  /** ⑤ başarılı: backend bütün oturumları düşürdü ve yeni TAM token verdi. */
+  const completePasswordChange = async (token: string) => {
+    toast.success("Parolan değiştirildi. Diğer cihazlardaki oturumların kapatıldı.");
+    await enterWithToken(token);
+  };
+
+  /** ⑤ çıkış: kısıtlı oturumu sunucuda iptal et (best-effort), forma dön. */
+  const abandonPasswordChange = (message?: string) => {
+    const token = passwordChange?.token;
+    setPasswordChange(null);
+    form.resetField("password");
+    if (message) toast.error(message);
+    if (token) void authService.logout(token).catch(() => undefined);
+  };
 
   /**
    * Girişi dener. `confirmKick=true` → 'notify' politikasında kullanıcı "iki
@@ -65,25 +109,17 @@ export function useLoginFlow() {
         { ...values, confirmKick: confirmKick || undefined, totpCode },
         { suppressErrorToast: true },
       );
-      await tokenStore.set(res.data.token);
-      const decoded = decodeJwt(res.data.token) ?? res.data.user;
-      if (!canEnterApp(decoded.permissions)) {
-        await tokenStore.clear();
-        toast.error("Bu uygulamayı kullanma yetkin yok. Yöneticine başvur.");
-        return;
-      }
       setConflict(null);
       setTotp(null);
       setEnrollmentNeeded(false);
-      setUser(decoded);
-      // Token'da OLMAYAN kimlik alanları (sistem hesabı / kurulumda var mı)
-      // `/auth/me`den gelir — arka planda; navigasyonu bekletmez.
-      void useAuthStore.getState().refreshSystemAccount();
-      // Kimlik sabitleme: insan bu sunucuya GİRDİ, yani "bu benim sunucum" dedi.
-      // Bundan sonraki keşiflerde kimlik tutmazsa kullanıcıya sorulur.
-      void pinServerIdentityAfterLogin();
-      // Her giriş Anasayfa'ya: eski "gidilmek istenen yol" sekme açmaz (kullanıcı kararı 2026-11-07).
-      void navigate("/", { replace: true });
+      // ⑤ ÖNCE: kısıtlı token izinsizdir; `canEnterApp` kontrolüne düşerse
+      // "yetkin yok" der ve kullanıcı neden giremediğini hiç öğrenemezdi.
+      if (res.data.passwordChangeRequired === true || decodeJwt(res.data.token)?.passwordChangeRequired === true) {
+        setPasswordChange({ username: values.username, token: res.data.token });
+        form.resetField("password");
+        return;
+      }
+      await enterWithToken(res.data.token, res.data.user);
     } catch (err) {
       // ── İkinci faktör dalları ────────────────────────────────────────────
       // ⚠️ SIRA: TOTP kontrolleri oturum-çakışması kontrolünden ÖNCE gelmeli.
@@ -138,6 +174,9 @@ export function useLoginFlow() {
     setTotp,
     enrollmentNeeded,
     setEnrollmentNeeded,
+    passwordChange,
+    completePasswordChange,
+    abandonPasswordChange,
     performLogin,
   };
 }

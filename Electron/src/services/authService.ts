@@ -1,7 +1,13 @@
 import type { AxiosRequestConfig } from "axios";
 import apiClient from "./apiClient";
 import type { ApiResponse } from "@/types/api";
-import type { AuthMeResponse, LoginRequest, LoginResponse } from "@/types/auth";
+import type {
+  AuthMeResponse,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  LoginRequest,
+  LoginResponse,
+} from "@/types/auth";
 import { IS_ELECTRON } from "@/lib/runtime-env";
 
 /**
@@ -57,6 +63,33 @@ export const authService = {
         },
       )
       .then(() => undefined),
+
+  /**
+   * KENDİ parolasını değiştir — normal oturumda da, zayıf parolayla açılan
+   * KISITLI oturumda da aynı uç. Başarıda backend bu cihaz dahil bütün oturumları
+   * düşürür ve yeni TAM token döner; çağıran onu saklamak zorundadır.
+   *
+   * `restrictedToken`: kısıtlı oturumun token'ı diske YAZILMAZ (yalnız giriş
+   * adımında bellekte durur), bu yüzden başlık buradan taşınır (logout deseni).
+   * Hata UX'ini form yönetir (alan altında sunucunun Türkçe cümlesi) →
+   * genel toast bastırılır.
+   */
+  changePassword: (
+    body: ChangePasswordRequest,
+    restrictedToken?: string,
+  ): Promise<ChangePasswordResponse> =>
+    apiClient
+      .post<ChangePasswordResponse>(
+        "/api/auth/change-password",
+        { clientType: CLIENT_TYPE, ...body },
+        {
+          suppressErrorToast: true,
+          ...(restrictedToken
+            ? { headers: { Authorization: `Bearer ${restrictedToken}` } }
+            : {}),
+        },
+      )
+      .then((r) => r.data),
 
   /**
    * Oturumun SUNUCUDAN çözülen kimliği. Token'da olmayan iki alanı taşır

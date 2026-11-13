@@ -10,6 +10,9 @@ export interface JwtPayload {
   exp?: number;
   /** Token üretim zamanı (saniye, epoch). */
   iat?: number;
+  /** Kısıtlı oturum: parola kurala uymuyor; token yalnız parola değiştirme +
+   *  çıkış ucuna geçer (backend `verifyToken`). İzin listesi boştur. */
+  passwordChangeRequired?: boolean;
 }
 
 /**
@@ -79,7 +82,23 @@ export interface LoginResponse {
   data: {
     token: string;
     user: JwtPayload;
+    /** Parola güncel kurala uymuyor: token KISITLIDIR (yalnız parola değiştirme +
+     *  çıkış). Alanı taşımayan eski backend'de hiç gelmez (zorunlu ekran çizilmez). */
+    passwordChangeRequired?: boolean;
   };
+  message: string;
+}
+
+/** `POST /api/auth/change-password` gövdesi. */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/** Başarıda bütün oturumlar düşer; yanıt yeni TAM token taşır. */
+export interface ChangePasswordResponse {
+  success: boolean;
+  data: { token: string; user: JwtPayload };
   message: string;
 }
 

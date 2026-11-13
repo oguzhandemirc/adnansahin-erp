@@ -10,7 +10,7 @@
 //
 // KULLANIM (fabrika sunucusunda, `Teks-Erp/` içinden):
 //     npm run superadmin:kur                # kurulum (idempotent)
-//     npm run superadmin:kur -- --rotate    # parola + PIN + TOTP yenile
+//     npm run superadmin:kur -- --rotate    # parola + TOTP yenile (eski PIN silinir)
 //
 // ⚠️ GERÇEK TERMİNAL ŞART. Script parolayı maskeleyerek okur; girdi boru/dosya
 // olduğunda readline soruları sırayla cevaplayamaz. Uzaktan koşulacaksa
@@ -27,9 +27,14 @@
 //      geçmişi, oturumları ve audit satırları maskeli hesaba TAŞINAMAZ (audit
 //      maskesi satır düzeyindedir — geçmiş satırlar bir anda "Sistem Bakımı"
 //      adına geçer ve fabrikanın kendi kayıtları yalanlanır).
-//   ③ SIR DİSKE YAZILMAZ. Ham parola/PIN/TOTP sırrı hiçbir dosyaya, log'a ya da
+//   ③ SIR DİSKE YAZILMAZ. Ham parola/TOTP sırrı hiçbir dosyaya, log'a ya da
 //      audit yüküne düşmez; yalnız `provisionSuperadmin`ın DÖNÜŞ değerinde
 //      yaşar ve interaktif katman onu bir kez ekrana basar.
+//
+// PIN YOK (2026-11-13, Y5 sonrası): süperadmin PIN/kartla GİREMEZ
+// (`isPrivilegedForFieldLogin`), PIN girişi zaten yalnız onaylı saha cihazından
+// açılır. İşe yaramayan bir kimliği üretip ekrana basmak yalnız sır yüzeyi
+// büyütürdü → kurulum PIN üretmez, rotasyon eski PIN'i SİLER (`quickPin: null`).
 //
 // TEST EDİLEBİLİRLİK: girdi okuma (TTY, maskeli parola, QR) ile karar verme
 // AYRI katmanlardır. Bekçi (`scripts/test_superadmin_provision.ts`)
@@ -55,12 +60,8 @@ import { p2002Mentions } from "../src/utils/p2002";
 /** Authenticator uygulamasında görünen ad — `totp-account.service` ile AYNI. */
 const TOTP_ISSUER = "TeksERP";
 
-/** `quickPin` sözleşmesi: TAM 6 hane (`auth.service.loginWithQuickPin` ile aynı). */
-const PIN_RE = /^\d{6}$/;
 /** Kullanıcı adı: boşluksuz, ASCII, giriş kutusuna elle yazılabilir. */
 const USERNAME_RE = /^[A-Za-z0-9._-]{3,50}$/;
-/** PIN üretim denemesi — `quickPin` sistem genelinde `@unique`. */
-const PIN_TRY = 60;
 
 // -----------------------------------------------------------------------------
 // SAF ÇEKİRDEK — bekçi bunu doğrudan çağırır
@@ -71,15 +72,12 @@ export interface ProvisionInput {
   username: string;
   /** Ham parola — hash'lenir, hiçbir yere ham yazılmaz. */
   password: string;
-  /** 6 hane; `null` ise ÜRETİLİR. */
-  pin: string | null;
-  /** `true` → mevcut hesabın parola/PIN/TOTP'si yenilenir + `tokenVersion++`. */
+  /** `true` → mevcut hesabın parola/TOTP'si yenilenir, eski PIN silinir + `tokenVersion++`. */
   rotate: boolean;
 }
 
 export interface ProvisionDeps {
   hashPassword(plain: string): Promise<string>;
-  randomPin(): string;
   generateTotpSecret(): string;
   now(): Date;
   logLifecycle(params: {
@@ -93,9 +91,6 @@ export type ProvisionErrorCode =
   | "USERNAME_INVALID"
   | "USERNAME_TAKEN"
   | "PASSWORD_INVALID"
-  | "PIN_INVALID"
-  | "PIN_TAKEN"
-  | "PIN_EXHAUSTED"
   | "NOT_PROVISIONED"
   | "RACE";
 
@@ -103,7 +98,6 @@ export interface ProvisionSecrets {
   id: string;
   username: string;
   /** Ekrana BİR KEZ basılır; hiçbir yere kaydedilmez. */
-  pin: string;
   totpSecret: string;
   otpauthUri: string;
 }
@@ -119,9 +113,6 @@ export const defaultProvisionDeps: ProvisionDeps = {
   // Kural + hash TEK helper'da (`password-policy.helper.ts`) — kural `parolaKusuru`nda
   // kullanıcı adıyla ZATEN ölçüldü; burada ikinci kez (kullanıcı adısız) ölçülmesi zararsız.
   hashPassword: (plain) => hashNewPassword(plain),
-  // 6 hane — baştaki sıfır da meşru (PIN bir SAYI değil, bir dizidir).
-  randomPin: () =>
-    String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0"),
   generateTotpSecret,
   now: () => new Date(),
   logLifecycle: logSuperadminLifecycleEvent,
@@ -138,48 +129,6 @@ function hata(code: ProvisionErrorCode, message: string): ProvisionResult {
  */
 function parolaKusuru(password: string, username: string): string | null {
   return checkPasswordPolicy(password, { username })?.message ?? null;
-}
-
-/**
- * Çakışmayan bir PIN çözer.
- * `istenen` verilmişse doğrulanır ve çakışıyorsa HATA döner (sessizce başka bir
- * PIN üretmek, kurulumcunun yazdığı kâğıtla sistemi ayrıştırırdı).
- */
-async function pinCoz(
-  istenen: string | null,
-  deps: ProvisionDeps,
-  haricUserId: string | null,
-): Promise<{ pin: string } | { code: ProvisionErrorCode; message: string }> {
-  const kullanimda = async (pin: string): Promise<boolean> => {
-    const row = await prisma.user.findFirst({
-      where: { quickPin: pin, ...(haricUserId ? { id: { not: haricUserId } } : {}) },
-      select: { id: true },
-    });
-    return row !== null;
-  };
-
-  if (istenen !== null) {
-    if (!PIN_RE.test(istenen)) {
-      return { code: "PIN_INVALID", message: "PIN TAM 6 haneli rakam olmalı." };
-    }
-    if (await kullanimda(istenen)) {
-      return {
-        code: "PIN_TAKEN",
-        message: "Bu PIN başka bir kullanıcıda — PIN sistem genelinde benzersizdir.",
-      };
-    }
-    return { pin: istenen };
-  }
-
-  for (let i = 0; i < PIN_TRY; i++) {
-    const aday = deps.randomPin();
-    if (!PIN_RE.test(aday)) continue;
-    if (!(await kullanimda(aday))) return { pin: aday };
-  }
-  return {
-    code: "PIN_EXHAUSTED",
-    message: `${PIN_TRY} denemede boş PIN bulunamadı — PIN'i elle verin.`,
-  };
 }
 
 /**
@@ -208,9 +157,6 @@ export async function provisionSuperadmin(
     const parolaHata = parolaKusuru(input.password, mevcut.username);
     if (parolaHata) return hata("PASSWORD_INVALID", parolaHata);
 
-    const pinSonuc = await pinCoz(input.pin, deps, mevcut.id);
-    if (!("pin" in pinSonuc)) return hata(pinSonuc.code, pinSonuc.message);
-
     const secret = deps.generateTotpSecret();
     const passwordHash = await deps.hashPassword(input.password);
     try {
@@ -220,12 +166,13 @@ export async function provisionSuperadmin(
           passwordHash,
           // Y8: parola kural helper'ından geçti → güncel kural sürümü.
           passwordPolicyVersion: PASSWORD_POLICY_VERSION,
-          quickPin: pinSonuc.pin,
+          // Y5 sonrası işe yaramayan eski PIN kimliği silinir (dosya başı notu).
+          quickPin: null,
           totpSecret: secret,
           totpEnabledAt: deps.now(),
           totpLastStep: null,
           isActive: true,
-          // ⚠️ Eski oturumlar ANINDA düşer (parola/PIN değişiminin her yerdeki
+          // ⚠️ Eski oturumlar ANINDA düşer (parola değişiminin her yerdeki
           // sözleşmesi). Aksi halde rotasyon "sızmış oturumu" kapatmazdı.
           tokenVersion: { increment: 1 },
           // ⚠️ KULLANICI ADI DEĞİŞTİRİLMEZ: ad GİRİŞ KİMLİĞİdir ve sessizce
@@ -233,8 +180,8 @@ export async function provisionSuperadmin(
         },
       });
     } catch (err) {
-      if (p2002Mentions(err, /users_(username_key|username_lower_uq|quickPin_key)/)) {
-        return hata("RACE", "PIN/kullanıcı adı bu sırada başka bir kullanıcıya yazıldı.");
+      if (p2002Mentions(err, /users_(username_key|username_lower_uq)/)) {
+        return hata("RACE", "Kullanıcı adı bu sırada başka bir kullanıcıya yazıldı.");
       }
       throw err;
     }
@@ -244,7 +191,6 @@ export async function provisionSuperadmin(
       kind: "rotated",
       id: mevcut.id,
       username: mevcut.username,
-      pin: pinSonuc.pin,
       totpSecret: secret,
       otpauthUri: buildOtpauthUri({
         username: mevcut.username,
@@ -290,9 +236,6 @@ export async function provisionSuperadmin(
   const parolaHata = parolaKusuru(input.password, username);
   if (parolaHata) return hata("PASSWORD_INVALID", parolaHata);
 
-  const pinSonuc = await pinCoz(input.pin, deps, null);
-  if (!("pin" in pinSonuc)) return hata(pinSonuc.code, pinSonuc.message);
-
   const secret = deps.generateTotpSecret();
   const passwordHash = await deps.hashPassword(input.password);
   let created: { id: string };
@@ -305,7 +248,6 @@ export async function provisionSuperadmin(
         fullName: SYSTEM_ACCOUNT_FULLNAME,
         passwordHash,
         passwordPolicyVersion: PASSWORD_POLICY_VERSION,
-        quickPin: pinSonuc.pin,
         totpSecret: secret,
         // ⚠️ İKİ ALAN BİRDEN: `getStatus` yalnız ikisi de doluyken "kurulu" der.
         totpEnabledAt: deps.now(),
@@ -315,12 +257,12 @@ export async function provisionSuperadmin(
       select: { id: true },
     });
   } catch (err) {
-    // ÜÇ unique çarpabilir ve üçüncüsü ŞEMA-DIŞIDIR (`users_username_lower_uq`,
+    // İKİ unique çarpabilir ve ikincisi ŞEMA-DIŞIDIR (`users_username_lower_uq`,
     // migration 20260731160000) — regex'e konmazsa yarış "bilinmeyen hata" sayılır.
-    if (p2002Mentions(err, /users_(username_key|username_lower_uq|quickPin_key)/)) {
+    if (p2002Mentions(err, /users_(username_key|username_lower_uq)/)) {
       return hata(
         "RACE",
-        "Kullanıcı adı ya da PIN bu sırada başka bir kullanıcıya yazıldı — tekrar deneyin.",
+        "Kullanıcı adı bu sırada başka bir kullanıcıya yazıldı — tekrar deneyin.",
       );
     }
     throw err;
@@ -332,7 +274,6 @@ export async function provisionSuperadmin(
     kind: "created",
     id: created.id,
     username,
-    pin: pinSonuc.pin,
     totpSecret: secret,
     otpauthUri: buildOtpauthUri({ username, secretBase32: secret, issuer: TOTP_ISSUER }),
   };
@@ -411,7 +352,7 @@ async function interaktif(): Promise<number> {
     console.log(
       "Kullanım:\n" +
         "  npm run superadmin:kur              satıcı hesabını kurar (idempotent)\n" +
-        "  npm run superadmin:kur -- --rotate  parola + PIN + TOTP'yi yeniler\n" +
+        "  npm run superadmin:kur -- --rotate  parola + TOTP'yi yeniler (eski PIN silinir)\n" +
         "\n  ⚠️ Gerçek terminal ister (`ssh -t` / `docker exec -it`).\n",
     );
     return 0;
@@ -473,7 +414,7 @@ async function interaktif(): Promise<number> {
     if (mevcut && !rotate) {
       console.log(
         `\nSatıcı hesabı ZATEN KURULU (${mevcut.username}). Hiçbir şey değiştirilmedi.\n` +
-          "Parola/PIN/TOTP yenilemek için: npm run superadmin:kur -- --rotate\n",
+          "Parola/TOTP yenilemek için: npm run superadmin:kur -- --rotate\n",
       );
       return 0;
     }
@@ -485,7 +426,7 @@ async function interaktif(): Promise<number> {
     console.log(
       rotate
         ? `\n=== Satıcı hesabı ROTASYONU (${mevcut?.username}) ===\n` +
-            "Parola, PIN ve iki adımlı doğrulama sırrı YENİLENİR; açık oturumlar düşer.\n"
+            "Parola ve iki adımlı doğrulama sırrı YENİLENİR, eski PIN silinir; açık oturumlar düşer.\n"
         : "\n=== Satıcı (süperadmin) hesabı kurulumu ===\n" +
             "Bu hesap fabrikanın hiçbir yüzeyinde görünmez; audit'e 'Sistem Bakımı' yazılır.\n",
     );
@@ -507,12 +448,9 @@ async function interaktif(): Promise<number> {
     }
     if (!password) return 1;
 
-    const pinGirdi = await sor("Hızlı giriş PIN'i — 6 hane (boş bırak: üretilsin): ");
-
     const sonuc = await provisionSuperadmin({
       username,
       password,
-      pin: pinGirdi === "" ? null : pinGirdi,
       rotate,
     });
 
@@ -532,7 +470,6 @@ async function interaktif(): Promise<number> {
     console.log("  │  AŞAĞIDAKİLER BİR DAHA GÖSTERİLMEZ — şimdi kaydedin.        │");
     console.log("  └──────────────────────────────────────────────────────────────┘\n");
     console.log(`  Kullanıcı adı : ${sonuc.username}`);
-    console.log(`  Hızlı PIN     : ${sonuc.pin}`);
     console.log(`  TOTP sırrı    : ${sonuc.totpSecret}`);
     console.log(`  otpauth URI   : ${sonuc.otpauthUri}\n`);
     try {
