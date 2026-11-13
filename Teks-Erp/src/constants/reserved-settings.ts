@@ -83,3 +83,17 @@ export function isSecuritySettingKey(key: string): boolean {
 export function isReservedSettingKey(key: string): boolean {
   return RESERVED_SETTING_KEYS.has(key) || isSecuritySettingKey(key);
 }
+
+/**
+ * Yalnız SÜPERADMİNİN (sistem hesabı) ham ayar ucundan değiştirebildiği anahtarlar
+ * (güvenlik denetimi 2026-11-13, O1). Patron bulutu eşitlemesi ve telefondan
+ * yazma şalterleri: "önce okuma, ≥ 1 hafta izle, sonra yazma" kararını
+ * `admin:settings` taşıyan bir yönetici tek istekle atlayamasın. Süperadmin yoksa
+ * kimse değiştiremez (bilinçli — ayar şifresi emsali); okuyucular satır yoksa KAPALI.
+ * Değerler `SETTING_KEYS.PATRON_CLOUD_SYNC_ENABLED` / `PATRON_CLOUD_INBOX_ENABLED`
+ * ile aynıdır (bekçi `test_patron_cloud_switch_superadmin` eşitliği ölçer).
+ */
+export const SUPERADMIN_WRITE_SETTING_KEYS: ReadonlySet<string> = new Set([
+  "patronCloud.syncEnabled",
+  "patronCloud.inboxEnabled",
+]);

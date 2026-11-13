@@ -21,7 +21,7 @@ import {
   MODULE_PROFILES,
   MODULE_PROFILE_IDS,
 } from "../constants/module-profiles";
-import { isReservedSettingKey, PROFILE_STAMP_SETTING_KEY } from "../constants/reserved-settings";
+import { isReservedSettingKey, PROFILE_STAMP_SETTING_KEY, SUPERADMIN_WRITE_SETTING_KEYS } from "../constants/reserved-settings";
 import { requireSettingsPassword } from "../middlewares/settings-password.middleware";
 import {
   protectSystemAccountTarget,
@@ -1484,6 +1484,22 @@ router.put(
   // tabloda olmayan anahtar yalnız `admin:settings` (fail-closed).
   (req: Request, res: Response, next: NextFunction) =>
     requirePermissionForEachKey([req.params.key as string], settingKeyWriters)(req, res, next),
+  // Patron bulutu şalterleri (eşitleme / telefondan yazma) YALNIZ SÜPERADMİN
+  // (denetim 2026-11-13 O1): `admin:settings` yetmez. Ayar şifresinden ÖNCE —
+  // süperadmin şifreden muaf, diğerine şifre denemesi yaktırmanın anlamı yok.
+  (req: Request, _res: Response, next: NextFunction) => {
+    const key = req.params.key as string;
+    if (SUPERADMIN_WRITE_SETTING_KEYS.has(key) && req.isSystemAccount !== true) {
+      next(
+        AppError.forbidden("Bu ayarı yalnız en yetkili hesap (sistem yöneticisi) değiştirebilir.", {
+          code: "SUPERADMIN_ONLY",
+          key,
+        }),
+      );
+      return;
+    }
+    next();
+  },
   // ⚠️ İZİNDEN SONRA (2026-09-03 / P3): niyet kapısı yetki kapısının YERİNE
   // geçmez, ARDINA takılır. Ters sırada yetkisiz bir kullanıcı da şifre
   // denemesi yaparak kilit sayacını doldurabilir (meşru yöneticiye DoS).
