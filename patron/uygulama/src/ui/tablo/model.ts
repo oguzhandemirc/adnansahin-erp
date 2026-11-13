@@ -29,6 +29,8 @@ export interface SutunTanimi<R> {
   /** Sunucu sıralama alanı (`LIST_SORT`); yoksa sütun sıralanamaz. */
   readonly sirala?: string;
   readonly hucre: (r: R) => string;
+  /** Hücre metninin en çok satır sayısı (varsayılan 1); ayırt edici kısmı sonda olan adlar için 2. */
+  readonly satir?: number;
   /** Metin yerine rozet gibi öğe (erişilebilirlik ve test yine `hucre` metnini kullanır). */
   readonly ogeler?: (r: R) => ReactNode;
 }

@@ -8,7 +8,7 @@ import { tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../tablo/mo
 const sayi = (v: number | null) => (num(v) === null ? "—" : qty(v));
 
 export const KALEM_SUTUNLARI: readonly SutunTanimi<Kalem>[] = [
-  { key: "kalem", baslik: "Kalem", ad: "Kalem (ürün · en · renk)", agirlik: 2.6, sirala: "kalem", hucre: (k) => k.etiket },
+  { key: "kalem", baslik: "Kalem", ad: "Kalem (ürün · en · renk)", agirlik: 2.6, sirala: "kalem", satir: 2, hucre: (k) => k.etiket },
   { key: "top", baslik: "Top", ad: "Top sayısı", agirlik: 0.7, sayi: true, sirala: "top", hucre: (k) => sayi(k.top) },
   { key: "metre", baslik: "Metre", ad: "Toplam metre", agirlik: 1.1, sayi: true, sirala: "metre", hucre: (k) => sayi(k.metre) },
   { key: "gun", baslik: "Yaş", ad: "En eski top (gün)", agirlik: 0.7, sayi: true, sirala: "gun", hucre: (k) => sayi(k.enEskiGun) },
@@ -17,7 +17,7 @@ export const KALEM_SUTUNLARI: readonly SutunTanimi<Kalem>[] = [
 
 export const TOP_SUTUNLARI: readonly SutunTanimi<Top>[] = [
   { key: "topNo", baslik: "Top no", agirlik: 1.5, sirala: "topNo", hucre: (t) => t.topNo ?? "—" },
-  { key: "kalem", baslik: "Kalem", agirlik: 2.2, sirala: "kalem", hucre: (t) => t.kalemEtiket },
+  { key: "kalem", baslik: "Kalem", agirlik: 2.2, sirala: "kalem", satir: 2, hucre: (t) => t.kalemEtiket },
   { key: "metre", baslik: "Metre", agirlik: 0.9, sayi: true, sirala: "metre", hucre: (t) => sayi(t.metre) },
   { key: "gun", baslik: "Yaş", ad: "Yaş (gün)", agirlik: 0.6, sayi: true, sirala: "gun", hucre: (t) => sayi(t.gun) },
   { key: "parti", baslik: "Parti", agirlik: 0.8, sirala: "parti", hucre: (t) => t.parti ?? "—" },

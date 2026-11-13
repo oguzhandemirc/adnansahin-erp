@@ -71,7 +71,7 @@ function Icerik({ veri }: { readonly veri: unknown }) {
         />
       </View>
       <BlokBasligi
-        baslik={kip === "kalem" ? "Kalem bazında" : "Top bazında"}
+        baslik={kip === "kalem" ? "Kalemler" : "Toplar"}
         sayi={kip === "kalem" ? b.kalemler.length : b.toplar.length}
         sag={<Text style={s.ozet} testID="stok-kalem-ozet">{`${qty(b.toplamTop)} ${UNIT.top} · ${qty(b.toplamMetre)} ${UNIT.metre}`}</Text>}
       />
@@ -83,7 +83,7 @@ function Icerik({ veri }: { readonly veri: unknown }) {
       </View>
       <TabloAraclari
         testID="stok-kalem"
-        ara={{ value: ara, onChangeText: setAra, placeholder: kip === "kalem" ? "Ürün, en, renk ara" : "Top no, parti, kalem ara" }}
+        ara={{ value: ara, onChangeText: setAra, placeholder: kip === "top" ? "Top no, parti, kalem ara" : bolum === "ham" ? "Ürün ara" : "Ürün, en, renk ara" }}
         suzgecSayisi={etkinSuzgecSayisi(suzgec)}
         onSuzgec={gruplar.length > 0 ? () => setSuzgecAcik(true) : undefined}
         onSutun={() => setSutunAcik(true)}

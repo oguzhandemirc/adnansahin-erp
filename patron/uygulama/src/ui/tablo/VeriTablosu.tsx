@@ -112,7 +112,7 @@ export function TabloSatiri<R>(p: { readonly sutunlar: readonly SutunTanimi<R>[]
         return (
           <View key={c.key} style={[s.hucre, { flex: c.agirlik }, c.sayi && s.hucreSag]}>
             {oge ?? (
-              <Text style={[s.hucreYazi, i === 0 && s.ilkHucre, c.sayi && s.sayi]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>
+              <Text style={[s.hucreYazi, i === 0 && s.ilkHucre, c.sayi && s.sayi]} numberOfLines={c.satir ?? 1} maxFontSizeMultiplier={FONT_SCALE.title}>
                 {c.hucre(p.kayit)}
               </Text>
             )}
