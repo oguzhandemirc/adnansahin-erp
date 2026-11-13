@@ -1,10 +1,10 @@
 # Backend `2.12.0`
 
-**Paket:** `tekserp-backend-20261113_033538-ad19d317.zip`
-**SHA256:** `0A73D1A006865138190004687FEC7CD948266DFEC87CEF153F0F856228C2761C`
-**Commit:** `ad19d317`
+**Paket:** `tekserp-backend-20261113_053513-d29ee21f.zip`
+**SHA256:** `C912B04A2599E252CCB26B8AC27A62C92EAECA5BA636CAAA0398A94E460EAF8D`
+**Commit:** `d29ee21f`
 **İçerik commit'leri:** `23c79311` (D1 imza + bulut istemcisi + kapatma düğmesi) · `e3a4990e` (D2 migration'lar) · `ce70d361`…`fbbde853` (D3a eşitleme turu) · `73064213`, `9747e7d7` (D3b anlıklar) · `f583e724` (D4 gelen kutusu) · `3c9345b6` (D5 rapor isteği) · `0b57a21d` (cari özeti verisi) · `08da6a4c` (Bağlı Cihazlar ucu + izin) · `087266f0` (fason anlığına top sayıları) · `2a4b014b` (stok kalem/top listesi ucu + `stok-kalem` anlığı) · `149dfed6` (iş emri katalog sürümü 3 + `fason-acik` firma kırılımı)
-**Yeniden paketlendi (2026-11-13, iki kez):** 2026-11-12 paketi (`…150506-bd801c2e`) ve 2026-11-13 03:35 paketi (`…033538-ad19d317`) hiçbir yere kurulmadan bayatladı; sürüm 2.12.0 kaldı, eski zip'ler kenara alındı.
+**Yeniden paketlendi (2026-11-13, iki kez):** 2026-11-12 paketi (`…150506-bd801c2e`) ve 2026-11-13 03:35 paketi (`…033538-ad19d317`) hiçbir yere kurulmadan bayatladı; sürüm 2.12.0 kaldı, eski zip'ler KULLANILMAZ.
 **Önceki saha sürümü:** **2.11.7** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.11.7 olduğunu ÖLÇER — farklıysa DUR).
 
 Paketleme **`-Surum 2.12.0`** ile koşulur: bu repoda `backend-v*` etiketi yok, yama otomatiği `package.json`dan
@@ -128,4 +128,9 @@ D8 provası (2026-11-12, 2026-11-11 yedeğinin kopyası): 301 GET çağrısını
 prova anı alanları maskelenince gövde farkı 0; yazma dizisinde fazladan yazılan tablo yok; performans farkı
 gürültü düzeyinde. D9 provası (2026-11-13, yeniden paketlenen kod `ad19d317`): 301/301 HTTP durumu aynı; maskeden
 sonra kalan farklar yalnız yeni `system:sessions` izni (açılış uzlaştırması + 2 audit satırı), sürüm numarası ve prova
-kullanıcısının doğuş anı; `/api/sessions/active` yalnız yeni tarafta 200; 5 adımlık yazma dizisi aynı. Sınır: `kur.ps1` ve pm2 Windows'ta koşulmadı; gerçek panel/tablet duman testi yapılmadı.
+kullanıcısının doğuş anı; `/api/sessions/active` yalnız yeni tarafta 200; 5 adımlık yazma dizisi aynı. D10 provası (2026-11-13 05:37, bu paketin kodu `d29ee21f`, aynı yöntem): 2 migration 1,16 sn, mevcut 161 tablonun
+içeriği değişmedi; 301/301 HTTP durumu aynı; yalnız yenide iki uç (`/api/sessions/active`,
+`/api/reports/inventory/scorecard/kalem/toplar`) 200; maskeden sonra kalan farklar D9'dakilere ek olarak yalnız
+`/scorecard/kalem` satırlarının ek `kg`/`oldestDays` alanları ve iki sırasız (`ORDER BY`suz) liste; 5 adımlık yazma
+dizisi aynı; eşitleme `0|28|0`, dışarı bağlantı yok; eski kod yeni şemada açıldı. Sınır: `kur.ps1` ve pm2 Windows'ta
+koşulmadı; gerçek panel/tablet duman testi yapılmadı.
