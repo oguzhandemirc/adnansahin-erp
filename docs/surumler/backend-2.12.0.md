@@ -1,10 +1,10 @@
 # Backend `2.12.0`
 
-**Paket:** `tekserp-backend-20261113_033538-ad19d317.zip`
-**SHA256:** `0A73D1A006865138190004687FEC7CD948266DFEC87CEF153F0F856228C2761C`
-**Commit:** `ad19d317`
-**İçerik commit'leri:** `23c79311` (D1 imza + bulut istemcisi + kapatma düğmesi) · `e3a4990e` (D2 migration'lar) · `ce70d361`…`fbbde853` (D3a eşitleme turu) · `73064213`, `9747e7d7` (D3b anlıklar) · `f583e724` (D4 gelen kutusu) · `3c9345b6` (D5 rapor isteği) · `0b57a21d` (cari özeti verisi) · `08da6a4c` (Bağlı Cihazlar ucu + izin) · `087266f0` (fason anlığına top sayıları)
-**Yeniden paketlendi (2026-11-13):** 2026-11-12 paketi (`…150506-bd801c2e`) hiçbir yere kurulmadan bayatladı; sürüm 2.12.0 kaldı, eski zip kenara alındı.
+**Paket:** `tekserp-backend-20261113_053513-d29ee21f.zip`
+**SHA256:** `C912B04A2599E252CCB26B8AC27A62C92EAECA5BA636CAAA0398A94E460EAF8D`
+**Commit:** `d29ee21f`
+**İçerik commit'leri:** `23c79311` (D1 imza + bulut istemcisi + kapatma düğmesi) · `e3a4990e` (D2 migration'lar) · `ce70d361`…`fbbde853` (D3a eşitleme turu) · `73064213`, `9747e7d7` (D3b anlıklar) · `f583e724` (D4 gelen kutusu) · `3c9345b6` (D5 rapor isteği) · `0b57a21d` (cari özeti verisi) · `08da6a4c` (Bağlı Cihazlar ucu + izin) · `087266f0` (fason anlığına top sayıları) · `2a4b014b` (stok kalem/top listesi ucu + `stok-kalem` anlığı) · `149dfed6` (iş emri katalog sürümü 3 + `fason-acik` firma kırılımı)
+**Yeniden paketlendi (2026-11-13, iki kez):** 2026-11-12 paketi (`…150506-bd801c2e`) ve 2026-11-13 03:35 paketi (`…033538-ad19d317`) hiçbir yere kurulmadan bayatladı; sürüm 2.12.0 kaldı, eski zip'ler KULLANILMAZ.
 **Önceki saha sürümü:** **2.11.7** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.11.7 olduğunu ÖLÇER — farklıysa DUR).
 
 Paketleme **`-Surum 2.12.0`** ile koşulur: bu repoda `backend-v*` etiketi yok, yama otomatiği `package.json`dan
@@ -15,10 +15,11 @@ sayar ve küçük hane artışını bilemez (küçük hane bir karardır).
 Patron bulutu eşitlemesi (D1–D5) ve müşteri (cari) özeti verisi geldi. **Hepsi varsayılan KAPALI**: adres,
 anahtar dosyası ve ayar açılmadıkça backend dışarıya istek atmaz, iş kaydı yazmaz, tetikleyiciler kapalı
 kalır. Ek olarak Sistem → **Bağlı Cihazlar** için salt okuma ucu (`GET /api/sessions/active`) ve izni
-(`system:sessions`) geldi. Mevcut panel/tablet akışlarında değişiklik YOK.
+(`system:sessions`) geldi. Stok & Ölü Stok raporunun "kalem bazında" sekmesine top listesi ucu
+(`GET /api/reports/inventory/scorecard/kalem/toplar`, salt okuma) eklendi. Mevcut panel/tablet akışlarında değişiklik YOK.
 
 Ölçüm (git, `1eadbd75` birleşik 2.11.7 `..` bu commit): yeni migration **2** (toplam **365**) · yeni HTTP ucu
-**1** (`GET /api/sessions/active`) · yeni izin kodu **1** (`system:sessions`) · yeni npm paketi **0** · `client-version-policy.ts` değişmedi · `deploy/kur.ps1` değişmedi.
+**2** (`GET /api/sessions/active`, `GET /api/reports/inventory/scorecard/kalem/toplar`) · yeni izin kodu **1** (`system:sessions`) · yeni npm paketi **0** · `client-version-policy.ts` değişmedi · `deploy/kur.ps1` değişmedi.
 
 ## 2. Ne değişti
 
@@ -34,6 +35,13 @@ kalır. Ek olarak Sistem → **Bağlı Cihazlar** için salt okuma ucu (`GET /ap
   Yöneticisi şablonuna eklendi, migration ile kimseye ATANMAZ (atama panelden). Ekran kataloğu: `system/sessions`.
 - **Fason anlığı** (`087266f0`): `fason-acik` anlığına `acikTop` + `boyahanedeTop` ve firma başına `acikTop` +
   `kategoriler`; yalnız eşitleme işinde üretilir (eşitleme KAPALIYKEN koşmaz).
+- **Stok kalem/top listesi** (`2a4b014b`): `GET /api/reports/inventory/scorecard/kalem/toplar?bolum=&kalem=` — kalem
+  satırıyla AYNI raf okumasından top listesi (kapı mevcut `inventory/scorecard` rapor kapısı, yeni izin YOK);
+  mevcut `/scorecard/kalem` satırlarına yalnız EK alan `kg` (tartılı top yoksa `null`) ve `oldestDays`. Patron
+  bulutu için yeni `stok-kalem` anlığı — yalnız eşitleme işinde üretilir.
+- **İş emri anlığı** (`149dfed6`): katalog sürümü 3 (iş emri başına aşama/müşteri/sipariş/fason firma alanları) ve
+  `fason-acik` firma kırılımı; yalnız eşitleme işinde koşar. Akış panosunun Kurşun/Tambur kuyruk yüklemi tek
+  helper'a taşındı (`production-flow-where.helper.ts`; küme aynı, davranış değişmedi).
 - **Cari özeti**: `iade` kaydı, sipariş `acik` bayrağı, müşteri başına özet anlığı (buluttaki
   `GET /api/cari-ozeti/:cariKartId` bunu okur).
 - Patron hattı dışında dokunulanlar: `server.ts` (işleri başlat/durdur), `auth.service.ts` ve
@@ -41,7 +49,7 @@ kalır. Ek olarak Sistem → **Bağlı Cihazlar** için salt okuma ucu (`GET /ap
   tek ayar okuması, girişte ≈ +2 ms medyan), `system-setting.service.ts` (anahtar sabitleri), `reserved-settings.ts`.
 - **Pakette `dist-web` (tarayıcı paneli) yeniden derlenir**: bu commit'teki panel kodu — müşteri kartında
   "Özet" sekmesi (yalnız mevcut uçları okur), widget'lı anasayfa panosu (mevcut rapor uçlarını okur) ve Sistem →
-  Bağlı Cihazlar dahil — tarayıcı panelinde de görünür.
+  Bağlı Cihazlar ve Stok & Ölü Stok "Kalem ve top" sekmesi dahil — tarayıcı panelinde de görünür.
 
 **Yeni ayar anahtarları** (yoksa varsayılan geçerli; hiçbiri migration ile yazılmaz):
 
@@ -59,14 +67,15 @@ mutlak yolu; veri dizininde, repoda değil).
 
 ## 3. Sözleşme
 
-- **Kırıldı mı:** HAYIR — yalnız EKLEME: bir yeni uç + bir yeni izin; mevcut uçların alan adı/tipi, parametresi,
+- **Kırıldı mı:** HAYIR — yalnız EKLEME: iki yeni uç + bir yeni izin + `/scorecard/kalem` satırında iki ek alan; mevcut uçların alan adı/tipi, parametresi,
   enum ve izinleri aynı.
-- **Eski istemci ne yapar:** değişmeden çalışır (yeni ucu çağırmaz; yeni iznin ataması panel 1.3.16'dan
+- **Eski istemci ne yapar:** değişmeden çalışır (yeni uçları çağırmaz; yeni iznin ataması panel 1.3.16'dan
   yapılır); D8 provasında `/api/client-policy/electron` ve `/mobile`
   yanıtları eski ve yeni backend'de aynı.
 - **Panel uyumluluğu:** panel **1.3.15 ve 1.3.16**, tablet **1.0.14** ile uyumlu. 1.3.16'nın "Özet" sekmesi ve
   panosu yalnız mevcut uçları çağırır; **Bağlı Cihazlar** ekranı yeni ucu ister — panel 1.3.16 bu backend'den
-  SONRA kurulur (2.11.7'ye karşı o ekran 404 alır).
+  SONRA kurulur (2.11.7'ye karşı o ekran 404 alır). Aynısı Stok & Ölü Stok "Kalem ve top" sekmesinin top
+  görünümü için geçerli (`/scorecard/kalem/toplar`; pakete giren tarayıcı panelinde zaten var).
 - **`minVersion` dokunuldu mu:** HAYIR (`client-version-policy.ts` değişmedi).
 
 ## 4. Migration
@@ -119,4 +128,9 @@ D8 provası (2026-11-12, 2026-11-11 yedeğinin kopyası): 301 GET çağrısını
 prova anı alanları maskelenince gövde farkı 0; yazma dizisinde fazladan yazılan tablo yok; performans farkı
 gürültü düzeyinde. D9 provası (2026-11-13, yeniden paketlenen kod `ad19d317`): 301/301 HTTP durumu aynı; maskeden
 sonra kalan farklar yalnız yeni `system:sessions` izni (açılış uzlaştırması + 2 audit satırı), sürüm numarası ve prova
-kullanıcısının doğuş anı; `/api/sessions/active` yalnız yeni tarafta 200; 5 adımlık yazma dizisi aynı. Sınır: `kur.ps1` ve pm2 Windows'ta koşulmadı; gerçek panel/tablet duman testi yapılmadı.
+kullanıcısının doğuş anı; `/api/sessions/active` yalnız yeni tarafta 200; 5 adımlık yazma dizisi aynı. D10 provası (2026-11-13 05:37, bu paketin kodu `d29ee21f`, aynı yöntem): 2 migration 1,16 sn, mevcut 161 tablonun
+içeriği değişmedi; 301/301 HTTP durumu aynı; yalnız yenide iki uç (`/api/sessions/active`,
+`/api/reports/inventory/scorecard/kalem/toplar`) 200; maskeden sonra kalan farklar D9'dakilere ek olarak yalnız
+`/scorecard/kalem` satırlarının ek `kg`/`oldestDays` alanları ve iki sırasız (`ORDER BY`suz) liste; 5 adımlık yazma
+dizisi aynı; eşitleme `0|28|0`, dışarı bağlantı yok; eski kod yeni şemada açıldı. Sınır: `kur.ps1` ve pm2 Windows'ta
+koşulmadı; gerçek panel/tablet duman testi yapılmadı.
