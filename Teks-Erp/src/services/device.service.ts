@@ -12,7 +12,10 @@ import prisma from "../lib/prisma";
 import { DeviceKind } from "@prisma/client";
 import { AppError } from "../utils/app-error";
 import { AuditService } from "./audit.service";
-import { readDevicePairingRequired } from "./system-setting.service";
+import { readDeviceAutoReattach, readDevicePairingRequired } from "./system-setting.service";
+import {
+  findDeviceByHw, isReattachTarget, learnHwDigest, reattachKnownHardware, type HwClaim,
+} from "./helpers/device-identity.helper";
 import { ACTOR_SELECT } from "./helpers/system-account.helper";
 
 /**
@@ -106,6 +109,8 @@ export class DeviceService {
   /** Admin: tüm cihazları listele (PENDING'ler önce). */
   static async list() {
     return prisma.device.findMany({
+      // Donanım özeti GİZLİ: bilen, kimliksiz `announce` ile satırı devralabilir (hwSource kalır).
+      omit: { hwDigest: true },
       orderBy: [{ status: "asc" }, { isActive: "desc" }, { createdAt: "desc" }],
       include: DEVICE_INCLUDE,
       // ⚠️ TAVAN (2026-08-09, F-CORE-GUV-003). Eskiden tavansızdı ve bu, kimlik
@@ -222,10 +227,14 @@ export class DeviceService {
    * ettiği) cihaz" farklı şeylerdir; public bir uç bir yönetici kararını geri
    * alamaz (F216'nın aynı gerekçesi).
    */
-  static async announce(input: { deviceId: string; name?: string; kind?: string }) {
+  static async announce(input: { deviceId: string; name?: string; kind?: string; hw?: HwClaim }) {
     const deviceId = (input.deviceId ?? "").trim();
     if (!deviceId) throw AppError.badRequest("deviceId zorunlu");
     const pairingRequired = await readDevicePairingRequired();
+    // ⚠️ KİMLİK (2026-11-13): `hw` YALNIZ `device.autoReattachKnownHardware` AÇIKKEN kullanılır.
+    // Kapalıyken (varsayılan) aşağıdaki yol bugünkü davranışla birebir aynıdır: özet ne
+    // okunur ne yazılır. `hw` göndermeyen eski istemci bayrağı hiç okutmaz.
+    const hw = input.hw && (await readDeviceAutoReattach()) ? input.hw : null;
     const kind = normalizeDeviceKind(input.kind);
     const kindLabel = kind === "PHONE" ? "Telefon" : kind === "DESKTOP" ? "Masaüstü" : "Tablet";
     const fallbackName = input.name?.trim() || `${kindLabel} ${deviceId.slice(0, 8)}`;
@@ -244,6 +253,18 @@ export class DeviceService {
       where: { deviceId },
       select: { id: true },
     });
+    // Bilinen donanım + yeni kurulum anahtarı: aktif + onaylı eski kayda BAĞLAN (yeni satır yok).
+    // Hedef pasif/PENDING ise bugünkü doğuş; yeni satır özeti ÖĞRENMEZ (özet eski satırda kalır).
+    let learnHw = hw !== null;
+    if (hw && !existing) {
+      const target = await findDeviceByHw(hw.ozet);
+      if (target && isReattachTarget(target)) {
+        await reattachKnownHardware(target, deviceId, hw);
+        const rebound = await prisma.device.findUniqueOrThrow({ where: { id: target.id }, include: DEVICE_INCLUDE });
+        return toAssignment(rebound, pairingRequired);
+      }
+      if (target) learnHw = false;
+    }
     if (!existing) {
       // Rejimden BAĞIMSIZ satır tavanı (bkz. MAX_DEVICE_ROWS): bayrak kapalıyken
       // PENDING sayacı hiç artmadığı için aşağıdaki tavan TEK BAŞINA yetmez.
@@ -291,6 +312,7 @@ export class DeviceService {
     if (input.kind && device.status === "PENDING" && device.kind !== kind) {
       await prisma.device.updateMany({ where: { deviceId, status: "PENDING" }, data: { kind } });
     }
+    if (hw && learnHw) await learnHwDigest(device, hw);
     // Otomatik onayın İZİ (yalnız yeni doğan satırda). Bayrak sonradan açılırsa
     // yöneticinin "bu cihazı hiç kimse onaylamadı" diyebileceği tek kayıt budur.
     if (!existing && !pairingRequired && device.status === "APPROVED") {

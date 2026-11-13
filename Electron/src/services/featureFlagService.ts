@@ -365,6 +365,9 @@ export interface FeatureFlags {
   /** Mobil cihaz eşleştirmesi zorunlu mu (true=aktif) yoksa pasif mi (false=default).
    *  Pasifken eşleşmemiş tabletler de sisteme girer (makine atfı NULL kalır). ENFORCE edilir. */
   devicePairingRequired: boolean;
+  /** Bilinen donanımı yeniden tanı (false=default): yeniden kurulan uygulama aktif + onaylı
+   *  eski kaydına bağlanır. Kapalıyken backend `hw` özetini hiç kullanmaz. */
+  deviceAutoReattachKnownHardware: boolean;
   /** Sevk onayı adımı zorunlu mu (false=default). Kapalıyken çuvallar seçilir seçilmez
    *  DOĞRUDAN sevk edilir (createShipment → DISPATCHED, stok o an düşer); açıkken önce
    *  PLANNED sevkiyat kurulur, çıkış ayrıca "Sevk Kapısı" ekranından onaylanır. */

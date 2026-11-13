@@ -102,6 +102,7 @@ function check(label: string, ok: boolean, extra = "") {
 // bayrak" değiller — yalnız `FlagDef` listesinde durmuyorlar.
 const PANEL_EXEMPT: Record<string, string> = {
   devicePairingRequired: "kind:'device' — Mobil Cihazlar section'ı yönetir",
+  deviceAutoReattachKnownHardware: "kind:'device' — Mobil Cihazlar section'ı yönetir (DevicePairingSection ikinci anahtar)",
   autoLogoutOnExpiry: "kind:'session' — Oturum section'ı yönetir",
   mobileIdleLockEnabled: "kind:'session' — Oturum section'ı yönetir",
   mobileLockOnBackground: "kind:'session' — Oturum section'ı yönetir",

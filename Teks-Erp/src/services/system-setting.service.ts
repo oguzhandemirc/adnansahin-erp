@@ -367,6 +367,10 @@ export const SETTING_KEYS = {
    *  tabletler de giriş yapıp çalışabilir (makine atfı NULL kalır). True iken
    *  eşleşmemiş/pasif cihaz device.middleware'de 401 ile kesilir. ENFORCE edilir. */
   DEVICE_PAIRING_REQUIRED: "device.pairingRequired",
+  /** Bilinen donanım yeniden tanınsın mı (cihaz kimliği, 2026-11-13). Default false (KAPALI):
+   *  `announce`taki `hw` özeti hiç okunmaz/saklanmaz — bugünkü davranış birebir. AÇIKKEN
+   *  yeniden kurulan uygulama aktif + onaylı eski kaydına bağlanır (yeni satır açılmaz). */
+  DEVICE_AUTO_REATTACH: "device.autoReattachKnownHardware",
   /** Sevk için ayrı onay adımı zorunlu mu. Default false (KAPALI): çuvalları seç → Sevk Et
    *  → DOĞRUDAN sevk edilir (DISPATCHED). AÇIKKEN: Sevk Et yalnız PLANNED sevkiyat kurar;
    *  çıkış ayrıca "Sevk Kapısı" ekranından dispatch edilir. */
@@ -1666,6 +1670,8 @@ export interface FeatureFlags {
   /** Cihaz eşleştirme zorunlu mu (true=aktif) yoksa pasif mi (false=default).
    *  Diğerlerinden farklı olarak ENFORCE edilir (device.middleware). */
   devicePairingRequired: boolean;
+  /** Bilinen donanımı yeniden tanı (yeniden kurulumda eski kayda bağla). Default false. */
+  deviceAutoReattachKnownHardware: boolean;
   /** Sevk için ayrı "ambar aldı / çıkış" onay adımı zorunlu mu (default false). */
   shipmentConfirmationEnabled: boolean;
   shipmentManualSackCountEnabled: boolean;
@@ -2117,6 +2123,7 @@ export class SystemSettingService {
       partyCodeAuto: await readPartyCodeAuto(cacheClient),
       fasonNoteMobileEntry: await readFasonNoteMobileEntry(cacheClient),
       devicePairingRequired: await readDevicePairingRequired(cacheClient),
+      deviceAutoReattachKnownHardware: await readDeviceAutoReattach(cacheClient),
       shipmentConfirmationEnabled: await readShipmentConfirmationEnabled(cacheClient),
       shipmentManualSackCountEnabled: await readShipmentManualSackCountEnabled(cacheClient),
       shipmentUndoSameDayOnly: await readShipmentUndoSameDayOnly(cacheClient),
@@ -2881,6 +2888,18 @@ export class SystemSettingService {
         SETTING_KEYS.DEVICE_PAIRING_REQUIRED,
         input.devicePairingRequired,
         "Mobil cihaz eşleştirmesi zorunlu olsun (kapalıyken eşleşmemiş cihazlar da girer)",
+        userId
+      );
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input, "deviceAutoReattachKnownHardware")) {
+      if (typeof input.deviceAutoReattachKnownHardware !== "boolean") {
+        throw AppError.badRequest("deviceAutoReattachKnownHardware boolean olmalı");
+      }
+      await this.set(
+        SETTING_KEYS.DEVICE_AUTO_REATTACH,
+        input.deviceAutoReattachKnownHardware,
+        "Bilinen donanımı yeniden tanı: yeniden kurulan uygulama aktif ve onaylı eski kaydına bağlanır",
         userId
       );
     }
@@ -4677,6 +4696,22 @@ export async function readDevicePairingRequired(
   const client = tx ?? prisma;
   const setting = await client.systemSetting.findUnique({
     where: { key: SETTING_KEYS.DEVICE_PAIRING_REQUIRED },
+    select: { value: true },
+  });
+  return asBoolean(setting?.value);
+}
+
+/**
+ * Bilinen donanım yeniden tanınsın mı (`device.autoReattachKnownHardware`)? Kayıt yok → false
+ * (KAPALI; kullanıcı kararı 2026-11-13: Adnan'a pasif gelir). Kapalıyken `announce`
+ * bugünkü (2.12.0) davranışla birebir aynıdır: `hw` okunmaz, yazılmaz, eşleştirilmez.
+ */
+export async function readDeviceAutoReattach(
+  tx?: Pick<typeof prisma, "systemSetting">,
+): Promise<boolean> {
+  const client = tx ?? prisma;
+  const setting = await client.systemSetting.findUnique({
+    where: { key: SETTING_KEYS.DEVICE_AUTO_REATTACH },
     select: { value: true },
   });
   return asBoolean(setting?.value);

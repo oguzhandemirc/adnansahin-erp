@@ -25,14 +25,23 @@ export function DevicePairingSection({
   const canEdit = hasAnyPermission(writePermissions);
   const flagsQ = useFeatureFlags();
   const server = flagsQ.data?.data?.devicePairingRequired ?? false;
+  // Bilinen donanımı yeniden tanı (2026-11-13; ana ürün PR #673 AutoReattachRow karşılığı).
+  // Varsayılan KAPALI — backend okuyucusunun kayıt-yok değeriyle aynı.
+  const serverReattach = flagsQ.data?.data?.deviceAutoReattachKnownHardware ?? false;
 
   const [draft, setDraft] = useState(server);
+  const [draftReattach, setDraftReattach] = useState(serverReattach);
   useEffect(() => setDraft(server), [server]);
-  const dirty = draft !== server;
+  useEffect(() => setDraftReattach(serverReattach), [serverReattach]);
+  const dirty = draft !== server || draftReattach !== serverReattach;
   useRegisterSettingsDirty(dirty);
 
   const mut = useMutation({
-    mutationFn: () => featureFlagService.update({ devicePairingRequired: draft }),
+    mutationFn: () =>
+      featureFlagService.update({
+        ...(draft !== server ? { devicePairingRequired: draft } : {}),
+        ...(draftReattach !== serverReattach ? { deviceAutoReattachKnownHardware: draftReattach } : {}),
+      }),
     onSuccess: () => {
       toast.success("Cihaz eşleştirme ayarı kaydedildi.");
       void qc.invalidateQueries({ queryKey: FEATURE_FLAGS_QUERY_KEY });
@@ -69,6 +78,32 @@ export function DevicePairingSection({
         />
       )}
 
+      {canEdit ? (
+        <FlagToggle
+          title="Yeniden kurulan cihazı eski kaydına bağla"
+          desc={
+            <>
+              Kapalıyken (varsayılan) uygulaması silinip yeniden kurulan her tablet ve PC
+              Cihazlar listesinde <strong>yeni bir kayıt</strong> olarak görünür. Açıkken
+              aynı cihaz donanımından tanınır ve <strong>aktif, onaylı</strong> eski kaydına
+              (ad, makine, donanım) bağlanır. Pasife alınmış ya da onayı geri alınmış kayda
+              asla otomatik bağlanmaz.
+            </>
+          }
+          defaultOn={false}
+          checked={draftReattach}
+          disabled={mut.isPending}
+          onChange={setDraftReattach}
+        />
+      ) : (
+        <ReadOnlyRow
+          title="Yeniden kurulan cihazı eski kaydına bağla"
+          enabled={serverReattach}
+          onLabel="Açık"
+          offLabel="Kapalı"
+        />
+      )}
+
       <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
         <strong className="text-amber-600 dark:text-amber-400">Dikkat:</strong>{" "}
         Eşleştirme pasifken, <strong>eşleşmemiş</strong> bir tabletten işlenen toplarda
@@ -82,7 +117,10 @@ export function DevicePairingSection({
           dirty={dirty}
           saving={mut.isPending}
           onSave={() => mut.mutate()}
-          onReset={() => setDraft(server)}
+          onReset={() => {
+            setDraft(server);
+            setDraftReattach(serverReattach);
+          }}
         />
       )}
     </div>
