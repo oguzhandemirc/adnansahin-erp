@@ -3,7 +3,8 @@
 **Paket:** `tekserp-backend-20261112_150506-bd801c2e.zip`
 **SHA256:** `0880C3B309627B77AE62537885308BAC1FF643218D660ACF6250E93FB3C6B15E`
 **Commit:** `bd801c2e`
-**İçerik commit'leri:** `23c79311` (D1 imza + bulut istemcisi + kapatma düğmesi) · `e3a4990e` (D2 migration'lar) · `ce70d361`…`fbbde853` (D3a eşitleme turu) · `73064213`, `9747e7d7` (D3b anlıklar) · `f583e724` (D4 gelen kutusu) · `3c9345b6` (D5 rapor isteği) · `0b57a21d` (cari özeti verisi)
+**İçerik commit'leri:** `23c79311` (D1 imza + bulut istemcisi + kapatma düğmesi) · `e3a4990e` (D2 migration'lar) · `ce70d361`…`fbbde853` (D3a eşitleme turu) · `73064213`, `9747e7d7` (D3b anlıklar) · `f583e724` (D4 gelen kutusu) · `3c9345b6` (D5 rapor isteği) · `0b57a21d` (cari özeti verisi) · `08da6a4c` (Bağlı Cihazlar ucu + izin) · `087266f0` (fason anlığına top sayıları)
+**Yeniden paketlendi (2026-11-13):** 2026-11-12 paketi (`…150506-bd801c2e`) hiçbir yere kurulmadan bayatladı; sürüm 2.12.0 kaldı, eski zip kenara alındı.
 **Önceki saha sürümü:** **2.11.7** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.11.7 olduğunu ÖLÇER — farklıysa DUR).
 
 Paketleme **`-Surum 2.12.0`** ile koşulur: bu repoda `backend-v*` etiketi yok, yama otomatiği `package.json`dan
@@ -13,10 +14,11 @@ sayar ve küçük hane artışını bilemez (küçük hane bir karardır).
 
 Patron bulutu eşitlemesi (D1–D5) ve müşteri (cari) özeti verisi geldi. **Hepsi varsayılan KAPALI**: adres,
 anahtar dosyası ve ayar açılmadıkça backend dışarıya istek atmaz, iş kaydı yazmaz, tetikleyiciler kapalı
-kalır. Fabrika açısından görünür değişiklik YOK — panel ve tablet bugünkü gibi çalışır.
+kalır. Ek olarak Sistem → **Bağlı Cihazlar** için salt okuma ucu (`GET /api/sessions/active`) ve izni
+(`system:sessions`) geldi. Mevcut panel/tablet akışlarında değişiklik YOK.
 
 Ölçüm (git, `1eadbd75` birleşik 2.11.7 `..` bu commit): yeni migration **2** (toplam **365**) · yeni HTTP ucu
-**0** · yeni izin kodu **0** · yeni npm paketi **0** · `client-version-policy.ts` değişmedi · `deploy/kur.ps1` değişmedi.
+**1** (`GET /api/sessions/active`) · yeni izin kodu **1** (`system:sessions`) · yeni npm paketi **0** · `client-version-policy.ts` değişmedi · `deploy/kur.ps1` değişmedi.
 
 ## 2. Ne değişti
 
@@ -26,13 +28,20 @@ kalır. Fabrika açısından görünür değişiklik YOK — panel ve tablet bug
 - **D3a/D3b** eşitleme turu (13 projeksiyon) ve anlıklar; yalnız eşitleme işinde koşar.
 - **D4** telefondan gelen sipariş/müşteri için gelen kutusu (`patronCloud.inboxEnabled`, ayrı ayar, KAPALI).
 - **D5** buluttan gelen rapor isteğini tüketen iş.
+- **Bağlı Cihazlar** (`08da6a4c`): `GET /api/sessions/active` — iptal edilmemiş ve süresi dolmamış oturumların
+  kullanıcı/cihaz/uygulama sürümü listesi, salt okuma (`limit` 1–500, varsayılan 200; jti/token dönmez, cihaz
+  kimliği yalnız ilk 8 hane). Kapı `admin:settings` YA DA yeni `system:sessions`; izin kataloğa ve Sistem
+  Yöneticisi şablonuna eklendi, migration ile kimseye ATANMAZ (atama panelden). Ekran kataloğu: `system/sessions`.
+- **Fason anlığı** (`087266f0`): `fason-acik` anlığına `acikTop` + `boyahanedeTop` ve firma başına `acikTop` +
+  `kategoriler`; yalnız eşitleme işinde üretilir (eşitleme KAPALIYKEN koşmaz).
 - **Cari özeti**: `iade` kaydı, sipariş `acik` bayrağı, müşteri başına özet anlığı (buluttaki
   `GET /api/cari-ozeti/:cariKartId` bunu okur).
 - Patron hattı dışında dokunulanlar: `server.ts` (işleri başlat/durdur), `auth.service.ts` ve
   `permission-management.service.ts` (patron teknik kullanıcısı girişsiz ve listede gizli; kapalıyken yalnız
   tek ayar okuması, girişte ≈ +2 ms medyan), `system-setting.service.ts` (anahtar sabitleri), `reserved-settings.ts`.
 - **Pakette `dist-web` (tarayıcı paneli) yeniden derlenir**: bu commit'teki panel kodu — müşteri kartında
-  "Özet" sekmesi (yalnız mevcut uçları okur) dahil — tarayıcı panelinde de görünür.
+  "Özet" sekmesi (yalnız mevcut uçları okur), widget'lı anasayfa panosu (mevcut rapor uçlarını okur) ve Sistem →
+  Bağlı Cihazlar dahil — tarayıcı panelinde de görünür.
 
 **Yeni ayar anahtarları** (yoksa varsayılan geçerli; hiçbiri migration ile yazılmaz):
 
@@ -50,11 +59,14 @@ mutlak yolu; veri dizininde, repoda değil).
 
 ## 3. Sözleşme
 
-- **Kırıldı mı:** HAYIR — yeni HTTP ucu yok, mevcut uçların alan adı/tipi, parametresi, enum ve izinleri aynı.
-- **Eski istemci ne yapar:** değişmeden çalışır; D8 provasında `/api/client-policy/electron` ve `/mobile`
+- **Kırıldı mı:** HAYIR — yalnız EKLEME: bir yeni uç + bir yeni izin; mevcut uçların alan adı/tipi, parametresi,
+  enum ve izinleri aynı.
+- **Eski istemci ne yapar:** değişmeden çalışır (yeni ucu çağırmaz; yeni iznin ataması panel 1.3.16'dan
+  yapılır); D8 provasında `/api/client-policy/electron` ve `/mobile`
   yanıtları eski ve yeni backend'de aynı.
-- **Panel uyumluluğu:** panel **1.3.15 ve 1.3.16**, tablet **1.0.14** ile uyumlu (1.3.16'nın "Özet" sekmesi
-  yalnız mevcut uçları çağırır; 2.11.7'de de çalışır).
+- **Panel uyumluluğu:** panel **1.3.15 ve 1.3.16**, tablet **1.0.14** ile uyumlu. 1.3.16'nın "Özet" sekmesi ve
+  panosu yalnız mevcut uçları çağırır; **Bağlı Cihazlar** ekranı yeni ucu ister — panel 1.3.16 bu backend'den
+  SONRA kurulur (2.11.7'ye karşı o ekran 404 alır).
 - **`minVersion` dokunuldu mu:** HAYIR (`client-version-policy.ts` değişmedi).
 
 ## 4. Migration
@@ -73,7 +85,7 @@ mutlak yolu; veri dizininde, repoda değil).
 
 - **Beklenen kesinti:** ölçülen kısım < 5 sn (`migrate deploy` 2,5 sn + açılış ≈ 1,5 sn); asıl süre pm2
   durdur/başlat ve dosya taşıma — tahmini 1–3 dk (Windows'ta ÖLÇÜLMEDİ).
-- **Sıra:** patron bulutu önce güncel (2026-11-12 kuruldu) → bu backend (eşitleme KAPALI) → panel 1.3.16
+- **Sıra:** patron bulutu önce güncel (2026-11-13 kuruldu) → bu backend (eşitleme KAPALI) → panel 1.3.16
   (isteğe bağlı) → okuma ayrı bakım işiyle açılır → ≥ 1 hafta sonra yazma.
 - **Kurulum yöntemi:** 2.11.7 ile aynı — paket `C:\TeksERP\guncelleme\`e; paketin kendi `kur.ps1` +
   `uzaktan-kos.ps1`i çıkarılır, `C:\TeksERP\kur.ps1` onunla değiştirilir; SYSTEM görevi:
@@ -100,6 +112,7 @@ aynı. Şema sorununda: backend durdurulur, `[3/9]`un `premigrate_` yedeğinden 
   `swallowed_errors = 0`; `SELECT count(*) FROM sync_marks;` → 0
 - `backend-err*.log` son satırlar — yeni hata var mı; açılış log'unda patron eşitlemesi için hata yok
 - panelde top listesi + müşteri kartı; tabletten bir okutma (normal çalışma)
+- tarayıcı panelinde (yönetici) Sistem → Bağlı Cihazlar açılır, en az kendi oturumunu listeler
 - ölçülen kesinti
 
 D8 provası (2026-11-12, 2026-11-11 yedeğinin kopyası): 301 GET çağrısının 301'inde HTTP durumu aynı; ortam ve
