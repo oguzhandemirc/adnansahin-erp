@@ -17,7 +17,7 @@ jest.mock("../src/state/session", () => ({ useSession: () => mockSession }));
 jest.mock("expo-router", () => ({ useRouter: () => ({ push: jest.fn(), back: jest.fn(), canGoBack: () => true }), usePathname: () => "/diger", useLocalSearchParams: () => ({}) }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
-const More = (require("../app/(app)/(tabs)/diger") as { default: () => ReactElement }).default;
+const More = (require("../app/(app)/diger") as { default: () => ReactElement }).default;
 const { okunmamisSay, okunmamisDeposu, retGoruldu, rozetMetni } = require("../src/state/okunmamis-ret") as typeof import("../src/state/okunmamis-ret");
 
 const msg = (mesajId: string, durum: InboxItem["durum"], hesapAdi = "Ayşe"): InboxItem =>

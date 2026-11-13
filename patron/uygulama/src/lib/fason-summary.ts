@@ -76,31 +76,24 @@ export function scorecardConsignedLines(ozet: unknown): readonly { readonly labe
 
 export interface SubcontractOpenView {
   readonly openText: string;
-  readonly lateText: string;
-  readonly late: boolean;
-  readonly soonText: string | null;
   readonly remainingText: string;
   readonly clipped: boolean;
-  readonly firms: readonly (ConsignedRowView & { readonly late: boolean })[];
+  readonly firms: readonly ConsignedRowView[];
 }
 
-/** `fason-acik` → "fasonda ne var, ne gecikti". Tanınmayan şekil `null`. */
+/** `fason-acik` → "fasonda ne var". Termin/gecikme yazılmaz (fabrika göndermez; patron istemiyor). Tanınmayan şekil `null`. */
 export function subcontractOpenView(veri: unknown): SubcontractOpenView | null {
   const d = obj(veri);
   if (!d || !isNum(d.acikSevk)) return null;
   return {
     openText: `${formatNumber(d.acikSevk, 0)} açık sevk`,
-    lateText: positive(d.geciken) ? `${formatNumber(d.geciken, 0)} sevkin dönüşü gecikti` : "Geciken dönüş yok",
-    late: positive(d.geciken),
-    soonText: positive(d.yaklasan) ? `${formatNumber(d.yaklasan, 0)} sevkin dönüşü yaklaşıyor` : null,
     remainingText: `Fasonda ${amount(d.kalanMiktar)} m kumaş`,
     clipped: d.kirpildi === true,
     firms: list(d.firmalar).map((f, i) => {
       const parts = [`${formatNumber(f.acikSevk, 0)} açık sevk`];
-      if (positive(f.geciken)) parts.push(`${formatNumber(f.geciken, 0)} gecikmiş`);
       if (positive(f.iplikKg)) parts.push(`${amount(f.iplikKg)} kg iplik`);
       if (positive(f.leventAdet)) parts.push(`${formatNumber(f.leventAdet, 0)} levent`);
-      return { key: text(f.fasonFirmaId) ?? String(i), title: text(f.etiket) ?? "—", value: `${amount(f.kalanMiktar)} m`, lines: [parts.join(" · ")], late: positive(f.geciken) };
+      return { key: text(f.fasonFirmaId) ?? String(i), title: text(f.etiket) ?? "—", value: `${amount(f.kalanMiktar)} m`, lines: [parts.join(" · ")] };
     }),
   };
 }

@@ -55,7 +55,7 @@ export function ConsignedSection({ scorecardOzet }: { readonly scorecardOzet: un
   );
 }
 
-/** Üretim › Fasondaki işler: açık sevk, geciken dönüş, firma başına kalan. */
+/** Fason ekranı: açık sevk, kalan metre, firma başına kalan (gecikme yazılmaz). */
 export function SubcontractOpenSection() {
   const s = useStyles();
   const remote = useSnapshot("fason-acik");
@@ -70,8 +70,6 @@ export function SubcontractOpenSection() {
             <>
               <SectionCard baslik={v.openText} testID="fason-acik-ozet">
                 <View>
-                  <Text style={s.line} testID="fason-acik-geciken">{v.lateText}</Text>
-                  {v.soonText ? <Text style={s.line} testID="fason-acik-yaklasan">{v.soonText}</Text> : null}
                   <Text style={s.line} testID="fason-acik-kalan">{v.remainingText}</Text>
                   {v.clipped ? <Text style={s.note}>Çok sayıda açık sevk var; firma listesi ilk sevklerden hazırlandı.</Text> : null}
                 </View>
@@ -79,7 +77,7 @@ export function SubcontractOpenSection() {
               {v.firms.length > 0 ? (
                 <ListeBlogu baslik="Firma başına" sayi={v.firms.length} testID="fason-acik-firmalar">
                   {v.firms.map((f, i) => (
-                    <ListeSatiri key={f.key} birincil={f.title} ikincil={f.lines.join(" · ")} deger={f.value} icon="business-outline" ton={f.late ? "warning" : "orange"} ayrac={i > 0} testID={`fason-firma-${f.key}`} />
+                    <ListeSatiri key={f.key} birincil={f.title} ikincil={f.lines.join(" · ")} deger={f.value} icon="business-outline" ton="orange" ayrac={i > 0} testID={`fason-firma-${f.key}`} />
                   ))}
                 </ListeBlogu>
               ) : null}

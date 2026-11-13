@@ -23,7 +23,7 @@ describe("ekran adları (P1, P3, P4)", () => {
   });
   it("modül kök ekranları başlık YAZMAZ; başlık `Screen module` üzerinden access.ts'ten gelir", () => {
     const roots: Readonly<Partial<Record<ModuleKey, string>>> = {
-      uretim: "app/(app)/uretim.tsx",
+      uretim: "app/(app)/(tabs)/uretim.tsx",
       finans: "app/(app)/finans.tsx",
       sevkiyat: "app/(app)/sevkiyat.tsx",
       stok: "app/(app)/(tabs)/stok.tsx",

@@ -34,10 +34,10 @@ describe("izinli menü", () => {
     mockSession.facility = null;
   });
   it("ray sırası sekmelerle aynı; Operasyon, İş ve Hesap grupları ardından gelir", () => {
-    mockSession.permissions = ["bulut:siparis:oku", "bulut:uretim:oku", "bulut:kasa:oku", "bulut:cari:oku", "bulut:stok:oku", "bulut:siparis:yaz", "bulut:hesap:yonet"];
+    mockSession.permissions = ["bulut:siparis:oku", "bulut:uretim:oku", "bulut:sevkiyat:oku", "bulut:kasa:oku", "bulut:cari:oku", "bulut:stok:oku", "bulut:siparis:yaz", "bulut:hesap:yonet"];
     render(<SideNav />);
     const order = screen.getAllByTestId(/^menu-/).map((n) => String(n.props.testID).slice(5));
-    expect(order).toEqual(["pano", "siparisler", "stok", "cariler", "uretim", "finans", "bildirimler", "hesaplar", "gelen-kutusu", "profil"]);
+    expect(order).toEqual(["pano", "siparisler", "uretim", "stok", "cariler", "sevkiyat", "finans", "bildirimler", "hesaplar", "gelen-kutusu", "profil"]);
     expect(screen.getByText("Operasyon")).toBeTruthy();
     expect(screen.getByText("İş")).toBeTruthy();
     expect(screen.getByText("Hesap")).toBeTruthy();

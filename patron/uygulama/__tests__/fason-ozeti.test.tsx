@@ -24,7 +24,7 @@ jest.mock("expo-router", () => ({
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 const Stock = (require("../app/(app)/(tabs)/stok") as { default: () => React.ReactElement }).default;
-const Production = (require("../app/(app)/uretim") as { default: () => React.ReactElement }).default;
+const Production = (require("../app/(app)/fason/index") as { default: () => React.ReactElement }).default;
 const Finance = (require("../app/(app)/finans") as { default: () => React.ReactElement }).default;
 const view = require("../src/lib/fason-summary") as typeof import("../src/lib/fason-summary");
 const { areaSummary } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
@@ -95,17 +95,17 @@ describe("§1 Stok › müşteri malı", () => {
   });
 });
 
-describe("§2 Üretim › fasondaki işler", () => {
-  it("açık sevk, gecikme, kalan ve firma satırı fabrikanın", async () => {
+describe("§2 Fason ekranı › fasondaki işler", () => {
+  it("açık sevk, kalan ve firma satırı fabrikanın; gecikme yazılmaz", async () => {
     mockSession.permissions = ["bulut:uretim:oku"];
     render(<Production />);
     await flush();
     expect(screen.getByText("7 açık sevk")).toBeTruthy();
-    expect(screen.getByTestId("fason-acik-geciken").props.children).toBe("2 sevkin dönüşü gecikti");
-    expect(screen.getByTestId("fason-acik-yaklasan").props.children).toBe("1 sevkin dönüşü yaklaşıyor");
+    expect(screen.queryByTestId("fason-acik-geciken")).toBeNull();
+    expect(screen.queryByText(/gecik/)).toBeNull();
     expect(screen.getByTestId("fason-acik-kalan").props.children).toBe("Fasonda 3.456 m kumaş");
     expect(screen.getByText("Boyahane A")).toBeTruthy();
-    expect(screen.getByText("4 açık sevk · 2 gecikmiş")).toBeTruthy();
+    expect(screen.getByText("4 açık sevk")).toBeTruthy();
   });
 
   it("izinsiz hesapta istenmez; eski fabrika 404 → boş durum", async () => {
@@ -167,7 +167,7 @@ describe("§5 görünüm hesap yapmaz", () => {
     const v = view.consignedView({ toplam: { topAdet: 2, topMiktar: 10, iplikKg: null, leventAdet: null }, cariler: [] })!;
     expect(v.totalLine).toBe("2 top");
     expect(v.totalValue).toBe("10 m");
-    expect(view.subcontractOpenView({ ...FASON, geciken: 0 })!.late).toBe(false);
+    expect(view.subcontractOpenView({ ...FASON, geciken: 0 })!.openText).toBe("7 açık sevk");
   });
 });
 

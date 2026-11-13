@@ -35,7 +35,7 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 const Profile = (require("../app/(app)/profil") as typeof import("../app/(app)/profil")).default;
 const AccountDetail = (require("../app/(app)/hesaplar/[id]") as typeof import("../app/(app)/hesaplar/[id]")).default;
 const Inbox = (require("../app/(app)/gelen-kutusu/index") as typeof import("../app/(app)/gelen-kutusu/index")).default;
-const More = (require("../app/(app)/(tabs)/diger") as typeof import("../app/(app)/(tabs)/diger")).default;
+const More = (require("../app/(app)/diger") as typeof import("../app/(app)/diger")).default;
 const { ThemeProvider, useTokens } = require("../src/ui/theme-context") as typeof import("../src/ui/theme-context");
 const { inboxBody, inboxOverdue, inboxSummary } = require("../src/ui/diger/inbox-format") as typeof import("../src/ui/diger/inbox-format");
 const { inboxRowText } = require("../src/ui/diger/InboxRow") as typeof import("../src/ui/diger/InboxRow");

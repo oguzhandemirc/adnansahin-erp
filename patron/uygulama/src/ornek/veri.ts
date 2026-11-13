@@ -77,10 +77,10 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
         { anahtar: "depo", etiket: "Depo", adet: 240 },
       ],
       istasyonlar: [
-        { id: "i1", kod: "KK1", ad: "Ham kontrol", tur: "IC", kuyruk: 46, aktif: 4, bugunTamamlanan: 118, bugunSevk: 0 },
-        { id: "i2", kod: "KRS", ad: "Kurşun", tur: "IC", kuyruk: 34, aktif: 3, bugunTamamlanan: 96, bugunSevk: 0 },
-        { id: "i3", kod: "TMB", ad: "Tambur", tur: "IC", kuyruk: 22, aktif: 2, bugunTamamlanan: 88, bugunSevk: 0 },
-        { id: "i4", kod: "FSN", ad: "Örnek Boyahane (fason)", tur: "DIS", kuyruk: 18, aktif: 0, bugunTamamlanan: 41, bugunSevk: 12 },
+        { id: "i1", kod: "KK1", ad: "Ham kontrol", tur: "RAW_QC", kuyruk: 46, aktif: 4, bugunTamamlanan: 118, bugunSevk: 0 },
+        { id: "i2", kod: "KRS", ad: "Kurşun", tur: "PROCESS_QC", kuyruk: 34, aktif: 3, bugunTamamlanan: 96, bugunSevk: 0 },
+        { id: "i3", kod: "TMB", ad: "Tambur", tur: "TAMBUR", kuyruk: 22, aktif: 2, bugunTamamlanan: 88, bugunSevk: 0 },
+        { id: "i4", kod: "FSN", ad: "Örnek Boyahane (fason)", tur: "SUBCONTRACTOR", kuyruk: 18, aktif: 0, bugunTamamlanan: 41, bugunSevk: 12 },
       ],
     },
     "fason-acik": {
