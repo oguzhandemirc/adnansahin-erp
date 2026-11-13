@@ -5,6 +5,10 @@
 //   ISLENIYOR ─(claim süresi doldu, bakım)→ BEKLIYOR (fabrikanın makbuzu tekrar işlemeyi idempotent kılar)
 //   BEKLIYOR ─(fabrika al, yazar ARTIK yetkisiz)→ REDDEDILDI `YAZAR_YETKISIZ` — yazma izni ve hesap durumu yalnız
 //   yazımda değil claim anında da sorulur; hiç alınmamış mesaja uygulanır (alınmış olanı fabrika işlemiş olabilir)
+//   BEKLIYOR ─(satıcı acil bulut kilidi)→ REDDEDILDI `YAZAR_YETKISIZ` — eşitleme rolü `account_factors`ı OKUYAMAZ, bu
+//   yüzden kilit claim'de süzülmez; kilit tx'i hesabın hiç alınmamış mesajlarını aynı makbuzla kapatır
+//   (`rejectLockedAuthorPending`). Yarış: yazım tx'i yazarın etken satırını kilitleyerek okur (`lockAuthorFactors`),
+//   kilit tx'i aynı satırı yazar — biri ötekini bekler; kilitli yazar yazamaz, kilitten önce yazılan mesaj kapanır.
 // `mesajId` istemcinin işlem kimliğidir (clientToken) — tekrarı makbuzdan cevaplanır.
 import { Prisma, type InboxMessage } from "@prisma/client";
 import { accountActor, recordAudit } from "../lib/audit";
@@ -37,6 +41,31 @@ function authorEligibleSql(): Prisma.Sql {
   const whens = Object.entries(INBOX_WRITE_PERMISSION).map(([kind, perm]) => Prisma.sql`WHEN ${kind} THEN ${perm}`);
   return Prisma.sql`EXISTS (SELECT 1 FROM accounts a WHERE a.id = t.account_id AND a.status = 'AKTIF'
     AND (CASE t.kind::text ${Prisma.join(whens, " ")} END) = ANY (a.permissions))`;
+}
+
+/**
+ * Yazarın etken satırını SATIR KİLİDİYLE okur (yoksa boş satırı doğurur): bulut kilidiyle (`setCloudLock`) sıraya girer.
+ * Kilitliyse yazım reddedilir. No-op `DO UPDATE` satırı kilitler ama değiştirmez.
+ */
+async function lockAuthorFactors(tx: Prisma.TransactionClient, tesisId: string, accountId: string): Promise<void> {
+  const rows = await tx.$queryRaw<{ bulut_kilidi: boolean }[]>`
+    INSERT INTO account_factors (account_id, tesis_id, updated_at) VALUES (${accountId}::uuid, ${tesisId}::uuid, now())
+    ON CONFLICT (account_id) DO UPDATE SET bulut_kilidi = account_factors.bulut_kilidi
+    RETURNING bulut_kilidi`;
+  if (rows[0]?.bulut_kilidi !== false) throw forbidden("Hesabınız bulutta kilitli; fabrikaya mesaj gönderilemez");
+}
+
+/**
+ * Bulut kilidi tx'i içinde (uygulama rolü): hesabın HİÇ ALINMAMIŞ bekleyen mesajları fabrikaya verilmez — claim'deki
+ * yetkisiz yazar makbuzuyla (`AUTHOR_INELIGIBLE_RESULT`) kapanır. Alınmış olana dokunulmaz (fabrika işlemiş olabilir).
+ */
+export async function rejectLockedAuthorPending(tx: Prisma.TransactionClient, tesisId: string, accountId: string, now: Date): Promise<string[]> {
+  const rows = await tx.$queryRaw<{ message_id: string }[]>`
+    UPDATE inbox_messages
+       SET status = 'REDDEDILDI', result = ${JSON.stringify(AUTHOR_INELIGIBLE_RESULT)}::jsonb, processed_at = ${now}::timestamptz, updated_at = now()
+     WHERE tesis_id = ${tesisId}::uuid AND account_id = ${accountId}::uuid AND status = 'BEKLIYOR' AND claim_count = 0
+    RETURNING message_id`;
+  return rows.map((r) => r.message_id);
 }
 
 export interface InboxCreateInput {
@@ -82,10 +111,12 @@ export async function createInboxMessage(ctx: CloudContext, s: SessionContext, i
     clientToken: input.mesajId,
     body: { tur: input.tur, govde: body },
     lock: { name: "CLIENT_TOKEN", key: `${s.tesisId}:${input.mesajId}` },
-    run: (tx) =>
-      tx.inboxMessage.create({
+    run: async (tx) => {
+      await lockAuthorFactors(tx, s.tesisId, s.accountId);
+      return tx.inboxMessage.create({
         data: { tesisId: s.tesisId, messageId: input.mesajId, kind: input.tur, body, accountId: s.accountId, accountName: s.accountName },
-      }),
+      });
+    },
     respond: (m) => ({ status: 201, data: messageView(m) }),
     audit: (m) => [{ actor: accountActor(s.accountId), event: "GELEN_KUTUSU_YAZILDI", entity: "InboxMessage", entityId: m.messageId, summary: { tur: m.kind } }],
   });

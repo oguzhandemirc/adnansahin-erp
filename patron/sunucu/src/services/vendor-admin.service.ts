@@ -10,6 +10,7 @@ import { publicKeyFromX } from "../lisans-protokol";
 import { recordAudit } from "../lib/audit";
 import { CloudError, notFound } from "../lib/errors";
 import { listReadyFacilities, withTesis } from "../lib/tenant";
+import { rejectLockedAuthorPending } from "./inbox.service";
 import { bindInstallationRoute, safeKeyId } from "./installation-directory";
 import type { TesisDbRouter } from "../lib/tesis-db";
 
@@ -105,11 +106,13 @@ export interface VendorAccountResult {
   readonly accountId: string;
   readonly changed: boolean;
   readonly sessions?: number;
+  /** Kilitte ret makbuzuyla kapanan, fabrikaya hiç verilmemiş mesaj sayısı. */
+  readonly messages?: number;
 }
 
 /**
- * Bulut kilidi (acil durum; fabrika kapalıyken de çalışır): kilitle → yeni giriş 401 ve açık oturumlar KAPANIR (kilit
- * açılınca eski oturum dirilmez); aç → bulut kilidi + geçici kaba kuvvet kilidi ve sayaç sıfırlanır. Atomik claim;
+ * Bulut kilidi (acil durum; fabrika kapalıyken de çalışır): kilitle → yeni giriş 401, açık oturumlar KAPANIR (kilit
+ * açılınca eski oturum dirilmez) ve hesabın fabrikaya henüz verilmemiş mesajları ret makbuzuyla kapanır; aç → bulut kilidi + geçici kaba kuvvet kilidi ve sayaç sıfırlanır. Atomik claim;
  * zaten o durumdaysa değişiklik yok (denetim yazılmaz).
  */
 export async function setCloudLock(db: TesisDbRouter, g: { tesisId: string; username: string; lock: boolean; reason?: VendorReason }, nowMs: number = Date.now()): Promise<VendorAccountResult> {
@@ -121,22 +124,24 @@ export async function setCloudLock(db: TesisDbRouter, g: { tesisId: string; user
         INSERT INTO account_factors (account_id, tesis_id, bulut_kilidi, updated_at) VALUES (${accountId}::uuid, ${g.tesisId}::uuid, true, ${now})
         ON CONFLICT (account_id) DO UPDATE SET bulut_kilidi = true, updated_at = EXCLUDED.updated_at WHERE account_factors.bulut_kilidi = false`);
       const closed = await tx.session.updateMany({ where: { tesisId: g.tesisId, accountId, closedAt: null }, data: { closedAt: now, closeReason: "SIFIRLAMA" } });
-      return { changed: n > 0, sessions: closed.count };
+      // Kilitli hesabın fabrikaya henüz verilmemiş mesajı verilmez (ret makbuzuyla kapanır; tekrar kilitte de süpürülür).
+      const rejected = await rejectLockedAuthorPending(tx, g.tesisId, accountId, now);
+      return { changed: n > 0, sessions: closed.count, messages: rejected.length };
     }
     const r = await tx.accountFactor.updateMany({
       where: { accountId, OR: [{ cloudLock: true }, { tempLockUntil: { not: null } }, { failureCount: { gt: 0 } }] },
       data: { cloudLock: false, tempLockUntil: null, failureCount: 0, failureWindowStart: null },
     });
-    return { changed: r.count > 0, sessions: 0 };
+    return { changed: r.count > 0, sessions: 0, messages: 0 };
   });
-  if (out.changed || out.sessions > 0) {
+  if (out.changed || out.sessions > 0 || out.messages > 0) {
     await recordAudit(db, {
       tesisId: g.tesisId,
       actor: VENDOR_ACTOR,
       event: g.lock ? "HESAP_BULUT_KILIDI" : "HESAP_BULUT_KILIDI_KALKTI",
       entity: "Account",
       entityId: accountId,
-      summary: { ...reasonSummary(g.reason), ...(g.lock ? { oturum: out.sessions } : {}) },
+      summary: { ...reasonSummary(g.reason), ...(g.lock ? { oturum: out.sessions, mesaj: out.messages } : {}) },
     });
   }
   return { accountId, ...out };
