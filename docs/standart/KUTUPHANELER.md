@@ -99,7 +99,7 @@ Ayrıca kayıtta duran iki küçük borç: OFL-1.1 font lisans metninin dağıt�
 
 ## 9 · Kayıt defteri
 
-Yeni **npm paketi** yalnız patron bulutuna eklendi (`bcryptjs`, 2026-11-14; tek native Maven bağımlılığı 2026-11-12) — kayıtlar aşağıda. Bir karar da "paket YOK"tur:
+Yeni **npm paketi** patron bulutuna (`bcryptjs`, 2026-11-14) ve tablete (`expo-application`, 2026-11-13) eklendi; tek native Maven bağımlılığı 2026-11-12 — kayıtlar aşağıda. Bir karar da "paket YOK"tur:
 **backend log kanalı** (2026-09-07) — `pino`/`winston` yerine **elle yazmak**
 seçildi ([KU-07]), çünkü taşımayı pm2 ve rotasyonu `pm2-logrotate` zaten
 yapıyordu; kalan tek eksik seviye + alan etiketiydi. Altı satırlık kayıt, ölçüm
@@ -122,3 +122,11 @@ ve sonuç arşivde: `docs/history/CLAUDE-NOT-ARSIVI.md` (2026-09-07) ve
 4. Bakım        : 3.0.3; caret (fabrikadaki `^3.0.3` ile hizalı — iki uç aynı özet biçimini okur)
 5. Lisans       : BSD-3-Clause
 6. Dağıtım      : yalnız bulut kapsayıcısı (`npm ci`); mobil/Electron etkilenmez
+
+### expo-application@~7.0.8 · mobil · 2026-11-13 (kullanıcı onayı)
+1. Problem      : kaldır-kur sonrası tablet yeni cihaz kaydı açıyor (canlı: 22 satır / 3–4 tablet); kalıcı donanım kimliği (ANDROID_ID) gerekir · §2.3 "Cihaz kimliği"
+2. Alternatifler: `react-native-device-info` (çok geniş yüzey, ek izin riski → red); SecureStore/AsyncStorage (kaldır-kurda silinir → sorunu çözmez); elle yerel modül (Expo'nun bakımlı modülünü kopyalamak → red); `expo-application` (SEÇİLDİ — Expo SDK 54 pinli, ana ürünle aynı sürüm)
+3. Boyut/biçim  : Expo yerel modülü (küçük); yalnız `getAndroidId()` kullanılır, tek dosyada (`utils/hardwareId.ts`); ham değer cihazdan çıkmaz, kurulum kimliğiyle HMAC özeti gider
+4. Bakım        : Expo SDK ile birlikte yükselir (`~7.0.8`, [KU-12])
+5. Lisans       : MIT
+6. Dağıtım      : yerel modül → yeni APK/AAB (Play) ister; yeni Android izni yok

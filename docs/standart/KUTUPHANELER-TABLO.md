@@ -66,6 +66,7 @@ Paket `deploy/` ve `scripts/`yi TAŞIMAZ (`docs/KOD-KURALLARI.md` § deploy) —
 | HTTP | `axios` (oturumlu) + ham `fetch` (kimliksiz) | ÇİFT ama BİLİNÇLİ AYRIM — [KU-05] |
 | Tarih | `dayjs` (27) | tarih SEÇİCİ paketi EKLENMEZ (`docs/history/kurallar-2026-09/filtre-liste.md:84`) |
 | Depolama | `expo-secure-store` (sır) · `@react-native-async-storage/async-storage` | — |
+| Cihaz kimliği | `expo-application` (yalnız `getAndroidId`, tek dosya `utils/hardwareId.ts`) | `react-native-device-info` KULLANILMAZ · §9 |
 | Kamera · okutma geri bildirimi | `expo-camera` 17 · `expo-haptics` + `expo-audio` | ekranlar `Haptics`i doğrudan değil `scanFeedback.signalScan` üzerinden çağırır |
 | Bluetooth | `react-native-bluetooth-classic` (3 dosya, lazy `require`) | `react-native-ble-plx` canlı ama sahipsiz — §7 |
 | Yazdırma / dosya | `expo-print` + `expo-file-system` | `expo-sharing` KULLANILMAZ (ölü) |
