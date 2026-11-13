@@ -37,6 +37,11 @@
           "kapsam": "panel",
           "tip": "yeni",
           "metin": "Sistem altına \"Bağlı Cihazlar\" ekranı eklendi: hangi kullanıcının hangi cihazda, uygulamanın hangi sürümüyle çalıştığı ve en son ne zaman görüldüğü tek listede görünür. Eski sürümde kalan cihazlar renkle işaretlenir. Ekran yalnız gösterir, hiçbir kaydı değiştirmez."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Stok & Ölü Stok raporunun kalem sekmesine \"Top bazında\" görünümü eklendi: rafta duran her top tek satırda (top no, kalem, parti, depo, yaş) görünür, en eski üstte. Bir kaleme tıklayınca o kalemin topları açılır; bu görünüm açıkken Excel/PDF top listesini basar. Bu görünüm kayıtlara dokunmaz."
         }
       ]
     },
