@@ -63,10 +63,10 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ### Patron girişi · doğrulama kodu (bulut `patron/sunucu`)
 
-- Doğrulama kodu (TOTP) isteğe bağlıdır ve hesap başına Profil › Güvenlik'ten açılır; açık hesapta giriş, parola değişimi, hesap silme ve cihaz bağlama kodsuz geçmez. [bekçi: patron/sunucu test_dogrulama_kodu]
-- Yanlış parolada doğrulama durumu sızmaz: `DOGRULAMA_KODU_GEREKLI` yalnız doğru paroladan sonra döner, yanlış parola her hesapta aynı 401'dir. [bekçi: patron/sunucu test_dogrulama_kodu]
-- Kodunu kaybeden hesabın doğrulaması yalnız satıcı CLI'siyle kapatılır (`tesis.ts dogrulama-kapat --eposta --talep --gerekce`, denetim `DOGRULAMA_KAPATILDI`); uygulamada kurtarma yolu yoktur. [bekçi: patron/sunucu test_dogrulama_kodu]
-- Parola asgari 12 karakterdir ve yaygın parola listesindeki parola reddedilir. [bekçi: patron/sunucu test_dogrulama_kodu]
+- Doğrulama kodu (TOTP) isteğe bağlıdır ve hesap başına Profil › Güvenlik'ten fabrika parolasıyla açılır; açık hesapta giriş kodsuz geçmez. [bekçi: patron/sunucu test_giris_fabrika_parolasi]
+- Yanlış parolada doğrulama durumu sızmaz: `DOGRULAMA_KODU_GEREKLI` yalnız doğru paroladan sonra döner, yanlış parola her hesapta aynı 401'dir. [bekçi: patron/sunucu test_giris_fabrika_parolasi]
+- Kodunu kaybeden hesabın doğrulaması yalnız satıcı CLI'siyle kapatılır (`tesis.ts dogrulama-kapat --kullanici= --gerekce= [--talep=]`, denetim `DOGRULAMA_KAPATILDI`); uygulamada kurtarma yolu yoktur. [bekçi: patron/sunucu test_hesap_acil_cli]
+- Bulutta hesap yaratma, davet, parola değişimi ve hesap silme YOKTUR (hesap fabrikanın malı); acil araçlar yalnız satıcı CLI'sidir — `kullanici-kilitle/ac` (bulut kilidi; açık oturum kapanır, açılınca dirilmez) ve `kullanici-yeniden-iste` (damga sıfır → sonraki gönderime dek yeni giriş 503); gerekçe denetime yazılır, kullanıcı adı çıktıya ve denetime yazılmaz. [bekçi: patron/sunucu test_hesap_acil_cli]
 - Giriş sözleşmesi değişince kurulum sırası önce bulut, sonra uygulamadır: yeni uygulama eski bulutta kodsuz giremez. [inceleme]
 
 ### Kullanıcı listesi (üyelik = Electron şifresi)
@@ -102,7 +102,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_patron_cloud_switch_superadmin` · `test_password_policy_version` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
-Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_dogrulama_kodu` (doğrulama kodu isteğe bağlı · açıkken zorunlu · sızıntı yok · CLI kapatma) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
+Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_giris_fabrika_parolasi` (giriş · TOTP · kaba kuvvet · bayatlık) · `test_hesap_acil_cli` (acil CLI · üyelik sökümü) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 

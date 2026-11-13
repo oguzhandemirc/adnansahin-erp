@@ -1,7 +1,7 @@
 // Davet belirteci YALNIZ ilk yanıtta gelir: bir kez gösterilir, depoya yazılmaz.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text, View } from "react-native";
-import type { AccountInviteResult } from "../api/wire";
+import type { AccountInviteResult } from "../api/eski-uyelik";
 import { formatDateTime } from "../lib/format";
 import { Banner, Card } from "./kit";
 import { makeStyles, useTokens } from "./theme-context";

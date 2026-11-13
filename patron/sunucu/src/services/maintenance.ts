@@ -1,9 +1,9 @@
-// BAKIM İŞİ — süreç içi zamanlayıcı (dakikalık tik + günde bir budama). Tek veritabanı, tek tesis ("merkez" adları eski
-// çok-DB düzeninden kalır: kimlik/yönlendirme tabloları aynı DB'dedir); satır işi kiracı kapsamında (RLS) koşar.
+// BAKIM İŞİ — süreç içi zamanlayıcı (dakikalık tik + günde bir budama). Tek veritabanı, tek tesis; satır işi kiracı
+// kapsamında (RLS) koşar.
 //   · Tik: süresi dolan claim'ler — gelen kutusu ISLENIYOR → BEKLIYOR (fabrikanın makbuzu tekrarı
 //     idempotent kılar); rapor HESAPLANIYOR → BEKLIYOR (bir kez), ikincide HATA `ZAMAN_ASIMI`;
-//     kapanıştan 30 gün geçen hesabın kimlik silmesi; merkez kimliğinin
-//     kapanışı (bağlı üyeliği kalmayınca) ve 30 gün sonra silmesi; 30 günü dolan giriş olayının IP alanı (`AGED_FIELDS`).
+//     kapanan (PASİF) fabrika hesabının bildirim cihazlarının pasifleşmesi; kapanıştan 30 gün geçen hesabın kimlik
+//     silmesi; 30 günü dolan giriş olayının IP alanı (`AGED_FIELDS`).
 //   · Günlük: SAKLAMA (tesis başına 3 · 13 · 25 ay · tümü) + telemetri/ayak izi budaması.
 // Hard delete YALNIZ burada ve YALNIZ `PRUNED_TABLES` beyanındaki tablolarda (bekçi
 // `test_patron_kapilari` ölçer). Budanan hiçbir satır fabrikanın defteri değildir: bulut okuma
@@ -13,9 +13,8 @@ import { allProjectionNames, ROOT_PROJECTIONS, type RootProjection } from "../ca
 import { allReportProjections } from "../catalog/reports";
 import { recordAudit } from "../lib/audit";
 import type { Tx } from "../lib/db";
-import { listReadyFacilities, withCentral, withTesis } from "../lib/tenant";
+import { listReadyFacilities, withTesis } from "../lib/tenant";
 import type { CloudContext } from "./context";
-import { closeAndPurgeIdentities } from "./identity-purge";
 
 /** Yaşa göre hard delete izni olan tablolar (beyan) → gerekçe. Başka her silme yasak. */
 export const PRUNED_TABLES = {
@@ -31,7 +30,6 @@ export const PRUNED_TABLES = {
   operation_receipts: "ISLEM_SAKLAMA_GUN (işlem kimliği penceresi)",
   account_audit: "ayak izi: başarısız giriş DENETIM_GIRIS_SAKLAMA_GUN · diğerleri DENETIM_SAKLAMA_GUN",
   notifications: "sonuçlanmış (GONDERILDI · BASARISIZ · ATLANDI) + BILDIRIM_SAKLAMA_GUN (telemetri; olay kimliği günlük/olay başına, pencere ondan uzun)",
-  login_routes: "merkez giriş dizini: hedef hesap kendi tesis DB'sinde artık ETKİN değil (yönlendirme önbelleği, kişisel veri taşımaz) · kimliği silinen (kapanıştan IDENTITY_PURGE_DAYS sonra) merkez kimliğin bütün üyelikleri",
 } as const;
 
 const DAY_MS = 86_400_000;
@@ -39,9 +37,11 @@ const TOMBSTONE_DAYS = 7;
 
 /**
  * Kapanan hesabın KİMLİĞİ bu kadar gün sonra silinir (Ek-6/A §2.5, "30 gün içinde") — metnin sözü, ortamdan
- * değiştirilemez. Tesiste silinen: ad · e-posta · merkez kimlik bağı · davet · oturumlar · cihaz anahtarları
- * (parola + TOTP merkez kimliktedir, kimliğin kendi silmesi ayrıdır); gelen kutusundaki yazar adı ve işlem makbuzu yanıtlarındaki ad/e-posta tombstone olur. KALAN:
- * satır ve kimliği (iş kayıtları ona bağlı), durum, izinler, tarihler, makbuzun kendisi. Ayak izi
+ * değiştirilemez. Fabrika hesabında (C4) silinen: ad + kullanıcı adı (tombstone; fabrikanın kopyası — eşitleme rolü
+ * yazar) · uygulamanın malı olan ikinci etken (TOTP sırrı, sayaç, kilitler) · oturumlar · cihaz anahtarları; gelen
+ * kutusundaki yazar adı ve işlem makbuzu yanıtlarındaki ad/kullanıcı adı tombstone olur. Parola özeti kapanışta zaten
+ * NULL'dır. KALAN: satır ve kimliği (iş kayıtları ona bağlı), durum, izinler, tarihler, makbuzun kendisi. Fabrika
+ * kullanıcıyı yeniden açarsa eşitleme ad/kullanıcı adını geri yazar ve damgayı düşürür. Ayak izi
  * `HESAP_KIMLIGI_SILINDI` (imha kaydı, Ek-6/A §6.1).
  */
 export const IDENTITY_PURGE_DAYS = 30;
@@ -56,14 +56,14 @@ export const AGED_FIELDS = {
 } as const;
 export const IP_RETENTION_DAYS = 30;
 
-/** Silinmiş hesabın gösterim adı ve e-postası (`.invalid` ayrılmış TLD: gerçek adres olamaz; tekillik kimlikten). */
+/** Silinmiş hesabın gösterim adı ve kullanıcı adı (CHECK biçimine uyar; ad tekilliği yalnız PASİF olmayanda). */
 export const tombstoneName = (accountId: string): string => `Silinmiş hesap #${accountId.slice(0, 8)}`;
-export const tombstoneEmail = (accountId: string): string => `silinmis-${accountId}@hesap.invalid`;
-const FAILED_LOGIN_EVENTS = ["GIRIS_BASARISIZ", "GIRIS_REDDEDILDI", "HESAP_GECICI_KILIT", "DAVET_BAGLAMA_REDDEDILDI"];
+export const tombstoneUsername = (accountId: string): string => `silinmis-${accountId.slice(0, 8)}`;
+const FAILED_LOGIN_EVENTS = ["GIRIS_BASARISIZ", "GIRIS_REDDEDILDI", "HESAP_GECICI_KILIT"];
 
 /**
  * İşlem makbuzu yanıtındaki silinen hesabın kimlik alanları → tombstone: hesap görünümü (`id` = hesap → `ad` ·
- * `eposta`, iç içe dahil) ve makbuz o hesabınsa gelen kutusu yazar adı (`hesapAdi`). Yanıtın biçimi ve öteki alanlar
+ * `kullaniciAdi`, iç içe dahil) ve makbuz o hesabınsa gelen kutusu yazar adı (`hesapAdi`). Yanıtın biçimi ve öteki alanlar
  * aynen kalır; makbuzun kimliği · eylemi · gövde özeti değişmez ⇒ aynı işlem kimliği aynı (tombstone'lu) yanıtı
  * alır, başka gövde yine 409 (idempotency sözleşmesi bozulmaz).
  */
@@ -74,7 +74,7 @@ export function scrubReceiptIdentity(value: unknown, accountId: string, ownRecei
   for (const [k, v] of Object.entries(value)) out[k] = scrubReceiptIdentity(v, accountId, ownReceipt);
   if (out.id === accountId) {
     if ("ad" in out) out.ad = tombstoneName(accountId);
-    if ("eposta" in out) out.eposta = tombstoneEmail(accountId);
+    if ("kullaniciAdi" in out) out.kullaniciAdi = tombstoneUsername(accountId);
   }
   if (ownReceipt && "hesapAdi" in out) out.hesapAdi = tombstoneName(accountId);
   return out;
@@ -239,50 +239,68 @@ async function pruneAccountTables(ctx: CloudContext, f: { tesisId: string; reten
   });
 }
 
+// ---------------------------------------------------------------- tik: kapanan hesabın cihazları
+
+/**
+ * Kapanan (PASİF) fabrika hesabının etkin bildirim cihazları pasifleşir (soft; satır kalır, silme 30. günde kimlikle).
+ * Kapatmayı eşitleme rolü yapar ve `push_devices`e erişemez; bu yüzden bakım tikinde (≤ BAKIM_ARALIGI_SN) uygulama
+ * rolüyle. Bildirim zaten yalnız AKTİF hesaba üretilir; bu adım cihaz listesini de kapatır. Döner: pasifleşen cihaz.
+ */
+export async function deactivateClosedAccountDevices(ctx: CloudContext, tesisId: string): Promise<number> {
+  return withTesis(ctx.app, { tesisId }, async (tx) => {
+    const devices = await tx.pushDevice.findMany({ where: { tesisId, active: true }, select: { accountId: true } });
+    if (devices.length === 0) return 0;
+    const closed = await tx.account.findMany({ where: { tesisId, status: "PASIF", id: { in: [...new Set(devices.map((d) => d.accountId))] } }, select: { id: true } });
+    if (closed.length === 0) return 0;
+    return (await tx.pushDevice.updateMany({ where: { tesisId, active: true, accountId: { in: closed.map((a) => a.id) } }, data: { active: false } })).count;
+  });
+}
+
 // ---------------------------------------------------------------- tik: kapanan hesabın kimliği (Ek-6/A §2.5)
 
-/** Tek tx, `ACCOUNT_ADMIN` kilidi (İLK ifade); hesap başına atomik claim (`PASIF ∧ silinmemiş ∧ kapanış ≤ sınır`). */
+/**
+ * İki adım, ikisi de yeniden koşulabilir: ① uygulama rolü (ACCOUNT_ADMIN kilidi İLK ifade) uygulamanın malını siler —
+ * oturum, cihaz, ikinci etken, gelen kutusu yazar adı, makbuz kimliği; hesap hâlâ vadeli kapalıysa. ② eşitleme rolü
+ * (hesabın fabrika kolonlarının tek yazarı) hesap başına atomik claim'le adı + kullanıcı adını tombstone'a çeker ve
+ * damgayı yazar. ② düşerse sonraki tik ①'i (etkisiz) tekrarlar ve ②'yi yeniden dener.
+ */
 export async function purgeClosedIdentities(ctx: CloudContext, tesisId: string, nowMs: number): Promise<number> {
   const cutoff = new Date(nowMs - IDENTITY_PURGE_DAYS * DAY_MS);
-  // Fabrika hesabı (kullanıcı adı dolu) kapsam DIŞI: satırı fabrikanın malıdır, uygulama rolü yazamaz (göç
-  // 20261113220000 tetikleyicisi) ve fabrika onu yeniden açabilir. Fabrika hesabının saklama kuralı C4'te.
-  const due = { tesisId, status: "PASIF" as const, identityPurgedAt: null, closedAt: { lte: cutoff }, kullaniciAdi: null };
+  const due = { tesisId, status: "PASIF" as const, identityPurgedAt: null, closedAt: { lte: cutoff } };
   const ids = await withTesis(ctx.app, { tesisId }, (tx) => tx.account.findMany({ where: due, select: { id: true } }));
   if (ids.length === 0) return 0;
-  const purged = await withTesis(ctx.app, { tesisId, lock: { name: "ACCOUNT_ADMIN", key: tesisId } }, async (tx) => {
+  const scrubbed = await withTesis(ctx.app, { tesisId, lock: { name: "ACCOUNT_ADMIN", key: tesisId } }, async (tx) => {
     const out: { id: string; oturum: number; cihaz: number; gelenKutusu: number; makbuz: number }[] = [];
     for (const { id } of ids) {
-      const claim = await tx.account.updateMany({
-        where: { ...due, id },
-        data: {
-          name: tombstoneName(id),
-          email: tombstoneEmail(id),
-          identityId: null,
-          inviteTokenHash: null,
-          inviteExpiresAt: null,
-          identityPurgedAt: new Date(nowMs),
-        },
-      });
-      if (claim.count === 0) continue;
+      if ((await tx.account.count({ where: { ...due, id } })) === 0) continue;
       const oturum = (await tx.session.deleteMany({ where: { tesisId, accountId: id } })).count;
       const cihaz = (await tx.pushDevice.deleteMany({ where: { tesisId, accountId: id } })).count;
+      await tx.accountFactor.updateMany({
+        where: { accountId: id },
+        data: { totpSecretSealed: null, totpLastStep: null, totpEnabledAt: null, cloudLock: false, failureCount: 0, failureWindowStart: null, tempLockUntil: null },
+      });
       const gelenKutusu = (await tx.inboxMessage.updateMany({ where: { tesisId, accountId: id }, data: { accountName: tombstoneName(id) } })).count;
       const makbuz = await scrubReceipts(tx, tesisId, id);
       out.push({ id, oturum, cihaz, gelenKutusu, makbuz });
     }
     return out;
   });
+  const purged: typeof scrubbed = [];
+  await withTesis(ctx.sync, { tesisId }, async (tx) => {
+    for (const p of scrubbed) {
+      const claim = await tx.account.updateMany({
+        where: { ...due, id: p.id },
+        data: { name: tombstoneName(p.id), kullaniciAdi: tombstoneUsername(p.id), identityPurgedAt: new Date(nowMs) },
+      });
+      if (claim.count === 1) purged.push(p);
+    }
+  });
   for (const p of purged) {
-    const summary = { kategoriler: ["ad", "eposta", "parola", "totp", "oturum", "cihaz"], oturum: p.oturum, cihaz: p.cihaz, gelenKutusu: p.gelenKutusu, makbuz: p.makbuz };
+    const summary = { kategoriler: ["ad", "kullaniciAdi", "totp", "oturum", "cihaz"], oturum: p.oturum, cihaz: p.cihaz, gelenKutusu: p.gelenKutusu, makbuz: p.makbuz };
     await recordAudit(ctx.app, { tesisId, actor: "sistem", event: "HESAP_KIMLIGI_SILINDI", entity: "Account", entityId: p.id, summary });
   }
   return purged.length;
 }
-
-// ---------------------------------------------------------------- tik: merkez kimliği (tek kimlik, çok tesis)
-
-/** Merkez kimliğinin kapanışı + kapanıştan IDENTITY_PURGE_DAYS sonra silmesi (`identity-purge.ts`; süre buradan). */
-export const purgeCentralIdentities = (ctx: CloudContext, nowMs: number) => closeAndPurgeIdentities(ctx, nowMs, IDENTITY_PURGE_DAYS);
 
 /** Tik: 30 günü dolan giriş olaylarından IP alanı çıkarılır (tesis kapsamında; yalnız `ip` anahtarı). */
 export async function stripAgedIps(ctx: CloudContext, tesisId: string, nowMs: number): Promise<number> {
@@ -293,25 +311,11 @@ export async function stripAgedIps(ctx: CloudContext, tesisId: string, nowMs: nu
   );
 }
 
-/** Merkez giriş dizini: hedefi kendi tesis DB'sinde artık ETKİN olmayan (ya da hiç olmayan) satır silinir. */
-export async function pruneLoginRoutes(ctx: CloudContext, tesisId: string): Promise<number> {
-  const routes = await withCentral(ctx.sync, {}, (tx) => tx.loginRoute.findMany({ where: { tesisId }, select: { id: true, accountId: true } }));
-  if (routes.length === 0) return 0;
-  const active = await withTesis(ctx.sync, { tesisId }, (tx) =>
-    tx.account.findMany({ where: { tesisId, id: { in: routes.map((r) => r.accountId) }, status: { in: ["AKTIF", "KILITLI"] } }, select: { id: true } }),
-  );
-  const keep = new Set(active.map((a) => a.id));
-  const stale = routes.filter((r) => !keep.has(r.accountId)).map((r) => r.id);
-  if (stale.length === 0) return 0;
-  return withCentral(ctx.sync, {}, async (tx) => (await tx.loginRoute.deleteMany({ where: { id: { in: stale }, tesisId } })).count);
-}
-
 export async function runDaily(ctx: CloudContext, nowMs: number): Promise<number> {
   let n = 0;
   for (const f of await listFacilities(ctx)) {
     n += (await perFacility(f.tesisId, "eşitleme budaması", () => pruneSyncTables(ctx, f, nowMs))) ?? 0;
     n += (await perFacility(f.tesisId, "hesap budaması", () => pruneAccountTables(ctx, f, nowMs))) ?? 0;
-    n += (await perFacility(f.tesisId, "giriş dizini", () => pruneLoginRoutes(ctx, f.tesisId))) ?? 0;
   }
   return n;
 }
@@ -344,13 +348,9 @@ export class MaintenanceScheduler {
       for (const f of await listFacilities(this.ctx)) {
         purged += (await perFacility(f.tesisId, "kimlik silme", () => purgeClosedIdentities(this.ctx, f.tesisId, nowMs))) ?? 0;
         await perFacility(f.tesisId, "IP alanı", () => stripAgedIps(this.ctx, f.tesisId, nowMs));
+        await perFacility(f.tesisId, "kapanan hesabın cihazları", () => deactivateClosedAccountDevices(this.ctx, f.tesisId));
       }
       if (purged > 0) console.log(`[patron] bakım: ${purged} kapanmış hesabın kimliği silindi (Ek-6/A §2.5)`);
-      const central = await purgeCentralIdentities(this.ctx, nowMs).catch((err: Error) => {
-        console.error(`[patron] bakım (merkez kimlik): ${(err as { code?: string }).code ?? err.message}`);
-        return { closed: 0, purged: 0 };
-      });
-      if (central.purged > 0) console.log(`[patron] bakım: ${central.purged} merkez kimliği silindi (kapanıştan ${IDENTITY_PURGE_DAYS} gün)`);
       const day = new Date(nowMs).toISOString().slice(0, 10);
       if (this.lastDailyDay !== day) {
         const n = await runDaily(this.ctx, nowMs);

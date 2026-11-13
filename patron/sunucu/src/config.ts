@@ -56,7 +56,6 @@ const EnvSchema = z
     API_HIZ_DK: positiveInt(30, 100000).default(600),
     /** IP başına dakikada geçersiz Bearer çözümlemesi; aşılınca o IP'nin oturumlu istekleri DB'ye inmeden 429. */
     OTURUM_RED_HIZ_DK: positiveInt(5, 10000).default(30),
-    DAVET_GECERLILIK_SAAT: positiveInt(1, 720).default(72),
     /** Fabrika kanalı (/v1/*) IP başına dakikalık hız sınırı. */
     V1_HIZ_DK: positiveInt(10, 100000).default(600),
     GELEN_KUTUSU_CLAIM_DK: positiveInt(1, 60).default(10),

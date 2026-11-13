@@ -3,7 +3,7 @@
 //   · Projeksiyonlar hesabın OKUYABİLDİĞİ kadardır: tx `app.projeksiyonlar`ı oturumla aynı açar (RLS), izinsiz alt
 //     satır (`.kisisel`) dökümde de yoktur; yöneticiye ayrı bir kapı YOK.
 //   · Kolonlar saklı satırın kendi alanlarıdır (fabrika kataloğunun opt-in kolonları); bulut kolon EKLEMEZ.
-//   · Bulutta doğan veri sırsız görünümle: hesaplar (parola/TOTP/davet yok), gelen kutusu, hesap denetimi.
+//   · Bulutta doğan veri sırsız görünümle: hesaplar (parola özeti/TOTP yok), gelen kutusu, hesap denetimi.
 //   · Sayfalı akış: her sayfa kendi kısa kiracı tx'i (uzun tx yok); bitince ayak izi `DISA_AKTARIM`.
 import { Prisma } from "@prisma/client";
 import type { SessionContext } from "../auth/session.service";
@@ -134,7 +134,7 @@ async function* byIdPages<T extends { id: string }>(fetch: (cursor: string | und
 const page = (cursor: string | undefined) => ({ orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }], take: PAGE, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
 
 const INBOX_COLUMNS = ["mesajId", "tur", "durum", "hesapId", "hesapAdi", "olusturulma", "islenme", "iptal", "govde", "sonuc"];
-const ACCOUNT_COLUMNS = ["id", "eposta", "ad", "durum", "izinler", "sonGiris", "davetBitis", "olusturulma"];
+const ACCOUNT_COLUMNS = ["id", "kullaniciAdi", "ad", "durum", "izinler", "sonGiris", "olusturulma"];
 const AUDIT_COLUMNS = ["id", "aktor", "olay", "varlik", "varlikId", "ozet", "zaman"];
 
 function cloudDatasets(ctx: CloudContext, s: SessionContext): Dataset[] {

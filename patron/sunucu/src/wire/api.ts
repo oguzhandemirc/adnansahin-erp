@@ -23,14 +23,12 @@ export interface Page<T> {
 export interface AccountSummary {
   readonly id: string;
   readonly ad: string;
-  /** Eski e-posta hesabı (C4'te kalkar); fabrika hesabında boş dize. */
-  readonly eposta: string;
-  /** Fabrika hesabının kullanıcı adı (küçük harf; giriş bununla). Eski sunucu/eski hesap göndermez. */
-  readonly kullaniciAdi?: string;
+  /** Fabrika kullanıcı adı (küçük harf; giriş bununla). Hesap fabrikanın malıdır: parola, ad ve izin fabrikada değişir. */
+  readonly kullaniciAdi: string;
   readonly izinler: readonly string[];
 }
 
-/** Kimliğin erişebildiği tesis (yalnız AKTİF üyelik; KİLİTLİ görünmez). */
+/** Hesabın tesisi (Adnan bulutu tek tesislidir; tesis geçişi yok). */
 export interface FacilityChoice {
   readonly id: string;
   readonly ad: string;
@@ -48,8 +46,6 @@ export interface LoginRequest {
   readonly parola: string;
   readonly totp?: string;
   readonly istemci?: "mobil" | "web";
-  /** Eski çok tesisli sunucunun ipucu; fabrika hesabında yok sayılır. */
-  readonly tesisId?: string;
 }
 
 /** `POST /oturum/ac` yanıtı. */
@@ -521,51 +517,17 @@ export interface ReportRequestDetail extends ReportRequest {
   readonly sonuc: { readonly veri: unknown; readonly hesaplandi: string; readonly kaynakUfuk: string | null } | null;
 }
 
-export type AccountStatus = "DAVETLI" | "AKTIF" | "KILITLI" | "PASIF";
+/** Bulut hesabı (fabrika kullanıcısının kopyası) — yalnız dışa aktarımda (`hesaplar` kümesi); sır taşımaz. */
+export type AccountStatus = "AKTIF" | "PASIF";
 
 export interface Account {
   readonly id: string;
-  readonly eposta: string;
+  readonly kullaniciAdi: string;
   readonly ad: string;
   readonly durum: AccountStatus;
   readonly izinler: readonly string[];
   readonly sonGiris: string | null;
-  readonly davetBitis: string | null;
   readonly olusturulma: string;
-}
-
-/** Davet/sıfırlama yanıtı: belirteç YALNIZ ilk yanıtta; tekrar yanıtında `davetGosterilemez`. */
-export interface AccountInviteResult {
-  readonly hesap: Account;
-  readonly davet?: string;
-  readonly davetGosterilemez?: true;
-  readonly davetBitis: string;
-}
-
-export interface PermissionCatalog {
-  readonly izinler: readonly string[];
-  readonly sablonlar: Readonly<Record<string, readonly string[]>>;
-}
-
-/** `POST /davet/incele`. */
-export interface InviteInfo {
-  readonly eposta: string;
-  readonly ad: string;
-  readonly tesisAd: string | null;
-  readonly bitis: string;
-  /** Eski akış: davet kabul edilmiş, onay bekliyor (yeni istemci parolayla yeniden kabul eder). */
-  readonly totpKurulumuBekliyor: boolean;
-}
-
-/** `POST /davet/kabul` — parola belirlenir, hesap HEMEN AKTİF (doğrulama kodu kapalı doğar; profilden açılır). */
-export interface InviteAccepted {
-  readonly eposta: string;
-  readonly durum: "AKTIF";
-}
-
-export interface InviteConfirmed {
-  readonly eposta: string;
-  readonly durum: "AKTIF";
 }
 
 /** `GET /oturum/dogrulama` — iki adımlı doğrulama (TOTP) durumu; `acilis` açıldığı an. Onay bekleyen kurulum açık SAYILMAZ. */
@@ -581,17 +543,6 @@ export interface TwoFactorStatus {
 export interface TwoFactorSetup {
   readonly totpSirri: string;
   readonly otpauth: string;
-}
-
-/**
- * `POST /oturum/hesap-sil` (parola + açıksa totp) — kendi hesabını silme: kimlik ve bütün tesis üyelikleri HEMEN kapanır, bütün
- * oturumlar düşer; kişisel veri `silinme` anında silinir. Son aktif yöneticisi olunan tesis varsa 409 `SON_YONETICI`
- * (`details.tesisler`: `{id, ad}[]`); yanlış faktör 400 `GIRIS_BASARISIZ`.
- */
-export interface AccountDeletion {
-  readonly kapanis: string;
-  readonly silinme: string;
-  readonly tesisSayisi: number;
 }
 
 export interface Device {

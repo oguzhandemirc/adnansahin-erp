@@ -25,8 +25,8 @@ import type { CloudContext } from "../../src/services/context";
 import type { Doorbell, DoorbellTopic } from "../../src/services/doorbell";
 import { InstallationDirectory } from "../../src/services/installation-directory";
 import { createNotificationRuntime } from "../../src/services/notification-scheduler";
-import { inviteFacilityAdmin, openFacility, registerInstallation } from "../../src/services/vendor-admin.service";
-import { acceptInvite } from "../../src/auth/invite.service";
+import { openFacility, registerInstallation } from "../../src/services/vendor-admin.service";
+import bcrypt from "bcryptjs";
 import { applyRoles } from "../db-rolleri";
 import { temizleTesisSatirlari } from "./test-temizlik";
 
@@ -190,9 +190,23 @@ export const TEST_PAROLASI = "bekci-bulut-parolasi-2026";
 
 export interface TestHesabi {
   readonly accountId: string;
-  readonly eposta: string;
+  readonly tesisId: string;
+  /** Fabrika kullanıcı adı (küçük harf, `bekci-<12hex>`). */
+  readonly kullaniciAdi: string;
   readonly sir: string;
   belirtec: string;
+}
+
+/** Fikstür parolasının bcrypt özeti (maliyet 10 — fabrikanınkiyle aynı); süreç başına bir kez hesaplanır. */
+let parolaOzeti: string | null = null;
+export function testParolaOzeti(): string {
+  parolaOzeti ??= bcrypt.hashSync(TEST_PAROLASI, 10);
+  return parolaOzeti;
+}
+
+/** Kullanıcı listesi bayatlık damgası (`facilities.kullanici_son_esitleme`) = enjekte saat — yeni giriş 503 almasın. */
+export async function damgaTazele(o: Ortam, tesisId: string): Promise<void> {
+  await withTesis(o.goc, { tesisId }, (tx) => tx.facility.updateMany({ where: { tesisId }, data: { usersPushedAt: new Date(o.saat.simdi()) } }));
 }
 
 /** TOTP kodu (verilen anda); aynı adımı ikinci kez kullanmamak için saat ≥ 30 sn ilerletilir. */
@@ -212,26 +226,30 @@ export async function dogrulamaAc(o: Ortam, belirtec: string, parola: string = T
 }
 
 /**
- * Hesap: satıcı daveti → kabul (hesap AKTİF) → giriş → (varsayılan) doğrulama AÇ (gerçek servis yolu). İzinler sonradan
- * GÖÇ rolüyle ayarlanır. `dogrulama: false` ⇒ kodsuz hesap (`sir` boş; giriş yalnız parola).
+ * Hesap: FABRİKA HESABI (üyelik = Electron şifresi) göç rolüyle doğrudan yazılır — fabrikanın `POST /v1/kullanicilar`
+ * gönderiminin bıraktığı satırın aynısı (mühürlü bcrypt özeti, AKTİF, izinler) + bayatlık damgası; sonra gerçek giriş
+ * (HTTP) ve (varsayılan) doğrulama AÇ. Eşitleme ucunun kendisini `test_kullanici_esitleme` ölçer.
+ * `dogrulama: false` ⇒ kodsuz hesap (`sir` boş; giriş yalnız parola).
  */
 export async function hesapKur(o: Ortam, tesisId: string, izinler: readonly string[], g: { dogrulama?: boolean } = {}): Promise<TestHesabi> {
-  const eposta = `bekci-${randomUUID().slice(0, 12)}@ornek.test`;
-  // Fikstür hesabı satıcı yolundan doğar; tesiste aktif yönetici olabileceği için açık zorlamayla (denetime yazılır).
-  const zorla = { talep: "BEKCI-FIKSTUR", gerekce: "bekçi fikstürü: test hesabı" };
-  const davet = await inviteFacilityAdmin(o.goc, { tesisId, email: eposta, name: "Bekçi Hesabı", validHours: 24, zorla }, o.saat.simdi());
-  await acceptInvite(o.ctx, { token: davet.token, password: TEST_PAROLASI });
-  await withTesis(o.goc, { tesisId }, (tx) => tx.account.update({ where: { id: davet.accountId }, data: { permissions: [...izinler] } }));
-  const hesap: TestHesabi = { accountId: davet.accountId, eposta, sir: "", belirtec: "" };
+  const id = randomUUID();
+  const kullaniciAdi = `bekci-${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+  await withTesis(o.goc, { tesisId }, (tx) =>
+    tx.account.create({
+      data: { id, tesisId, kullaniciAdi, name: "Bekçi Hesabı", permissions: [...izinler], passwordSealed: o.ctx.secrets.seal(testParolaOzeti(), id, "parola") },
+    }),
+  );
+  const hesap: TestHesabi = { accountId: id, tesisId, kullaniciAdi, sir: "", belirtec: "" };
   hesap.belirtec = await girisYap(o, hesap);
   if (g.dogrulama === false) return hesap;
   const sir = await dogrulamaAc(o, hesap.belirtec);
   return { ...hesap, sir };
 }
 
-export async function girisYap(o: Ortam, h: Pick<TestHesabi, "eposta" | "sir">): Promise<string> {
+export async function girisYap(o: Ortam, h: Pick<TestHesabi, "tesisId" | "kullaniciAdi" | "sir">): Promise<string> {
   o.saat.ilerlet(31_000);
-  const r = await api(o, "POST", "/api/oturum/ac", { govde: { eposta: h.eposta, parola: TEST_PAROLASI, ...(h.sir ? { totp: totpKodu(h.sir, o.saat.simdi()) } : {}) } });
+  await damgaTazele(o, h.tesisId);
+  const r = await api(o, "POST", "/api/oturum/ac", { govde: { kullaniciAdi: h.kullaniciAdi, parola: TEST_PAROLASI, ...(h.sir ? { totp: totpKodu(h.sir, o.saat.simdi()) } : {}) } });
   if (r.status !== 200) throw new Error(`giriş başarısız: ${r.status} ${JSON.stringify(r.json)}`);
   return (r.json.data as { belirtec: string }).belirtec;
 }

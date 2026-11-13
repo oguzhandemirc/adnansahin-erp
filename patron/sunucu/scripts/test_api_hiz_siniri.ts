@@ -44,7 +44,7 @@ async function belirtecKapisi(): Promise<void> {
     kontrol("§2c 6. geçersiz belirteç → 429 HIZ_SINIRI (DB'ye inmeden)", altinci.status === 429 && altinci.json.details?.code === "HIZ_SINIRI", String(altinci.status));
     const ayniIp = await api(o, "GET", "/api/oturum", { belirtec: h.belirtec });
     kontrol("§2d kapı kapalıyken aynı IP'nin oturumlu isteği de 429 (pencere sonuna dek)", ayniIp.status === 429, String(ayniIp.status));
-    const giris = await api(o, "POST", "/api/oturum/ac", { govde: { eposta: "yok@ornek.test", parola: "x".repeat(12) } });
+    const giris = await api(o, "POST", "/api/oturum/ac", { govde: { kullaniciAdi: "yok-boyle-biri", parola: "x".repeat(12) } });
     kontrol("§2e açık uç (giriş) kapıdan etkilenmez (401, 429 değil)", giris.status === 401, String(giris.status));
   } finally {
     await temizleTesis(o, k.tesisId);

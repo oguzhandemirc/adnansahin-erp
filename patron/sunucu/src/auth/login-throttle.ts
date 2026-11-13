@@ -1,5 +1,5 @@
-// GİRİŞ KİLİDİ — KİMLİK (merkez `identities`) + KAYNAK ikilisine bağlıdır: ardışık başarısızlık eşiği yalnız o kaynaktan gelen denemeleri
-// süreli durdurur, başka kaynaktan doğru üçlü girer — hesap düzeyi kilit, e-postayı bilen herkesin elinde süresiz
+// GİRİŞ KİLİDİ — HESAP + KAYNAK ikilisine bağlıdır: ardışık başarısızlık eşiği yalnız o kaynaktan gelen denemeleri
+// süreli durdurur, başka kaynaktan doğru üçlü girer — hesap düzeyi kilit, kullanıcı adını bilen herkesin elinde süresiz
 // hizmet engeline dönüşüyordu (tek kimlik bütün tesislerde tek sayaç). Bellek içi (tek süreç; yeniden başlatmada sıfırlanır), kaynak adresi düz saklanmaz.
 import { createHmac, randomBytes } from "node:crypto";
 import { securityEvent } from "../lib/security-events";

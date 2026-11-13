@@ -84,9 +84,9 @@ async function stalenessScope(ctx: CloudContext, account: FactoryAccount | null)
   return all.length === 1 ? all[0]! : null;
 }
 
-/** Fabrika kullanıcı kümesi tavandan taze mi (`sync_state.kullanici_son_esitleme`; NULL/satırsız ⇒ bayat). */
+/** Fabrika kullanıcı kümesi tavandan taze mi (`facilities.kullanici_son_esitleme`; NULL ⇒ bayat). */
 export async function factoryFresh(ctx: CloudContext, tesisId: string, nowMs: number): Promise<boolean> {
-  const st = await withTesis(ctx.app, { tesisId }, (tx) => tx.syncState.findUnique({ where: { tesisId }, select: { usersPushedAt: true } }));
+  const st = await withTesis(ctx.app, { tesisId }, (tx) => tx.facility.findUnique({ where: { tesisId }, select: { usersPushedAt: true } }));
   return st?.usersPushedAt != null && nowMs - st.usersPushedAt.getTime() <= ctx.config.FABRIKA_BAYATLIK_GUN * 86_400_000;
 }
 

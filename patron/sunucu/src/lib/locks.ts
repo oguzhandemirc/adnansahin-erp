@@ -5,12 +5,10 @@
 export const LOCK_NAMESPACES = {
   /** Tesis başına eşitleme paketi (sözleşme §6.3/2) — `try`: doluysa 409 PAKET_ISLENIYOR. */
   PACKAGE: 9201,
-  /** Tesis başına hesap yönetimi: davet · izin · kilit · pasif · sıfırlama (son yönetici kuralı). */
+  /** Tesis başına hesap bakımı: kapanan hesabın kimlik silmesi (uygulama rolünün adımı). */
   ACCOUNT_ADMIN: 9202,
   /** (tesis, işlem kimliği) başına: gelen kutusu mesajı · rapor isteği · cihaz kaydı tekrarları sıraya girer. */
   CLIENT_TOKEN: 9203,
-  /** Merkez kimlik + üyelik: e-posta özeti başına (davet kabulü/onayı). Sıra: önce LOGIN_ROUTE (merkez), sonra ACCOUNT_ADMIN (tesis). */
-  LOGIN_ROUTE: 9204,
   /** Tesis başına fabrika kullanıcı kümesi (`POST /v1/kullanicilar`): ekle/güncelle/kapat aynı anda tek gönderim işler. */
   KULLANICI_ESITLEME: 9205,
 } as const;

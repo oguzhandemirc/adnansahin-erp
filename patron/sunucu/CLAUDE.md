@@ -25,14 +25,13 @@ Patronun buluttaki OKUMA KOPYASI ve TEK yazma kanalı. **Bulut hesap yapmaz, fab
 
 ## Advisory kilit envanteri (patron DB'si — backend 80xx ve satıcı 91xx'ten bağımsız)
 
-Kilit tx'in İLK ifadesidir ve kiracı ayarıyla AYNI SELECT'te alınır (`lib/tenant.ts`); bir tx tek kilit alır (sıra önce `LOGIN_ROUTE` sonra `ACCOUNT_ADMIN`). Tek tanım `src/lib/locks.ts` `LOCK_NAMESPACES`; tablo onunla birebir (bekçi `scripts/test_patron_kapilari.ts` §1).
+Kilit tx'in İLK ifadesidir ve kiracı ayarıyla AYNI SELECT'te alınır (`lib/tenant.ts`); bir tx tek kilit alır. Tek tanım `src/lib/locks.ts` `LOCK_NAMESPACES`; tablo onunla birebir (bekçi `scripts/test_patron_kapilari.ts` §1).
 
 | Uzay | Ad | Kapsam |
 |---|---|---|
 | 9201 | `PACKAGE` | tesis başına eşitleme paketi — `try`: doluysa 409 `PAKET_ISLENIYOR` |
-| 9202 | `ACCOUNT_ADMIN` | tesis başına hesap yönetimi (son yönetici kuralı) |
+| 9202 | `ACCOUNT_ADMIN` | tesis başına uygulamanın hesap verisi (kapanan hesabın kimlik silmesi — uygulama adımı) |
 | 9203 | `CLIENT_TOKEN` | (tesis, işlem kimliği) başına tekrarlar sıraya girer |
-| 9204 | `LOGIN_ROUTE` | kimlik e-posta özeti başına (davet kabul/onay/bağla, satıcı kimlik sıfırlaması, kimlik kapanışı/silmesi, kendi hesabını silme, özet yenileme (ozet-yenile)); hesap kilidinden ÖNCE |
 | 9205 | `KULLANICI_ESITLEME` | tesis başına fabrika kullanıcı kümesi (`POST /v1/kullanicilar`: ekle · güncelle · kapat) |
 
 ## Alt-alan kuralları — dokunmadan önce oku

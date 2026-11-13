@@ -9,8 +9,7 @@
 //      A kapsamında B'ye yazılamaz · ön-kiracı arama yalnız TEK anahtarlı satırı açar.
 //   §4 alan izni (RESTRICTIVE): izinsiz alt satır (`cari-kart.kisisel`) doğrudan SQL'le de 0 satır.
 //   §5 rol ayrımı: uygulama rolü projeksiyona YAZAMAZ; eşitleme rolü hesap tablosunu bütünüyle OKUYAMAZ — yalnız
-//      fabrika kolonlarını (gelen kutusu yazar sorgusu + kullanıcı kümesi, C1) okur; e-posta, kimlik bağı, davet
-//      sırrı, son giriş RED;
+//      fabrika kolonlarını (gelen kutusu yazar sorgusu + kullanıcı kümesi, C1) okur; son giriş RED;
 //      uygulama rolü denetim satırında yalnız `summary`yi (IP alanı silmesi) güncelleyebilir.
 //   §6 kapsam yardımcısı: sıfır UUID / biçimsiz tesis / `*` projeksiyon REDDEDİLİR.
 //   §7 açılış kapısı: RLS'i atlayabilen rol (göç rolü = süper kullanıcı) ile sunucu KALKMAZ.
@@ -134,7 +133,7 @@ async function ayarsizBolumu(o: Ortam, a: { tesisId: string }): Promise<void> {
   }
 }
 
-async function capraz(o: Ortam, a: { tesisId: string; hesap: string; eposta: string }, b: { tesisId: string; hesap: string }): Promise<void> {
+async function capraz(o: Ortam, a: { tesisId: string; hesap: string; kullaniciAdi: string }, b: { tesisId: string; hesap: string }): Promise<void> {
   console.log("\n§3 tesis A kapsamında B görünmez · WITH CHECK · ön-kiracı arama");
   const c = await istemci(tesisUrl(o, a.tesisId, "uygulama"));
   try {
@@ -149,11 +148,13 @@ async function capraz(o: Ortam, a: { tesisId: string; hesap: string; eposta: str
       hataVerir(c, "INSERT INTO account_audit (id, tesis_id, actor, event, entity) VALUES (gen_random_uuid(), $1, 'bekci', 'X', 'Y')", [b.tesisId]),
     );
     kontrol("§3d WITH CHECK: A kapsamında B'ye yazma HATA", yaz.hata && /row-level security/i.test(yaz.mesaj), yaz.mesaj.slice(0, 80));
-    const guncelle = await kapsamda(c, ayarA, () => c.query("UPDATE accounts SET name = 'ele gecirildi' WHERE id = $1", [b.hesap]));
-    kontrol("§3e A kapsamında B'nin hesabını güncelleme 0 satır", guncelle.rowCount === 0);
-    const arama = await kapsamda(c, { "app.tesis_id": NO_TENANT, "app.giris_eposta": a.eposta }, () => c.query("SELECT id FROM accounts"));
-    kontrol("§3f e-postayla ön-kiracı giriş araması KALKTI (kimlik `identities`te): `app.giris_eposta` hiçbir hesabı açmaz", arama.rowCount === 0);
-    const aramaYan = await kapsamda(c, { "app.tesis_id": NO_TENANT, "app.giris_eposta": a.eposta, "app.projeksiyonlar": "siparis" }, () =>
+    const guncelle = await kapsamda(c, ayarA, () => c.query("UPDATE accounts SET last_login_at = now() WHERE id = $1", [b.hesap]));
+    kontrol("§3e A kapsamında B'nin hesabını (yazılabilir son giriş kolonu) güncelleme 0 satır", guncelle.rowCount === 0);
+    const eski = await kapsamda(c, { "app.tesis_id": NO_TENANT, "app.giris_eposta": a.kullaniciAdi }, () => c.query("SELECT id FROM accounts"));
+    kontrol("§3f eski e-posta araması (`app.giris_eposta`) hiçbir hesabı açmaz (davet/kimlik söküldü)", eski.rowCount === 0);
+    const arama = await kapsamda(c, { "app.tesis_id": NO_TENANT, "app.kullanici_adi": a.kullaniciAdi }, () => c.query<{ id: string }>("SELECT id FROM accounts"));
+    kontrol("§3f2 kullanıcı adıyla ön-kiracı giriş araması yalnız o hesabı açar", arama.rowCount === 1 && arama.rows[0]!.id === a.hesap, `${arama.rowCount} satır`);
+    const aramaYan = await kapsamda(c, { "app.tesis_id": NO_TENANT, "app.kullanici_adi": a.kullaniciAdi, "app.projeksiyonlar": "siparis" }, () =>
       c.query("SELECT count(*)::int AS n FROM projection_rows"),
     );
     kontrol("§3g arama kipi başka tabloyu AÇMAZ (projeksiyon 0)", aramaYan.rows[0]?.n === 0);
@@ -191,12 +192,12 @@ async function rolAyrimi(o: Ortam, a: { tesisId: string }): Promise<void> {
     kontrol("§5b eşitleme rolü hesap tablosunu OKUYAMAZ", oku.hata && /permission denied/i.test(oku.mesaj), oku.mesaj.slice(0, 60));
     const yazar = await kapsamda(sync, { "app.tesis_id": a.tesisId }, () => hataVerir(sync, "SELECT id, tesis_id, status, permissions FROM accounts"));
     const kimlik: string[] = [];
-    for (const kolon of ["email", "identity_id", "invite_token_hash", "last_login_at", "invite_expires_at", "created_by_id"]) {
+    for (const kolon of ["last_login_at"]) {
       const r = await kapsamda(sync, { "app.tesis_id": a.tesisId }, () => hataVerir(sync, `SELECT ${kolon} FROM accounts`));
       if (!(r.hata && /permission denied/i.test(r.mesaj))) kimlik.push(kolon);
     }
     kontrol(
-      "§5b2 ⭐ eşitleme rolü `accounts`ta YALNIZ fabrika kolonlarını okur (gelen kutusu yazar sorgusu + kullanıcı kümesi); e-posta · kimlik bağı · davet sırrı · son giriş RED",
+      "§5b2 ⭐ eşitleme rolü `accounts`ta YALNIZ fabrika kolonlarını okur (gelen kutusu yazar sorgusu + kullanıcı kümesi); son giriş RED (e-posta/davet kolonları C4'te düştü)",
       !yazar.hata && yazar.satir >= 1 && kimlik.length === 0,
       yazar.hata ? yazar.mesaj.slice(0, 60) : kimlik.join(",") || `${yazar.satir} satır`,
     );
@@ -292,7 +293,7 @@ async function main(): Promise<void> {
       ["eşitleme", kullanici(tesisUrl(o, kA.tesisId, "esitleme")), SYNC_GRANTS, SYNC_COLUMN_GRANTS],
     ]);
     await ayarsizBolumu(o, kA);
-    await capraz(o, { tesisId: kA.tesisId, hesap: hA.accountId, eposta: hA.eposta }, { tesisId: kB.tesisId, hesap: hB.accountId });
+    await capraz(o, { tesisId: kA.tesisId, hesap: hA.accountId, kullaniciAdi: hA.kullaniciAdi }, { tesisId: kB.tesisId, hesap: hB.accountId });
     await alanIzni(o, kA);
     await rolAyrimi(o, kA);
     await yardimci(o, kA);

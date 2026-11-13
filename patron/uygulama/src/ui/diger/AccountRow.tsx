@@ -1,6 +1,6 @@
 // Hesap satırı (tek satır ListeSatiri): ad · son giriş; sağda durum rozeti (aktif değilse) ya da Yönetici rozeti.
 // Rol ölçütü `roleOf` (`bulut:hesap:yonet` → Yönetici); yalnız gösterir, karar sunucudadır.
-import type { Account } from "../../api/wire";
+import type { LegacyAccount as Account } from "../../api/eski-uyelik";
 import { formatAgo } from "../../lib/format";
 import { statusEntry } from "../../lib/labels";
 import { ListeSatiri, Rozet, STATUS_ROZET_TONU } from "../ortak";

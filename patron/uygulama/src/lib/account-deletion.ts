@@ -1,6 +1,6 @@
 // Kendi hesabını silme (Google Play hesap silme politikası) — açıklama metni tek yerde: ekran ve mağaza/gizlilik metni
 // aynı cümleleri söylesin. Davranışın kaynağı sunucudur (`POST /oturum/hesap-sil`); burada yalnız anlatım ve biçim.
-import type { AccountDeletion } from "../api/wire";
+import type { AccountDeletion } from "../api/eski-uyelik";
 import { formatDate } from "./format";
 
 export const DELETION_SUPPORT_EMAIL = "info@etkiliyazilim.com";

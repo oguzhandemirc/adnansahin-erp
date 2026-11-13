@@ -77,7 +77,7 @@ async function main(): Promise<void> {
   ok(`giriş (izin: ${login.hesap.izinler.length})`);
 
   const s = await api.session();
-  expect(s.hesap.eposta === info.eposta, "oturum hesabı farklı");
+  expect(s.hesap.id === login.hesap.id, "oturum hesabı farklı");
   ok(`oturum: tesis '${s.tesis.ad ?? "—"}', eşitleme ${s.esitleme ? s.esitleme.sonEsitleme : "henüz yok"}`);
   try {
     await api.snapshot("ozet.siparis");

@@ -1,6 +1,8 @@
 // Ortak durum sözlüğü: teldeki (`api/wire.ts`) durum enum'ları → Türkçe etiket + 4'lü durum tonu.
 // Tip `Record<…>` olduğundan wire'a yeni değer eklenince derleme kırılır; bilinmeyen değer ekranda ham döner.
 import type { AccountStatus, InboxStatus, NotificationStatus, ReportStatus } from "../../api/wire";
+// GEÇİCİ (C4 → A1): eski hesap ekranları DAVETLI/KILITLI taşır; A1 ekranlarla birlikte söker.
+import type { LegacyAccountStatus } from "../../api/eski-uyelik";
 
 export type StatusTone = "iyi" | "uyari" | "kritik" | "bilgi";
 
@@ -9,7 +11,7 @@ export interface StatusEntry {
   readonly tone: StatusTone;
 }
 
-export type WireStatus = InboxStatus | ReportStatus | AccountStatus | NotificationStatus;
+export type WireStatus = InboxStatus | ReportStatus | AccountStatus | LegacyAccountStatus | NotificationStatus;
 
 export const STATUS_DICT: Readonly<Record<WireStatus, StatusEntry>> = {
   // gelen kutusu

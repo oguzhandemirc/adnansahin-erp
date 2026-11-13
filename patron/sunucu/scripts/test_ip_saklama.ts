@@ -3,23 +3,24 @@
 //   §1 giriş olayları istemci adresini taşır: GIRIS · GIRIS_BASARISIZ · GIRIS_REDDEDILDI (vekil başlığından)
 //   §2 30. gün sınırı: olaydan 30 gün − 1 dk sonra IP DURUR (negatif) · tam 30. gün IP alanı SİLİNİR (pozitif);
 //      olay satırı ve öteki alanları (oturum, istemci) KALIR · IP'siz olay dokunulmaz · başka tesis etkilenmez
-//   §3 hesap güvenlik kaydı ekranı (API) IP'yi 30 gün gösterir, sonra göstermez
+//   §3 hesap denetimi dökümü (`/api/disa-aktar/hesap-denetimi`) IP'yi 30 gün gösterir, sonra göstermez
 //   §4 uygulamanın erişim günlüğü satırı IP ve sorgu dizgisi TAŞIMAZ (yöntem + yol + durum + süre)
 // Koşum: npx tsx scripts/test_ip_saklama.ts
 // =============================================================================
 import { withTesis } from "../src/lib/tenant";
 import { IP_RETENTION_DAYS, stripAgedIps } from "../src/services/maintenance";
-import { TEST_PAROLASI, api, hesapKur, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, totpKodu, type Ortam, type TestHesabi } from "./lib/test-ortam";
+import { setCloudLock } from "../src/services/vendor-admin.service";
+import { TEST_PAROLASI, hesapKur, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, totpKodu, type Ortam, type TestHesabi } from "./lib/test-ortam";
 
 const GUN = 86_400_000;
 const BASLIK = "x-bekci-ip";
 
-async function girisIp(o: Ortam, h: Pick<TestHesabi, "eposta" | "sir">, ip: string, parola = TEST_PAROLASI): Promise<number> {
+async function girisIp(o: Ortam, h: Pick<TestHesabi, "kullaniciAdi" | "sir">, ip: string, parola = TEST_PAROLASI): Promise<number> {
   o.saat.ilerlet(31_000);
   const res = await fetch(`${o.adres}/api/oturum/ac?izle=gizli`, {
     method: "POST",
     headers: { "Content-Type": "application/json", [BASLIK]: ip },
-    body: JSON.stringify({ eposta: h.eposta, parola, totp: totpKodu(h.sir, o.saat.simdi()) }),
+    body: JSON.stringify({ kullaniciAdi: h.kullaniciAdi, parola, totp: totpKodu(h.sir, o.saat.simdi()) }),
   });
   await res.text();
   return res.status;
@@ -46,10 +47,10 @@ async function main(): Promise<void> {
     kontrol("§1c hatalı parola 401", (await girisIp(o, h, "198.51.100.9", "yanlis-parola-deneme")) === 401);
     const basarisiz = await olay(o, a.tesisId, "GIRIS_BASARISIZ", h.accountId);
     kontrol("§1d GIRIS_BASARISIZ IP taşır", ipOf(basarisiz?.summary) === "198.51.100.9", JSON.stringify(basarisiz?.summary));
-    await withTesis(o.goc, { tesisId: a.tesisId }, (tx) => tx.account.update({ where: { id: kilitlenecek.accountId }, data: { status: "KILITLI" } }));
+    await setCloudLock(o.goc, { tesisId: a.tesisId, username: kilitlenecek.kullaniciAdi, lock: true, reason: { gerekce: "bekçi: IP saklama bulut kilidi" } });
     await girisIp(o, kilitlenecek, "192.0.2.44");
     const red = await olay(o, a.tesisId, "GIRIS_REDDEDILDI", kilitlenecek.accountId);
-    kontrol("§1e GIRIS_REDDEDILDI (kilitli hesap) IP taşır", ipOf(red?.summary) === "192.0.2.44", JSON.stringify(red?.summary));
+    kontrol("§1e GIRIS_REDDEDILDI (bulut kilitli hesap) IP taşır", ipOf(red?.summary) === "192.0.2.44", JSON.stringify(red?.summary));
     await girisIp(o, hb, "192.0.2.200");
 
     console.log("\n§2 30. gün sınırı (zaman bazlı)");
@@ -62,18 +63,19 @@ async function main(): Promise<void> {
     kontrol("§2b tam 30. gün: IP alanı SİLİNİR (pozitif sınır)", n >= 3 && ipOf(sonra?.summary) === undefined, `${n} satır`);
     kontrol("§2c olay satırı ve öteki alanları KALIR", sonra?.event === "GIRIS" && JSON.stringify(sonra.summary).includes("oturumId") && JSON.stringify(sonra.summary).includes("istemci"));
     kontrol("§2d başarısız/reddedilen olaylar da IP'siz, satırları duruyor", ipOf((await olay(o, a.tesisId, "GIRIS_BASARISIZ", h.accountId))?.summary) === undefined && ipOf((await olay(o, a.tesisId, "GIRIS_REDDEDILDI", kilitlenecek.accountId))?.summary) === undefined);
-    const davet = await withTesis(o.goc, { tesisId: a.tesisId }, (tx) => tx.accountAudit.count({ where: { tesisId: a.tesisId, event: "YONETICI_DAVET" } }));
-    kontrol("§2e IP'siz olaylar dokunulmadı", davet >= 2);
+    const kilit = await olay(o, a.tesisId, "HESAP_BULUT_KILIDI", kilitlenecek.accountId);
+    kontrol("§2e IP'siz olay (satıcı CLI bulut kilidi) dokunulmadı", JSON.stringify(kilit?.summary).includes("IP saklama bulut kilidi"), JSON.stringify(kilit?.summary));
     kontrol("§2f başka tesisin giriş IP'si etkilenmedi", ipOf((await olay(o, b.tesisId, "GIRIS", hb.accountId))?.summary) === "192.0.2.200");
 
-    console.log("\n§3 hesap güvenlik kaydı ekranı");
-    const belirtecB = hb.belirtec;
-    const listeB = await api(o, "GET", "/api/hesaplar/denetim?limit=50", { belirtec: belirtecB });
-    const kayitlarB = (listeB.json.data as { kayitlar: { olay: string; ozet: unknown }[] }).kayitlar;
-    kontrol("§3a 30 gün içinde yönetici IP'yi görür", kayitlarB.some((k) => k.olay === "GIRIS" && ipOf(k.ozet) === "192.0.2.200"));
-    const listeA = await api(o, "GET", "/api/hesaplar/denetim?limit=50", { belirtec: h.belirtec });
-    const kayitlarA = (listeA.json.data as { kayitlar: { olay: string; ozet: unknown }[] }).kayitlar;
-    kontrol("§3b süresi dolan IP ekranda yok", listeA.status === 200 && !kayitlarA.some((k) => k.olay === "GIRIS" && ipOf(k.ozet) === "203.0.113.7"));
+    console.log("\n§3 hesap denetimi dökümü (yönetici)");
+    const dokum = async (belirtec: string): Promise<{ status: number; text: string }> => {
+      const res = await fetch(`${o.adres}/api/disa-aktar/hesap-denetimi?bicim=json`, { headers: { Authorization: `Bearer ${belirtec}` } });
+      return { status: res.status, text: await res.text() };
+    };
+    const dokumB = await dokum(hb.belirtec);
+    kontrol("§3a 30 gün içinde yönetici IP'yi dökümde görür", dokumB.status === 200 && dokumB.text.includes("192.0.2.200"), String(dokumB.status));
+    const dokumA = await dokum(h.belirtec);
+    kontrol("§3b süresi dolan IP dökümde yok", dokumA.status === 200 && !dokumA.text.includes("203.0.113.7") && !dokumA.text.includes("198.51.100.9") && !dokumA.text.includes("192.0.2.44"), String(dokumA.status));
 
     console.log("\n§4 erişim günlüğü satırı");
     const satirlar: string[] = [];

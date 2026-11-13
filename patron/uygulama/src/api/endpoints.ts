@@ -1,10 +1,8 @@
 // Uygulamanın çağırdığı HER uç burada (yol şablonu + yöntem). Ayna bekçisi bu tabloyu sunucunun
 // `API_ROUTES`uyla karşılaştırır — sunucuda olmayan uca istek yazılamaz.
 import type { ApiClient, DownloadedFile, Query } from "./client";
+import type { LegacyAccount as Account, AccountDeletion, AccountInviteResult, InviteAccepted, InviteConfirmed, InviteInfo, PermissionCatalog } from "./eski-uyelik";
 import type {
-  Account,
-  AccountDeletion,
-  AccountInviteResult,
   Device,
   CustomerMessageBody,
   ExportFormat,
@@ -16,9 +14,6 @@ import type {
   InboxItemKind,
   InboxItem,
   InboxStatus,
-  InviteAccepted,
-  InviteConfirmed,
-  InviteInfo,
   LoginRequest,
   LoginResponse,
   NotificationItem,
@@ -26,7 +21,6 @@ import type {
   NotificationSettingsView,
   OrderMessageBody,
   Page,
-  PermissionCatalog,
   ProjectionRecord,
   ReportRequest,
   ReportRequestDetail,

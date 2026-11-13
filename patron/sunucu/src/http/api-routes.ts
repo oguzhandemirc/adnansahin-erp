@@ -4,20 +4,17 @@
 // Bearer` (çerez YOK → CSRF yüzeyi yok); yazma yalnız application/json. Bekçi: test_patron_kapilari.
 import express, { type NextFunction, type Request, type Response, type Router } from "express";
 import { z } from "zod";
-import { acceptInvite, confirmInvite, inspectInvite, linkInvite } from "../auth/invite.service";
 import { loginFactoryAccount } from "../auth/factory-login";
-import { listFacilities, login, logout, resolveSession, switchFacility, type OpenedSession, type SessionContext } from "../auth/session.service";
-import { ASSIGNABLE_PERMISSIONS, ROLE_TEMPLATES } from "../catalog/permissions";
+import { logout, resolveSession, type OpenedSession, type SessionContext } from "../auth/session.service";
 import { CloudError, badRequest } from "../lib/errors";
-import { createAccount, listAccountAudit, listAccounts, resetAccount, setAccountStatus, updateAccount } from "../services/account.service";
 import type { CloudContext } from "../services/context";
-import { LIST_ID_FILTER_KEYS, LIST_MEMBER_FILTER_KEYS, LIST_SORT_DIRS, type ListSortDir, type LoginResponse, type PermissionCatalog } from "../wire/api";
+import { LIST_ID_FILTER_KEYS, LIST_MEMBER_FILTER_KEYS, LIST_SORT_DIRS, type ListSortDir, type LoginResponse } from "../wire/api";
 import { facilityStatus, getCustomerSummary, getProjectionRecord, getSnapshot, listProjection } from "../services/data.service";
 import { deactivateDevice, listDevices, registerDevice } from "../services/device.service";
 import { requestSnapshotRefresh } from "../services/doorbell";
 import { cancelInbox, createInboxMessage, getInbox, listInbox } from "../services/inbox.service";
 import { cancelReportRequest, createReportRequest, getReportRequest, listReportRequests } from "../services/report.service";
-import { PermissionList, Template, Token, Uuid, body, page, param, s, sendFile, text, uuidCursor, written, type ApiCall, type ApiRouteDef } from "./api-route-kit";
+import { Token, body, page, param, s, sendFile, text, uuidCursor, written, type ApiCall, type ApiRouteDef } from "./api-route-kit";
 import { CHANGE_ROUTES } from "./change-routes";
 import { EXPORT_ROUTES } from "./export-routes";
 import { OptionalCode, OWN_FACTOR_ROUTES } from "./own-factor-routes";
@@ -36,14 +33,13 @@ function sortDir(v: string | undefined): ListSortDir | undefined {
   return v as ListSortDir;
 }
 
-/** Giriş gövdesi: fabrika hesabı (`kullaniciAdi`, tel `LoginRequest`) ya da eski e-posta (C4'te kalkar). Katı. */
-const loginFields = { parola: z.string().min(1).max(200), totp: OptionalCode, istemci: z.enum(["mobil", "web"]).optional(), tesisId: Uuid.optional() };
-const LoginBody = z.union([z.strictObject({ kullaniciAdi: z.string().min(1).max(100), ...loginFields }), z.strictObject({ eposta: z.string().min(3).max(254), ...loginFields })]);
+/** Giriş gövdesi: fabrika kullanıcı adı + fabrika parolası (tel `LoginRequest`). Katı: `eposta` ve öteki alanlar 400. */
+const LoginBody = z.strictObject({ kullaniciAdi: z.string().min(1).max(100), parola: z.string().min(1).max(200), totp: OptionalCode, istemci: z.enum(["mobil", "web"]).optional() });
 
 const loginResponse = (r: OpenedSession): LoginResponse => ({
   belirtec: r.token,
   bitis: r.expiresAt.toISOString(),
-  hesap: { id: r.session.accountId, ad: r.session.accountName, eposta: r.session.email, ...(r.session.kullaniciAdi !== null ? { kullaniciAdi: r.session.kullaniciAdi } : {}), izinler: [...r.session.permissions].sort() },
+  hesap: { id: r.session.accountId, ad: r.session.accountName, kullaniciAdi: r.session.kullaniciAdi, izinler: [...r.session.permissions].sort() },
   tesisId: r.session.tesisId,
   tesisler: r.facilities,
 });
@@ -57,49 +53,8 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
     kimlik: { muaf: "oturum doğumu; tekrar yeni oturum açar (eski oturum süresiyle kapanır)" },
     handler: async (c) => {
       const b = body(c, LoginBody);
-      const common = { password: b.parola, totp: b.totp, client: b.istemci ?? null, ip: clientAddress(c.req, c.ctx.config) };
-      // Birincil: fabrika hesabı (C3). `eposta` gövdesi eski kimlik girişidir — GEÇİCİ UYUMLULUK, C4'te kalkar.
-      const r = "kullaniciAdi" in b
-        ? await loginFactoryAccount(c.ctx, { ...common, username: b.kullaniciAdi })
-        : await login(c.ctx, { ...common, email: b.eposta, ...(b.tesisId ? { tesisId: b.tesisId } : {}) });
+      const r = await loginFactoryAccount(c.ctx, { username: b.kullaniciAdi, password: b.parola, totp: b.totp, client: b.istemci ?? null, ip: clientAddress(c.req, c.ctx.config) });
       return { data: loginResponse(r) };
-    },
-  },
-  {
-    method: "post",
-    path: "/davet/incele",
-    auth: "ACIK",
-    kimlik: { muaf: "salt okuma; davet belirteci URL'ye ve erişim günlüğüne düşmesin diye POST gövdesinde" },
-    handler: async (c) => ({ data: await inspectInvite(c.ctx, body(c, z.strictObject({ davet: z.string().max(100) })).davet) }),
-  },
-  {
-    method: "post",
-    path: "/davet/kabul",
-    auth: "ACIK",
-    kimlik: { muaf: "davet belirteci tek kullanımlık kimliktir; kabul hesabı etkinleştirir ve belirteci düşürür (tekrar 404)" },
-    handler: async (c) => {
-      const b = body(c, z.strictObject({ davet: z.string().max(100), parola: z.string().min(1).max(200) }));
-      return { data: await acceptInvite(c.ctx, { token: b.davet, password: b.parola }) };
-    },
-  },
-  {
-    method: "post",
-    path: "/davet/onay",
-    auth: "ACIK",
-    kimlik: { muaf: "davet belirteci tek kullanımlık kimliktir; onay atomik claim (DAVETLI → AKTİF)" },
-    handler: async (c) => {
-      const b = body(c, z.strictObject({ davet: z.string().max(100), totp: z.string().min(1).max(12) }));
-      return { data: await confirmInvite(c.ctx, { token: b.davet, totp: b.totp }) };
-    },
-  },
-  {
-    method: "post",
-    path: "/davet/bagla",
-    auth: "ACIK",
-    kimlik: { muaf: "davet belirteci tek kullanımlık kimliktir; bağlama atomik claim (DAVETLI → AKTİF), her ret girişle aynı 401" },
-    handler: async (c) => {
-      const b = body(c, z.strictObject({ davet: z.string().max(100), eposta: z.string().min(3).max(254), parola: z.string().min(1).max(200), totp: OptionalCode }));
-      return { data: await linkInvite(c.ctx, { token: b.davet, email: b.eposta, password: b.parola, totp: b.totp, ip: clientAddress(c.req, c.ctx.config) }) };
     },
   },
   // ---- oturum ----
@@ -115,20 +70,8 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
       return { data: null };
     },
   },
-  { method: "get", path: "/oturum/tesisler", auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await listFacilities(c.ctx, s(c)) }) },
-  {
-    method: "post",
-    path: "/oturum/gecis",
-    auth: "OTURUM",
-    kimlik: { muaf: "eski oturumun kapanışı atomik claim; tekrar 401 (oturum kapandı), ikinci oturum doğmaz" },
-    handler: async (c) => {
-      const b = body(c, z.strictObject({ tesisId: Uuid }));
-      return { data: loginResponse(await switchFacility(c.ctx, s(c), b.tesisId)) };
-    },
-  },
   ...OWN_FACTOR_ROUTES,
   ...VIEW_PREF_ROUTES,
-  { method: "get", path: "/izinler", auth: "OTURUM", kimlik: "OKUMA", handler: async () => ({ data: { izinler: ASSIGNABLE_PERMISSIONS, sablonlar: ROLE_TEMPLATES } satisfies PermissionCatalog }) },
   // ---- veri ----
   {
     method: "get",
@@ -229,54 +172,6 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
   },
   ...NOTIFICATION_ROUTES,
   ...EXPORT_ROUTES,
-  // ---- hesap yönetimi (bulut:hesap:yonet) ----
-  { method: "get", path: "/hesaplar", auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await listAccounts(c.ctx, s(c)) }) },
-  {
-    method: "get",
-    path: "/hesaplar/denetim",
-    auth: "OTURUM",
-    kimlik: "OKUMA",
-    handler: async (c) => {
-      const { cursor, limit } = page(c);
-      return { data: await listAccountAudit(c.ctx, s(c), { cursor: uuidCursor(cursor), limit }) };
-    },
-  },
-  {
-    method: "post",
-    path: "/hesaplar",
-    auth: "OTURUM",
-    kimlik: "ISLEM_KIMLIGI",
-    handler: async (c) => {
-      const b = body(c, z.strictObject({ clientToken: Token, eposta: z.email().max(254), ad: z.string().trim().min(1).max(120), izinler: PermissionList.optional(), sablon: Template.optional() }));
-      if ((b.izinler === undefined) === (b.sablon === undefined)) throw badRequest("İzin listesi ya da şablon (yalnız biri) verilmeli");
-      return written(await createAccount(c.ctx, s(c), b));
-    },
-  },
-  {
-    method: "patch",
-    path: "/hesaplar/:id",
-    auth: "OTURUM",
-    kimlik: "ISLEM_KIMLIGI",
-    handler: async (c) => {
-      const b = body(c, z.strictObject({ clientToken: Token, ad: z.string().trim().min(1).max(120).optional(), izinler: PermissionList.optional(), sablon: Template.optional() }));
-      if (b.izinler !== undefined && b.sablon !== undefined) throw badRequest("İzin listesi ile şablon birlikte verilemez");
-      return written(await updateAccount(c.ctx, s(c), param(c, "id"), b));
-    },
-  },
-  {
-    method: "post",
-    path: "/hesaplar/:id/durum",
-    auth: "OTURUM",
-    kimlik: "ISLEM_KIMLIGI",
-    handler: async (c) => written(await setAccountStatus(c.ctx, s(c), param(c, "id"), body(c, z.strictObject({ clientToken: Token, durum: z.enum(["AKTIF", "KILITLI", "PASIF"]) })))),
-  },
-  {
-    method: "post",
-    path: "/hesaplar/:id/sifirla",
-    auth: "OTURUM",
-    kimlik: "ISLEM_KIMLIGI",
-    handler: async (c) => written(await resetAccount(c.ctx, s(c), param(c, "id"), body(c, z.strictObject({ clientToken: Token })))),
-  },
 ];
 
 function bearer(req: Request): string | undefined {

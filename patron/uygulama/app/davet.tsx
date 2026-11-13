@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { ApiError, errorMessage } from "../src/api/client";
-import type { InviteInfo } from "../src/api/wire";
+import type { InviteInfo } from "../src/api/eski-uyelik";
 import { formatDateTime } from "../src/lib/format";
 import { useSession } from "../src/state/session";
 import { AuthShell } from "../src/ui/diger/AuthShell";

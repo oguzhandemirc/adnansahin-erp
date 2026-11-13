@@ -41,7 +41,7 @@ export default function More() {
           <Avatar name={hesap?.ad} permissions={permissions} size={48} />
           <View style={s.esnek}>
             <Text style={s.ad} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{hesap?.ad ?? "Hesabım"}</Text>
-            {hesap?.eposta ? <Text style={s.eposta} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{hesap.eposta}</Text> : null}
+            {hesap?.kullaniciAdi ? <Text style={s.eposta} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{hesap.kullaniciAdi}</Text> : null}
           </View>
           <RoleBadge permissions={permissions} testID="diger-rol" />
           <Ionicons name="chevron-forward" size={16} color={t.color.textMuted} />

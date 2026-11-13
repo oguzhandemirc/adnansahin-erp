@@ -5,7 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
-import type { AccountDeletion } from "../../src/api/wire";
+import type { AccountDeletion } from "../../src/api/eski-uyelik";
 import { DELETION_EFFECTS, LAST_ADMIN_HINT, deletionDoneText } from "../../src/lib/account-deletion";
 import { useSession } from "../../src/state/session";
 import { Screen } from "../../src/ui/Frame";

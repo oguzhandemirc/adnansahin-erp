@@ -18,7 +18,7 @@ describe("Rozet + sözlük", () => {
     }
   });
   it("teldeki her durum değeri sözlükte, Türkçe etiketle (ham enum ekrana çıkmaz)", () => {
-    const accounts: AccountStatus[] = ["DAVETLI", "AKTIF", "KILITLI", "PASIF"];
+    const accounts: AccountStatus[] = ["AKTIF", "PASIF"];
     for (const v of [...INBOX_STATUSES, ...REPORT_STATUSES, ...NOTIFICATION_STATUSES, ...accounts]) {
       expect(STATUS_DICT[v]).toBeDefined();
       expect(statusEntry(v).label).not.toBe(v);

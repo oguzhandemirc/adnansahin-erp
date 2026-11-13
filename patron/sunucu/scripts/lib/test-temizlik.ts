@@ -13,12 +13,9 @@ export function testDatabase(gocUrl: string): string {
   return db;
 }
 
-/** Yabancı anahtar sırası: çocuk önce, `facilities` en son. Kimlik (`identities`) tesise ait değildir, burada silinmez. */
+/** Yabancı anahtar sırası: çocuk önce, `facilities` en son. */
 const SON = ["accounts", "installations", "facilities"];
-export const TESIS_SILME_SIRASI: readonly string[] = [
-  ...CLOUD_TABLES.filter((t) => t !== "identities" && !SON.includes(t)),
-  ...SON,
-];
+export const TESIS_SILME_SIRASI: readonly string[] = [...CLOUD_TABLES.filter((t) => !SON.includes(t)), ...SON];
 
 async function withClient<T>(gocUrl: string, fn: (c: Client) => Promise<T>): Promise<T> {
   testDatabase(gocUrl);
@@ -31,7 +28,7 @@ async function withClient<T>(gocUrl: string, fn: (c: Client) => Promise<T>): Pro
   }
 }
 
-/** Tek bekçi tesisinin bütün satırları (kiracı tabloları + kurulum yönü + üyelik). */
+/** Tek bekçi tesisinin bütün satırları (kiracı tabloları + kurulum yönü + hesaplar). */
 export async function temizleTesisSatirlari(gocUrl: string, tesisId: string): Promise<void> {
   await withClient(gocUrl, async (c) => {
     await c.query("BEGIN");
@@ -52,7 +49,7 @@ export async function temizleTesisSatirlari(gocUrl: string, tesisId: string): Pr
   });
 }
 
-/** Koşucunun tur başı süpürmesi: `_test` DB'sindeki bütün bekçi verisi (kimlikler dahil). Silinen tesis sayısını döner. */
+/** Koşucunun tur başı süpürmesi: `_test` DB'sindeki bütün bekçi verisi (yönlendirme tabloları dahil). Silinen tesis sayısını döner. */
 export async function supurTestVerisi(gocUrl: string): Promise<number> {
   return withClient(gocUrl, async (c) => {
     await c.query("BEGIN");
@@ -61,8 +58,7 @@ export async function supurTestVerisi(gocUrl: string): Promise<number> {
       const tesisler = (await c.query<{ tesis_id: string }>("SELECT tesis_id FROM facilities")).rows.map((r) => r.tesis_id);
       await c.query("COMMIT");
       for (const t of tesisler) await temizleTesisSatirlari(gocUrl, t);
-      for (const t of ROUTING_TABLES.filter((x) => x !== "identities")) await c.query(`DELETE FROM ${ident(t)}`);
-      await c.query("DELETE FROM identities");
+      for (const t of ROUTING_TABLES) await c.query(`DELETE FROM ${ident(t)}`);
       return tesisler.length;
     } catch (err) {
       await c.query("ROLLBACK").catch(() => undefined);

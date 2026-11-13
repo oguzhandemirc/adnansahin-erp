@@ -3,13 +3,13 @@
 // `lib/db-grants.ts` `SYNC_COLUMN_GRANTS.accounts`) uygular:
 //   · kümede olup bulutta olmayan → EKLENİR (id = fabrika `users.id`, AKTİF);
 //   · ad / kullanıcı adı / izin / parola özeti farklı ya da PASİF → GÜNCELLENİR (AKTİF; kapanış silinir);
-//   · fabrika hesabı olup kümede olmayan → KAPATILIR (PASİF + parola özeti NULL + kapanış anı + oturumlar düşer).
+//   · bulutta olup kümede olmayan → KAPATILIR (PASİF + parola özeti NULL + kapanış anı + oturumlar düşer).
 // Parola özeti değişince (kapanış ve yeniden açılış dahil) `kimlik_surumu` +1 ve açık oturumlar kapanır (C3 ayrıca
 // sürümü karşılaştırır). Özet SecretBox ile mühürlenir (sınıf `parola`, AAD = hesap id); değişim tespiti mührü AÇARAK
 // yapılır (mühür her seferinde farklıdır). Tek tx, İLK ifadesi 9205 `KULLANICI_ESITLEME` kilidi; satır başına atomik
 // claim (`kimlik_surumu` beklenen değer). Denetim tx DIŞINDA, satır başına (özet ve mühür ASLA yazılmaz); log
 // yalnız SAYI. Uygulama rolünün bu kolonlara yazma yetkisi yoktur (bekçi `test_kullanici_esitleme`). Her kabul edilen
-// gönderim `sync_state.kullanici_son_esitleme`yi damgalar (C3 bayatlık tavanı, `auth/factory-login.ts`).
+// gönderim `facilities.kullanici_son_esitleme`yi damgalar (C3 bayatlık tavanı, `auth/factory-login.ts`).
 import { createHash } from "node:crypto";
 import { Prisma, type AccountStatus } from "@prisma/client";
 import { invalidAssignments } from "../catalog/permissions";
@@ -25,7 +25,7 @@ const TX_TIMEOUT_MS = 30_000;
 
 interface Existing {
   readonly id: string;
-  readonly kullaniciAdi: string | null;
+  readonly kullaniciAdi: string;
   readonly name: string;
   readonly permissions: string[];
   readonly status: AccountStatus;
@@ -89,7 +89,7 @@ async function insertAccounts(a: Apply, rows: readonly NewAccount[]): Promise<vo
 
 /** ① Kapat: fabrika hesabı olup kümede olmayan (PASİF olan zaten kapalı) — atomik claim, oturumlar düşer. */
 async function closeMissing(a: Apply, rows: readonly Existing[], incoming: ReadonlySet<string>): Promise<Change[]> {
-  const toClose = rows.filter((r) => r.kullaniciAdi !== null && !incoming.has(r.id) && r.status !== "PASIF");
+  const toClose = rows.filter((r) => !incoming.has(r.id) && r.status !== "PASIF");
   for (const r of toClose) {
     const c = await a.tx.account.updateMany({
       where: { id: r.id, tesisId: a.tesisId, status: r.status, identityVersion: r.identityVersion },
@@ -128,8 +128,6 @@ async function upsertIncoming(a: Apply, users: readonly CloudUser[], byId: Reado
       out.push({ id: u.id, event: "HESAP_EKLENDI", fields: [], permissions });
       continue;
     }
-    // Kimliği bir eski (e-posta) hesapla çakışan kullanıcı: fabrika kimliği UUID'dir, çakışma veri bozulmasıdır.
-    if (prev.kullaniciAdi === null) throw new CloudError(409, "DURUM_CAKISMASI", "Fabrika kullanıcısının kimliği buluttaki bir e-posta hesabıyla çakışıyor");
     const fields = diffOf(a, prev, u, { kullaniciAdi, permissions });
     if (fields.length === 0) continue;
     const newPassword = fields.includes("parola");
@@ -141,6 +139,8 @@ async function upsertIncoming(a: Apply, users: readonly CloudUser[], byId: Reado
         permissions,
         status: "AKTIF",
         closedAt: null,
+        // Kimliği silinmiş (kapanıştan 30 gün sonra tombstone) hesap yeniden açılırsa damga AYNI ifadede düşer (CHECK).
+        identityPurgedAt: null,
         ...(newPassword ? { passwordSealed: a.ctx.secrets.seal(u.parolaOzeti, u.id, "parola"), identityVersion: { increment: 1 } } : {}),
       },
     });
@@ -168,14 +168,15 @@ export async function applyUserSet(
   const changes = await withTesis(ctx.sync, { tesisId, lock: { name: "KULLANICI_ESITLEME", key: tesisId }, timeoutMs: TX_TIMEOUT_MS }, async (tx) => {
     const a: Apply = { ctx, tx, tesisId, nowMs };
     const rows: Existing[] = await tx.account.findMany({
-      where: { tesisId, OR: [{ kullaniciAdi: { not: null } }, { id: { in: incomingIds } }] },
+      where: { tesisId },
       select: { id: true, kullaniciAdi: true, name: true, permissions: true, status: true, passwordSealed: true, identityVersion: true },
     });
     const closed = await closeMissing(a, rows, new Set(incomingIds));
     const upserted = await upsertIncoming(a, input.kullanicilar, new Map(rows.map((r) => [r.id, r])));
-    // Bayatlık damgası (C3 giriş tavanı): AYNI tx'te. Satırı ilk eşitleme paketi doğurur; paketten önce gelen küme
-    // damga bırakmaz (giriş 503 kalır — fail-closed) ve fabrikanın bir sonraki gönderimi (≤ 10 dk) damgalar.
-    await tx.syncState.updateMany({ where: { tesisId }, data: { usersPushedAt: new Date(nowMs) } });
+    // Bayatlık damgası (C3 giriş tavanı): AYNI tx'te, tesis satırında (C4: `tesis-ac` ile doğar; ilk küme eşitleme
+    // paketinden önce gelse de damgalar — ilk girişte bekleme yok).
+    const stamped = await tx.facility.updateMany({ where: { tesisId }, data: { usersPushedAt: new Date(nowMs) } });
+    if (stamped.count !== 1) throw new CloudError(409, "DURUM_CAKISMASI", "Tesis kaydı bulunamadı; kullanıcı listesi damgalanamadı");
     return [...closed, ...upserted];
   });
 
