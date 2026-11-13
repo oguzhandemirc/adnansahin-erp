@@ -103,6 +103,6 @@ export default function Shipments() {
 const useStyles = makeStyles((t) => ({
   ozet: { marginTop: space.m },
   ikili: { flexDirection: "row" as const, gap: space.m, marginBottom: space.s },
-  yarim: { flex: 1, minWidth: 0 },
+  yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
   not: { ...typography.footnote, color: t.color.textMuted, marginTop: space.s },
 }));

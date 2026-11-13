@@ -125,6 +125,6 @@ const useStyles = makeStyles((t) => ({
   musteriAd: { ...typography.headline, fontSize: 18, lineHeight: 23, color: t.color.text },
   rozetler: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.xs },
   ikili: { flexDirection: "row" as const, gap: space.m, marginTop: space.m },
-  yarim: { flex: 1, minWidth: 0 },
+  yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
   foot: { ...typography.footnote, color: t.color.textMuted, textAlign: "center" as const, marginTop: space.l },
 }));

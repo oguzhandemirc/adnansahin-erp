@@ -149,7 +149,7 @@ export default function Production() {
 const useStyles = makeStyles(() => ({
   kartlar: { marginTop: space.m, marginBottom: space.m, gap: space.m },
   ikili: { flexDirection: "row" as const, gap: space.m },
-  yarim: { flex: 1, minWidth: 0 },
+  yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
   blok: { marginBottom: space.m },
   rozetler: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
 }));

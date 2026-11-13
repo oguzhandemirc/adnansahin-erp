@@ -2,14 +2,15 @@
 // müşteri malı (emanet, PB1: `emanet-bakiye`) · kalem/top listesi (Ham | Bitmiş; anlık `stok-kalem`, `src/ui/stok`) · ürün bazında
 // tablo. Kutular ve ürün tablosu `stok-karnesi`nden (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
 // Ürün tablosu tek belgenin içidir (sayfasız, bulut sıralamaz/süzmez) → başlık sıralamasız, süzgeç/arama yok; yalnız sütun
-// seçimi profilde (`tablo.stok`).
+// seçimi profilde (`tablo.stok`). Yaş dağılımı açılır-kapanır: varsayılan kapalı, durum cihazda (`useAcikKapali`).
 import { useMemo, useState, type ReactNode } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
 import { DEAD_STOCK_STATUS, FREE_STOCK_HINT, FREE_STOCK_LABEL, STOCK_AGE_TONE, UNIT } from "../../../src/lib/labels/uretim";
 import { AgingBar } from "../../../src/ui/charts";
 import { Screen } from "../../../src/ui/Frame";
 import { KademeliGiris } from "../../../src/ui/hareket";
-import { BlokBasligi, SectionCard, StatCard } from "../../../src/ui/ortak";
+import { AcilirKart, BlokBasligi, StatCard } from "../../../src/ui/ortak";
+import { useAcikKapali } from "../../../src/ui/ortak/useAcikKapali";
 import { arr, num, obj, pct, qty, str } from "../../../src/ui/pano/read";
 import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
@@ -78,6 +79,7 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
   const deadSt = DEAD_STOCK_STATUS[dead ? "var" : "yok"];
   const ages = arr(obj(data).yasKovalari);
   const items = arr(obj(data).urunler);
+  const yas = useAcikKapali("stok.yas-dagilimi", false);
   return (
     <View>
       {stamp}
@@ -105,7 +107,7 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
 
       {ages.length > 0 ? (
         <KademeliGiris sira={2} style={s.blok}>
-          <SectionCard baslik="Yaş dağılımı" aciklama={`Yaşlı ${qty(o.yasliMiktar)} ${UNIT.metre}`} testID="bolum-yas">
+          <AcilirKart baslik="Yaş dağılımı" aciklama={`Yaşlı ${qty(o.yasliMiktar)} ${UNIT.metre}`} acik={yas.acik} hazir={yas.hazir} onDegistir={yas.degistir} testID="bolum-yas">
             <AgingBar
               testID="yas-kovalari"
               segments={ages.map((a) => ({
@@ -116,7 +118,7 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
               }))}
             />
             {(num(o.yassizAdet) ?? 0) > 0 ? <Text style={s.footnote}>{`Yaşı bilinmeyen: ${qty(o.yassizAdet)} ${UNIT.top} · ${qty(o.yassizMiktar)} ${UNIT.metre}`}</Text> : null}
-          </SectionCard>
+          </AcilirKart>
         </KademeliGiris>
       ) : null}
 
@@ -136,8 +138,8 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
 }
 
 const useStyles = makeStyles((t) => ({
-  ikili: { flexDirection: "row" as const, gap: space.m, marginBottom: space.m },
-  yarim: { flex: 1, minWidth: 0 },
+  ikili: { flexDirection: "row" as const, gap: space.s, marginBottom: space.s },
+  yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
   blok: { marginBottom: space.m },
   footnote: { ...typography.footnote, color: t.color.textMuted, marginTop: space.m },
 }));
