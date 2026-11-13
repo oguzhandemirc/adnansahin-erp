@@ -37,6 +37,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Teknik kullanıcının giriş yöntemi yoktur: `AuthService.issueToken` onu reddeder (parola/PIN/kart 401), izin verilmez, kullanıcı listesinde görünmez, kimliği ham ayar ucuna kapalıdır; yazma kapanınca kullanıcı aktif kalır. [bekçi: test_patron_bulut_gelen_kutusu]
 - Telefondan gelen birim fiyat yok sayılır (kalemde fiyat ve toplam boş, makbuz mesajı söyler); finans verisi telefondan alınmaz. [bekçi: test_patron_bulut_gelen_kutusu]
 - Benzer adlı müşteri varsa telefon kartı RET alır ("Benzer müşteri var: …"); eşik panelin uyarı yüzeyiyle aynı `findSimilarNames`tir, panel aynı adayda yalnız uyarır — ayrı firma ise kart panelden açılır. [bekçi: test_patron_bulut_gelen_kutusu]
+- Telefon yazısının yazarı (bulut hesabı = fabrika kullanıcısı) işlendiği AN güncel fabrika izniyle denetlenir — kullanıcı listesiyle aynı süzgeç (`cloudAuthorHolds`): yok, pasif/silinmiş, teknik kullanıcı ya da `patron:giris` veya türün yazma izni (sipariş `order:write`/`mobile:siparis`, müşteri `customer:write`) yoksa makbuzlu RET `IS_KURALI` "Yetkiniz fabrikada kaldırılmış", kayıt doğmaz. [bekçi: test_patron_bulut_gelen_kutusu]
 - Belirsiz hatalı mesaj üç turda makbuzlu "fabrikada işlenemedi" retle kapanır; deneme sayacı süreç belleğindedir ve yeniden başlatma idempotent tekrarla zararsızdır. [bekçi: test_patron_bulut_gelen_kutusu]
 
 ### Rapor isteği (D5)
