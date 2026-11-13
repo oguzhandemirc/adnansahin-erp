@@ -156,7 +156,7 @@ SHOW teks.audit_guard;   -- 'on' dönmeli
 ```powershell
 cd C:\TeksERP\app
 npm run superadmin:kur                # kurulum (idempotent)
-npm run superadmin:kur -- --rotate    # parola + PIN + TOTP yenile
+npm run superadmin:kur -- --rotate    # parola + TOTP yenile (eski PIN silinir)
 ```
 
 > ⚠️ **GERÇEK TERMİNAL ŞART — uzaktan koşuyorsan `-t` VER.** Script parolayı

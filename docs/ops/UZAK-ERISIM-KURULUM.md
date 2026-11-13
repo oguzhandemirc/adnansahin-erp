@@ -181,7 +181,7 @@ hesabı** değiştirebilir. Hesap **sunucuda elle koşulan bir script'le** doğa
 ```powershell
 cd C:\TeksERP\app
 npm run superadmin:kur                # kurulum (idempotent — hesap varsa DOKUNMAZ)
-npm run superadmin:kur -- --rotate    # parola + PIN + TOTP yenile
+npm run superadmin:kur -- --rotate    # parola + TOTP yenile (eski PIN silinir)
 ```
 
 > ⚠️ **GERÇEK TERMİNAL ŞART — uzaktan koşuyorsan `-t` VER.** Script parolayı
@@ -195,12 +195,12 @@ npm run superadmin:kur -- --rotate    # parola + PIN + TOTP yenile
 > içinden çağırmayın.
 
 Script sırayla sorar: **kullanıcı adı** (öneri `bakim` — nötr seçin, satıcıyı
-çağrıştırmasın) · **parola** (iki kez, ekrana basılmaz) · **6 haneli hızlı giriş
-PIN'i** (boş bırakılırsa üretilir). İki adımlı doğrulama sırrını üretir ve
+çağrıştırmasın) · **parola** (iki kez, ekrana basılmaz). Hızlı giriş PIN'i
+**üretilmez** (2026-11-13: süperadmin PIN/kartla giremez). İki adımlı doğrulama sırrını üretir ve
 `otpauth://` URI'siyle birlikte **terminalde QR olarak BİR KEZ** basar —
 authenticator uygulamasıyla o an okutun.
 
-> ⚠️ **Çıktı bir daha gösterilmez.** PIN + TOTP sırrı parola yöneticisinde
+> ⚠️ **Çıktı bir daha gösterilmez.** TOTP sırrı parola yöneticisinde
 > tutulur, **fabrikaya VERİLMEZ**. Hiçbir dosyaya/log'a/audit yüküne yazılmaz;
 > audit'e yalnız `SUPERADMIN_PROVISIONED` / `SUPERADMIN_ROTATED` izi düşer
 > (sırsız, gerçek kullanıcı adı da yok).
@@ -217,15 +217,13 @@ authenticator uygulamasıyla o an okutun.
 > ile yazılmaya devam eder (emniyet supabı — kilitlenme yok). Boot log'unda
 > `[superadmin] Satıcı hesabı yok — emniyet supabı devrede` satırı bunu söyler.
 
-**ROTASYON** (`--rotate`): parola + PIN + TOTP sırrı **yenilenir** ve
+**ROTASYON** (`--rotate`): parola + TOTP sırrı **yenilenir**, eski PIN **silinir** ve
 `tokenVersion` artar → **açık oturumların hepsi anında düşer**. Kalıcı bir
 "rotasyon bayrağı" YOKTUR; kaldırılması unutulacak bir satır bırakmaz.
 
 > ⚠️ **KULLANICI ADI DEĞİŞMEZ** (giriş kimliğidir; sessizce değiştirmek satıcıyı
 > bir sonraki girişte dışarıda bırakırdı). Ad gerçekten değişecekse hesap elle
 > güncellenir.
-> ⚠️ **PIN başka bir kullanıcıdaysa** rotasyon UYGULANMAZ — script hata verir ve
-> hesaba hiçbir şey yazılmaz (`quickPin` sistem genelinde benzersiz).
 > ⚠️ **Kurulu hesap yokken `--rotate`** hata verir; hesap YARATMAZ.
 
 > ⚠️ **Hesabı KALDIRMA** (satıcı ilişkisi biterse):

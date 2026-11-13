@@ -221,7 +221,7 @@ async function sistemHesabi(): Promise<void> {
   try {
     const mevcut = await prisma.user.findFirst({ where: { isSystemAccount: true }, select: { username: true } });
     const password = randomBytes(12).toString("base64url");
-    const r = await provisionSuperadmin({ username: mevcut?.username ?? "sistem", password, pin: null, rotate: Boolean(mevcut) });
+    const r = await provisionSuperadmin({ username: mevcut?.username ?? "sistem", password, rotate: Boolean(mevcut) });
     if (r.kind === "error") dur(`sistem hesabı: ${r.code} ${r.message}`);
     if (r.kind === "exists") dur("sistem hesabı zaten var ama rotasyon yapılmadı — parola bilinmiyor");
     const ad = mevcut?.username ?? "sistem";

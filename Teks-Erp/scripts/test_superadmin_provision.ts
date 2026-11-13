@@ -30,6 +30,9 @@
 //   8. ÖLÜ `.env` SATIRI UYARISI SUSAR ya da DEĞERİ BASAR — P2 yolunu kullanmış
 //      kurulumda o satırlar hâlâ CANLI kimlik bilgisidir; susarsak sır diskte
 //      unutulur, değeri basarsak pm2 log'una sır yazmış oluruz.
+//   9. ÖLÜ PIN GERİ GELİR — Y5 sonrası süperadmin PIN/kartla giremez; kurulum
+//      yine PIN üretirse ekrana basılan, hiçbir yere götürmeyen bir sır doğar.
+//      Kurulum `quickPin` null bırakır, rotasyon eski PIN'i siler (§2, §4).
 //
 // ⚠️ BU BEKÇİ YAZAR: mevcut sistem hesabını GEÇİCİ olarak pasifleştirir
 //    (`isSystemAccount=false`), kendi fixture'ını yaratır ve `finally`de İKİSİNİ
@@ -197,7 +200,7 @@ async function ciktiyiYakala<T>(f: () => Promise<T>): Promise<{ sonuc: T; cikti:
 
 function sirlariTopla(r: ProvisionResult): void {
   if (r.kind === "created" || r.kind === "rotated") {
-    sirlar.push(r.pin, r.totpSecret);
+    sirlar.push(r.totpSecret);
   }
 }
 
@@ -251,7 +254,6 @@ async function main(): Promise<void> {
       const red = await provisionSuperadmin({
         username: gorunur.username,
         password: PAROLA_1,
-        pin: null,
         rotate: false,
       });
       check(
@@ -272,7 +274,6 @@ async function main(): Promise<void> {
       const redBuyuk = await provisionSuperadmin({
         username: gorunur.username.toUpperCase(),
         password: PAROLA_1,
-        pin: null,
         rotate: false,
       });
       check(
@@ -285,7 +286,6 @@ async function main(): Promise<void> {
     const rotasyonYok = await provisionSuperadmin({
       username: FIXTURE_USERNAME,
       password: PAROLA_1,
-      pin: null,
       rotate: true,
     });
     check(
@@ -313,7 +313,6 @@ async function main(): Promise<void> {
       provisionSuperadmin({
         username: FIXTURE_USERNAME,
         password: PAROLA_1,
-        pin: null,
         rotate: false,
       }),
     );
@@ -354,8 +353,11 @@ async function main(): Promise<void> {
       satir?.fullName ?? "—",
     );
     check("hesap aktif", satir?.isActive === true);
-    check("PIN yazıldı ve dönüş değeriyle AYNI", satir?.quickPin === ilk.pin);
-    check("PIN 6 hane", /^\d{6}$/.test(ilk.pin), ilk.pin.replace(/\d/g, "•"));
+    // Y5 sonrası süperadmin PIN/kartla giremez → kurulum işe yaramayan bir
+    // kimlik ÜRETMEZ (2026-11-13). Üretseydi ekrana basılan, hiçbir yere
+    // götürmeyen ama `quickPin` @unique uzayında yer kaplayan bir sır doğardı.
+    check("PIN ÜRETİLMEDİ (`quickPin` null)", satir?.quickPin === null, satir?.quickPin ? "dolu" : "null");
+    check("dönüş değeri PIN taşımıyor", !("pin" in ilk));
     check(
       "TOTP sırrı + `totpEnabledAt` İKİSİ BİRDEN yazıldı (getStatus 'kurulu' der)",
       satir?.totpSecret === ilk.totpSecret && satir?.totpEnabledAt !== null,
@@ -405,7 +407,6 @@ async function main(): Promise<void> {
     const ikinci = await provisionSuperadmin({
       username: "bambaska-ad",
       password: PAROLA_2,
-      pin: null,
       rotate: false,
     });
     check("ikinci koşum → 'exists'", ikinci.kind === "exists", ikinci.kind);
@@ -430,17 +431,27 @@ async function main(): Promise<void> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  console.log("\n=== 4) ROTASYON — parola + PIN + TOTP yenilenir, oturumlar düşer ===");
+  console.log("\n=== 4) ROTASYON — parola + TOTP yenilenir, eski PIN silinir, oturumlar düşer ===");
   if (ilk.kind === "created") {
     const once = await prisma.user.findUnique({
       where: { id: ilk.id },
       select: { passwordHash: true, quickPin: true, totpSecret: true, tokenVersion: true, username: true },
     });
-    // Deterministik deps: PIN'i biz veriyoruz ki "değişti mi" ölçümü şansa kalmasın.
+    // ESKİ KURULUM BENZETİMİ: 2026-11-13 öncesi kurulan hesap PIN taşır. Rotasyon
+    // onu SİLMELİ (Y5 sonrası ölü kimlik). Boş bir 6 haneli değer seçilir.
+    let eskiPin = "";
+    for (let i = 0; i < 50 && !eskiPin; i++) {
+      const aday = String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
+      if (!(await prisma.user.findFirst({ where: { quickPin: aday }, select: { id: true } }))) eskiPin = aday;
+    }
+    await prisma.user.update({ where: { id: ilk.id }, data: { quickPin: eskiPin } });
+    sirlar.push(eskiPin);
+    check("körlük zemini: rotasyon öncesi hesapta ESKİ PIN var", eskiPin.length === 6);
+    // Deterministik deps: TOTP sırrını biz veriyoruz ki "değişti mi" ölçümü şansa kalmasın.
     const sabitSir = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
     const deps: ProvisionDeps = { ...defaultProvisionDeps, generateTotpSecret: () => sabitSir };
     const rot = await provisionSuperadmin(
-      { username: "yok-sayilir", password: PAROLA_2, pin: null, rotate: true },
+      { username: "yok-sayilir", password: PAROLA_2, rotate: true },
       deps,
     );
     sirlariTopla(rot);
@@ -461,7 +472,7 @@ async function main(): Promise<void> {
       "yeni parola gerçekten geçerli (hash yazıldı, bozulmadı)",
       await bcrypt.compare(PAROLA_2, sonra?.passwordHash ?? ""),
     );
-    check("PIN DEĞİŞTİ", once?.quickPin !== sonra?.quickPin, `${once?.quickPin} → ${sonra?.quickPin}`);
+    check("eski PIN SİLİNDİ (`quickPin` null)", sonra?.quickPin === null, sonra?.quickPin ? "dolu" : "null");
     check("TOTP sırrı DEĞİŞTİ", once?.totpSecret !== sonra?.totpSecret && sonra?.totpSecret === sabitSir);
     check("`totpLastStep` sıfırlandı (eski kod tekrar kullanılamaz)", sonra?.totpLastStep === null);
     check(
@@ -483,7 +494,7 @@ async function main(): Promise<void> {
   // ═══════════════════════════════════════════════════════════════════════════
   console.log("\n=== 5) SIR SIZINTISI — audit · DB · dosya sistemi ===");
   {
-    check("körlük zemini: aranacak sır toplandı", sirlar.length >= 3, `${sirlar.length} değer`);
+    check("körlük zemini: aranacak sır toplandı", sirlar.length >= 3, `${sirlar.length} değer`); // 2 TOTP + eski PIN
     // Audit best-effort ve tx dışında — yazılma penceresi verilir.
     await new Promise((r) => setTimeout(r, 400));
 
