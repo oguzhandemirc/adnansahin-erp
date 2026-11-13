@@ -66,7 +66,7 @@ let originalFlag = false;
 let satirVardi = false;
 let testUserId: string | null = null;
 const TEST_USERNAME = `bekci.finance.${process.pid}`;
-const TEST_PASSWORD = "test123456";
+const TEST_PASSWORD = "Bekci-Dusuk-Yetki-48";
 
 async function main(): Promise<void> {
   console.log("=== Ön muhasebe kapalı-rejim bekçisi ===\n");

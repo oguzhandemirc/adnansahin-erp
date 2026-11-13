@@ -28,6 +28,9 @@ router.post("/totp/enroll", AuthController.totpEnrollConsume);
 // kullanıcı oluşturmanın tek yolu POST /api/admin/users (permission-management).
 router.get("/me", verifyToken, AuthController.me);
 router.post("/logout", verifyToken, AuthController.logout);
+// Kendi parolasını değiştir — kısıtlı oturumun (parola kurala uymuyor) girebildiği
+// İKİ uçtan biri (diğeri logout; kapı `auth.middleware` PASSWORD_CHANGE_ALLOWED).
+router.post("/change-password", verifyToken, AuthController.changePassword);
 
 // Self-service UI tercihleri (ekstra permission gerekmez — kendi kaydı)
 router.get("/preferences", verifyToken, UserPreferenceController.getMine);

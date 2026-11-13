@@ -78,6 +78,7 @@ import { AuthService } from "../src/services/auth.service";
 import { PermissionManagementService } from "../src/services/permission-management.service";
 import { SETTING_KEYS, readPatronCloudInboxEnabled } from "../src/services/system-setting.service";
 import { ensureTestAdmin } from "./fixture-test-user";
+import { PASSWORD_POLICY_VERSION } from "../src/services/helpers/password-policy.helper";
 import { cleanupTestCustomers } from "./fixture-customer-cleanup";
 
 let pass = 0, fail = 0;
@@ -102,7 +103,7 @@ const authorUserIds: string[] = [];
 
 async function mkAuthor(tag: string, codes: readonly string[], over: Record<string, unknown> = {}): Promise<string> {
   const u = await prisma.user.create({
-    data: { username: `${STAMP}-yazar-${tag}-${randomBytes(3).toString("hex")}`, fullName: `${STAMP} yazar ${tag}`, passwordHash: await bcrypt.hash(`D4-${randomUUID()}`, 10), ...over },
+    data: { username: `${STAMP}-yazar-${tag}-${randomBytes(3).toString("hex")}`, fullName: `${STAMP} yazar ${tag}`, passwordHash: await bcrypt.hash(`D4-${randomUUID()}`, 10), passwordPolicyVersion: PASSWORD_POLICY_VERSION, ...over },
     select: { id: true },
   });
   authorUserIds.push(u.id);
@@ -285,8 +286,8 @@ async function main(): Promise<void> {
       try { await f(); return "TOKEN"; } catch (e) { return String((e as { statusCode?: number }).statusCode ?? (e as Error).message); }
     };
     const sPw = await status(() => AuthService.login(PATRON_CLOUD_USERNAME, knownPw));
-    const sPin = await status(() => AuthService.loginWithQuickPin(pin));
-    const sCard = await status(() => AuthService.loginWithCard(`TEKSU:${actor}:${cardToken}`));
+    const sPin = await status(() => AuthService.loginWithQuickPin(pin, { fieldDevice: { kind: "TABLET" } }));
+    const sCard = await status(() => AuthService.loginWithCard(`TEKSU:${actor}:${cardToken}`, { fieldDevice: { kind: "TABLET" } }));
     check("⭐ parola bilinse de giriş 401", sPw === "401", sPw);
     check("⭐ PIN verilse de giriş 401", sPin === "401", sPin);
     check("⭐ kart verilse de giriş 401", sCard === "401", sCard);
@@ -599,9 +600,12 @@ async function main(): Promise<void> {
     await prisma.userPermission.deleteMany({ where: { userId: revoked, permission: { code: "patron:giris" } } });
     const passiveAuthor = await mkAuthor("pasif", AUTHOR_CODES, { isActive: false });
     const noOrderWrite = await mkAuthor("siparissiz", ["patron:giris", "customer:write"]);
+    // Y8: parolası yeni kuralla belirlenmemiş yazar buluta gitmez → yazısı da işlenmez.
+    const legacyPwAuthor = await mkAuthor("eski-parola", AUTHOR_CODES, { passwordPolicyVersion: 0 });
     const authorCases: Array<[string, string, "SIPARIS" | "CARI"]> = [
       ["bilinmeyen yazar kimliği", randomUUID(), "SIPARIS"],
       ["pasif yazar", passiveAuthor, "SIPARIS"],
+      ["parolası yeni kuralla belirlenmemiş yazar (Y8)", legacyPwAuthor, "SIPARIS"],
       ["`patron:giris` geri alınmış yazar (sipariş)", revoked, "SIPARIS"],
       ["`patron:giris` geri alınmış yazar (müşteri)", revoked, "CARI"],
       ["`order:write` olmayan yazar → sipariş", noOrderWrite, "SIPARIS"],

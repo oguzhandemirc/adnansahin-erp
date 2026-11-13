@@ -171,11 +171,11 @@ async function main(): Promise<void> {
 
     console.log("\n── §5 Kart formu Finans (HTTP) ──");
     const adminTok = await login(admin.username, admin.password);
-    const opUser = await prisma.user.create({ data: { username: `${TAG}-op`.toLowerCase(), fullName: `${TAG} operasyon`, passwordHash: await AuthService.hashPassword("test123456"), isActive: true }, select: { id: true } });
+    const opUser = await prisma.user.create({ data: { username: `${TAG}-op`.toLowerCase(), fullName: `${TAG} operasyon`, passwordHash: await AuthService.hashPassword("Bekci-Dusuk-Yetki-48"), isActive: true }, select: { id: true } });
     ids.users.push(opUser.id);
     const perms = await prisma.permission.findMany({ where: { code: { in: ["customer:read", "customer:write"] } }, select: { id: true } });
     await prisma.userPermission.createMany({ data: perms.map((p) => ({ userId: opUser.id, permissionId: p.id })) });
-    const opTok = await login(`${TAG}-op`.toLowerCase(), "test123456");
+    const opTok = await login(`${TAG}-op`.toLowerCase(), "Bekci-Dusuk-Yetki-48");
     const r5a = await call("PATCH", `/api/customers/${k1.data.id}`, opTok, { finance: { paymentTermDays: 30 } });
     check("§5a ⭐ `finance` alt nesnesi finance:write'sız → 403 PERMISSION_DENIED required finance:write; vade YAZILMADI", r5a.status === 403 && r5a.body.details?.code === "PERMISSION_DENIED" && r5a.body.details?.required === "finance:write" && (await hesap(k1.data.id))[0]!.paymentTermDays === null, `${r5a.status} ${JSON.stringify(r5a.body.details)}`);
     const r5b = await call("PATCH", `/api/customers/${k1.data.id}`, opTok, { notes: `${TAG} not` });

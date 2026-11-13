@@ -57,4 +57,12 @@ export interface JwtPayload {
    *  iptal edilince eski token 401 alır. Eski (jti'siz) tokenlar deploy sonrası bir
    *  kez re-login gerektirir (fail-closed). */
   jti: string;
+  /**
+   * KISITLI OTURUM (2026-11-13): parola kurala uymadığı için masaüstüne verilen
+   * token. `true` iken `permissions` boştur ve `verifyToken` yalnız
+   * `POST /api/auth/change-password` + `POST /api/auth/logout`a izin verir;
+   * diğer her uç 403 `PASSWORD_CHANGE_REQUIRED`. Claim imzalıdır, istemci
+   * uyduramaz ve silemez (silinmiş claim imzayı bozar).
+   */
+  passwordChangeRequired?: boolean;
 }

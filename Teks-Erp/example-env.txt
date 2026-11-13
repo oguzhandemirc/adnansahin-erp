@@ -1,6 +1,7 @@
 PORT=4000
 DATABASE_URL="postgresql://****:****@****:****/****?schema=public"
-JWT_SECRET="supersecret_tekserp_jwt_key_change_me_in_prod"
+# Üret: openssl rand -hex 32 (depodaki eski demo değeri ASLA kullanma — güvenlik denetimi 2026-11-13)
+JWT_SECRET="<openssl rand -hex 32 CIKTISI>"
 # Patron bulutu (varsayılan KAPALI; ikisi de boşken buluta hiç çıkılmaz — docs/kurallar/patron-bulutu.md)
 # PATRON_CLOUD_URL=https://<bulut kökeni>
 # PATRON_CLOUD_KEY_FILE=<anahtar dosyasının mutlak yolu, repo dışında>

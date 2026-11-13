@@ -355,14 +355,18 @@ async function sectionLoginLockout(): Promise<void> {
   console.log("\n[4] Giriş kilidi anahtarı — fabrika tek kova / vekil arkası iki kova");
   const req = fakeReq("POST", "/api/auth/login", "203.0.113.7");
 
+  // Y4 (2026-11-13): fabrika kipinde de dar kova tutulur (yalnız başarının
+  // kendi hatalarını geniş kovadan düşebilmesi için); EŞİK geniş kovada ×1 kalır.
   const ipOnly = resolveLoginLockoutKeys(req, "u:admin", cleanEnv());
-  check("fabrika: TEK kova döner", ipOnly.length === 1, JSON.stringify(ipOnly));
-  check("fabrika: anahtar salt IP (bugünkü davranış)", ipOnly[0]?.key === "203.0.113.7");
-  check("fabrika: çarpan 1 (eşik değişmez)", ipOnly[0]?.budgetMultiplier === 1);
+  const ipWide = ipOnly.find((k) => k.wide);
+  check("fabrika: dar + geniş iki kova döner", ipOnly.length === 2, JSON.stringify(ipOnly));
+  check("fabrika: geniş kova salt IP (bugünkü eşik anahtarı)", ipWide?.key === "203.0.113.7");
+  check("fabrika: geniş kova çarpanı 1 (eşik değişmez)", ipWide?.budgetMultiplier === 1);
   check(
-    "fabrika: kullanıcı adı anahtara GİRMEZ (password spraying kapalı kalır)",
-    !ipOnly[0]?.key.includes("admin"),
+    "fabrika: kullanıcı adı GENİŞ kovaya GİRMEZ (password spraying kapalı kalır)",
+    !ipWide?.key.includes("admin"),
   );
+  check("fabrika: dar kova ip|kimlik, çarpan 1", ipOnly[0]?.key === "203.0.113.7|u:admin" && ipOnly[0]?.budgetMultiplier === 1 && !ipOnly[0]?.wide);
 
   const two = resolveLoginLockoutKeys(req, "u:Admin", cleanEnv({ TRUST_PROXY: "1" }));
   check("vekil arkası: İKİ kova döner", two.length === 2, JSON.stringify(two.map((k) => k.key)));
@@ -721,9 +725,9 @@ function sectionWiring(): void {
     /hardening\.swaggerEnabled/.test(srvSrc) && !/NODE_ENV !== "production"[\s\S]{0,80}Swagger/.test(srvSrc),
   );
 
-  // Üç giriş yolu da KİMLİKLİ anahtar çözüyor (iki argümanlı çağrı).
+  // Üç giriş yolu + kendi parolasını değiştirme (2026-11-13) KİMLİKLİ anahtar çözüyor (iki argümanlı çağrı).
   const calls = authSrc.match(/resolveLoginLockoutKeys\(\s*req\s*,/g) ?? [];
-  check("üç giriş yolu da resolveLoginLockoutKeys(req, kimlik) çağırıyor", calls.length === 3, `${calls.length} çağrı`);
+  check("üç giriş yolu + parola değiştirme resolveLoginLockoutKeys(req, kimlik) çağırıyor", calls.length === 4, `${calls.length} çağrı`);
   check(
     "eski tek-argümanlı resolveLoginLockoutKey artık controller'da kullanılmıyor",
     !/resolveLoginLockoutKey\(/.test(authSrc.replace(/resolveLoginLockoutKeys\(/g, "")),

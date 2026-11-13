@@ -30,6 +30,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 ### Telefondan yazma (gelen kutusu, D4)
 
 - Altın kural: telefondan gelen yeni sipariş/müşteri insan onayı beklemeden işlenir, ama her kapı işlendiği anda GÜNCEL fabrika verisine karşı koşar; ret okunur Türkçe nedenle buluta döner ve kayıt doğmaz. [bekçi: test_patron_bulut_gelen_kutusu]
+- `patronCloud.syncEnabled` ve `patronCloud.inboxEnabled` şalterlerini yalnız süperadmin değiştirir (`SUPERADMIN_WRITE_SETTING_KEYS`, ham ayar ucunda izin kapısından sonra ve ayar şifresinden önce): `admin:settings`/`*` taşıyan sistem-dışı hesap 403 `SUPERADMIN_ONLY`; süperadmin yoksa kimse değiştiremez. [bekçi: test_patron_cloud_switch_superadmin]
 - Yazma ayrı ayardır: `patronCloud.inboxEnabled` varsayılan KAPALI ve eşitleme açıkken de ayrıca açılır; kapalıyken iş kurulmaz, gelen kutusuna istek gitmez, teknik kullanıcı doğmaz. Aralık `patronCloud.inboxIntervalSeconds` (20–600 sn, varsayılan 30; aralık dışı değer varsayılana düşer). [bekçi: test_patron_bulut_gelen_kutusu]
 - Yalnız iki tür işlenir (yeni sipariş · yeni müşteri); tanınmayan tür makbuzsuz retle buluta bildirilir. [bekçi: test_patron_bulut_gelen_kutusu]
 - Aynı `mesajId` tek kayıt doğurur: kayıt ile makbuz AYNI tx'te yazılır, 8036 kilidi tx'in ilk ifadesidir ve makbuz `messageId` UNIQUE son seddir; tekrar ya da yarış makbuzdaki sonucu alır. [bekçi: test_patron_bulut_gelen_kutusu]
@@ -70,6 +71,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ### Kullanıcı listesi (üyelik = Electron şifresi)
 
+- Buluta yalnız parolası GÜNCEL kural sürümüyle belirlenmiş kullanıcının özeti gider (Y8): `User.passwordPolicyVersion >= PASSWORD_POLICY_VERSION` hem sorguda hem satır yükleminde; sürümü yalnız `newPasswordFields` (yarat · yönetici sıfırla · kendi değiştir · süperadmin kur) günceller, eski parolalı kullanıcı yeniden belirleyene kadar ne girer ne yazar; bulut tarafında `PAROLA_ZAYIF` yanıtı yoktur (kâhin olurdu). [bekçi: test_password_policy_version]
 - Telefona yalnız `patron:giris` iznini BİREBİR taşıyan fabrika kullanıcısı girer; `*`/`patron:*` jokeri ve "Admin (Tam Yetki)" şablonu bu izni vermez, panelden kişi kişi atanır. [bekçi: test_patron_bulut_kullanicilar]
 - Telefon izni bulutta atanmaz, fabrika izinlerinden türetilir; tablonun tek kaynağı `cloud-sync/user-permission-map.ts`tir ve finans izni türetmez. [bekçi: test_patron_bulut_kullanicilar]
 - Süperadmin, sistem ve teknik kullanıcı buluta ASLA gitmez; pasif, silinmiş ve izin penceresi dışındaki kullanıcı kümeden düşer (süzgeç sorguda ve satır yükleminde iki kat). [bekçi: test_patron_bulut_kullanicilar]
@@ -85,7 +87,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 1. `.env`: `PATRON_CLOUD_URL=https://<bulut kökeni>` ve `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (dosya veri dizininde, repoda değil).
 2. `cd Teks-Erp && npx tsx scripts/patron-bulut-anahtar.ts` — dosya yoksa üretir (0600), varsa okur; `--kurulum=` ve `--acik-anahtar=` değerlerini basar, özel anahtarı basmaz. Bu iki değer bulutta `tesis.ts kurulum-kaydet --kurulum= --acik-anahtar=`e verilir (adımlar ve ölçümler: `docs/ops/PATRON-ESITLEME-KURULUM.md` § 5).
-3. Ayar: `PUT /api/admin/settings/patronCloud.syncEnabled` `{"value":"true"}` (admin:settings + ayar şifresi); geri dönüş aynı ucu `"false"` ile çağırmaktır. Yoklama aralığı `patronCloud.syncIntervalMinutes` (1–60 dk, varsayılan 5; aralık dışı değer varsayılana düşer).
+3. Ayar: `PUT /api/admin/settings/patronCloud.syncEnabled` `{"value":"true"}` (YALNIZ süperadmin oturumuyla — `admin:settings` 403 `SUPERADMIN_ONLY` alır; süperadmin ayar şifresinden muaf); geri dönüş aynı ucu `"false"` ile çağırmaktır. Yoklama aralığı `patronCloud.syncIntervalMinutes` (1–60 dk, varsayılan 5; aralık dışı değer varsayılana düşer).
 4. Telefondan yazma (okumadan en az bir hafta sonra): `PUT /api/admin/settings/patronCloud.inboxEnabled` `{"value":"true"}`; geri dönüş aynı uç `"false"`. Gelen kutusu aralığı `patronCloud.inboxIntervalSeconds` (20–600 sn, varsayılan 30). Adımlar: `docs/ops/PATRON-ESITLEME-KURULUM.md` § 6.
 
 ## Tuzaklar
@@ -97,7 +99,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ## Bekçiler
 
-Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
+Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_patron_cloud_switch_superadmin` · `test_password_policy_version` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
 Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_dogrulama_kodu` (doğrulama kodu isteğe bağlı · açıkken zorunlu · sızıntı yok · CLI kapatma) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
 
