@@ -122,8 +122,24 @@ model Facility {
 
   installations Installation[]
   accounts      Account[]
+  syncRequest   SyncRequest?
 
   @@map("facilities")
+}
+
+/// "Şimdi güncelle" işareti (2026-11-13) — tesis başına TEK satır. `pendingAt` bekleyen işaret (NULL = yok; fabrika
+/// `/v1/rapor/al` yanıtında atomik TÜKETİR), `acceptedAt` son kabul edilen istek (60 sn penceresi). Veri taşımaz.
+model SyncRequest {
+  id         String    @id @default(uuid()) @db.Uuid
+  tesisId    String    @unique @map("tesis_id") @db.Uuid
+  pendingAt  DateTime? @map("pending_at") @db.Timestamptz
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  facility Facility @relation(fields: [tesisId], references: [tesisId], onDelete: Restrict)
+
+  @@map("sync_requests")
 }
 
 /// Kurulum kaydı — imzalı isteği doğrulamak için fabrikanın açık anahtarı + aktiflik. Tek kaynak CLI

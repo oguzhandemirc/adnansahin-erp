@@ -82,7 +82,7 @@ async function main(): Promise<void> {
       "src/lib/cloud-signing/parmak-izi.ts": "8e9de778bab11815b6ae2e13ecfaaaf2ac94cba1639fbb114f62e2214723b1e6",
       "src/lib/cloud-signing/belgeler.ts": "336593a378b06aaadfa0c88b90542b90385b81c1ac5b998f419f00fe0e8d357f",
       "src/lib/cloud-signing/istek.ts": "09dbf16ef7e8e43456ff69bd5072933dd291df4fe9486d34f91d0fe6efa5d865",
-      "src/cloud-sync/wire/esitleme.ts": "bcc2c8cca83a7bee6c81f428e7dbe7c2b28e0a4906e087c2ea43ab56f97ea923",
+      "src/cloud-sync/wire/esitleme.ts": "8cf2612489af1a05b36b1e1cc61844de10ff05a6c4a2ef28c1354084c29ce2ee",
     };
     for (const [f, h] of Object.entries(SEAL)) {
       const got = createHash("sha256").update(readFileSync(path.join(ROOT, f))).digest("hex");

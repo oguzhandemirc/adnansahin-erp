@@ -299,5 +299,6 @@ export async function facilityStatus(ctx: CloudContext, s: SessionContext): Prom
       : null,
     hizmet: OPEN_SERVICE,
     liste: LIST_CAPABILITIES,
+    simdiGuncelle: true,
   };
 }

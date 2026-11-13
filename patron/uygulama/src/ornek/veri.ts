@@ -38,6 +38,7 @@ export function ornekOturum(): FacilityStatus {
       siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])),
       uyelikSuzgecleri: { cariKartId: ["is-emri"], siparisId: ["is-emri"], fasonFirmaId: ["is-emri"] },
     },
+    simdiGuncelle: true,
   };
 }
 

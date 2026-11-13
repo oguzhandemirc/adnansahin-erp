@@ -6,6 +6,7 @@ import type { z } from "zod";
 import { PROTOCOL_VERSION, REQUEST_HEADER, isPlainObject } from "../lisans-protokol";
 import { CloudError, badRequest } from "../lib/errors";
 import type { CloudContext } from "../services/context";
+import type { DoorbellTopic } from "../services/doorbell";
 import { claimInbox, recordInboxResults } from "../services/inbox.service";
 import { authenticateFactory, type FactoryCaller } from "../services/installation-auth";
 import { claimReports, recordReportResult } from "../services/report.service";
@@ -15,6 +16,7 @@ import {
   InboxClaimRequestSchema,
   InboxResultRequestSchema,
   MAX_COMPRESSED_BYTES,
+  REPORT_CLAIM_HOLD_MS,
   ReportClaimRequestSchema,
   ReportResultRequestSchema,
   SYNC_PATHS,
@@ -22,6 +24,9 @@ import {
 } from "../wire/esitleme";
 import { rateLimit } from "./rate-limit";
 import { readRawBody } from "./raw-body";
+
+/** Rapor yoklamasını erken döndüren ziller: yeni rapor isteği ve "Şimdi güncelle" işareti (`ozet` DEĞİL). */
+const CLAIM_WAKE_TOPICS: readonly DoorbellTopic[] = ["rapor", "esitleme"];
 
 interface FactoryRequest {
   readonly caller: FactoryCaller;
@@ -83,7 +88,27 @@ export function createFactoryRouter(ctx: CloudContext): Router {
 
   router.post(SYNC_PATHS.REPORT_CLAIM.replace("/v1", ""), async (req: Request, res: Response) => {
     const r = await authenticated(ctx, req, SYNC_PATHS.REPORT_CLAIM);
-    res.json(await claimReports(ctx, r.caller, strictJson(ReportClaimRequestSchema, r, req), r.nowMs));
+    const body = strictJson(ReportClaimRequestSchema, r, req);
+    // Uzun yoklama ("Şimdi güncelle", 2026-11-13): dinleyici claim'den ÖNCE açılır (arada çalan zil kaybolmaz);
+    // boş yanıt en çok `REPORT_CLAIM_HOLD_MS` bekler, yeni rapor isteği ya da işaret gelince claim BİR kez daha koşar.
+    // Fabrika bağlantıyı kapatırsa ikinci claim koşmaz (işaret/istek bir sonraki yoklamaya kalır).
+    const listener = ctx.doorbell.listen?.(r.caller.tesisId, CLAIM_WAKE_TOPICS) ?? null;
+    try {
+      let out = await claimReports(ctx, r.caller, body, r.nowMs);
+      if (listener) {
+        if ((out.istekler ?? []).length === 0 && !out.esitlemeIstegi) {
+          const gone = new AbortController();
+          res.on("close", () => gone.abort());
+          const rang = await listener.wait(REPORT_CLAIM_HOLD_MS, gone.signal);
+          if (gone.signal.aborted) return;
+          if (rang) out = await claimReports(ctx, r.caller, body, ctx.now());
+        }
+        out = { ...out, uzunYoklama: true };
+      }
+      res.json(out);
+    } finally {
+      listener?.close();
+    }
   });
 
   router.post(SYNC_PATHS.REPORT_RESULT.replace("/v1", ""), async (req: Request, res: Response) => {

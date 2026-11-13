@@ -25,6 +25,7 @@ import type {
   CustomerSummaryResponse,
   Snapshot,
   SnapshotRefresh,
+  SyncNowResponse,
   TestNotificationResult,
   ListSortDir,
   ViewPrefKey,
@@ -45,6 +46,8 @@ export const ENDPOINTS = {
   /** M2a: `cari-ozeti` anlığından tek müşteri; anlık hiç gelmediyse 404. */
   customerSummary: ["get", "/cari-ozeti/:cariKartId"],
   refresh: ["post", "/tazele"],
+  /** "Şimdi güncelle": tesis başına tek işaret; yalnız `/oturum` `simdiGuncelle` beyan eden sunucuda var. */
+  syncNow: ["post", "/esitleme/simdi"],
   inboxCreate: ["post", "/gelen-kutusu"],
   inboxList: ["get", "/gelen-kutusu"],
   inboxGet: ["get", "/gelen-kutusu/:mesajId"],
@@ -114,6 +117,8 @@ export function createApi(c: ApiClient) {
     customerSummary: (cariKartId: string) => c.get<CustomerSummaryResponse>(pathOf("customerSummary", { cariKartId })),
     /** Ekran açılınca `ozet` zili (S47) — içerik taşımaz; aralığa saygı `lib/refresh.ts`te. */
     refresh: () => c.post<SnapshotRefresh>(pathOf("refresh"), {}),
+    /** "Şimdi güncelle" — fabrikaya eşitleme işareti (veri taşımaz); ekranda yalnız sunucu beyan ettiyse çağrılır. */
+    syncNow: () => c.post<SyncNowResponse>(pathOf("syncNow"), {}),
     inboxCreate: (mesajId: string, tur: InboxItemKind, govde: OrderMessageBody | CustomerMessageBody) =>
       c.post<InboxItem>(pathOf("inboxCreate"), { mesajId, tur, govde }),
     inboxList: (p: { durum?: InboxStatus; imlec?: string; limit?: number } = {}) => c.get<Page<InboxItem>>(pathOf("inboxList"), p),

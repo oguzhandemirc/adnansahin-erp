@@ -13,6 +13,7 @@ import { reportEligibility, type ReportEligibility } from "../cloud-sync/eligibi
 import { cloudContext, cloudPost, egressCloudTransport, type CloudTransport } from "../cloud-sync/cloud-client";
 import { computeReportResult, REPORT_TIMEOUT_MS, sendReportResult } from "../cloud-sync/report-requests";
 import { ENVELOPE_VERSION, ReportClaimResponseSchema, ReportResultRequestSchema, SYNC_PATHS, type ReportResult } from "../cloud-sync/wire";
+import { triggerCloudSyncNow } from "./cloud-sync.job";
 
 const STARTUP_DELAY_MS = 25 * 1000;
 /** Bir turda en çok bu kadar istek (sırayla, her biri ayrı `al`) — claim süresi taze kalsın. */
@@ -21,6 +22,12 @@ export const REPORTS_PER_TICK = 3;
 export const MAX_REPORT_ATTEMPTS = 3;
 export const REPORT_BACKOFF_MAX_MS = 10 * 60 * 1000;
 const ATTEMPT_MAP_MAX = 1000;
+/**
+ * Uzun yoklama beyan eden bulutta ("Şimdi güncelle", 2026-11-13) bir sonraki yoklama kısa aralıkla gelir; ama iki tur
+ * BAŞLANGICI arası en az `LONG_POLL_MIN_CYCLE_MS` — bulut beklemeden dönse bile yoklama dakikada ≤ 6 kalır.
+ */
+export const LONG_POLL_GAP_MS = 2_000;
+export const LONG_POLL_MIN_CYCLE_MS = 10_000;
 
 export type ReportRunStatus = "KAPALI" | "BASARILI" | "BASARISIZ" | "MESGUL";
 export interface ReportRunResult {
@@ -30,6 +37,8 @@ export interface ReportRunResult {
   /** Gönderilen sonuçlar (HAZIR | HATA) — gönderimi başarısız olanlar dahil değil. */
   readonly sent: readonly ReportResult[];
   readonly failedSend: number;
+  /** Bulut son yanıtta uzun yoklama beyan etti (eski bulut: false ⇒ bugünkü aralık). */
+  readonly longPoll: boolean;
 }
 
 let started = false;
@@ -38,6 +47,7 @@ let timer: NodeJS.Timeout | null = null;
 let transport: CloudTransport = egressCloudTransport;
 let eligibilityFn: () => Promise<ReportEligibility> = () => reportEligibility();
 let timeoutMs = REPORT_TIMEOUT_MS;
+let onSyncNow: () => unknown = () => triggerCloudSyncNow();
 let failures = 0;
 let lastWarn: string | null = null;
 const attempts = new Map<string, number>();
@@ -48,7 +58,24 @@ function warnOnce(text: string): void {
   uyari("patron-bulut", text);
 }
 
-const empty = (status: ReportRunStatus, reason: string | null = null): ReportRunResult => ({ status, reason, claimed: 0, sent: [], failedSend: 0 });
+const empty = (status: ReportRunStatus, reason: string | null = null): ReportRunResult => ({ status, reason, claimed: 0, sent: [], failedSend: 0, longPoll: false });
+
+/** "Şimdi güncelle" işareti: eşitleme işine iletilir; hatası rapor turunu da fabrikanın yazmasını da DURDURMAZ. */
+function relaySyncNow(): void {
+  try {
+    const r = onSyncNow();
+    if (r === "YAKIN_ZAMANDA") bilgi("patron-bulut", "patron \"şimdi güncelle\" istedi — son turdan 60 sn geçmedi, tur tetiklenmedi");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    warnOnce(`"şimdi güncelle" iletilemedi (${msg.replace(/\s+/g, " ").slice(0, 200)})`);
+  }
+}
+
+/** Bir sonraki rapor turunun gecikmesi: hata → geri çekilme (çağıran); uzun yoklama → kısa; aksi hâlde ayar aralığı. */
+export function nextReportDelayMs(r: Pick<ReportRunResult, "status" | "longPoll">, intervalMs: number, tickElapsedMs: number): number {
+  if (r.status !== "BASARILI" || !r.longPoll) return intervalMs;
+  return Math.max(LONG_POLL_GAP_MS, LONG_POLL_MIN_CYCLE_MS - tickElapsedMs);
+}
 
 /** Tek tur: ön koşul → (≤ `REPORTS_PER_TICK` kez) tek istek `al` → hesapla → `sonuc`. Asla fırlatmaz. */
 export async function runCloudReportsOnce(): Promise<ReportRunResult> {
@@ -61,11 +88,14 @@ export async function runCloudReportsOnce(): Promise<ReportRunResult> {
     const sent: ReportResult[] = [];
     let claimed = 0;
     let failedSend = 0;
+    let longPoll = false;
     for (let i = 0; i < REPORTS_PER_TICK; i++) {
       const res = await cloudPost(ctx, SYNC_PATHS.REPORT_CLAIM, { v: ENVELOPE_VERSION, enFazla: 1 }, { gzip: false });
-      if (!res.ok) return { status: "BASARISIZ", reason: res.code, claimed, sent, failedSend };
+      if (!res.ok) return { status: "BASARISIZ", reason: res.code, claimed, sent, failedSend, longPoll: false };
       const env = ReportClaimResponseSchema.safeParse(res.json);
-      if (!env.success) return { status: "BASARISIZ", reason: "YANIT_GECERSIZ", claimed, sent, failedSend };
+      if (!env.success) return { status: "BASARISIZ", reason: "YANIT_GECERSIZ", claimed, sent, failedSend, longPoll: false };
+      longPoll = env.data.uzunYoklama === true;
+      if (env.data.esitlemeIstegi === true) relaySyncNow();
       const req = env.data.istekler[0];
       if (!req) break;
       claimed++;
@@ -97,11 +127,11 @@ export async function runCloudReportsOnce(): Promise<ReportRunResult> {
         }
         attempts.set(req.istekId, n);
         // Sonuç kaybolursa claim süresi dolunca bulut isteği yeniden verir; sayaç sonsuz döngüyü keser.
-        return { status: "BASARISIZ", reason: s.code, claimed, sent, failedSend };
+        return { status: "BASARISIZ", reason: s.code, claimed, sent, failedSend, longPoll: false };
       }
     }
     if (claimed > 0) bilgi("patron-bulut", `rapor isteği: ${claimed} üstlenildi · ${sent.length} sonuç gönderildi`);
-    return { status: "BASARILI", reason: null, claimed, sent, failedSend };
+    return { status: "BASARILI", reason: null, claimed, sent, failedSend, longPoll };
   } catch (err) {
     const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     warnOnce(`rapor isteği turu hata verdi (${msg.replace(/\s+/g, " ").slice(0, 240)})`);
@@ -112,6 +142,7 @@ export async function runCloudReportsOnce(): Promise<ReportRunResult> {
 }
 
 async function tick(): Promise<number> {
+  const startedAt = Date.now();
   const r = await runCloudReportsOnce();
   const e = await eligibilityFn().catch(() => null);
   const intervalMs = e && e.ok ? e.reportIntervalSeconds * 1000 : 5 * 60 * 1000;
@@ -125,7 +156,7 @@ async function tick(): Promise<number> {
     failures = 0;
     lastWarn = null;
   }
-  return intervalMs;
+  return nextReportDelayMs(r, intervalMs, Date.now() - startedAt);
 }
 
 function schedule(delayMs: number): void {
@@ -167,12 +198,14 @@ export function __configureCloudReportsForTests(p: {
   transport?: CloudTransport;
   eligibility?: () => Promise<ReportEligibility>;
   timeoutMs?: number;
+  onSyncNow?: () => unknown;
   reset?: boolean;
 }): void {
   if (p.reset) {
     transport = egressCloudTransport;
     eligibilityFn = () => reportEligibility();
     timeoutMs = REPORT_TIMEOUT_MS;
+    onSyncNow = () => triggerCloudSyncNow();
     failures = 0;
     lastWarn = null;
     attempts.clear();
@@ -180,6 +213,7 @@ export function __configureCloudReportsForTests(p: {
   if (p.transport) transport = p.transport;
   if (p.eligibility) eligibilityFn = p.eligibility;
   if (p.timeoutMs !== undefined) timeoutMs = p.timeoutMs;
+  if (p.onSyncNow) onSyncNow = p.onSyncNow;
 }
 
 /** Test kancası: zamanlayıcı kurulu mu (ön koşul kapalıyken hiç kurulmamalı). */

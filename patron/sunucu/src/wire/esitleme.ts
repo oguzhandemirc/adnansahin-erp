@@ -320,8 +320,23 @@ export const ReportClaimResponseSchema = z.object({
     .array(z.object({ istekId: Uuid, raporAnahtari: z.string().max(80), parametreler: z.record(z.string(), z.unknown()).default({}), olusturulma: Iso.optional() }))
     .max(REPORT_CLAIM_MAX)
     .default([]),
+  /**
+   * "Şimdi güncelle" işareti (2026-11-13): patron telefondan istedi; bulut tesisin TEK bekleyen işaretini bu yanıtta
+   * TÜKETİR (atomik). Fabrika eşitleme turunu hemen tetikler — son turdan `SYNC_NOW_MIN_GAP_MS` geçtiyse. Eski bulut
+   * göndermez, eski fabrika yok sayar (yanıt GEVŞEK).
+   */
+  esitlemeIstegi: z.boolean().optional().catch(undefined),
+  /**
+   * Bulut boş yanıtı bekletir (uzun yoklama, en çok `REPORT_CLAIM_HOLD_MS`): yeni rapor isteği ya da işaret gelince
+   * hemen döner. Beyan eden buluta fabrika kısa aralıkla yeniden sorar; eski bulut göndermez ⇒ bugünkü aralık.
+   */
+  uzunYoklama: z.boolean().optional().catch(undefined),
 });
 export type ReportClaimResponse = z.input<typeof ReportClaimResponseSchema>;
+/** Uzun yoklamada bulutun boş rapor yanıtını en çok bekletme süresi (fabrika istemcisinin 60 sn zaman aşımının altında). */
+export const REPORT_CLAIM_HOLD_MS = 20_000;
+/** "Şimdi güncelle": bulutta kabul edilen iki işaret ve fabrikada tetiklenen iki tur arası en az (yük ≤ 1/dk). */
+export const SYNC_NOW_MIN_GAP_MS = 60_000;
 
 /** Standart görüntünün dönemi; isteğe bağlı raporda ve kesit raporda `null`. */
 export const REPORT_PERIODS = ["bugun", "bu-ay", "gecen-ay"] as const;

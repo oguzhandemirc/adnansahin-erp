@@ -1,7 +1,8 @@
 // Örnek veri istemcisi: `ApiClient`in yerine oturur (endpoints/kancalar aynen çalışır), ağa hiç çıkmaz.
 // Okumalar `veri.ts`ten gelir; yazmalar reddedilir. Kısa gecikme iskelet ve yenileme durumlarını gösterir.
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
-import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT } from "../api/wire";
+import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, type SyncNowResponse } from "../api/wire";
+import { SYNC_NOW_GAP_MS } from "../lib/simdi-guncelle";
 import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
 
 const GECIKME_MS = 350;
@@ -112,12 +113,23 @@ function oku(path: string, q: Query | undefined): unknown {
   throw yok();
 }
 
+/** "Şimdi güncelle" önizlemesi: bulutun 60 sn penceresini taklit eder; fabrika yok, veri değişmez. */
+let ornekSonKabul = 0;
+export function ornekSimdiGuncelle(nowMs: number): SyncNowResponse {
+  if (nowMs - ornekSonKabul >= SYNC_NOW_GAP_MS) {
+    ornekSonKabul = nowMs;
+    return { durum: "BEKLIYOR", sonrakiMumkun: new Date(nowMs + SYNC_NOW_GAP_MS).toISOString() };
+  }
+  return { durum: "YAKIN_ZAMANDA", sonrakiMumkun: new Date(ornekSonKabul + SYNC_NOW_GAP_MS).toISOString() };
+}
+
 function yaz(path: string): unknown {
   if (path === "/oturum/ac") return ornekGiris();
   if (path === "/oturum/kapat") return null;
   // Kurulum adımı gösterilebilsin diye örnek anahtar (RFC 6238 örneği; gerçek bir hesaba bağlı değil); onay yazılmaz.
   if (path === "/oturum/dogrulama/baslat") return { totpSirri: "JBSWY3DPEHPK3PXP", otpauth: "otpauth://totp/Adnan%20%C5%9Eahin%20Y%C3%B6netim:ornek.patron?secret=JBSWY3DPEHPK3PXP&issuer=Adnan%20%C5%9Eahin%20Y%C3%B6netim&algorithm=SHA1&digits=6&period=30" };
   if (path === "/tazele") return { zil: false, sonrakiMs: 60_000 };
+  if (path === "/esitleme/simdi") return ornekSimdiGuncelle(Date.now());
   throw new ApiError(403, "ORNEK_VERI", "Örnek veri kipinde fabrikaya yazılmaz");
 }
 

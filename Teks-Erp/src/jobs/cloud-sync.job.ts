@@ -13,6 +13,7 @@ import { egressCloudTransport, type CloudTransport } from "../cloud-sync/cloud-c
 import { runSyncRound, type RoundDeps, type RoundOutcome } from "../cloud-sync/sync-round";
 import { pruneSyncMarks } from "../cloud-sync/marks-pruning";
 import { loadWatermarks, saveWatermarks, wmKey } from "../cloud-sync/watermarks";
+import { SYNC_NOW_MIN_GAP_MS } from "../cloud-sync/wire";
 
 const TICK_MS = 60 * 1000;
 const STARTUP_DELAY_MS = 30 * 1000;
@@ -49,6 +50,9 @@ let forceReconcileOnce = false;
 let lastPruneYmd: string | null = null;
 /** Son başarılı anlık hesabı (bellekte; yeniden başlatmada ilk tur hepsini hesaplar). */
 let lastSnapshotAt = 0;
+/** "Şimdi güncelle": son tetiklenen tur (bellekte) ve bir sonraki turda anlıkların aralık beklemeden hesaplanması. */
+let lastSyncNowAt = 0;
+let forceSnapshotsOnce = false;
 /** Aynı hata metni art arda yazılmaz (geri çekilmede her tık aynı satırı basmasın). */
 let lastWarn: string | null = null;
 let status: Omit<CloudSyncStatus, "running" | "consecutiveFailures" | "nextDueAt" | "lastSnapshotAt"> = {
@@ -118,7 +122,8 @@ async function tickBody(nowMs: number): Promise<void> {
   const deps: RoundDeps = { transport, nowMs: () => nowMs, eligibility: async () => elig, onPacket };
   if (nowMs >= nextDueAt) {
     // Anlıklar aralık başına EN ÇOK bir kez hesaplanır (devam turları — `more` — yeniden hesaplamaz).
-    const snapshots = nowMs - lastSnapshotAt >= intervalMs;
+    const snapshots = forceSnapshotsOnce || nowMs - lastSnapshotAt >= intervalMs;
+    forceSnapshotsOnce = false;
     const o = await runSyncRound({ kind: "ARTIMLI", snapshots }, deps);
     remember(o, nowMs);
     if (snapshots && o.status !== "HATA") lastSnapshotAt = nowMs;
@@ -192,6 +197,27 @@ export function stopCloudSync(): void {
   bilgi("patron-bulut", "eşitleme işi durdu");
 }
 
+export type SyncNowResult = "TETIKLENDI" | "YAKIN_ZAMANDA" | "KAPALI" | "MESGUL";
+
+/**
+ * "Şimdi güncelle" (2026-11-13): patron işareti rapor yoklamasının yanıtında geldi — eşitleme turunu (anlıklar dahil)
+ * HEMEN koştur. İş kurulu değilse (kapatma düğmesi/ön koşul kapalı) hiçbir şey yapmaz; son tur ya da son tetikten bu
+ * yana `SYNC_NOW_MIN_GAP_MS` (60 sn) geçmediyse tetiklemez (bulut ele geçse bile yük ≤ 1/dk). Tur yine ön koşulu
+ * sorar ve hatası dışarı sızmaz (`runCloudSyncTick`). Asla fırlatmaz; beklemez.
+ */
+export function triggerCloudSyncNow(nowMs: number = Date.now()): SyncNowResult {
+  if (!started) return "KAPALI";
+  if (inFlight) return "MESGUL";
+  const last = Math.max(status.lastRoundAt ?? 0, lastSyncNowAt);
+  if (nowMs - last < SYNC_NOW_MIN_GAP_MS) return "YAKIN_ZAMANDA";
+  lastSyncNowAt = nowMs;
+  nextDueAt = 0;
+  forceSnapshotsOnce = true;
+  schedule(0);
+  bilgi("patron-bulut", "patron \"şimdi güncelle\" istedi — eşitleme turu öne alındı");
+  return "TETIKLENDI";
+}
+
 /** Test/ölçüm kancası: zamanlayıcıyı beklemeden tur; taşıma/ön koşul/paket gözlemcisi enjekte edilir. */
 export function __configureCloudSyncForTests(p: {
   transport?: CloudTransport;
@@ -211,6 +237,9 @@ export function __configureCloudSyncForTests(p: {
     lastSnapshotAt = 0;
     lastReconcileAttemptAt = 0;
     lastWarn = null;
+    lastSyncNowAt = 0;
+    forceSnapshotsOnce = false;
+    status = { ...status, lastRoundAt: null, lastOutcome: null };
   }
   if (p.transport) transport = p.transport;
   if (p.eligibility) eligibilityFn = p.eligibility;

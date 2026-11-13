@@ -86,6 +86,18 @@ export interface FacilityStatus {
   readonly hizmet: ServiceStatus;
   /** Eski sunucu göndermez: yoksa kimlik süzgeci ve yeni aramalar YOK sayılır (eski sunucu tanımadığı parametreyi yok sayar). */
   readonly liste?: ListCapabilities;
+  /** `POST /esitleme/simdi` ucunun beyanı ("Şimdi güncelle", 2026-11-13); eski sunucu göndermez ⇒ istemci eylemi gizler. */
+  readonly simdiGuncelle?: boolean;
+}
+
+/**
+ * `POST /esitleme/simdi` — "Şimdi güncelle". Tesis başına TEK bekleyen işaret: `BEKLIYOR` = işaret açık (yeni açıldı ya
+ * da zaten bekliyordu; fabrika bir sonraki yoklamasında alıp eşitler); `YAKIN_ZAMANDA` = son kabul edilen istekten bu
+ * yana 60 sn dolmadı, yeni işaret açılmadı. `sonrakiMumkun` yeni işaretin açılabileceği an (ISO). Veri taşımaz.
+ */
+export interface SyncNowResponse {
+  readonly durum: "BEKLIYOR" | "YAKIN_ZAMANDA";
+  readonly sonrakiMumkun: string;
 }
 
 // ---------------------------------------------------------------- dışa aktarma (Ek-6/A §4.2)

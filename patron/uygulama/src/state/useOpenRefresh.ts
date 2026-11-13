@@ -16,9 +16,9 @@ export const AFTER_DOORBELL_MS: readonly number[] = [3_000, 6_000, 10_000];
  * Zil sonrası takip: her adımda `check()` yeni damgayı döner; `before`dan farklıysa `onChanged` bir kez çağrılır ve
  * kalan adımlar iptal edilir. Dönen fonksiyon odak kaybında bekleyenleri iptal eder.
  */
-export function followDoorbell(before: string | null, check: () => Promise<string | null>, onChanged: () => void): () => void {
+export function followDoorbell(before: string | null, check: () => Promise<string | null>, onChanged: () => void, steps: readonly number[] = AFTER_DOORBELL_MS): () => void {
   let done = false;
-  const timers = AFTER_DOORBELL_MS.map((ms) =>
+  const timers = steps.map((ms) =>
     setTimeout(() => {
       if (done) return;
       void check()

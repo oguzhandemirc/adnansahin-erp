@@ -14,6 +14,7 @@ import { deactivateDevice, listDevices, registerDevice } from "../services/devic
 import { requestSnapshotRefresh } from "../services/doorbell";
 import { cancelInbox, createInboxMessage, getInbox, listInbox } from "../services/inbox.service";
 import { cancelReportRequest, createReportRequest, getReportRequest, listReportRequests } from "../services/report.service";
+import { requestSyncNow } from "../services/sync-request.service";
 import { Token, body, page, param, s, sendFile, text, uuidCursor, written, type ApiCall, type ApiRouteDef } from "./api-route-kit";
 import { CHANGE_ROUTES } from "./change-routes";
 import { EXPORT_ROUTES } from "./export-routes";
@@ -86,6 +87,8 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
   { method: "get", path: `/veri/:${PROJECTION}/:id`, auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await getProjectionRecord(c.ctx, s(c), String(c.req.params[PROJECTION]), String(c.req.params.id)) }) },
   // Ekran açıkken tazeleme: `ozet` zili (§14 S47); içerik taşımaz, tesis başına 30 sn'de bir.
   { method: "post", path: "/tazele", auth: "OTURUM", kimlik: { muaf: "zil içerik taşımaz; tekrar yalnız fazladan anlık tur yaptırır (§6.5)" }, handler: async (c) => ({ data: requestSnapshotRefresh(c.ctx.doorbell, s(c).tesisId, c.ctx.now()) }) },
+  // "Şimdi güncelle" (2026-11-13): tesis başına tek bekleyen işaret; 60 sn içindeki istek yeni işaret açmaz. Veri taşımaz.
+  { method: "post", path: "/esitleme/simdi", auth: "OTURUM", kimlik: { muaf: "tesis başına tek işaret; tekrar aynı işareti görür (60 sn penceresi)" }, handler: async (c) => { body(c, z.strictObject({})); return { data: await requestSyncNow(c.ctx, s(c)) }; } },
   { method: "get", path: `/anlik/:${PROJECTION}`, auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await getSnapshot(c.ctx, s(c), String(c.req.params[PROJECTION])) }) },
   // M2a: cari özeti — `cari-ozeti` anlığından tek müşteri (izin anlığınkiyle aynı: `bulut:siparis:oku`).
   { method: "get", path: "/cari-ozeti/:cariKartId", auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await getCustomerSummary(c.ctx, s(c), String(c.req.params.cariKartId)) }) },

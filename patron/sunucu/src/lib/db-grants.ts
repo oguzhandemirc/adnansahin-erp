@@ -37,6 +37,8 @@ export const APP_GRANTS: Readonly<Record<string, readonly Privilege[]>> = {
   notifications: ["SELECT", "INSERT", "UPDATE", "DELETE"],
   projection_rows: ["SELECT"],
   sync_state: ["SELECT"],
+  // "Şimdi güncelle" işareti: hesap AÇAR (tesis başına tek satır, 60 sn penceresi); silinmez.
+  sync_requests: ["SELECT", "INSERT", "UPDATE"],
 };
 
 /** Fabrikanın yazdığı hesap kolonları — yalnız eşitleme rolü (`SYNC_COLUMN_GRANTS`); uygulama rolüne VERİLMEZ. */
@@ -82,6 +84,8 @@ export const SYNC_GRANTS: Readonly<Record<string, readonly Privilege[]>> = {
   account_audit: ["INSERT"],
   // Kurulum yönü (ilk yazan bağlar, bağ değişmez).
   installation_routes: ["SELECT", "INSERT"],
+  // "Şimdi güncelle" işaretini `/v1/rapor/al` yanıtında TÜKETİR (yalnız `pending_at` NULL'a çekilir).
+  sync_requests: ["SELECT", "UPDATE"],
 };
 
 /** Şemadaki bütün uygulama tabloları (bekçi: şema ↔ bu liste birebir). */
@@ -108,6 +112,7 @@ export const CLOUD_TABLES: readonly string[] = [
   "full_sync_runs",
   "request_nonces",
   "installation_routes",
+  "sync_requests",
 ];
 
 /** Kiracı verisi OLMAYAN tablolar: RLS TAŞIMAZ, yalnız rol yetkisiyle korunur (kurulum yönü). */
