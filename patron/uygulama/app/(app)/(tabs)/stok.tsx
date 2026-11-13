@@ -1,5 +1,6 @@
 // Stok — "ne var, kaç gündür duruyor": ham · yarı mamul · bitmiş (metre + top) · ölü stok uyarısı · yaş dağılımı ·
-// müşteri malı (emanet, PB1: `emanet-bakiye`) · ürün bazında tablo. Renk/depo kırılımı veride yok → çizilmez. Tek kaynak `stok-karnesi` (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
+// müşteri malı (emanet, PB1: `emanet-bakiye`) · kalem/top listesi (Ham | Bitmiş; anlık `stok-kalem`, `src/ui/stok`) · ürün bazında
+// tablo. Kutular ve ürün tablosu `stok-karnesi`nden (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
 // Ürün tablosu tek belgenin içidir (sayfasız, bulut sıralamaz/süzmez) → başlık sıralamasız, süzgeç/arama yok; yalnız sütun
 // seçimi profilde (`tablo.stok`).
 import { useMemo, useState, type ReactNode } from "react";
@@ -13,6 +14,7 @@ import { arr, num, obj, pct, qty, str } from "../../../src/ui/pano/read";
 import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { ConsignedSection } from "../../../src/ui/fason/FasonCards";
+import { StokKalemBolumu } from "../../../src/ui/stok/StokKalemBolumu";
 import { azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
 import { SutunSecici } from "../../../src/ui/tablo/Seciciler";
 import { useTabloTercihi } from "../../../src/ui/tablo/useTabloTercihi";
@@ -120,8 +122,12 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
 
       <ConsignedSection scorecardOzet={o} />
 
+      <KademeliGiris sira={3} style={s.blok}>
+        <StokKalemBolumu />
+      </KademeliGiris>
+
       {items.length > 0 ? (
-        <KademeliGiris sira={3}>
+        <KademeliGiris sira={4}>
           <UrunTablosu items={items} />
         </KademeliGiris>
       ) : null}

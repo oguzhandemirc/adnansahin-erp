@@ -107,4 +107,19 @@ describe("örnek veri istemcisi", () => {
   it("firma adları açıkça uydurma", () => {
     for (const r of ORNEK_LISTE()["cari-kart"]!) expect(String((r.kayit as { ad: string }).ad)).toMatch(/^(Örnek|Deneme|Numune|Taslak|Prova) /);
   });
+
+  it("stok kalem örneği: ürün adları uydurma; kalem satırı kendi toplarının toplamı", () => {
+    const { ORNEK_STOK_KALEM } = require("../src/ornek/veri") as typeof import("../src/ornek/veri");
+    const v = ORNEK_STOK_KALEM();
+    for (const b of [v.ham, v.bitmis]) {
+      expect(b.kalemler.length).toBeGreaterThan(0);
+      for (const k of b.kalemler) {
+        expect(k.urun).toMatch(/^(ÖRNEK|DENEME|NUMUNE|TASLAK|PROVA) /);
+        const t = b.toplar.filter((x) => x.kalem === k.anahtar);
+        expect(t).toHaveLength(k.top);
+        expect(Math.round(t.reduce((a, x) => a + x.metre, 0) * 10) / 10).toBe(k.metre);
+      }
+      expect(b.toplamTop).toBe(b.toplar.length);
+    }
+  });
 });

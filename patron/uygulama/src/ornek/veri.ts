@@ -108,6 +108,7 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
         { anahtar: "u4", etiket: "Taslak Kadife 140 cm", adet: 41, miktar: 9900, enEskiGun: 7, siparissizMiktar: 0 },
       ],
     },
+    "stok-kalem": ORNEK_STOK_KALEM(),
     "acik-siparis-karsilama": { ozet: { karsilanmaYuzde: 61.5, acikKalem: 24, gecikenKalem: 0 } },
     // Finans aileleri de katalogda; örnek hesapta finans izni yok → listelenmez (izinle süzülür).
     "rapor-katalogu": {
@@ -118,6 +119,42 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
         ["inventory/depo", "Depo"], ["inventory/scorecard", "Stok karnesi"], ["finance/alacaklar", "Alacaklar"], ["finance/aging", "Alacak yaşlandırma"],
       ].map(([anahtar, baslik]) => ({ anahtar, baslik, aile: anahtar!.split("/")[0], parametreler: ["dateFrom", "dateTo"] })),
     },
+  };
+}
+
+type OrnekKalem = { anahtar: string; urun: string; en: number | null; renk: string | null; kat: string | null; gunler: number[]; boy: number };
+
+/** Stok kalem anlığı (örnek): kalem satırları kendi toplarından toplanır ki iki görünüm aynı sayıyı versin. */
+function stokKalemBolumu(kalemler: OrnekKalem[], onEk: string) {
+  let sira = 0;
+  const toplar = kalemler.flatMap((k) =>
+    k.gunler.map((gun, i) => {
+      sira += 1;
+      const metre = Math.round((k.boy - i * 7.5 + (sira % 3) * 4.25) * 10) / 10;
+      return { id: `${onEk}-${sira}`, topNo: `${onEk.toUpperCase()}-${String(1000 + sira)}`, kalem: k.anahtar, metre, kg: null, parti: sira % 2 ? `P0${(sira % 9) + 1}` : null, depo: "Ana depo", gun };
+    }),
+  );
+  const satirlar = kalemler.map(({ gunler: _g, boy: _b, ...k }) => {
+    const t = toplar.filter((x) => x.kalem === k.anahtar);
+    return { ...k, top: t.length, metre: Math.round(t.reduce((a, x) => a + x.metre, 0) * 10) / 10, kg: null, enEskiGun: Math.max(...t.map((x) => x.gun)) };
+  });
+  return { toplamTop: toplar.length, toplamMetre: Math.round(toplar.reduce((a, x) => a + x.metre, 0) * 10) / 10, kalemler: satirlar, toplar };
+}
+
+export function ORNEK_STOK_KALEM() {
+  return {
+    ham: stokKalemBolumu([
+      { anahtar: "h1", urun: "ÖRNEK HAM SATEN", en: null, renk: null, kat: null, gunler: [3, 12, 12, 40], boy: 118 },
+      { anahtar: "h2", urun: "DENEME HAM KETEN", en: null, renk: null, kat: null, gunler: [1, 5, 95], boy: 132 },
+      { anahtar: "h3", urun: "NUMUNE HAM TÜL", en: null, renk: null, kat: null, gunler: [21, 33], boy: 104 },
+    ], "h"),
+    bitmis: stokKalemBolumu([
+      { anahtar: "b1", urun: "ÖRNEK SATEN", en: 280, renk: "KREM", kat: null, gunler: [2, 4, 9, 9, 15], boy: 46 },
+      { anahtar: "b2", urun: "ÖRNEK SATEN", en: 280, renk: "BEYAZ", kat: "2 Kat", gunler: [6, 31], boy: 38 },
+      { anahtar: "b3", urun: "DENEME KETEN", en: 150, renk: "GRİ", kat: null, gunler: [1, 3, 3], boy: 52 },
+      { anahtar: "b4", urun: "NUMUNE TÜL", en: 320, renk: "EKRU", kat: "4 Kat", gunler: [64, 120], boy: 27 },
+      { anahtar: "b5", urun: "TASLAK KADİFE", en: 140, renk: "BORDO", kat: null, gunler: [11], boy: 61.5 },
+    ], "b"),
   };
 }
 
