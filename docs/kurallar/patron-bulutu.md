@@ -62,6 +62,10 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Tel sözleşmesi yalnız EKLEYEREK genişler: var olan uç, alan, projeksiyon adı değişmez; yeni alan katalog sürümünü artırır. [inceleme]
 - Sözleşme genişletmesinde kurulum sırası önce bulut, sonra fabrikadır; eski bulut bilinmeyen projeksiyonu yalnız o girdide reddeder (tur KISMI, düşmez) ama reddedilen kayıt her turda baştan, anlık her aralıkta yeniden gönderilir. [inceleme]
 
+### Şimdi güncelle (2026-11-13, sözleşme istisnası)
+
+- Telefonun "şimdi güncelle" isteği veri taşımaz, yalnız tesis başına TEK işaret açar (60 sn içinde yenisi açılmaz); fabrika işareti KENDİ başlattığı imzalı rapor yoklamasının yanıtında alır (yeni bağlantı yönü yok) ve eşitleme turunu yalnız iş kuruluyken ve son tur/tetikten 60 sn geçtiyse tetikler; tetik hatası rapor turunu düşürmez, eski bulut/eski fabrika bugünkü davranışta kalır. [bekçi: test_patron_bulut_simdi_guncelle · patron/sunucu test_simdi_guncelle]
+
 ### Patron girişi (üyelik = Electron şifresi; bulut `patron/sunucu`, uygulama `patron/uygulama`)
 
 - Bulut TEK tesislidir ve hesap fabrikanın malıdır: patron, panelin (Electron) kullanıcı adı + parolasıyla girer; bulutta ve uygulamada hesap yaratma, davet, e-posta kimliği, parola değişimi, hesap silme ve tesis geçişi YOKTUR — parolayı fabrikadaki yönetici değiştirir. [bekçi: patron/sunucu test_hesap_acil_cli]
@@ -110,9 +114,9 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_patron_cloud_switch_superadmin` · `test_password_policy_version` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_patron_bulut_siparis_uretim` · `test_patron_bulut_simdi_guncelle` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
-Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_giris_fabrika_parolasi` (giriş · TOTP · kaba kuvvet · bayatlık) · `test_hesap_acil_cli` (acil CLI · üyelik sökümü) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
+Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_giris_fabrika_parolasi` (giriş · TOTP · kaba kuvvet · bayatlık) · `test_hesap_acil_cli` (acil CLI · üyelik sökümü) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` · `test_simdi_guncelle` (şimdi güncelle işareti · uzun yoklama) ve dizindeki diğer `test_*.ts`.
 
-Uygulama (`patron/uygulama`, `npx jest`): `__tests__/iki-adimli-dogrulama.test.tsx` (giriş adımları · hata cümleleri) · `__tests__/mirror.test.ts` (uç tablosu ↔ sunucu rotaları) · `__tests__/siparis-uretim.test.tsx` (sipariş Üretim sütunu · ayrıntıda iş emirleri yalnız `is-emri` üyelik süzgeci beyanlıysa).
+Uygulama (`patron/uygulama`, `npx jest`): `__tests__/iki-adimli-dogrulama.test.tsx` (giriş adımları · hata cümleleri) · `__tests__/mirror.test.ts` (uç tablosu ↔ sunucu rotaları) · `__tests__/siparis-uretim.test.tsx` (sipariş Üretim sütunu · ayrıntıda iş emirleri yalnız `is-emri` üyelik süzgeci beyanlıysa) · `__tests__/simdi-guncelle.test.tsx` (panodaki "Şimdi güncelle" yalnız `simdiGuncelle` beyanlıysa · geri bildirim cümleleri).
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 

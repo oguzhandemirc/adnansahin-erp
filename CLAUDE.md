@@ -31,7 +31,7 @@ Eklenecek (henüz yok): patron bulut sunucusu (Node, Adnan'a özel VDS) ve patro
 - **ALTIN KURAL:** telefondan yazmada insan onayı/denetim ekranı yoktur, kayıt doğrudan işlenir; ama telefon bayat veriyle iş yapamaz — fabrika TEK OTORİTE, kaydı işlerken güncel veriye karşı doğrular (ret + neden), çift gönderim tek kayıttır (`mesajId = clientToken`).
 - **Bulut hesap yapmaz;** her türev sayıyı fabrika hesaplar.
 - **Önce okuma canlıya,** yazma en az bir hafta sorunsuz izlemeden sonra; geri dönüş tek ayardır.
-- Yeni API/uygulama tasarlanmaz, mevcut patron sözleşmesine uyulur; bu kopyada sözleşme sürümü SABİT.
+- Yeni API/uygulama tasarlanmaz, mevcut patron sözleşmesine uyulur; bu kopyada sözleşme sürümü SABİT (istisna: telefondan "şimdi güncelle" isteği, 2026-11-13).
 
 ## Kapsam
 
