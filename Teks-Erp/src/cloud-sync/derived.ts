@@ -42,22 +42,26 @@ async function orderDerived(rows: readonly RawRow[], nowMs: number): Promise<Der
     where: { orderId: { in: ids(rows) } },
     select: { orderId: true, quantity: true, shippedQty: true, unit: true, cancelledAt: true },
   });
-  const byOrder = new Map<string, { open: Prisma.Decimal; count: number }>();
+  const byOrder = new Map<string, { open: Prisma.Decimal; total: Prisma.Decimal; count: number }>();
   for (const l of lines) {
-    const acc = byOrder.get(l.orderId) ?? { open: D0(), count: 0 };
+    const acc = byOrder.get(l.orderId) ?? { open: D0(), total: D0(), count: 0 };
     if (isActiveLine(l)) {
       acc.count++;
-      if (isMeasuredLine(l) && dec(l.quantity).gt(dec(l.shippedQty))) acc.open = acc.open.plus(dec(l.quantity).minus(dec(l.shippedQty)));
+      // `acikMiktar` ile `toplamMiktar` AYNI satır kapsamı (aktif ∧ ölçülen) — tek dal, kopya yok.
+      if (isMeasuredLine(l)) {
+        acc.total = acc.total.plus(dec(l.quantity));
+        if (dec(l.quantity).gt(dec(l.shippedQty))) acc.open = acc.open.plus(dec(l.quantity).minus(dec(l.shippedQty)));
+      }
     }
     byOrder.set(l.orderId, acc);
   }
   const customers = await displayNames("customer", rows.map((r) => r.customerId));
   const out: DerivedValues = new Map();
   for (const r of rows) {
-    const acc = byOrder.get(r.id) ?? { open: D0(), count: 0 };
+    const acc = byOrder.get(r.id) ?? { open: D0(), total: D0(), count: 0 };
     const open = isDeadlineOpenStatus(String(r.status));
     const late = open && daysPastDeadline(r.deadline as Date | null, nowMs) !== null;
-    out.set(r.id, { acikMiktar: acc.open, kalemSayisi: acc.count, gecikmis: late, acik: open, musteriAdi: customers.get(r.customerId as string) ?? null });
+    out.set(r.id, { acikMiktar: acc.open, toplamMiktar: acc.total, kalemSayisi: acc.count, gecikmis: late, acik: open, musteriAdi: customers.get(r.customerId as string) ?? null });
   }
   return out;
 }

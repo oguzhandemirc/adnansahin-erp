@@ -9,7 +9,8 @@
 //     iptal edilen iade dışarıda, en çok alınan ürünler miktar sırasında.
 //  §4 Panel eşitliği: aynı müşteri için panel servisleri (müşteri karnesi · iade karnesi · açık sipariş karşılama)
 //     aynı soruya AYNI sayıyı verir.
-//  §5 Kayıtlar: `iade` satırı ve siparişin `acik`ı katalog kurucusundan beklenen değerle çıkar.
+//  §5 Kayıtlar: `iade` satırı, siparişin `acik`ı ve `toplamMiktar`ı (aktif ∧ ölçülen satır Σ miktar) katalog kurucusundan
+//     beklenen değerle çıkar.
 //  §6 Kapalıyken yeni kod çalışmaz: kurucu yalnız anlık turundan (`snapshots.ts`) çağrılır.
 //  §7 Aynı fabrika günü içinde iki kurulum aynı içerik özetini verir (dönem sınırı gün içinde kaymaz).
 //
@@ -18,6 +19,8 @@
 //  S2 sevk metresinden iade düşüldü (net sevk) → 2 ✗: §3 brüt sevk + §4 müşteri karnesi eşitliği.
 //  S3 açık küme daraltıldı (`… && status === "APPROVED"`) → 2 ✗: §3 açık + §4 açık sipariş karşılama eşitliği.
 //  S4 son-12-ay başı fabrika gününe hizalanmadı (`now − 365 gün`) → 1 ✗: §7 (anlık her tur yeniden giderdi).
+//  (2026-11-13, `toplamMiktar`) S5 `derived.ts` toplam isMeasuredLine dalının dışına alındı (KG dahil) → 1 ✗: §5 toplam.
+//  S6 toplam isActiveLine dışına alındı (iptal kalem dahil) → 1 ✗: §5 toplam.
 // =============================================================================
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -110,7 +113,7 @@ async function main(): Promise<void> {
   check("`iade` kayıt projeksiyonu var (kök roll_returns)", iade?.root.table === "roll_returns");
   check("`cari-ozeti` anlığı katalogda", SNAPSHOT_PROJECTIONS.some((p) => p.name === "cari-ozeti"));
   const siparis = findRecordProjection("siparis");
-  check("siparişte `acik` türevi + katalog sürümü 2", !!siparis?.derived.some((d) => d.wire === "acik") && siparis?.catalogVersion === 2);
+  check("siparişte `acik` + `toplamMiktar` türevi + katalog sürümü 3", !!siparis?.derived.some((d) => d.wire === "acik") && !!siparis?.derived.some((d) => d.wire === "toplamMiktar") && siparis?.catalogVersion === 3);
   const iadeNames = iade ? [...iade.columns.map((c) => `${c.wire}←${c.source}`), ...iade.derived.map((d) => d.wire)] : [];
   check("iade: finans sözcüğü yok", iadeNames.length > 5 && !iadeNames.some((n) => FINANCE.test(n)), iadeNames.join(","));
   check("iade: serbest metin (reasonText/note) ve kişi (receivedById) GİTMEZ", iade !== undefined && !iade.columns.some((c) => ["reasonText", "note", "receivedById", "cancelReason"].includes(c.source)));
@@ -171,6 +174,10 @@ async function main(): Promise<void> {
       const orders = plain((await buildRecords(siparis, [ids.orderOpen, ids.orderOld, ids.orderCancelled], now.getTime())).rows.get("siparis") ?? []);
       const acik = (id: string) => (Array.isArray(orders) ? orders.find((o) => field(o, "id") === id) : undefined);
       check("sipariş `acik`: kısmi sevk true · tamamlanan false · iptal false", field(acik(ids.orderOpen), "acik") === true && field(acik(ids.orderOld), "acik") === false && field(acik(ids.orderCancelled), "acik") === false);
+      // Toplam = Σ quantity, aktif ∧ ölçülen satır (acikMiktar ile aynı kapsam): MT 300 + MT 80 = 380; iptal kalem MT 50 ve KG 20 hariç.
+      const num = (id: string, k: string) => Number(field(acik(id), k));
+      check("sipariş `toplamMiktar`: 380 (iptal kalem + ölçülmeyen birim hariç) · açık 280 · eski 40", num(ids.orderOpen, "toplamMiktar") === 380 && num(ids.orderOpen, "acikMiktar") === 280 && num(ids.orderOld, "toplamMiktar") === 40,
+        `${field(acik(ids.orderOpen), "toplamMiktar")}/${field(acik(ids.orderOpen), "acikMiktar")}/${field(acik(ids.orderOld), "toplamMiktar")}`);
     } else check("projeksiyonlar çözüldü", false);
 
     console.log("\n§6 Kapalıyken çalışmaz: kurucu yalnız anlık turundan çağrılır");

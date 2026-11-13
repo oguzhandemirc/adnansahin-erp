@@ -235,6 +235,10 @@ const DURUMLAR = ["APPROVED", "PARTIAL_SHIPPED", "PENDING", "APPROVED", "COMPLET
 export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
   const siparis = DURUMLAR.map((durum, i) => {
     const c = CARILER[i % 4]!;
+    // Fabrika türevleri tutarlı: açık + sevk ≤ toplam (iptalde sevk 0, açık 0; tamamlananda sevk = toplam).
+    const acikMiktar = durum === "COMPLETED" || durum === "CANCELLED" ? 0 : 2400 + i * 850;
+    const toplamMiktar = durum === "COMPLETED" ? 3000 + i * 500 : durum === "CANCELLED" ? 2000 : durum === "PARTIAL_SHIPPED" ? Math.round(acikMiktar / 0.55) : acikMiktar;
+    const sevkMiktari = durum === "CANCELLED" ? 0 : toplamMiktar - acikMiktar;
     return kayit(
       `s${i + 1}`,
       {
@@ -247,7 +251,9 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         yon: i % 4 === 3 ? "EXPORT" : "DOMESTIC",
         siparisTarihi: once(i * 3 + 1).slice(0, 10),
         termin: sonra(10 + i * 4),
-        acikMiktar: durum === "COMPLETED" || durum === "CANCELLED" ? 0 : 2400 + i * 850,
+        acikMiktar,
+        sevkMiktari,
+        toplamMiktar,
         kalemSayisi: 1 + (i % 3),
         tamamlanma: durum === "COMPLETED" ? 100 : durum === "PARTIAL_SHIPPED" ? 45 : 0,
       },
