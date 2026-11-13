@@ -7,7 +7,7 @@
 # `docker save | ssh … docker load` ile taşınır (kayıt deposu YOK).
 #
 #   sunucu — node dist/server.js (tek süreç, tek dinleyici: /v1 · /api · /saglik) · Prisma şema motoru +
-#            derlenmiş CLI'lar (göç · roller · tesis-db · tesis/ilk yönetici) aynı imajda, `goc` rolüyle koşar.
+#            derlenmiş CLI'lar (göç · roller · tek tesis CLI'si `tesis.js`) aynı imajda, `goc` rolüyle koşar.
 # Root OLMAYAN kullanıcı (10001); uygulama dosyaları root'a ait, compose kök FS'i salt okunur bağlar.
 # Taban imaj özetle sabit (ana ürün TeksERP@19aa48a9 ile aynı özet).
 # =============================================================================
@@ -29,11 +29,11 @@ RUN npx prisma generate \
  && npx prisma version \
  && npx tsc -p tsconfig.json \
  && npx tsc --ignoreConfig --outDir dist-cli --rootDir . --target es2022 --module commonjs --esModuleInterop \
-      --strict --skipLibCheck --resolveJsonModule --types node scripts/tesis.ts scripts/db-rolleri.ts scripts/tesis-db.ts \
+      --strict --skipLibCheck --resolveJsonModule --types node scripts/tesis.ts scripts/db-rolleri.ts \
  && npm prune --omit=dev --omit=optional \
  && test ! -e node_modules/typescript && test ! -e node_modules/tsx && test ! -e node_modules/eslint \
  && test -f dist/server.js \
- && test -f dist-cli/scripts/tesis.js && test -f dist-cli/scripts/db-rolleri.js && test -f dist-cli/scripts/tesis-db.js \
+ && test -f dist-cli/scripts/tesis.js && test -f dist-cli/scripts/db-rolleri.js \
  && ls node_modules/@prisma/engines | grep -q '^schema-engine-'
 
 FROM ${NODE_IMAGE} AS sunucu
@@ -53,8 +53,7 @@ ENV NODE_ENV=production \
     HOME=/tmp \
     CHECKPOINT_DISABLE=1 \
     PRISMA_HIDE_UPDATE_MESSAGE=1 \
-    ANAHTAR_DIZINI=/anahtarlar \
-    KURULUM_KAYNAGI=kayit
+    ANAHTAR_DIZINI=/anahtarlar
 USER 10001:10001
 EXPOSE 4620
 ENTRYPOINT ["/usr/local/bin/patron-baslat"]

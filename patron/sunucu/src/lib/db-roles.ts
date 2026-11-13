@@ -8,18 +8,25 @@ export const ident = (s: string): string => `"${s.replace(/"/g, '""')}"`;
 export const literal = (s: string): string => `'${s.replace(/'/g, "''")}'`;
 
 const ROLE_ATTRS = "LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT";
+/** ALTER'da yalnız süper kullanıcı OLMAYAN göç rolünün (CREATEROLE) değiştirebildiği özellikler: PG16+ SUPERUSER,
+ *  BYPASSRLS, CREATEDB, REPLICATION özelliğini — kapatmak için bile — yalnız o özelliği taşıyan rol değiştirebilir.
+ *  Onlar ALTER'dan sonra OKUNARAK doğrulanır (fail-closed). */
+const ALTER_ATTRS = "LOGIN NOCREATEROLE NOINHERIT";
 
-/** Çalışma rolü: yoksa CREATE, varsa ALTER (özellikler + parola hizalanır). */
+/** Çalışma rolü: yoksa CREATE (bütün özellikler), varsa ALTER (değiştirilebilen özellikler + parola) ve doğrulama. */
 export async function ensureLoginRole(client: Client, name: string, password: string): Promise<void> {
   const exists = await client.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [name]);
-  const verb = exists.rowCount === 0 ? "CREATE" : "ALTER";
+  const alter = (): Promise<unknown> => client.query(`ALTER ROLE ${ident(name)} WITH ${ALTER_ATTRS} PASSWORD ${literal(password)}`);
   try {
-    await client.query(`${verb} ROLE ${ident(name)} WITH ${ROLE_ATTRS} PASSWORD ${literal(password)}`);
+    if (exists.rowCount === 0) await client.query(`CREATE ROLE ${ident(name)} WITH ${ROLE_ATTRS} PASSWORD ${literal(password)}`);
+    else await alter();
   } catch (err) {
     // 42710 = yarışta öteki taraf az önce kurdu; ALTER ile hizala.
     if ((err as { code?: string }).code !== "42710") throw new Error(`${name} rolü kurulamadı (${(err as { code?: string }).code ?? "?"})`);
-    await client.query(`ALTER ROLE ${ident(name)} WITH ${ROLE_ATTRS} PASSWORD ${literal(password)}`);
+    await alter();
   }
+  const r = await client.query<{ guclu: boolean }>("SELECT rolsuper OR rolbypassrls OR rolcreatedb OR rolreplication AS guclu FROM pg_roles WHERE rolname = $1", [name]);
+  if (r.rows[0]?.guclu !== false) throw new Error(`${name} rolü süper kullanıcı/BYPASSRLS/CREATEDB/REPLICATION taşıyor — çalışma rolü olamaz; DB yöneticisi düzeltmeli`);
 }
 
 /** Tablo REVOKE'u kolon yetkilerini de geri alır (PG) ⇒ beyandan düşen yetki DB'de kalmaz. */

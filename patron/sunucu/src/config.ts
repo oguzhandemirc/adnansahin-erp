@@ -46,6 +46,10 @@ const EnvSchema = z
     GIRIS_ESIGI: positiveInt(3, 50).default(5),
     KILIT_DK: positiveInt(1, 1440).default(15),
     GIRIS_HIZ_DK: positiveInt(1, 1000).default(20),
+    /** Hesap API'si (/api/*) geneli IP başına dakikalık sınır (O8; telefon kullanımı dakikada onlarca istektir). */
+    API_HIZ_DK: positiveInt(30, 100000).default(600),
+    /** IP başına dakikada geçersiz Bearer çözümlemesi; aşılınca o IP'nin oturumlu istekleri DB'ye inmeden 429. */
+    OTURUM_RED_HIZ_DK: positiveInt(5, 10000).default(30),
     DAVET_GECERLILIK_SAAT: positiveInt(1, 720).default(72),
     /** Fabrika kanalı (/v1/*) IP başına dakikalık hız sınırı. */
     V1_HIZ_DK: positiveInt(10, 100000).default(600),

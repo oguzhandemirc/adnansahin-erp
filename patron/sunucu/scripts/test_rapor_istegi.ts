@@ -157,7 +157,8 @@ async function main(): Promise<void> {
     const goruyor = async (izinler: string[], id: string) =>
       withTesis(o.ctx.app, { tesisId: k.tesisId, projections: sessionProjections(effectivePermissions(izinler)) }, (tx) => tx.reportResult.findUnique({ where: { id } }));
     kontrol("§3e ⭐ RLS (uygulama rolü, ham kapsam): sipariş izniyle sevkiyat karnesi satırı 0 · sevkiyat izniyle 1", (await goruyor(["bulut:rapor:oku", "bulut:siparis:oku"], sonucId)) === null && (await goruyor(["bulut:rapor:oku", "bulut:sevkiyat:oku"], sonucId)) !== null);
-    const eskiId = await withTesis(o.goc, { tesisId: k.tesisId }, async (tx) =>
+    // RETURNING satırı SELECT politikasından geçer: göç rolü süper kullanıcı değilse (VDS) kapsam açıkça verilir.
+    const eskiId = await withTesis(o.goc, { tesisId: k.tesisId, projections: ["rapor.sales"] }, async (tx) =>
       (await tx.reportResult.create({ data: { tesisId: k.tesisId, reportKey: "sales/shipment-scorecard", projection: "rapor.sales", paramsDigest: "x".repeat(64), data: {}, computedAt: new Date(), sourceHorizon: new Date() } })).id,
     );
     kontrol(

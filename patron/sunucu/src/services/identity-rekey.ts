@@ -1,4 +1,4 @@
-// KİMLİK E-POSTA ÖZETİ YENİLEME (PATRON-TESIS-DB §6) — tesis DB anahtarı değişince merkez `identities.email_digest`
+// KİMLİK E-POSTA ÖZETİ YENİLEME — giriş dizini anahtarı (eski adıyla tesis DB anahtarı; tek DB) değişince `identities.email_digest`
 // değerleri bayatlar (giriş yeni anahtarla arar, bulamaz). Merkez düz e-posta tutmaz: özet üyelik satırından → tesis
 // DB'sindeki BAĞLI hesabın e-postasından → geçerli anahtarla yeniden hesaplanır. Bağsız kimlik bayat kalır (bakım
 // kapatır/siler). Parmak izi kaydı yok: "anahtar değişti" = bağlı kimliğin saklı özeti ≠ hesaplanan özet; aynı ölçüm

@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   const sync = new TesisDbRouter({ role: "esitleme", url: config.ESITLEME_DATABASE_URL, key });
   for (const router of [app, sync]) {
     const r = await roleBypassesRls(router.db);
-    if (r.bypass) throw new Error(`${router.db.label} rolü (${r.role}) RLS'i atlayabiliyor (süper kullanıcı/BYPASSRLS) — kiracı yalıtımı yok, açılış DURDU`);
+    if (r.bypass) throw new Error(`${router.db.label} rolü (${r.role}) RLS'i atlayabiliyor (süper kullanıcı/BYPASSRLS/tablo sahibi) — kiracı yalıtımı yok, açılış DURDU`);
   }
   const ctx: CloudContext = {
     config,

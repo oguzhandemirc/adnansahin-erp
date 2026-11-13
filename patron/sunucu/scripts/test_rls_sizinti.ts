@@ -259,7 +259,7 @@ function acilis(url: string): Promise<{ kod: number | null; cikti: string }> {
 async function acilisKapisi(o: Ortam): Promise<void> {
   console.log("\n§7 açılış kapısı");
   const kotu = await acilis(process.env.GOC_DATABASE_URL!);
-  kontrol("§7a RLS'i atlayabilen rol (göç = süper kullanıcı) ile sunucu KALKMAZ", kotu.kod === 1 && /RLS'i atlayabiliyor/.test(kotu.cikti), kotu.cikti.trim().split("\n").pop()?.slice(0, 100));
+  kontrol("§7a RLS'i atlayabilen rol (göç = tablo sahibi; süper kullanıcı olsun olmasın) ile sunucu KALKMAZ", kotu.kod === 1 && /RLS'i atlayabiliyor/.test(kotu.cikti), kotu.cikti.trim().split("\n").pop()?.slice(0, 100));
   const iyi = await acilis(o.ctx.config.DATABASE_URL);
   kontrol("§7b çalışma rolüyle sunucu kalkar", /PATRON_DINLIYOR/.test(iyi.cikti), iyi.cikti.trim().split("\n")[0]?.slice(0, 80));
 }

@@ -10,6 +10,7 @@
 
 - Adnan bulutu TEK veritabanı ve TEK tesislidir (ayıklama D4, 2026-11-13): tesis başına DB, merkez yönlendirme kataloğu, hazırlayıcı, imha ve destek rolü YOKTUR. `tesis-ac` kayıtlı başka tesis varken 409 `DURUM_CAKISMASI` verir. Bekçi `test_tek_veritabani`.
 - Hizmet SÜRESİZDİR (ayıklama D5, 2026-11-13): hizmet aşaması (salt okuma / kapalı), lisans sınıfı, modül hakkı, abonelik bitişi ve devir YOKTUR; tel sözleşmesindeki `hizmet` alanı sabit `{asama: ACIK, bitis: null, saltOkunurBitis: null}` döner. Fabrika kanalı kapısı = kurulum kaydı + açık anahtar + `active`; pasif kayıtta `/v1` 403 `KURULUM_IPTAL`, hesap yazmaları (gelen kutusu, rapor isteği) 403 `PATRON_BULUT_KAPALI`. Bekçiler `test_disa_aktarma` §1–§2, `test_esitleme_idempotency` §5j–§5l.
+- Göç rolü SÜPER KULLANICI DEĞİLDİR (ayıklama D6, 2026-11-13): üretimde `patron_goc` (`deploy/patron/db-init/10-goc-rolu.sh`); `db-roles.ts` süper kullanıcı gerektiren rol özelliklerini ALTER etmez, okuyarak doğrular. Sunucu RLS'i atlayabilen rolle de, tablo SAHİBİ rolle de KALKMAZ (`db.ts` `roleBypassesRls`; bekçi `test_rls_sizinti` §7a). `/api` geneli IP başına `API_HIZ_DK` (600/dk) + geçersiz Bearer kapısı `OTURUM_RED_HIZ_DK` (30/dk, aşılınca DB'ye inmeden 429); kenar hız sınırı Caddy'de değil sunucudadır (bekçi `test_api_hiz_siniri`).
 
 ## Komutlar
 

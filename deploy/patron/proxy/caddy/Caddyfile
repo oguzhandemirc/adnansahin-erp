@@ -1,0 +1,26 @@
+# Adnan VDS ters vekili — VDS /opt/adnan/proxy/caddy/Caddyfile bu dosyanın birebir kopyasıdır.
+# Dizin kapsayıcıya salt okunur bağlanır (/etc/caddy); dosyayı yerinde düzenle → validate → reload (README).
+# Alan adı ve e-posta repoya GİRMEZ: proxy/.env'den (PATRON_ALAN_ADI, ACME_EPOSTA).
+{
+	email {$ACME_EPOSTA}
+	# Yönetim ucu yalnız kapsayıcı içi (reload için); dışa açık değil.
+	admin localhost:2019
+}
+
+# Güvenlik başlıkları — her site bloğu `import guvenlik` ile alır. Yalnız JSON API sunulur (HTML yok), bu yüzden
+# CSP en dar hâlidir; HSTS 1 yıl (alt alan adı/preload bilinçli olarak YOK: başka alt alan adlarını bağlamasın).
+(guvenlik) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		Cross-Origin-Resource-Policy "same-origin"
+		Permissions-Policy "interest-cohort=()"
+		-Server
+		-Via
+	}
+}
+
+import /etc/caddy/patron.caddy

@@ -20,7 +20,7 @@ Patronun buluttaki OKUMA KOPYASI ve TEK yazma kanalı. **Bulut hesap yapmaz, fab
 ## Tek DB, tek tesis — roller
 
 - TEK veritabanı, TEK tesis: kiracı ve kimlik/yönlendirme tabloları aynı DB'de; tesis başına DB, merkez kataloğu, hazırlayıcı, imha ve destek rolü YOK. `tesis-ac` ikinci tesisi 409 ile reddeder (bekçi `test_tek_veritabani`). Bağlantı nesnesi `lib/tesis-db.ts`.
-- Göç rolü tablo sahibidir; sunucu bu rolle BAĞLANMAZ. Uygulama ve eşitleme rolleri NOBYPASSRLS (ad + parola `.env` URL'lerinde); yetkiler tek kaynak `src/lib/db-grants.ts` — yeni tablonun yetkisi AYNI dilimde girer. Sunucu RLS'i atlayabilen rolle KALKMAZ.
+- Göç rolü tablo sahibidir; sunucu bu rolle BAĞLANMAZ. Uygulama ve eşitleme rolleri NOBYPASSRLS (ad + parola `.env` URL'lerinde); yetkiler tek kaynak `src/lib/db-grants.ts` — yeni tablonun yetkisi AYNI dilimde girer. Sunucu RLS'i atlayabilen rolle ve tablo sahibi rolle KALKMAZ; göç rolü süper kullanıcı DEĞİLDİR (D6). `/api` hız sınırı sunucuda: `API_HIZ_DK` + `OTURUM_RED_HIZ_DK`.
 - `app.tesis_id` ayarsız bağlantıda sorgu HATA verir (fail-closed); `*` projeksiyon YASAK.
 
 ## Advisory kilit envanteri (patron DB'si — backend 80xx ve satıcı 91xx'ten bağımsız)

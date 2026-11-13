@@ -1,7 +1,7 @@
-// ÜYELİK — tek bulut kimliği (merkez `identities`: e-posta özeti + parola + TOTP) birden çok tesise üyelikle
-// (`login_routes`: kimlik → tesis + hesap) erişir. Üyeliğin ETKİNLİĞİ tesis DB'sinde sorulur: hesap AKTİF ve aynı
-// kimliğe bağlı olmalı (dizin bayatlayabilir; tesis DB'si tek doğruluk kaynağıdır). KİLİTLİ üyelik listede yoktur.
-// Tesis DB'si yoksa (imha) ya da hazır değilse üyelik görünmez — bir tesisin arızası öbürlerine girişi kesmez.
+// ÜYELİK — bulut kimliği (`identities`: e-posta özeti + parola + TOTP) tesise üyelikle (`login_routes`: kimlik → tesis +
+// hesap) erişir. Adnan'da TEK veritabanı ve TEK tesis vardır; "merkez"/"tesis DB'si" adları eski çok-DB düzeninden kalır
+// (kimlik dilimi "Electron şifresi" bu modeli yeniden yazacak). Üyeliğin ETKİNLİĞİ hesap satırında sorulur: hesap AKTİF ve
+// aynı kimliğe bağlı olmalı (dizin bayatlayabilir; hesap satırı tek doğruluk kaynağıdır). KİLİTLİ üyelik listede yoktur.
 import type { Identity, SessionCloseReason } from "@prisma/client";
 import type { Tx } from "../lib/db";
 import { CloudError } from "../lib/errors";

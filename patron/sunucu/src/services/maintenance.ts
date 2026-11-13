@@ -1,5 +1,5 @@
-// BAKIM İŞİ — süreç içi zamanlayıcı (dakikalık tik + günde bir budama). Tesis listesi merkezden (HAZIR tesis
-// DB'leri), her satır işi o tesisin DB'sinde ve kiracı kapsamında (RLS) koşar; bir tesisin hatası ötekini durdurmaz.
+// BAKIM İŞİ — süreç içi zamanlayıcı (dakikalık tik + günde bir budama). Tek veritabanı, tek tesis ("merkez" adları eski
+// çok-DB düzeninden kalır: kimlik/yönlendirme tabloları aynı DB'dedir); satır işi kiracı kapsamında (RLS) koşar.
 //   · Tik: süresi dolan claim'ler — gelen kutusu ISLENIYOR → BEKLIYOR (fabrikanın makbuzu tekrarı
 //     idempotent kılar); rapor HESAPLANIYOR → BEKLIYOR (bir kez), ikincide HATA `ZAMAN_ASIMI`;
 //     kapanıştan 30 gün geçen hesabın kimlik silmesi; merkez kimliğinin
