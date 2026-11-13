@@ -248,6 +248,11 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         siparisTarihi: once(i * 3 + 1).slice(0, 10),
         termin: sonra(10 + i * 4),
         acikMiktar: durum === "COMPLETED" || durum === "CANCELLED" ? 0 : 2400 + i * 850,
+        // Fabrikanın türettiği sevk ve toplam (m, brüt): toplam = sevk + açık (iptalde 0).
+        sevkMiktari: durum === "PARTIAL_SHIPPED" ? 1500 + i * 100 : durum === "COMPLETED" ? 3000 + i * 200 : 0,
+        toplamMiktar:
+          durum === "CANCELLED" ? 0
+          : (durum === "COMPLETED" ? 3000 + i * 200 : 2400 + i * 850) + (durum === "PARTIAL_SHIPPED" ? 1500 + i * 100 : 0),
         kalemSayisi: 1 + (i % 3),
         tamamlanma: durum === "COMPLETED" ? 100 : durum === "PARTIAL_SHIPPED" ? 45 : 0,
       },

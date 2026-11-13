@@ -15,7 +15,7 @@ import { arr, num, obj, pct, qty, str } from "../../../src/ui/pano/read";
 import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { StokKalemBolumu } from "../../../src/ui/stok/StokKalemBolumu";
-import { azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
+import { siganSutun as azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
 import { SutunSecici } from "../../../src/ui/tablo/Seciciler";
 import { useTabloTercihi } from "../../../src/ui/tablo/useTabloTercihi";
 import { AracDugmesi, TabloBasligi, TabloGovdesi, TabloSatiri } from "../../../src/ui/tablo/VeriTablosu";

@@ -49,10 +49,16 @@ export interface SuzgecGrubu {
 
 export const ANA = "ana";
 
-/** Telefon dikeyde en çok 4 sütun (390 pt'de her sütun ≥ ~80 pt, kesik yazı yok); geniş ekranda 7. */
+/** Ekrana SIĞAN sütun: telefon dikeyde 4 (390 pt'de her sütun ≥ ~80 pt), geniş ekranda 7. Fazlası yatay kaydırılır. */
 export const TELEFON_SUTUN = 4;
 export const GENIS_SUTUN = 7;
-export const azamiSutun = (genislik: number): number => (genislik >= 600 ? GENIS_SUTUN : TELEFON_SUTUN);
+export const siganSutun = (genislik: number): number => (genislik >= 600 ? GENIS_SUTUN : TELEFON_SUTUN);
+/** Seçilebilecek en çok sütun (sığmayanlar yatay kaydırmayla görünür). */
+export const AZAMI_SUTUN = 10;
+export const azamiSutun = (_genislik?: number): number => AZAMI_SUTUN;
+/** Yatay kipte sütun genişliği = ağırlık × birim (pt). */
+export const SUTUN_BIRIMI = 80;
+export const sutunGenisligi = (agirlik: number): number => Math.round(agirlik * SUTUN_BIRIMI);
 
 /** Başlığa dokununca: başka sütun → artan; artan → azalan; azalan → kapalı (sunucunun varsayılan sırası). */
 export function sonrakiSiralama(simdiki: Siralama | null, alan: string): Siralama | null {

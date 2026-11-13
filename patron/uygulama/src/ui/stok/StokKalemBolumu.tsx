@@ -14,7 +14,7 @@ import { qty } from "../pano/read";
 import { SnapshotGate } from "../pano/SnapshotGate";
 import { useSnapshot } from "../pano/useSnapshot";
 import { SegmentedControl } from "../SegmentedControl";
-import { azamiSutun, etkinSuzgecSayisi, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SutunTanimi } from "../tablo/model";
+import { siganSutun as azamiSutun, etkinSuzgecSayisi, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SutunTanimi } from "../tablo/model";
 import { SuzgecSecici, SutunSecici } from "../tablo/Seciciler";
 import { useTabloTercihi } from "../tablo/useTabloTercihi";
 import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri } from "../tablo/VeriTablosu";

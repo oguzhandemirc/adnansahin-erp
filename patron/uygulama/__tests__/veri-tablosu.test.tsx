@@ -76,8 +76,12 @@ describe("§1 saf model", () => {
     expect(M.sutunDegistir(["a", "b"], "a", 4)).toEqual(["b"]);
     expect(M.sutunTasi(["a", "b", "c"], "a", -1)).toEqual(["a", "b", "c"]);
     expect(M.sutunTasi(["a", "b", "c"], "a", 1)).toEqual(["b", "a", "c"]);
-    expect(M.azamiSutun(390)).toBe(M.TELEFON_SUTUN);
-    expect(M.azamiSutun(800)).toBe(M.GENIS_SUTUN);
+    expect(M.siganSutun(390)).toBe(M.TELEFON_SUTUN);
+    expect(M.siganSutun(800)).toBe(M.GENIS_SUTUN);
+    // Seçilebilen sütun sığandan fazladır; fazlası yatay kaydırılır.
+    expect(M.azamiSutun(390)).toBe(M.AZAMI_SUTUN);
+    expect(M.AZAMI_SUTUN).toBeGreaterThan(M.GENIS_SUTUN);
+    expect(M.sutunGenisligi(1.5)).toBe(120);
   });
 
   it("rozet etkin grup sayısıdır; aynı değere yeniden dokunmak seçimi kaldırır", () => {
@@ -109,24 +113,24 @@ describe("§1 saf model", () => {
 
 describe("§2 ekran: sıralama ve süzgeç SUNUCUDA", () => {
   it("başlığa dokunmak `sirala/yon` gönderir (artan → azalan → kapalı); satırlar sunucunun sırasıyla kalır", async () => {
-    mockList.mockResolvedValue(page(rec(ID2, { siparisNo: "SP-2", acikMiktar: 10, durum: "APPROVED" }), rec(ID1, { siparisNo: "SP-1", acikMiktar: 50, durum: "APPROVED" })));
+    mockList.mockResolvedValue(page(rec(ID2, { siparisNo: "SP-2", sevkMiktari: 10, durum: "APPROVED" }), rec(ID1, { siparisNo: "SP-1", sevkMiktari: 50, durum: "APPROVED" })));
     render(<Orders />);
     await settle();
     expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ sirala: undefined, yon: undefined }));
-    fireEvent.press(screen.getByTestId("siparis-sutun-acik"));
+    fireEvent.press(screen.getByTestId("siparis-sutun-sevkToplam"));
     await settle();
-    expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ sirala: "acikMiktar", yon: "artan" }));
-    expect(screen.getByTestId("siparis-ok-acik")).toBeTruthy();
+    expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ sirala: "sevkMiktari", yon: "artan" }));
+    expect(screen.getByTestId("siparis-ok-sevkToplam")).toBeTruthy();
     // İstemci yeniden sıralamaz: sunucu ne döndürdüyse o sıra (10 m, 50 m — artanda da sunucunun dizisi).
     const satirlar = screen.getAllByTestId(/^siparis-satir-/).map((n) => n.props.testID as string);
     expect(satirlar).toEqual([`siparis-satir-${ID2}`, `siparis-satir-${ID1}`]);
-    fireEvent.press(screen.getByTestId("siparis-sutun-acik"));
+    fireEvent.press(screen.getByTestId("siparis-sutun-sevkToplam"));
     await settle();
-    expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ sirala: "acikMiktar", yon: "azalan" }));
-    fireEvent.press(screen.getByTestId("siparis-sutun-acik"));
+    expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ sirala: "sevkMiktari", yon: "azalan" }));
+    fireEvent.press(screen.getByTestId("siparis-sutun-sevkToplam"));
     await settle();
     expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ sirala: undefined }));
-    expect(screen.queryByTestId("siparis-ok-acik")).toBeNull();
+    expect(screen.queryByTestId("siparis-ok-sevkToplam")).toBeNull();
   });
 
   it("sıralanamayan sütun (durum) düğme değildir; sunucu sıralamayı beyan etmezse hiçbir başlık düğme değildir", async () => {
@@ -161,20 +165,33 @@ describe("§2 ekran: sıralama ve süzgeç SUNUCUDA", () => {
     expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ suzgec: undefined }));
   });
 
+  it("sipariş no kısa gösterilir (SIP-2026-0444 → 2026-0444); sevk/toplam hücresi, toplam yoksa —", async () => {
+    mockList.mockResolvedValue(page(
+      rec(ID1, { siparisNo: "SIP-2026-0444", musteriAdi: "A", durum: "APPROVED", sevkMiktari: "500", toplamMiktar: "1000" }),
+      rec(ID2, { siparisNo: "SIP-2026-0445", musteriAdi: "B", durum: "APPROVED", sevkMiktari: "0" }),
+    ));
+    render(<Orders />);
+    await settle();
+    expect(screen.getByText("2026-0444")).toBeTruthy();
+    expect(screen.queryByText("SIP-2026-0444")).toBeNull();
+    expect(screen.getByText("500 / 1.000")).toBeTruthy();
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+
   it("sütun seçimi: gizli sütun eklenir, azamiden fazlası eklenmez, son sütun gizlenemez", async () => {
     const azami = M.azamiSutun(require("react-native").Dimensions.get("window").width as number);
     mockList.mockResolvedValue(page(rec(ID1, { siparisNo: "SP-1", musteriAdi: "A", siparisTarihi: "2026-11-01", durum: "APPROVED" })));
     render(<Orders />);
     await settle();
     fireEvent.press(screen.getByTestId("siparis-sutunlar"));
-    const gizli = ["tarih", "sevk", "kalem", "yon"]; // varsayılan 4 sütunun dışındakiler, tanım sırasıyla
+    const gizli = ["tarih", "kalem", "yon"]; // varsayılan 4 sütunun dışındakiler, tanım sırasıyla
     for (const k of gizli) fireEvent.press(screen.getByTestId(`siparis-sutun-secici-${k}`));
     const gorunen = gizli.filter((k) => screen.queryByTestId(`siparis-sutun-${k}`) !== null);
     expect(gorunen).toEqual(gizli.slice(0, Math.max(0, azami - 4))); // azamiye ulaşınca yenisi eklenmez
-    for (const k of ["no", "musteri", "acik", "durum", ...gorunen.slice(1)]) fireEvent.press(screen.getByTestId(`siparis-sutun-secici-${k}`));
+    for (const k of ["no", "musteri", "sevkToplam", "durum", ...gorunen.slice(1)]) fireEvent.press(screen.getByTestId(`siparis-sutun-secici-${k}`));
     const kalan = gorunen[0] ?? "durum";
     expect(screen.getByTestId(`siparis-sutun-${kalan}`)).toBeTruthy(); // son sütun gizlenemez
-    expect(screen.getAllByTestId(/^siparis-sutun-(no|musteri|acik|durum|tarih|sevk|kalem|yon)$/)).toHaveLength(1);
+    expect(screen.getAllByTestId(/^siparis-sutun-(no|musteri|sevkToplam|durum|tarih|kalem|yon)$/)).toHaveLength(1);
   });
 });
 

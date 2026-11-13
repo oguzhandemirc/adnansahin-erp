@@ -47,6 +47,15 @@ export function formatMoney(value: unknown, currency = "TRY"): string {
 const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** "2026-09-29T10:05:00Z" → "29.09.2026"; takvim günü "2026-09-29" dilimsiz basılır. */
+/**
+ * Dar liste sütununda belge numarasının harf öneki atılır: "SIP-2026-0444" → "2026-0444". Yalnız GÖSTERİM içindir;
+ * numaranın kendisi (arama, ayrıntı, paylaşım) fabrikanın verdiği tam haliyle kalır.
+ */
+export function kisaBelgeNo(no: string | null | undefined): string | null {
+  if (!no) return null;
+  return no.replace(/^[A-ZÇĞİÖŞÜ]{1,6}-(?=\d{4}-\d)/u, ""); // yalnız "ÖNEK-YYYY-sıra" biçimi kısalır
+}
+
 export function formatDate(iso: unknown): string {
   if (typeof iso !== "string" || iso === "") return "—";
   return DAY_ONLY.test(iso) ? fmtDayKey(iso) : formatFactory(iso, "dd.MM.yyyy");

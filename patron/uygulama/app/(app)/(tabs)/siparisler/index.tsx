@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import type { ProjectionRecord } from "../../../../src/api/wire";
 import { can } from "../../../../src/lib/access";
-import { formatDate, formatNumber } from "../../../../src/lib/format";
+import { formatDate, formatNumber, kisaBelgeNo } from "../../../../src/lib/format";
 import { orderStatus, orderStatusShort } from "../../../../src/lib/labels/siparis";
 import { useSession } from "../../../../src/state/session";
 import { useRemote } from "../../../../src/state/useRemote";
@@ -32,11 +32,14 @@ function DurumHucresi({ durum }: { durum: unknown }) {
 }
 
 const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
-  { key: "no", baslik: "No", ad: "Sipariş no", agirlik: 1.7, sirala: "siparisNo", hucre: (r) => str(k(r).siparisNo) ?? "—" },
+  { key: "no", baslik: "No", ad: "Sipariş no", agirlik: 1.15, sirala: "siparisNo", hucre: (r) => kisaBelgeNo(str(k(r).siparisNo)) ?? "—" },
   { key: "musteri", baslik: "Müşteri", agirlik: 1.05, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
   { key: "tarih", baslik: "Tarih", ad: "Sipariş tarihi", agirlik: 1, sirala: "siparisTarihi", hucre: (r) => (str(k(r).siparisTarihi) ? formatDate(k(r).siparisTarihi) : "—") },
-  { key: "acik", baslik: "Açık m", ad: "Açık miktar (m)", agirlik: 0.9, sayi: true, sirala: "acikMiktar", hucre: (r) => sayi(k(r).acikMiktar) },
-  { key: "sevk", baslik: "Sevk m", ad: "Sevk edilen (m)", agirlik: 1, sayi: true, sirala: "sevkMiktari", hucre: (r) => sayi(k(r).sevkMiktari) },
+  // Sevk edilen / sipariş toplamı (m, brüt). Toplamı fabrika hesaplar (`toplamMiktar`); gelmiyorsa (eski fabrika) "—".
+  {
+    key: "sevkToplam", baslik: "Sevk / Toplam", ad: "Sevk / Toplam (m)", agirlik: 1.5, sayi: true, sirala: "sevkMiktari",
+    hucre: (r) => (present(k(r).toplamMiktar) ? `${sayi(k(r).sevkMiktari)} / ${sayi(k(r).toplamMiktar)}` : "—"),
+  },
   { key: "kalem", baslik: "Kalem", ad: "Kalem sayısı", agirlik: 0.7, sayi: true, sirala: "kalemSayisi", hucre: (r) => sayi(k(r).kalemSayisi) },
   { key: "yon", baslik: "Yön", agirlik: 0.9, hucre: (r) => YON[str(k(r).yon) ?? ""] ?? "—" },
   {
@@ -49,7 +52,7 @@ const AYAR = {
   projeksiyon: "siparis",
   anahtar: "tablo.siparis",
   sutunlar: SIPARIS_SUTUNLARI,
-  varsayilan: ["no", "musteri", "acik", "durum"],
+  varsayilan: ["no", "musteri", "sevkToplam", "durum"],
   aramaIpucu: "Sipariş no ya da müşteri",
   haricAlanlar: ["gecikmis"],
   testID: "siparis",

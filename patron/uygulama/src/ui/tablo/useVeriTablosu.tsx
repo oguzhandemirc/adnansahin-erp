@@ -11,10 +11,10 @@ import { ListStates } from "../siparis/parts";
 import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
 import { useSession } from "../../state/session";
 import type { ListQuery } from "../siparis/useRemoteList";
-import { azamiSutun, etkinSuzgecSayisi, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecSec, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
+import { azamiSutun, etkinSuzgecSayisi, siganSutun, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecSec, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
 import { SutunSecici, SuzgecSecici } from "./Seciciler";
 import { useTabloTercihi } from "./useTabloTercihi";
-import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri } from "./VeriTablosu";
+import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useYatayEksen, type YatayEksen } from "./VeriTablosu";
 
 export interface VeriTablosuAyari {
   readonly projeksiyon: string;
@@ -37,6 +37,8 @@ export interface VeriTablosu {
   readonly terim: string;
   setTerim(v: string): void;
   readonly azami: number;
+  /** Görünür sütun ekrana sığmıyorsa başlık ve satırların ortak yatay ekseni; sığıyorsa yok. */
+  readonly yatay: YatayEksen | null;
   readonly list: RemoteList;
   readonly suzuldu: boolean;
   degistir(f: (t: TabloTercihi) => TabloTercihi): void;
@@ -56,6 +58,7 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
   const { facility } = useSession();
   const { width } = useWindowDimensions();
   const azami = azamiSutun(width);
+  const eksen = useYatayEksen();
   const spec = useListCapability().search(ayar.projeksiyon);
   const siralanabilir = facility?.liste?.siralama?.[ayar.projeksiyon] ?? [];
   const cokluSuzgec = !!facility?.liste?.siralama;
@@ -81,6 +84,7 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
   const gorunur = pref.tercih.sutunlar.flatMap((k) => ayar.sutunlar.filter((c) => c.key === k));
   return {
     ayar, tercih: pref.tercih, gorunur, gruplar: gs, siralanabilir, aramaVar: !!spec, terim, setTerim, azami, list,
+    yatay: gorunur.length > siganSutun(width) ? eksen : null,
     suzuldu: !!sorgu.ara || !!temel.suzgec || Object.values(ek.kimlik ?? {}).some(Boolean),
     degistir: pref.degistir,
   };
@@ -100,7 +104,7 @@ export function TabloUstu({ tablo }: { readonly tablo: VeriTablosu }) {
         onSuzgec={tablo.gruplar.length > 0 ? () => setSuzgecAcik(true) : undefined}
         onSutun={() => setSutunAcik(true)}
       />
-      <TabloBasligi testID={ayar.testID} sutunlar={tablo.gorunur} siralama={tercih.siralama} siralanabilir={tablo.siralanabilir} onSirala={(alan) => degistir((t) => ({ ...t, siralama: sonrakiSiralama(t.siralama, alan) }))} />
+      <TabloBasligi testID={ayar.testID} yatay={tablo.yatay ?? undefined} sutunlar={tablo.gorunur} siralama={tercih.siralama} siralanabilir={tablo.siralanabilir} onSirala={(alan) => degistir((t) => ({ ...t, siralama: sonrakiSiralama(t.siralama, alan) }))} />
       <SutunSecici
         visible={sutunAcik} testID={`${ayar.testID}-sutun-secici`} sutunlar={ayar.sutunlar} gorunur={tercih.sutunlar} azami={tablo.azami}
         onDegistir={(k) => degistir((t) => ({ ...t, sutunlar: sutunDegistir(t.sutunlar, k, tablo.azami) }))}
@@ -136,8 +140,8 @@ export function TabloListesi({ tablo, onPress, bos, bosSuzgecli, icon, goster }:
   return (
     <View>
       {satirlar.length > 0 ? (
-        <TabloGovdesi testID={`${tablo.ayar.testID}-govde`}>
-          {satirlar.map((r, i) => <TabloSatiri key={r.id} sutunlar={tablo.gorunur} kayit={r} ayrac={i > 0} onPress={() => onPress(r)} testID={`${tablo.ayar.testID}-satir-${r.id}`} />)}
+        <TabloGovdesi testID={`${tablo.ayar.testID}-govde`} yatay={tablo.yatay ? { eksen: tablo.yatay, genislik: toplamGenislik(tablo.gorunur) } : undefined}>
+          {satirlar.map((r, i) => <TabloSatiri key={r.id} yatay={!!tablo.yatay} sutunlar={tablo.gorunur} kayit={r} ayrac={i > 0} onPress={() => onPress(r)} testID={`${tablo.ayar.testID}-satir-${r.id}`} />)}
         </TabloGovdesi>
       ) : null}
       <ListStates list={durum} empty={tablo.suzuldu ? bosSuzgecli : bos} icon={icon} testID={tablo.ayar.testID} />
