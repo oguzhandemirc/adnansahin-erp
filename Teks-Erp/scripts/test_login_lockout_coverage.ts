@@ -32,7 +32,7 @@ import { readPinLockoutConfig } from "../src/services/system-setting.service";
 
 const CTRL = join(__dirname, "../src/controllers/auth.controller.ts");
 /** Kilit gerektiren giriş handler'ları — yeni bir giriş yolu eklenirse buraya yaz. */
-const LOGIN_HANDLERS = ["login", "loginCard", "loginQuickPin"] as const;
+const LOGIN_HANDLERS = ["login", "loginCard", "loginQuickPin", "changePassword"] as const;
 
 let pass = 0;
 let fail = 0;
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
     );
 
     // SIRA: rezervasyon, kimlik doğrulayan AuthService çağrısından ÖNCE olmalı.
-    const authAt = body.search(/await AuthService\.(login|loginWithCard|loginWithQuickPin)\(/);
+    const authAt = body.search(/await AuthService\.(login|loginWithCard|loginWithQuickPin|changeOwnPassword)\(/);
     check(
       `${name}: kilit AuthService çağrısından (bcrypt) ÖNCE`,
       reserveAt !== -1 && authAt !== -1 && reserveAt < authAt,

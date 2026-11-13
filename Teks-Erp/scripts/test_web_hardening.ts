@@ -721,9 +721,9 @@ function sectionWiring(): void {
     /hardening\.swaggerEnabled/.test(srvSrc) && !/NODE_ENV !== "production"[\s\S]{0,80}Swagger/.test(srvSrc),
   );
 
-  // Üç giriş yolu da KİMLİKLİ anahtar çözüyor (iki argümanlı çağrı).
+  // Üç giriş yolu + kendi parolasını değiştirme (2026-11-13) KİMLİKLİ anahtar çözüyor (iki argümanlı çağrı).
   const calls = authSrc.match(/resolveLoginLockoutKeys\(\s*req\s*,/g) ?? [];
-  check("üç giriş yolu da resolveLoginLockoutKeys(req, kimlik) çağırıyor", calls.length === 3, `${calls.length} çağrı`);
+  check("üç giriş yolu + parola değiştirme resolveLoginLockoutKeys(req, kimlik) çağırıyor", calls.length === 4, `${calls.length} çağrı`);
   check(
     "eski tek-argümanlı resolveLoginLockoutKey artık controller'da kullanılmıyor",
     !/resolveLoginLockoutKey\(/.test(authSrc.replace(/resolveLoginLockoutKeys\(/g, "")),

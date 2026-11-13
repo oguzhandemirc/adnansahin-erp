@@ -181,8 +181,16 @@ const EXEMPT: Record<string, string> = {
  * KAPIYA bağlandı — `scripts/test_scan_series.ts §6` her koşumda
  * `scan.service.ts` ve `scan.routes.ts` kaynağında `prisma.`/`tx.` çağrısı ve
  * prisma import'u ARAR. Gerekçe değişirse bekçi kırmızı verir.
+ *
+ * ⚠️ 15 → 16 (2026-11-13, BİLİNÇLİ): `POST /api/auth/change-password` yalnız
+ * `verifyToken` taşır — `/auth/logout` ve `/auth/preferences` emsali: kullanıcı
+ * YALNIZ KENDİ kaydına yazar (kimlik token'dan, hedef kimliği gövdede yok) ve
+ * eski parolayı bilmek zorundadır. Üstelik kısıtlı oturumun (parola kurala
+ * uymuyor, izinler BOŞ) girebildiği iki uçtan biridir: izin guard'ı koymak
+ * zayıf parolalı kullanıcıyı parolasını değiştiremez hâle kilitlerdi.
+ * Bekçi: `test_password_change_required` §0/§2.
  */
-const BARE_CHAIN_BASELINE = 15;
+const BARE_CHAIN_BASELINE = 16;
 
 /** Körlük zemini: tarayıcı boşa düşerse "ihlal yok" ile "hiçbir şeye bakılmadı" aynı yeşile çıkmasın. */
 const MIN_ROUTE_LAYERS = 400;

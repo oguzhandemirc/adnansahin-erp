@@ -20,6 +20,27 @@ import {
 } from "./system-setting.service";
 import { SessionRegistryService } from "./session-registry.service";
 import { TotpAccountService } from "./totp-account.service";
+import { checkPasswordPolicy, hashNewPassword } from "./helpers/password-policy.helper";
+
+/**
+ * Üretilen token'ın KAPSAMI (2026-11-13, parola sıkılaştırma):
+ *  • `full`            — bugünkü davranış.
+ *  • `password-change` — masaüstünde kurala uymayan parolayla giriş: izin [] +
+ *    `passwordChangeRequired` claim'i; `verifyToken` yalnız parola değiştirme ve
+ *    çıkışı geçirir.
+ *  • `mobile-only`     — sahada (mobil istemci) kurala uymayan parolayla giriş:
+ *    eski tablet bu durumu tanımadığı için KİLİTLENMEZ, ama token yalnız
+ *    `mobile:*` izinlerini taşır — `clientType:"mobile"` yazıp tam token almak
+ *    kapalıdır.
+ */
+type TokenScope = "full" | "password-change" | "mobile-only";
+
+/** Sonuçta `passwordChangeRequired` yalnız parola kurala uymadığında `true` döner. */
+export interface LoginResult {
+  token: string;
+  user: JwtPayload;
+  passwordChangeRequired?: boolean;
+}
 
 /** Login çağrılarının istemci bağlamı — Session registry + aynı-tip politika için.
  *  clientType body'den (default 'mobile'); deviceId x-device-id/req.device'den;
@@ -95,12 +116,13 @@ export class AuthService {
     username: string,
     password: string,
     ctx?: LoginContext
-  ): Promise<{ token: string; user: JwtPayload }> {
+  ): Promise<LoginResult> {
     const user = await prisma.user.findUnique({
       where: { username },
       select: {
         id: true,
         username: true,
+        fullName: true,
         passwordHash: true,
         isActive: true,
         tokenVersion: true,
@@ -122,9 +144,81 @@ export class AuthService {
     // hiç geçemese bile meşru kullanıcıyı oturumundan atabilirdi.
     await this.assertSecondFactor(user.id, ctx);
 
-    return this.issueToken(
+    // Mevcut parola kurala uyuyor mu? Düz metin YALNIZ burada elde — PIN/kart
+    // girişinde ölçülemez. Uymuyorsa giriş BAŞARILI ama kapsam daralır (bkz.
+    // `TokenScope`). Sonuç sır değildir; parola hiçbir çıktıya girmez.
+    const weak = checkPasswordPolicy(password, { username: user.username, fullName: user.fullName }) !== null;
+    const scope: TokenScope = !weak
+      ? "full"
+      : isDesktopClient(ctx?.clientType)
+        ? "password-change"
+        : "mobile-only";
+    const result = await this.issueToken(
       { id: user.id, username: user.username, tokenVersion: user.tokenVersion },
-      ctx
+      ctx,
+      scope
+    );
+    return weak ? { ...result, passwordChangeRequired: true } : result;
+  }
+
+  /**
+   * KENDİ PAROLASINI DEĞİŞTİR (normal ve kısıtlı oturum). Eski parola doğrulanır,
+   * yeni parola kural helper'ından geçer; `tokenVersion++` + oturum iptaliyle
+   * bu cihaz DAHİL bütün oturumlar düşer ve bu çağrı yeni TAM token döner.
+   *
+   * ⚠️ Yanlış eski parola 400 `CURRENT_PASSWORD_INVALID`dır, 401 DEĞİL: panelin
+   * 401 dalı oturumu kapatır ve kullanıcı yazdığı yeni parolayla birlikte giriş
+   * ekranına atılırdı. Kaba kuvvet sayımını controller bu koda bakarak yapar.
+   * ⚠️ İkinci faktör yeniden sorulmaz: çağıran oturum zaten TOTP'den geçti.
+   */
+  static async changeOwnPassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    ctx?: LoginContext
+  ): Promise<LoginResult> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, username: true, fullName: true, passwordHash: true, isActive: true, tokenVersion: true },
+    });
+    if (!user || !user.isActive) {
+      throw AppError.unauthorized("Hesap pasif veya bulunamadı. Tekrar giriş yapın.");
+    }
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw AppError.badRequest("Mevcut parola yanlış.", { code: "CURRENT_PASSWORD_INVALID" });
+    }
+    if (currentPassword === newPassword) {
+      throw AppError.badRequest("Yeni parola mevcut parolayla aynı olamaz.", {
+        code: "PASSWORD_POLICY",
+        reason: "SAME_AS_CURRENT",
+      });
+    }
+    const passwordHash = await hashNewPassword(newPassword, {
+      username: user.username,
+      fullName: user.fullName,
+    });
+    // ATOMİK CLAIM: okuduğumuz tokenVersion hâlâ geçerliyse yaz. Arada yönetici
+    // sıfırladıysa ya da yetki değiştiyse count=0 → 409 (eski parolayla yarışan
+    // yazım yeni durumu ezmesin).
+    const claimed = await prisma.user.updateMany({
+      where: { id: user.id, isActive: true, tokenVersion: user.tokenVersion },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
+    });
+    if (claimed.count === 0) {
+      throw AppError.conflict("Hesap bu sırada değişti. Tekrar giriş yapın.", { code: "SESSION_CHANGED" });
+    }
+    await SessionRegistryService.revokeAllForUser(user.id, "PASSWORD_RESET").catch(() => undefined);
+    await AuditService.log({
+      userId: user.id,
+      action: "UPDATE",
+      tableName: "USER_PASSWORD",
+      recordId: user.id,
+      newData: { username: user.username, selfService: true },
+    }).catch(() => undefined);
+    return this.issueToken(
+      { id: user.id, username: user.username, tokenVersion: user.tokenVersion + 1 },
+      ctx,
+      "full"
     );
   }
 
@@ -363,7 +457,8 @@ export class AuthService {
       username: string;
       tokenVersion: number;
     },
-    ctx?: LoginContext
+    ctx?: LoginContext,
+    scope: TokenScope = "full"
   ): Promise<{ token: string; user: JwtPayload }> {
     // Patron bulutu teknik kullanıcısının GİRİŞ YÖNTEMİ YOKTUR: parolası sıfırlansa ya da PIN/kart verilse bile
     // oturum açılmaz (tek token üreticisi burası; mesaj genel — hesabın varlığını doğrulamaz). Kayıt yoksa no-op.
@@ -475,11 +570,19 @@ export class AuthService {
 
     // jti token'a jwt.sign jwtid ile eklenir — sign payload'ında jti TUTMUYORUZ
     // (jsonwebtoken "jti already present" hatası verir). Dönen JwtPayload jti taşır.
+    // Kapsam daraltması (bkz. `TokenScope`) kanal kapısından SONRA: yalnız mobil
+    // izinli hesap masaüstünde yine CHANNEL_DENIED alır, kısıtlı token değil.
     const signPayload = {
       userId: user.id,
       username: user.username,
-      permissions,
+      permissions:
+        scope === "password-change"
+          ? []
+          : scope === "mobile-only"
+            ? permissions.filter((p) => p.startsWith("mobile:"))
+            : permissions,
       tokenVersion: user.tokenVersion,
+      ...(scope === "password-change" ? { passwordChangeRequired: true } : {}),
     };
     const signOptions: jwt.SignOptions = { jwtid: jti };
     // exp claim = effectiveExpiresAt'a göre saniye (aynı nowMs tabanı → Session.expiresAt

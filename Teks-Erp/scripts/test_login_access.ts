@@ -49,7 +49,7 @@ async function expectStatus(
   }
 }
 
-const PW = "sifre123";
+const PW = "Bekci-Erisim-Parola-55"; // parola kuralına uyar (zayıf parola masaüstünde kısıtlı token verir)
 
 function decodeJwt(token: string) {
   return jwt.decode(token) as
