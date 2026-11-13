@@ -1,8 +1,8 @@
 # Backend `2.12.0`
 
-**Paket:** `tekserp-backend-20261112_150506-bd801c2e.zip`
-**SHA256:** `0880C3B309627B77AE62537885308BAC1FF643218D660ACF6250E93FB3C6B15E`
-**Commit:** `bd801c2e`
+**Paket:** `tekserp-backend-20261113_033538-ad19d317.zip`
+**SHA256:** `0A73D1A006865138190004687FEC7CD948266DFEC87CEF153F0F856228C2761C`
+**Commit:** `ad19d317`
 **İçerik commit'leri:** `23c79311` (D1 imza + bulut istemcisi + kapatma düğmesi) · `e3a4990e` (D2 migration'lar) · `ce70d361`…`fbbde853` (D3a eşitleme turu) · `73064213`, `9747e7d7` (D3b anlıklar) · `f583e724` (D4 gelen kutusu) · `3c9345b6` (D5 rapor isteği) · `0b57a21d` (cari özeti verisi) · `08da6a4c` (Bağlı Cihazlar ucu + izin) · `087266f0` (fason anlığına top sayıları)
 **Yeniden paketlendi (2026-11-13):** 2026-11-12 paketi (`…150506-bd801c2e`) hiçbir yere kurulmadan bayatladı; sürüm 2.12.0 kaldı, eski zip kenara alındı.
 **Önceki saha sürümü:** **2.11.7** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.11.7 olduğunu ÖLÇER — farklıysa DUR).
