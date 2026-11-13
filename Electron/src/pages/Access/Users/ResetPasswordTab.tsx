@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/forms/FormField";
 import { adminUserService } from "@/services/adminUserService";
+import { newPasswordField, PASSWORD_RULE_HINT } from "@/lib/password-rules";
 
 interface Props {
   userId: string;
@@ -17,8 +18,8 @@ interface Props {
 
 const schema = z
   .object({
-    password: z.string().min(6, "En az 6 karakter"),
-    confirm: z.string().min(6, "En az 6 karakter"),
+    password: newPasswordField,
+    confirm: z.string().min(1, "Yeni şifreyi tekrar yaz"),
   })
   .refine((d) => d.password === d.confirm, {
     path: ["confirm"],
@@ -35,6 +36,7 @@ export function ResetPasswordTab({ userId, username }: Props) {
     defaultValues: { password: "", confirm: "" },
   });
 
+  const { errors } = form.formState;
   const password = form.watch("password");
   useEffect(() => {
     if (done) setDone(false);
@@ -69,7 +71,7 @@ export function ResetPasswordTab({ userId, username }: Props) {
         </div>
       </div>
 
-      <FormField label="Yeni Şifre" htmlFor="password" error={form.formState.errors.password} required>
+      <FormField label="Yeni Şifre" htmlFor="password" error={errors.password} hint={PASSWORD_RULE_HINT} required>
         <Input
           id="password"
           type="password"
@@ -79,12 +81,7 @@ export function ResetPasswordTab({ userId, username }: Props) {
         />
       </FormField>
 
-      <FormField
-        label="Yeni Şifre (tekrar)"
-        htmlFor="confirm"
-        error={form.formState.errors.confirm}
-        required
-      >
+      <FormField label="Yeni Şifre (tekrar)" htmlFor="confirm" error={errors.confirm} required>
         <Input
           id="confirm"
           type="password"

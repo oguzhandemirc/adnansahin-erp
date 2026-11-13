@@ -1,4 +1,5 @@
-import { PanelLeft, Search, LogOut, RotateCw, Settings } from "lucide-react";
+import { useState } from "react";
+import { PanelLeft, Search, LogOut, RotateCw, Settings, KeyRound } from "lucide-react";
 import { PencereKontrolleri } from "./PencereKontrolleri";
 import { Button } from "@/components/ui/button";
 import { DemoModeBadge } from "@/components/demo/DemoModeBadge";
@@ -15,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuthStore } from "@/store/auth";
+import { ChangePasswordDialog } from "@/components/auth/ChangePasswordDialog";
 import { useTabsStore } from "@/store/tabs";
 import { useRoleAccess } from "@/hooks/useRoleAccess";
 import { upperTr } from "../../lib/tr-case";
@@ -42,6 +44,7 @@ export function Topbar({ onToggleSidebar, onOpenCommand }: Props) {
   const logout = useAuthStore((s) => s.logout);
   const { isAdmin, permissions } = useRoleAccess();
   const navigateActive = useTabsStore((s) => s.navigateActive);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
     <header className="app-drag flex h-12 shrink-0 select-none items-center gap-2 border-b border-border/60 bg-card/60 pr-3 backdrop-blur-xl">
@@ -116,6 +119,9 @@ export function Topbar({ onToggleSidebar, onOpenCommand }: Props) {
             <DropdownMenuItem onSelect={() => navigateActive("/settings")}>
               <Settings className="mr-2 h-4 w-4" /> Kullanıcı Tercihleri
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
+              <KeyRound className="mr-2 h-4 w-4" /> Parolamı değiştir
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => {
@@ -126,6 +132,7 @@ export function Topbar({ onToggleSidebar, onOpenCommand }: Props) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
         {/* Pencere düğmeleri EN SAĞDA — uygulamanın kendi başlığı aynı zamanda
             pencerenin başlığıdır; ayrı bir şerit yok. */}
         <PencereKontrolleri />
