@@ -70,7 +70,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 
 1. `.env`: `PATRON_CLOUD_URL=https://<bulut kökeni>` ve `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (dosya veri dizininde, repoda değil).
-2. `cd Teks-Erp && npx tsx scripts/patron-bulut-anahtar.ts` — dosya yoksa üretir (0600), varsa okur; `--kurulum=` ve `--acik-anahtar=` değerlerini basar, özel anahtarı basmaz. Bu iki değer bulutta `tesis.ts kurulum-kaydet --bitis=yok`a verilir (`yok` = süresiz hak; adımlar, bitiş notu ve ölçümler: `docs/ops/PATRON-ESITLEME-KURULUM.md` § 5).
+2. `cd Teks-Erp && npx tsx scripts/patron-bulut-anahtar.ts` — dosya yoksa üretir (0600), varsa okur; `--kurulum=` ve `--acik-anahtar=` değerlerini basar, özel anahtarı basmaz. Bu iki değer bulutta `tesis.ts kurulum-kaydet --kurulum= --acik-anahtar=`e verilir (adımlar ve ölçümler: `docs/ops/PATRON-ESITLEME-KURULUM.md` § 5).
 3. Ayar: `PUT /api/admin/settings/patronCloud.syncEnabled` `{"value":"true"}` (admin:settings + ayar şifresi); geri dönüş aynı ucu `"false"` ile çağırmaktır. Yoklama aralığı `patronCloud.syncIntervalMinutes` (1–60 dk, varsayılan 5; aralık dışı değer varsayılana düşer).
 4. Telefondan yazma (okumadan en az bir hafta sonra): `PUT /api/admin/settings/patronCloud.inboxEnabled` `{"value":"true"}`; geri dönüş aynı uç `"false"`. Gelen kutusu aralığı `patronCloud.inboxIntervalSeconds` (20–600 sn, varsayılan 30). Adımlar: `docs/ops/PATRON-ESITLEME-KURULUM.md` § 6.
 
@@ -78,14 +78,14 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 - Windows'ta dosya izin bitleri NTFS ACL'yi yansıtmaz; orada 0600 denetimi atlanır ve koruma anahtar dizininin ACL'sidir.
 - Üretim akışının "Depo" kolonu binadaki BÜTÜN `WAREHOUSE` topunu (çuvaldakiler dahil) sayar; stok karnesinin "Bitmiş"i yalnız çuvala/sevkiyata girmemiş serbest stoktur — iki ayrı kavramdır, birini ötekine eşitleme; ayrımı etiket taşır.
-- Bulutta `kurulum-kaydet --bitis=yok` süresiz haktır (uzak tarih yazılır); NULL bitiş "hak dondu" demektir ve CLI onu yazmaz (bulut bekçisi `patron/sunucu/scripts/test_hizmet_sonu.ts` §1j–o).
+- Bulut hizmeti süresizdir: lisans sınıfı, modül hakkı, abonelik bitişi ve hizmet aşaması yoktur; fabrika kanalı kapısı kurulum kaydı + açık anahtar + aktifliktir (bulut bekçileri `test_disa_aktarma` §1–§2, `test_esitleme_idempotency` §5j–§5l).
 - Kurulum kimliği keşif kimliğiyle aynıdır (`system.installationId`); boot işi üretir — araç onu yalnız okur, DB'ye yazmaz.
 
 ## Bekçiler
 
 Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
-Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_dogrulama_kodu` (doğrulama kodu isteğe bağlı · açıkken zorunlu · sızıntı yok · CLI kapatma) · `test_cari_ozeti` · `test_hizmet_sonu` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
+Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_dogrulama_kodu` (doğrulama kodu isteğe bağlı · açıkken zorunlu · sızıntı yok · CLI kapatma) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 

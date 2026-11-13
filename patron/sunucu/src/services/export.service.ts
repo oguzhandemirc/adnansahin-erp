@@ -1,6 +1,5 @@
 // DIŞA AKTARMA (Ek-6/A §4.2) — tesis yöneticisi (`bulut:hesap:yonet`) Bulut Kopyası'nın ve bulutta doğan verinin
-// dökümünü JSON ya da CSV alır. Hizmet açıkken ve bittikten sonraki 90 gün (SALT_OKUNUR) açıktır; KAPALI'da oturum
-// zaten açılmaz. Kurallar:
+// dökümünü JSON ya da CSV alır (Adnan'da hizmet aşaması hep açık; manifestin `hizmet` alanı sabit). Kurallar:
 //   · Projeksiyonlar hesabın OKUYABİLDİĞİ kadardır: tx `app.projeksiyonlar`ı oturumla aynı açar (RLS), izinsiz alt
 //     satır (`.kisisel`) dökümde de yoktur; yöneticiye ayrı bir kapı YOK.
 //   · Kolonlar saklı satırın kendi alanlarıdır (fabrika kataloğunun opt-in kolonları); bulut kolon EKLEMEZ.
@@ -18,7 +17,7 @@ import { ADMIN_PERMISSION, accountView } from "./account.service";
 import type { CloudContext } from "./context";
 import { rowView, selectRows, visibleSubRows, type Row } from "./data.service";
 import { messageView } from "./inbox.service";
-import { loadServiceFacts, serviceState } from "./service-lifecycle";
+import { OPEN_SERVICE } from "./facility-gate";
 
 const PAGE = 500;
 
@@ -184,24 +183,21 @@ async function cloudCounts(ctx: CloudContext, s: SessionContext): Promise<Record
 
 export async function exportManifest(ctx: CloudContext, s: SessionContext): Promise<ExportManifest> {
   requireAdmin(s);
-  const nowMs = ctx.now();
   const roots = readableRoots(s);
-  const { counts, facts } = await withTesis(ctx.app, { tesisId: s.tesisId, projections: s.projections }, async (tx) => ({
-    counts: await tx.$queryRaw<{ projection: string; n: number }[]>`
+  const counts = await withTesis(ctx.app, { tesisId: s.tesisId, projections: s.projections }, (tx) =>
+    tx.$queryRaw<{ projection: string; n: number }[]>`
       SELECT projection, count(*)::int AS n FROM projection_rows
        WHERE tesis_id = ${s.tesisId}::uuid AND deleted_at IS NULL AND projection = ANY(${roots.map((r) => r.name)}::text[])
        GROUP BY projection`,
-    facts: await loadServiceFacts(tx, s.tesisId),
-  }));
+  );
   const byName = new Map(counts.map((c) => [c.projection, c.n]));
   const cloud = await cloudCounts(ctx, s);
-  const state = facts ? serviceState(facts, nowMs) : null;
   const kumeler: ExportDataset[] = [
     ...roots.map((d): ExportDataset => ({ ad: d.name, tur: d.root.kind === "ANLIK" ? "ANLIK" : "KAYIT", adet: byName.get(d.name) ?? 0, bicimler: d.root.kind === "ANLIK" ? ["json"] : ["json", "csv"] })),
     ...Object.entries(cloud).map(([ad, adet]): ExportDataset => ({ ad, tur: "BULUT", adet, bicimler: ["json", "csv"] })),
   ];
   return {
-    hizmet: { asama: state?.phase ?? "KAPALI", bitis: state?.endedAt?.toISOString() ?? null, saltOkunurBitis: state?.readOnlyUntil?.toISOString() ?? null },
+    hizmet: OPEN_SERVICE,
     kumeler,
   };
 }

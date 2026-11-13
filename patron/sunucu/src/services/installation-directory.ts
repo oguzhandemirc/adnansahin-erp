@@ -1,4 +1,4 @@
-// KURULUM DİZİNİ — imzalı isteğin açık anahtarı ve eşitleme hakkı (sınıf, modüller, bitiş, DEVREDİLDİ).
+// KURULUM DİZİNİ — imzalı isteğin açık anahtarı ve kaydın aktifliği (lisans sınıfı/modül/bitiş Adnan'da YOK).
 // Tek kaynak: CLI'yle yazılmış kayıt (`scripts/tesis.ts kurulum-kaydet`). Adnan'da satıcı iç API'si yoktur
 // (ayıklama 2026-11-13); bulut kimseye sormaz, kayıt yoksa RED (fail-closed).
 import type { Installation } from "@prisma/client";
@@ -11,10 +11,6 @@ export interface InstallationRecord {
   readonly tesisId: string;
   readonly publicKeyX: string | null;
   readonly keyId: string | null;
-  readonly licenseClass: Installation["licenseClass"];
-  readonly modules: readonly string[];
-  readonly cloudUntil: Date | null;
-  readonly handedOver: boolean;
   readonly active: boolean;
 }
 
@@ -24,10 +20,6 @@ function toRecord(row: Installation): InstallationRecord {
     tesisId: row.tesisId,
     publicKeyX: row.publicKeyX,
     keyId: row.keyId,
-    licenseClass: row.licenseClass,
-    modules: row.modules,
-    cloudUntil: row.cloudUntil,
-    handedOver: row.handedOver,
     active: row.active,
   };
 }

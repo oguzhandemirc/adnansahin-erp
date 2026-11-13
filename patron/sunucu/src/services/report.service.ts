@@ -64,7 +64,7 @@ export async function createReportRequest(ctx: CloudContext, s: SessionContext, 
   if (!hasAll(s, requiredReportPermissions(verdict.permission, undefined))) throw forbidden("Bu raporu isteme yetkiniz yok");
   if (Buffer.byteLength(JSON.stringify(input.parametreler), "utf8") > MAX_PARAMS_BYTES) throw badRequest("Rapor parametreleri çok büyük");
   const nowMs = ctx.now();
-  await assertFacilityCloudOpen(ctx, s.tesisId, nowMs);
+  await assertFacilityCloudOpen(ctx, s.tesisId);
   const entry = await catalogEntry(ctx, s.tesisId, input.raporAnahtari);
   if (!entry) throw new CloudError(404, "RAPOR_BILINMIYOR", "Rapor fabrikanın rapor kataloğunda yok (katalog henüz eşitlenmemiş olabilir)");
   if (!hasAll(s, requiredReportPermissions(verdict.permission, entry.izin))) throw forbidden("Bu raporu isteme yetkiniz yok");

@@ -1,24 +1,16 @@
-// Tesisin patron bulutu kanalı açık mı — hesap yazmaları (gelen kutusu, rapor isteği) için. Fabrika
-// hakkı yoksa mesaj BEKLIYOR'da çürür ⇒ yazma baştan 403. Hizmet bitince (SALT_OKUNUR) yazma kapalı,
-// okuma ve dışa aktarma 90 gün açık; sonra giriş de kapanır (Ek-6/A §4.2 — aşama `service-lifecycle.ts`).
+// Tesisin patron bulutu kanalı açık mı — hesap yazmaları (gelen kutusu, rapor isteği) için. Fabrikanın AKTİF
+// kurulum kaydı yoksa mesaj BEKLIYOR'da çürür ⇒ yazma baştan 403. Adnan bulutu tek tesisli ve süresizdir:
+// lisans sınıfı, abonelik bitişi, salt okuma/kapalı hizmet aşaması YOKTUR (ayıklama D5); tel sözleşmesindeki
+// hizmet alanı (`ServiceStatus`) sabit `ACIK` döner.
 import { CloudError } from "../lib/errors";
 import { withTesis } from "../lib/tenant";
+import type { ServiceStatus } from "../wire/api";
 import type { CloudContext } from "./context";
-import { cloudEntitlementError } from "./installation-auth";
-import { loadServiceFacts, serviceState } from "./service-lifecycle";
 
-export async function assertFacilityCloudOpen(ctx: CloudContext, tesisId: string, nowMs: number): Promise<void> {
-  const { facts, installations } = await withTesis(ctx.app, { tesisId }, async (tx) => ({
-    facts: await loadServiceFacts(tx, tesisId),
-    installations: await tx.installation.findMany({ where: { tesisId, active: true } }),
-  }));
-  const state = facts ? serviceState(facts, nowMs) : null;
-  if (state && state.phase !== "ACIK") {
-    throw new CloudError(403, "PATRON_BULUT_KAPALI", "Adnan Şahin Yönetim hizmeti sona erdi; veriler salt okunur, yeni kayıt girilemez", {
-      asama: state.phase,
-      saltOkunurBitis: state.readOnlyUntil?.toISOString() ?? null,
-    });
-  }
-  const open = installations.some((i) => cloudEntitlementError({ ...i }, nowMs) === null);
-  if (!state || !open) throw new CloudError(403, "PATRON_BULUT_KAPALI", "Tesisin Adnan Şahin Yönetim aboneliği açık değil; fabrika bu isteği alamaz");
+/** Oturum şeridi ve dışa aktarma manifestindeki hizmet alanı — Adnan'da HEP açık. */
+export const OPEN_SERVICE: ServiceStatus = { asama: "ACIK", bitis: null, saltOkunurBitis: null };
+
+export async function assertFacilityCloudOpen(ctx: CloudContext, tesisId: string): Promise<void> {
+  const open = await withTesis(ctx.app, { tesisId }, (tx) => tx.installation.count({ where: { tesisId, active: true } }));
+  if (open === 0) throw new CloudError(403, "PATRON_BULUT_KAPALI", "Fabrikanın patron bulutu kaydı yok ya da pasif; fabrika bu isteği alamaz");
 }

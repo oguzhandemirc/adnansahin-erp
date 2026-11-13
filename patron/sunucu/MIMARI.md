@@ -9,16 +9,19 @@
 ## Tek DB, tek tesis — üç rol
 
 - Adnan bulutu TEK veritabanı ve TEK tesislidir (ayıklama D4, 2026-11-13): tesis başına DB, merkez yönlendirme kataloğu, hazırlayıcı, imha ve destek rolü YOKTUR. `tesis-ac` kayıtlı başka tesis varken 409 `DURUM_CAKISMASI` verir. Bekçi `test_tek_veritabani`.
+- Hizmet SÜRESİZDİR (ayıklama D5, 2026-11-13): hizmet aşaması (salt okuma / kapalı), lisans sınıfı, modül hakkı, abonelik bitişi ve devir YOKTUR; tel sözleşmesindeki `hizmet` alanı sabit `{asama: ACIK, bitis: null, saltOkunurBitis: null}` döner. Fabrika kanalı kapısı = kurulum kaydı + açık anahtar + `active`; pasif kayıtta `/v1` 403 `KURULUM_IPTAL`, hesap yazmaları (gelen kutusu, rapor isteği) 403 `PATRON_BULUT_KAPALI`. Bekçiler `test_disa_aktarma` §1–§2, `test_esitleme_idempotency` §5j–§5l.
 
 ## Komutlar
 
 ```bash
 cd patron/sunucu
 npx prisma migrate deploy && npx prisma generate && npx tsx scripts/db-rolleri.ts   # migrate dev/reset YASAK
-npx tsx scripts/tesis.ts tesis-ac --tesis=<uuid> --ad="Fabrika" [--saklama=13|3|25|tumu]
-npx tsx scripts/tesis.ts kurulum-kaydet --tesis=<uuid> --kurulum=<uuid> --acik-anahtar=<x> --sinif=URETIM --moduller=patron-bulut,production.enabled --bitis=<ISO|yok>   # yok = süresiz
-npx tsx scripts/tesis.ts yonetici-davet --tesis=<uuid> --eposta=<e-posta> --ad="Ad Soyad"   # davet belirteci BİR KEZ basılır
-npx tsx scripts/tesis.ts yonetici-yeniden-davet --tesis=<uuid> --eposta=<e-posta> [--zorla --talep=<no> --gerekce="…"]   # aktif yönetici varken yalnız zorlamayla
+npx tsx scripts/tesis.ts tesis-ac --ad="Adnan Şahin" [--tesis=<uuid>] [--saklama=13|3|25|tumu]   # kimlik verilmezse üretilir; tek tesis
+npx tsx scripts/tesis.ts durum                                       # tesis + kurulum kayıtları (sırsız)
+npx tsx scripts/tesis.ts kurulum-kaydet --kurulum=<uuid> --acik-anahtar=<x> [--pasif]   # fabrikanın patron-bulut-anahtar.ts çıktısı
+npx tsx scripts/tesis.ts yonetici-davet --eposta=<e-posta> --ad="Ad Soyad"   # davet belirteci BİR KEZ basılır
+npx tsx scripts/tesis.ts yonetici-yeniden-davet --eposta=<e-posta> [--zorla --talep=<no> --gerekce="…"]   # aktif yönetici varken yalnız zorlamayla
+npx tsx scripts/tesis.ts kimlik-sifirla --eposta=<e-posta> --zorla --talep=<no> --gerekce="…"   # kayıp parola: sırlar silinir, izinler korunarak yeni davet
 npx tsx scripts/tesis.ts dogrulama-kapat --eposta=<e-posta> --talep=<no> --gerekce="…"   # doğrulama kodunu (TOTP) kapatır; TEK kurtarma yolu, e-posta basılmaz
 npx tsx scripts/tesis.ts ozet-yenile [--apply]   # giriş dizini anahtarı değişince kimlik e-posta özetleri; kuru koşum varsayılan
 npm run typecheck:scripts && npm run lint        # commit kapısı altıncı proje olarak aynısını ölçer (tip + eslint + lint-baseline.json tavanı)

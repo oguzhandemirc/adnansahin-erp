@@ -4,7 +4,6 @@
 // açar ve yönetici kalmadığında sıfırlar — tesiste AKTİF yönetici varken yönetici daveti/yükseltmesi RED,
 // yalnız açık zorlama (talep no + gerekçe) ile ve denetime yazılarak. Her eylem `satici-cli` aktörüyle düşer.
 // Paylaşımlı (birden çok tesise üye) kimliğin sırrını YALNIZ satıcı sıfırlar (`resetIdentity`, her zaman zorlamayla).
-import type { LicenseClass } from "@prisma/client";
 import { createInvite } from "../auth/invite.service";
 import { closeIdentitySessions, identityEngagedOutside, membershipRoutes } from "../auth/membership";
 import { normalizeEmail } from "../auth/session.service";
@@ -45,35 +44,19 @@ export async function openFacility(db: TesisDbRouter, g: { tesisId: string; name
   return row;
 }
 
-export async function setFacilityStatus(db: TesisDbRouter, g: { tesisId: string; status: "AKTIF" | "PASIF" }) {
-  const r = await withTesis(db, { tesisId: g.tesisId }, (tx) => tx.facility.updateMany({ where: { tesisId: g.tesisId }, data: { status: g.status } }));
-  if (r.count === 0) throw notFound("Tesis");
-  await recordAudit(db, { tesisId: g.tesisId, actor: VENDOR_ACTOR, event: `TESIS_${g.status}`, entity: "Facility", entityId: g.tesisId });
-}
-
 export interface InstallationInput {
   readonly tesisId: string;
   readonly installationId: string;
   readonly publicKeyX: string;
-  readonly licenseClass: LicenseClass;
-  readonly modules: readonly string[];
-  readonly cloudUntil: Date | null;
-  readonly handedOver?: boolean;
   readonly active?: boolean;
 }
 
-export async function registerInstallation(db: TesisDbRouter, g: InstallationInput, nowMs: number = Date.now()) {
+export async function registerInstallation(db: TesisDbRouter, g: InstallationInput) {
   if (!publicKeyFromX(g.publicKeyX)) throw new CloudError(400, "GOVDE_GECERSIZ", "Kurulum açık anahtarı biçimsiz (Ed25519 x, base64url)");
   const fields = {
     publicKeyX: g.publicKeyX,
     keyId: safeKeyId(g.publicKeyX),
-    licenseClass: g.licenseClass,
-    modules: [...g.modules],
-    cloudUntil: g.cloudUntil,
-    handedOver: g.handedOver ?? false,
     active: g.active ?? true,
-    source: "KAYIT" as const,
-    refreshedAt: new Date(nowMs),
   };
   if (!(await bindInstallationRoute(db, g.installationId, g.tesisId))) throw new CloudError(409, "KURULUM_BASKA_TESISTE", "Bu kurulum başka bir tesise kayıtlı; kurulum tesis değiştiremez");
   const row = await withTesis(db, { tesisId: g.tesisId }, (tx) =>
@@ -85,7 +68,7 @@ export async function registerInstallation(db: TesisDbRouter, g: InstallationInp
     event: "KURULUM_KAYDI",
     entity: "Installation",
     entityId: g.installationId,
-    summary: { sinif: g.licenseClass, patronBulut: g.modules.includes("patron-bulut"), bitis: g.cloudUntil?.toISOString() ?? null },
+    summary: { aktif: fields.active },
   });
   return row;
 }

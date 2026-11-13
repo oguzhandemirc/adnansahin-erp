@@ -10,7 +10,7 @@ import { foldSql, searchCondition } from "../lib/search";
 import { NO_TENANT, withTesis } from "../lib/tenant";
 import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_MEMBER_FILTER_KEYS, LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, SUZGEC_AZAMI, type CustomerSummary, type ListFilterOption, type ListSortDir, type ListSortKind, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListMemberFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
 import type { CloudContext } from "./context";
-import { loadServiceFacts, serviceState } from "./service-lifecycle";
+import { OPEN_SERVICE } from "./facility-gate";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -276,16 +276,14 @@ export async function getCustomerSummary(ctx: CloudContext, s: SessionContext, c
   return { cariKartId: id, son12AyBaslangic: row.baslangic, ozet: (row.ozet ?? null) as CustomerSummary | null, surum: row.version_at.toISOString() };
 }
 
-/** Ekranın üst şeridi: tesis adı · son eşitleme · sözleşme uyarısı · takılan ufuk · görülebilir projeksiyonlar · hizmet aşaması. */
+/** Ekranın üst şeridi: tesis adı · son eşitleme · sözleşme uyarısı · takılan ufuk · görülebilir projeksiyonlar · hizmet (hep ACIK). */
 export async function facilityStatus(ctx: CloudContext, s: SessionContext): Promise<FacilityStatus> {
   const nowMs = ctx.now();
-  const { facility, state, facts } = await withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => ({
+  const { facility, state } = await withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => ({
     facility: await tx.facility.findUnique({ where: { tesisId: s.tesisId } }),
     state: await tx.syncState.findUnique({ where: { tesisId: s.tesisId } }),
-    facts: await loadServiceFacts(tx, s.tesisId),
   }));
   const stuckMs = state ? nowMs - state.horizonChangedAt.getTime() : 0;
-  const service = facts ? serviceState(facts, nowMs) : { phase: "KAPALI" as const, endedAt: null, readOnlyUntil: null };
   return {
     tesis: { id: s.tesisId, ad: facility?.name ?? null, saklamaAy: facility?.retentionMonths ?? null },
     hesap: { id: s.accountId, ad: s.accountName, eposta: s.email, izinler: [...s.permissions].sort() },
@@ -299,7 +297,7 @@ export async function facilityStatus(ctx: CloudContext, s: SessionContext): Prom
           fabrikaSurumu: state.appVersion,
         }
       : null,
-    hizmet: { asama: service.phase, bitis: service.endedAt?.toISOString() ?? null, saltOkunurBitis: service.readOnlyUntil?.toISOString() ?? null },
+    hizmet: OPEN_SERVICE,
     liste: LIST_CAPABILITIES,
   };
 }

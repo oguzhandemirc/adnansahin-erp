@@ -12,7 +12,6 @@ import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
-import type { LicenseClass } from "@prisma/client";
 import { SecretBox } from "../../src/auth/secret-box";
 import { hotp, totpStep } from "../../src/auth/totp";
 import { loadConfig } from "../../src/config";
@@ -164,37 +163,26 @@ export interface TestKurulumu {
 
 export async function tesisKur(
   o: Ortam,
-  g: { sinif?: LicenseClass; patronBulut?: boolean; bitis?: Date | null; saklamaAy?: number | null; ad?: string } = {},
+  g: { aktif?: boolean; saklamaAy?: number | null; ad?: string } = {},
 ): Promise<TestKurulumu> {
   const tesisId = randomUUID();
   const kurulumId = randomUUID();
   const { privateKey } = generateKeyPairSync("ed25519");
   const acikAnahtar = publicKeyX(privateKey);
   await openFacility(o.goc, { tesisId, name: g.ad ?? `Bekçi Tesisi ${tesisId.slice(0, 8)}`, ...(g.saklamaAy === undefined ? {} : { retentionMonths: g.saklamaAy }) });
-  await ekKurulum(o, tesisId, { kurulumId, privateKey, sinif: g.sinif, patronBulut: g.patronBulut, bitis: g.bitis });
+  await ekKurulum(o, tesisId, { kurulumId, privateKey, aktif: g.aktif });
   return { tesisId, kurulumId, privateKey, acikAnahtar };
 }
 
 export async function ekKurulum(
   o: Ortam,
   tesisId: string,
-  g: { kurulumId?: string; privateKey?: KeyObject; sinif?: LicenseClass; patronBulut?: boolean; bitis?: Date | null },
+  g: { kurulumId?: string; privateKey?: KeyObject; aktif?: boolean },
 ): Promise<TestKurulumu> {
   const kurulumId = g.kurulumId ?? randomUUID();
   const privateKey = g.privateKey ?? generateKeyPairSync("ed25519").privateKey;
   const acikAnahtar = publicKeyX(privateKey);
-  await registerInstallation(
-    o.goc,
-    {
-      tesisId,
-      installationId: kurulumId,
-      publicKeyX: acikAnahtar,
-      licenseClass: g.sinif ?? "URETIM",
-      modules: g.patronBulut === false ? ["production.enabled"] : ["production.enabled", "patron-bulut"],
-      cloudUntil: g.bitis === undefined ? new Date(o.saat.simdi() + 365 * 86_400_000) : g.bitis,
-    },
-    o.saat.simdi(),
-  );
+  await registerInstallation(o.goc, { tesisId, installationId: kurulumId, publicKeyX: acikAnahtar, active: g.aktif ?? true });
   return { tesisId, kurulumId, privateKey, acikAnahtar };
 }
 

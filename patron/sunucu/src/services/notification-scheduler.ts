@@ -11,7 +11,6 @@ import type { CloudContext } from "./context";
 import { generateForFacility } from "./notification-events";
 import { checkReceipts, type ReceiptTotals } from "./notification-receipts";
 import { deliverDue, type DeliveryTotals } from "./notification-sender";
-import { facilityServiceState } from "./service-lifecycle";
 
 export interface NotificationRuntime {
   readonly transport: PushTransport;
@@ -45,8 +44,6 @@ export async function runNotificationRound(ctx: CloudContext, transport: PushTra
     await perFacility(tesisId, "bildirim", async () => {
       const f = await withTesis(ctx.app, { tesisId }, (tx) => tx.facility.findFirst({ where: { tesisId, status: "AKTIF" }, select: { tesisId: true } }));
       if (!f) return;
-      // Hizmet bitince (salt okuma) bildirim üretilmez ve gönderilmez: eşitleme durdu, "veri gelmiyor" yanıltır.
-      if ((await facilityServiceState(ctx, tesisId, nowMs))?.phase !== "ACIK") return;
       total.created += await generateForFacility(ctx, tesisId, nowMs);
       const d = await deliverDue(ctx, transport, tesisId, nowMs);
       total.sent += d.sent;

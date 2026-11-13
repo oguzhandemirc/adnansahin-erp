@@ -1,37 +1,22 @@
 // FABRİKA KANALI KAPISI — imzalı İSTEK (protokol LISANS-PROTOKOLU.md §4 sırası, amaç `esitle`):
 //   ① readRequestIdentity (imzasız) → kurulum dizini (açık anahtar + hak) ② verifyRequest (typ ·
-//   imza · kurulum · amaç · ±10 dk · HAM gövde özeti) ③ nonce ATOMİK (tesis kapsamında UNIQUE) ④ hak
-//   kapısı: yalnız URETIM sınıfı + `patron-bulut` modülü + bitmemiş abonelik + DEVREDİLMEMİŞ ⑤ tesisin
-//   hizmet aşaması ACIK (tesis kapatıldıysa kanal da kapalı — `service-lifecycle.ts`).
+//   imza · kurulum · amaç · ±10 dk · HAM gövde özeti) ③ nonce ATOMİK (tesis kapsamında UNIQUE) ④ kurulum
+//   kaydı AKTİF. Adnan'da lisans sınıfı, modül hakkı, abonelik bitişi, devir ve hizmet aşaması YOK (tek tesis,
+//   süresiz — ayıklama D5): kayıt + açık anahtar + aktiflik kapının tamamıdır.
 // Kiracı İSTEKTEN değil kurulumdan çözülür (`tesisId` gövdeden ALINMAZ — sözleşme §9.2).
 // Kayıtsız kurulum ile yabancı anahtar imzadan önce AYNI 401'i alır (var/yok kâhini yok; B5).
-import { CLOCK_SKEW_MS, UuidSchema, isCloudSenderClass, isoToMs, readRequestIdentity, verifyRequest, type RequestDoc } from "../lisans-protokol";
+import { CLOCK_SKEW_MS, UuidSchema, isoToMs, readRequestIdentity, verifyRequest, type RequestDoc } from "../lisans-protokol";
 import { CloudError, requestRejected } from "../lib/errors";
 import { isUniqueViolation } from "../lib/prisma-errors";
 import { withTesis } from "../lib/tenant";
 import type { CloudContext } from "./context";
 import { safeKeyId, type InstallationRecord } from "./installation-directory";
-import { CLOUD_MODULE_KEY, facilityServiceState } from "./service-lifecycle";
 import { securityEvent } from "../lib/security-events";
-
-export { CLOUD_MODULE_KEY };
 
 export interface FactoryCaller {
   readonly installation: InstallationRecord;
   readonly tesisId: string;
   readonly request: RequestDoc;
-}
-
-/** Eşitleme hakkı (sözleşme §1.4 — bulut İKİNCİ kapıdır; fabrika zaten göndermez). */
-export function cloudEntitlementError(inst: InstallationRecord, nowMs: number): CloudError | null {
-  if (!isCloudSenderClass(inst.licenseClass)) {
-    return new CloudError(403, "SINIF_GONDEREMEZ", "Bu kurulumun lisans sınıfı patron bulutuna veri gönderemez (yalnız üretim, barındırılan ve demo)");
-  }
-  const until = inst.cloudUntil?.getTime() ?? 0;
-  if (!inst.modules.includes(CLOUD_MODULE_KEY) || until <= nowMs || inst.handedOver) {
-    return new CloudError(403, "PATRON_BULUT_KAPALI", "Patron bulutu hakkı yok ya da aboneliğin süresi doldu");
-  }
-  return null;
 }
 
 async function recordNonce(ctx: CloudContext, inst: InstallationRecord, request: RequestDoc, nowMs: number): Promise<void> {
@@ -49,7 +34,7 @@ async function recordNonce(ctx: CloudContext, inst: InstallationRecord, request:
 }
 
 /** `path`: isteği alan uç (`SYNC_PATHS` sabiti) — imzalı `yol` taşıyan istek yalnız o uca geçer (amaç hep `esitle`). */
-/** Güvenlik olayı sayacı: kimlik/imza reddi (401) ve hak reddi (403) sınıf başına sayılır (B3). */
+/** Güvenlik olayı sayacı: kimlik/imza reddi (401) ve pasif kurulum reddi (403) sınıf başına sayılır (B3). */
 export async function authenticateFactory(ctx: CloudContext, g: { header: unknown; rawBody: Buffer; nowMs: number; path: string }): Promise<FactoryCaller> {
   try {
     return await authenticate(ctx, g);
@@ -87,9 +72,5 @@ async function authenticate(ctx: CloudContext, g: { header: unknown; rawBody: Bu
   const inst = candidate;
   await recordNonce(ctx, inst, verified.value, g.nowMs);
   if (!inst.active) throw new CloudError(403, "KURULUM_IPTAL", "Bu kurulumun kaydı pasif; patron bulutu kanalı kapalı");
-  const denied = cloudEntitlementError(inst, g.nowMs);
-  if (denied) throw denied;
-  const service = await facilityServiceState(ctx, inst.tesisId, g.nowMs);
-  if (service?.phase !== "ACIK") throw new CloudError(403, "PATRON_BULUT_KAPALI", "Tesisin patron bulutu hizmeti kapalı (tesis kapatıldı ya da hizmet sona erdi)");
   return { installation: inst, tesisId: inst.tesisId, request: verified.value };
 }

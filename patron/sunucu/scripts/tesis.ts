@@ -1,34 +1,34 @@
 // =============================================================================
-// SATICI CLI'si — patron bulutunda tesis · kurulum kaydı · ilk tesis yöneticisi (göç rolüyle).
-//   npx tsx scripts/tesis.ts tesis-ac --tesis=<uuid> --ad="Fabrika A.Ş." [--saklama=3|13|25|tumu]
-//        (bulut TEK TESİSLİ: kayıtlı başka tesis varsa REDDEDİLİR; aynı kimlikle yeniden koşum adı/saklamayı günceller)
-//   npx tsx scripts/tesis.ts tesis-durum --tesis=<uuid> --durum=AKTIF|PASIF
-//   npx tsx scripts/tesis.ts kurulum-kaydet --tesis=<uuid> --kurulum=<uuid> --acik-anahtar=<x> \
-//        --sinif=URETIM --moduller=patron-bulut,production.enabled --bitis=<ISO|yok> [--pasif]
-//        (`yok` = SÜRESİZ hak; NULL bitiş "hak dondu" demektir, CLI onu yazmaz)
-//   npx tsx scripts/tesis.ts yonetici-davet --tesis=<uuid> --eposta=<e-posta> --ad="Ad Soyad" [--saat=72]
-//   npx tsx scripts/tesis.ts yonetici-yeniden-davet --tesis=<uuid> --eposta=<e-posta> [--saat=72]
-//        (ikisi de tesiste AKTİF hesap yöneticisi varken REDDEDİLİR; zorunluysa yalnız
-//        `--zorla --talep=<talep no> --gerekce="…"` ile — talep ve gerekçe bulut denetimine yazılır)
-//   npx tsx scripts/tesis.ts kimlik-sifirla --tesis=<uuid> --eposta=<e-posta> --zorla --talep=<talep no> --gerekce="…" [--saat=72]
-//        (paylaşımlı bulut kimliğinin parola + TOTP sırrını siler; bütün tesislerde oturum kapanır, giriş durur;
-//        `--tesis`teki üyelik hesabı yeni davet alır ve kabulü kimliği yeniden sırlar. Zorlamasız RED; denetime yazılır)
+// TESİS CLI'si — Adnan patron bulutu TEK TESİSLİDİR; yönetim yalnız SSH + bu CLI (göç rolüyle, VDS'te `goc` kapsayıcısında).
+// Tesis kimliği komutlarda VERİLMEZ: bulutta tek tesis satırı vardır, her komut onu bulur (yoksa "önce tesis-ac").
+//   npx tsx scripts/tesis.ts tesis-ac --ad="Adnan Şahin" [--tesis=<uuid>] [--saklama=3|13|25|tumu]
+//        (kimlik verilmezse üretilir; kayıtlı tesis varken yeniden koşum adı/saklamayı günceller; BAŞKA kimlikle RED)
+//   npx tsx scripts/tesis.ts durum
+//        (tesis + kurulum kayıtlarının özeti; sır ve açık anahtar basılmaz)
+//   npx tsx scripts/tesis.ts kurulum-kaydet --kurulum=<uuid> --acik-anahtar=<x> [--pasif]
+//        (fabrikanın `scripts/patron-bulut-anahtar.ts` çıktısı; lisans sınıfı/modül/bitiş YOK — kayıt + anahtar + aktiflik)
+//   npx tsx scripts/tesis.ts yonetici-davet --eposta=<e-posta> --ad="Ad Soyad" [--saat=72]
+//   npx tsx scripts/tesis.ts yonetici-yeniden-davet --eposta=<e-posta> [--saat=72]
+//        (ilk yönetici / yönetici kalmadığında kurtarma; ikisi de AKTİF hesap yöneticisi varken REDDEDİLİR, zorunluysa
+//        yalnız `--zorla --talep=<talep no> --gerekce="…"` ile — talep ve gerekçe bulut denetimine yazılır)
+//   npx tsx scripts/tesis.ts kimlik-sifirla --eposta=<e-posta> --zorla --talep=<talep no> --gerekce="…" [--saat=72]
+//        (kayıp parola: kimliğin parola + TOTP sırrını siler, oturumlar kapanır, hesap izinleri KORUNARAK yeni davet alır)
 //   npx tsx scripts/tesis.ts dogrulama-kapat --eposta=<e-posta> --talep=<talep no> --gerekce="…"
 //        (kimliğin doğrulama kodunu (TOTP) kapatır — telefon kaybında TEK kurtarma yolu; parola ve oturumlar kalır;
-//        her üyelik tesisinin denetimine talep + gerekçeyle yazılır; e-posta çıktıya basılmaz)
+//        denetime talep + gerekçeyle yazılır; e-posta çıktıya basılmaz)
 //   npx tsx scripts/tesis.ts ozet-yenile [--apply]
 //        (giriş dizini anahtarı değişince: bağlı kimliklerin e-posta özetini geçerli anahtarla yeniden hesaplar; kuru
 //        koşum varsayılan, yalnız kimlik kimliği + sayı basar; çakışmada HİÇ yazmaz; anahtar dosyası YOKSA üretmez, durur)
-// Tesis/kurulum kimlikleri SATICIDAN gelir (HAK'taki `tesis.id` · `kurulumId`), burada uydurulmaz.
 // Davet belirteci YALNIZ bu komutun çıktısında, BİR KEZ basılır; repoya/loga/denetime yazılmaz.
+// Kimlik modeli ayrı dilimde ("Electron şifresi") değişecek; davet/kurtarma komutları o dilime dek geçerli.
 // =============================================================================
-import type { LicenseClass } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { FacilityDbKey, facilityDbKeyPath } from "../src/auth/facility-db-key";
 import { loadEnvFile } from "../src/lib/env";
+import { listReadyFacilities, withTesis } from "../src/lib/tenant";
 import { TesisDbRouter } from "../src/lib/tesis-db";
 import { applyDigestRekey, describePlan, planDigestRekey } from "../src/services/identity-rekey";
-import { parseCloudUntilArg } from "../src/services/service-lifecycle";
 import {
   assertSingleFacility,
   disableIdentityTwoFactor,
@@ -38,7 +38,6 @@ import {
   registerInstallation,
   reinviteAdmin,
   resetIdentity,
-  setFacilityStatus,
 } from "../src/services/vendor-admin.service";
 
 function args(argv: readonly string[]): Record<string, string> {
@@ -70,6 +69,14 @@ function gocUrl(env: NodeJS.ProcessEnv): string {
   const url = env.GOC_DATABASE_URL;
   if (!url) throw new Error("GOC_DATABASE_URL tanımlı değil");
   return url;
+}
+
+/** Bulutun tek tesisi; yoksa ya da (beklenmedik biçimde) birden çoksa durur. */
+async function soleFacility(db: TesisDbRouter): Promise<string> {
+  const all = await listReadyFacilities(db);
+  if (all.length === 0) throw new Error("Kayıtlı tesis yok — önce `tesis-ac --ad=\"…\"`");
+  if (all.length > 1) throw new Error(`Bulutta ${all.length} tesis var; tek tesis beklenir (veri elle incelenmeli)`);
+  return all[0]!;
 }
 
 /** Özet yenileme: önce plan (kuru), `--apply` ile ve planda çakışma yoksa yazar. Çıkış 0 temiz · 1 çakışma/okunamayan/durdu. */
@@ -113,35 +120,38 @@ async function main(): Promise<number> {
   try {
     switch (komut) {
       case "tesis-ac": {
-        const tesisId = uuidArg(a, "tesis");
+        const existing = await listReadyFacilities(db);
+        const tesisId = a.tesis ? uuidArg(a, "tesis") : existing.length === 1 ? existing[0]! : randomUUID();
         await assertSingleFacility(db, tesisId);
         const r = await openFacility(db, { tesisId, name: need(a, "ad"), retentionMonths: retention(a.saklama) });
         console.log(`✅ tesis ${r.tesisId} — ${r.name} (saklama: ${r.retentionMonths ?? "tümü"})`);
         break;
       }
-      case "tesis-durum": {
-        const durum = z.enum(["AKTIF", "PASIF"]).parse(need(a, "durum"));
-        await setFacilityStatus(db, { tesisId: uuidArg(a, "tesis"), status: durum });
-        console.log(`✅ tesis durumu ${durum}`);
+      case "durum": {
+        const tesisId = await soleFacility(db);
+        const { facility, installations } = await withTesis(db, { tesisId }, async (tx) => ({
+          facility: await tx.facility.findUnique({ where: { tesisId } }),
+          installations: await tx.installation.findMany({ where: { tesisId }, orderBy: { createdAt: "asc" } }),
+        }));
+        console.log(`tesis ${tesisId} — ${facility?.name ?? "?"} (saklama: ${facility?.retentionMonths ?? "tümü"})`);
+        if (installations.length === 0) console.log("  kurulum kaydı YOK — fabrika eşitlemesi 401 alır (`kurulum-kaydet`)");
+        for (const i of installations) console.log(`  kurulum ${i.installationId} — ${i.active ? "AKTİF" : "PASİF"}, anahtar ${i.keyId ?? "yok"}`);
         break;
       }
       case "kurulum-kaydet": {
         const r = await registerInstallation(db, {
-          tesisId: uuidArg(a, "tesis"),
+          tesisId: await soleFacility(db),
           installationId: uuidArg(a, "kurulum"),
           publicKeyX: need(a, "acik-anahtar"),
-          licenseClass: z.enum(["URETIM", "TEST", "DR", "DEMO", "BAYI", "BARINDIRILAN"]).parse(need(a, "sinif")) as LicenseClass,
-          modules: need(a, "moduller").split(",").map((s) => s.trim()).filter(Boolean),
-          cloudUntil: parseCloudUntilArg(need(a, "bitis")),
           active: a.pasif !== "true",
         });
-        console.log(`✅ kurulum ${r.installationId} — ${r.licenseClass}, patron bulutu ${r.modules.includes("patron-bulut") ? "VAR" : "yok"}`);
+        console.log(`✅ kurulum ${r.installationId} — ${r.active ? "AKTİF" : "PASİF"}`);
         break;
       }
       case "yonetici-davet":
       case "yonetici-yeniden-davet": {
         const zorla = overrideFromArgs(a);
-        const g = { tesisId: uuidArg(a, "tesis"), email: need(a, "eposta"), validHours: Number(a.saat ?? "72"), ...(zorla ? { zorla } : {}) };
+        const g = { tesisId: await soleFacility(db), email: need(a, "eposta"), validHours: Number(a.saat ?? "72"), ...(zorla ? { zorla } : {}) };
         const r = komut === "yonetici-davet" ? await inviteFacilityAdmin(db, { ...g, name: need(a, "ad") }) : await reinviteAdmin(db, g);
         console.log(`✅ davet hazır — hesap ${r.accountId}, bitiş ${r.expiresAt.toISOString()}`);
         console.log(`   Davet belirteci (BİR KEZ gösterilir; yöneticiye güvenli kanaldan iletin): ${r.token}`);
@@ -149,7 +159,7 @@ async function main(): Promise<number> {
       }
       case "kimlik-sifirla": {
         const zorla = overrideFromArgs(a);
-        const r = await resetIdentity(db, { tesisId: uuidArg(a, "tesis"), email: need(a, "eposta"), validHours: Number(a.saat ?? "72"), ...(zorla ? { zorla } : {}) });
+        const r = await resetIdentity(db, { tesisId: await soleFacility(db), email: need(a, "eposta"), validHours: Number(a.saat ?? "72"), ...(zorla ? { zorla } : {}) });
         console.log(`✅ kimlik sıfırlandı — hesap ${r.accountId} yeniden davetli, bitiş ${r.expiresAt.toISOString()}`);
         console.log(`   Davet belirteci (BİR KEZ gösterilir; kişiye güvenli kanaldan iletin): ${r.token}`);
         break;
@@ -157,11 +167,11 @@ async function main(): Promise<number> {
       case "dogrulama-kapat": {
         const zorla = overrideFromArgs({ ...a, zorla: "true" });
         const r = await disableIdentityTwoFactor(db, { email: need(a, "eposta"), ...(zorla ? { zorla } : {}) });
-        console.log(r.changed ? `✅ doğrulama kodu kapatıldı — ${r.facilities} tesis denetimine yazıldı; giriş: e-posta + parola` : "ℹ️  doğrulama kodu zaten kapalı — değişiklik yok");
+        console.log(r.changed ? `✅ doğrulama kodu kapatıldı — denetime yazıldı; giriş: e-posta + parola` : "ℹ️  doğrulama kodu zaten kapalı — değişiklik yok");
         break;
       }
       default:
-        throw new Error("Komut: tesis-ac | tesis-durum | kurulum-kaydet | yonetici-davet | yonetici-yeniden-davet | kimlik-sifirla | dogrulama-kapat | ozet-yenile");
+        throw new Error("Komut: tesis-ac | durum | kurulum-kaydet | yonetici-davet | yonetici-yeniden-davet | kimlik-sifirla | dogrulama-kapat | ozet-yenile");
     }
   } finally {
     await db.close();

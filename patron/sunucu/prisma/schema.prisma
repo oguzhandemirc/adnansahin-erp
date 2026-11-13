@@ -24,25 +24,9 @@ datasource db {
   provider = "postgresql"
 }
 
-/// Protokol `LICENSE_CLASSES` ile birebir (yalnız URETIM eşitleme gönderebilir).
-enum LicenseClass {
-  URETIM
-  TEST
-  DR
-  DEMO
-  BAYI
-  BARINDIRILAN
-}
-
 enum FacilityStatus {
   AKTIF
   PASIF
-}
-
-/// Kurulum kaydının kaynağı: satıcı CLI'si ile yapılandırılmış kayıt ya da satıcı iç API'si önbelleği.
-enum InstallationSource {
-  KAYIT
-  SATICI
 }
 
 enum IdentityStatus {
@@ -166,19 +150,16 @@ model LoginRoute {
 }
 
 // -----------------------------------------------------------------------------
-// TESİS · KURULUM (satıcının Müşteri → Tesis → Kurulum ağacının buluttaki yansıması)
+// TESİS · KURULUM (tek tesis: CLI `scripts/tesis.ts tesis-ac` + `kurulum-kaydet`)
 // -----------------------------------------------------------------------------
 
-/// Tesis — `tesis_id` satıcının HAK'taki `tesis.id`sidir (kimlik satıcıda doğar). Saklama süresi
-/// portal ayarıdır (3 · 13 · 25 ay · NULL = tümü; varsayılan 13).
-/// `serviceEndedAt`: hizmetin bittiği DONMUŞ an (NULL = açık); aşama tek kaynaktan türer
-/// (`src/services/service-lifecycle.ts`: açık → 90 gün salt okuma → kapalı/imha bekliyor).
+/// Tesis — bulutta TEK satır (tek tesis; `tesis-ac` ikinci tesisi reddeder). Saklama süresi
+/// ayardır (3 · 13 · 25 ay · NULL = tümü; varsayılan 13). Hizmet aşaması/lisans bitişi YOK (ayıklama D5).
 model Facility {
   tesisId         String         @id @map("tesis_id") @db.Uuid
   name            String         @map("name") @db.VarChar(200)
   retentionMonths Int?           @default(13) @map("retention_months")
   status          FacilityStatus @default(AKTIF) @map("status")
-  serviceEndedAt  DateTime?      @map("service_ended_at") @db.Timestamptz
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -188,23 +169,17 @@ model Facility {
   @@map("facilities")
 }
 
-/// Kurulum kaydı — imzalı isteği doğrulamak için açık anahtar + eşitleme hakkı (sınıf, modüller,
-/// patron bulutu bitişi). Kaynak: satıcı CLI'si (KAYIT) ya da satıcı iç API önbelleği (SATICI).
+/// Kurulum kaydı — imzalı isteği doğrulamak için fabrikanın açık anahtarı + aktiflik. Tek kaynak CLI
+/// (`kurulum-kaydet`); lisans sınıfı, modül hakkı, abonelik bitişi ve devir YOK (ayıklama D5).
 model Installation {
-  id             String             @id @default(uuid()) @db.Uuid
-  tesisId        String             @map("tesis_id") @db.Uuid
-  installationId String             @unique @map("kurulum_id") @db.Uuid
-  publicKeyX     String?            @map("public_key_x") @db.VarChar(43)
-  keyId          String?            @map("key_id") @db.VarChar(47)
-  licenseClass   LicenseClass       @map("license_class")
-  modules        String[]           @map("modules")
-  cloudUntil     DateTime?          @map("cloud_until") @db.Timestamptz
-  handedOver     Boolean            @default(false) @map("handed_over")
-  active         Boolean            @default(true) @map("active")
-  source         InstallationSource @map("source")
-  refreshedAt    DateTime           @map("refreshed_at") @db.Timestamptz
-  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  tesisId        String   @map("tesis_id") @db.Uuid
+  installationId String   @unique @map("kurulum_id") @db.Uuid
+  publicKeyX     String?  @map("public_key_x") @db.VarChar(43)
+  keyId          String?  @map("key_id") @db.VarChar(47)
+  active         Boolean  @default(true) @map("active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   facility Facility @relation(fields: [tesisId], references: [tesisId], onDelete: Restrict)
 

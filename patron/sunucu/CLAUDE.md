@@ -36,7 +36,7 @@ Kilit tx'in İLK ifadesidir ve kiracı ayarıyla AYNI SELECT'te alınır (`lib/t
 
 ## Alt-alan kuralları — dokunmadan önce oku
 
-ana ürün `kurallar/patron-bulutu.md` (docs, TeksERP@19aa48a9; bu repoda yok) § Patron sunucusu — Kurulum kaydı · Hizmet aşaması · Hesaplar · Bildirimler (B5).
+ana ürün `kurallar/patron-bulutu.md` (docs, TeksERP@19aa48a9; bu repoda yok) § Patron sunucusu — Kurulum kaydı · Hesaplar · Bildirimler (B5). Hizmet aşaması Adnan'da YOK (süresiz; `hizmet` alanı sabit ACIK — `MIMARI.md`).
 
 ## Budama beyanı (telemetri + okuma kopyası)
 

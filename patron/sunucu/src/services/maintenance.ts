@@ -1,8 +1,8 @@
 // BAKIM İŞİ — süreç içi zamanlayıcı (dakikalık tik + günde bir budama). Tesis listesi merkezden (HAZIR tesis
 // DB'leri), her satır işi o tesisin DB'sinde ve kiracı kapsamında (RLS) koşar; bir tesisin hatası ötekini durdurmaz.
 //   · Tik: süresi dolan claim'ler — gelen kutusu ISLENIYOR → BEKLIYOR (fabrikanın makbuzu tekrarı
-//     idempotent kılar); rapor HESAPLANIYOR → BEKLIYOR (bir kez), ikincide HATA `ZAMAN_ASIMI`; hizmet
-//     bitiş damgası (`service-lifecycle.ts`); kapanıştan 30 gün geçen hesabın kimlik silmesi; merkez kimliğinin
+//     idempotent kılar); rapor HESAPLANIYOR → BEKLIYOR (bir kez), ikincide HATA `ZAMAN_ASIMI`;
+//     kapanıştan 30 gün geçen hesabın kimlik silmesi; merkez kimliğinin
 //     kapanışı (bağlı üyeliği kalmayınca) ve 30 gün sonra silmesi; 30 günü dolan giriş olayının IP alanı (`AGED_FIELDS`).
 //   · Günlük: SAKLAMA (tesis başına 3 · 13 · 25 ay · tümü) + telemetri/ayak izi budaması.
 // Hard delete YALNIZ burada ve YALNIZ `PRUNED_TABLES` beyanındaki tablolarda (bekçi
@@ -16,7 +16,6 @@ import type { Tx } from "../lib/db";
 import { listReadyFacilities, withCentral, withTesis } from "../lib/tenant";
 import type { CloudContext } from "./context";
 import { closeAndPurgeIdentities } from "./identity-purge";
-import { refreshAllServiceEnds } from "./service-lifecycle";
 
 /** Yaşa göre hard delete izni olan tablolar (beyan) → gerekçe. Başka her silme yasak. */
 export const PRUNED_TABLES = {
@@ -339,7 +338,6 @@ export class MaintenanceScheduler {
     this.running = true;
     try {
       await expireClaims(this.ctx, nowMs);
-      const service = await refreshAllServiceEnds(this.ctx, nowMs);
       let purged = 0;
       for (const f of await listFacilities(this.ctx)) {
         purged += (await perFacility(f.tesisId, "kimlik silme", () => purgeClosedIdentities(this.ctx, f.tesisId, nowMs))) ?? 0;
@@ -356,8 +354,6 @@ export class MaintenanceScheduler {
         const n = await runDaily(this.ctx, nowMs);
         this.lastDailyDay = day;
         if (n > 0) console.log(`[patron] bakım: ${n} satır budandı (saklama + telemetri)`);
-        // İmha insan işidir (tutanak): salt okuma süresi dolan tesis her gün hatırlatılır (Ek-6/A §4.3).
-        if (service.awaitingDestruction.length > 0) console.warn(`[patron] imha bekleyen tesis (salt okuma süresi doldu — scripts/tesis.ts imha): ${service.awaitingDestruction.join(", ")}`);
       }
     } catch (err) {
       console.error(`[patron] bakım turu başarısız: ${(err as Error).message}`);
