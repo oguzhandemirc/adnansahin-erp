@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Kurulum provası (D8): eski backend (2.11.7) ile yeni backend'i, fabrika verisinin
 // İKİ AYRI yerel kopyasında yan yana koşturup ölçer. Bekçi DEĞİLDİR; yalnız
-// `_d8_`/`_prova`/`_test` adlı yerel veritabanlarında ve 127.0.0.1 adreslerinde çalışır.
+// `_d<n>_`/`_prova`/`_test` adlı yerel veritabanlarında ve 127.0.0.1 adreslerinde çalışır.
 //
 // Alt komutlar (çıktılar --out dizinine JSON/metin olarak yazılır):
 //   snapshot  --db=<ad> --out=<dosya>             tablo başına satır sayısı + içerik özeti
@@ -26,7 +26,7 @@ const PG_AYAR = { host: "127.0.0.1", port: Number(process.env.PGPORT ?? 55440), 
 
 // ---------- korumalar ----------
 function dbKorumasi(ad, yazma) {
-  if (!/^[a-z0-9_]+$/.test(ad) || !/(_d8_|_prova|_test)/.test(ad)) throw new Error(`REDDEDİLDİ: '${ad}' prova/test veritabanı değil`);
+  if (!/^[a-z0-9_]+$/.test(ad) || !/(_d\d+_|_prova|_test)/.test(ad)) throw new Error(`REDDEDİLDİ: '${ad}' prova/test veritabanı değil`);
   if (yazma && ad === SABLON_DB) throw new Error(`REDDEDİLDİ: ${SABLON_DB} şablondur, ona yazılmaz`);
   if (PG_AYAR.host !== "127.0.0.1") throw new Error("REDDEDİLDİ: yalnız 127.0.0.1");
 }
@@ -92,7 +92,7 @@ async function kullanici(ad, kodlarDb) {
   );
   const r = await c.query(
     `INSERT INTO user_permissions (id, "userId", "permissionId", "grantedById", "createdAt", "updatedAt")
-     SELECT md5($1::text || p.code)::uuid, $1, p.id, $1, now(), now() FROM permissions p WHERE p.code = ANY($2)
+     SELECT md5($1::text || p.code)::uuid, $1::uuid, p.id, $1::uuid, now(), now() FROM permissions p WHERE p.code = ANY($2)
      ON CONFLICT DO NOTHING`,
     [PROVA_KULLANICI.id, kodlar],
   );

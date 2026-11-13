@@ -17,6 +17,30 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-13",
+      "baslik": "Müşteri Özeti, yeni anasayfa ve Bağlı Cihazlar",
+      "surumler": {
+        "panel": "1.3.16"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Müşteri kartına \"Özet\" sekmesi eklendi: müşterinin son siparişleri, açık siparişleri, sevk edilenleri ve iadeleri tek yerde görünür. Her bölümden ilgili listeye geçilir. Yetkinizin olmadığı bölüm gösterilmez. Sekme yalnız gösterir, hiçbir kaydı değiştirmez."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Anasayfa kutulardan oluşan bir panoya dönüştü: üretim, sevkiyat, sipariş, fason ve stok rakamları, grafikler ve bekleyen işler ayrı kutularda görünür. \"Panoyu düzenle\" ile kutu ekleyip çıkarabilir, sürükleyerek sıralayabilirsiniz; \"Varsayılana dön\" ilk düzene döndürür. Yetkinizin olmadığı kutu gösterilmez."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Sistem altına \"Bağlı Cihazlar\" ekranı eklendi: hangi kullanıcının hangi cihazda, uygulamanın hangi sürümüyle çalıştığı ve en son ne zaman görüldüğü tek listede görünür. Eski sürümde kalan cihazlar renkle işaretlenir. Ekran yalnız gösterir, hiçbir kaydı değiştirmez."
+        }
+      ]
+    },
+    {
       "id": "2026-11-12c",
       "baslik": "Güncelleme denetimi sıklaştı",
       "surumler": {
@@ -46,20 +70,6 @@
           "kapsam": "tablet",
           "tip": "iyilestirme",
           "metin": "Güncellemeler artık yalnız Google Play'den gelir; uygulama yeni sürümü kendisi bildirir. Yeni sürüm olunca ana menüde \"Yeni sürüm hazır\" der; \"Güncelle\"ye dokunmanız yeter. Bir işin ortasındayken sormaz, internet yoksa sessiz kalır."
-        }
-      ]
-    },
-    {
-      "id": "2026-11-12",
-      "baslik": "Müşteri kartında Özet sekmesi",
-      "surumler": {
-        "panel": "1.3.16"
-      },
-      "maddeler": [
-        {
-          "kapsam": "panel",
-          "tip": "yeni",
-          "metin": "Müşteri kartına \"Özet\" sekmesi eklendi: müşterinin son siparişleri, açık siparişleri, sevk edilenleri ve iadeleri tek yerde görünür. Her bölümden ilgili listeye geçilir. Yetkinizin olmadığı bölüm gösterilmez. Sekme yalnız gösterir, hiçbir kaydı değiştirmez."
         }
       ]
     },
