@@ -17,7 +17,7 @@ import { AppError } from "../utils/app-error";
 import {
   resolveLoginLockoutKeys,
   reserveLoginAttempt,
-  resetLoginLockout,
+  settleLoginSuccess,
   releaseLoginAttempt,
 } from "../middlewares/login-lockout";
 import "../types/express-augment";
@@ -136,9 +136,10 @@ export class AuthController {
     // devam eder, yani DoS ayağı hiç kapanmaz.
     //
     // ⚠️ ANAHTAR ORTAMA GÖRE İKİ BİÇİMDE (bkz. login-lockout.ts başlığı):
-    //  • Fabrika (TRUST_PROXY yok) → TEK anahtar = req.ip, yani BUGÜNKÜ davranış.
-    //    Kullanıcı adı bilerek katılmaz: soket IP'si zaten cihaz başınadır ve
-    //    kullanıcı adını eklemek password-spraying'e kapı açardı.
+    //  • Fabrika (TRUST_PROXY yok) → geniş kova = req.ip (×1, eşik BUGÜNKÜ gibi:
+    //    aynı IP'den 5 hata kilit, kullanıcı adı değiştirmek spraying'e kapı
+    //    açmaz) + dar kova `ip|kullanıcı` (Y4: başarılı giriş yalnız kendi
+    //    hatalarını geniş kovadan düşebilsin diye; bkz. settleLoginSuccess).
     //  • Ters vekil arkasında → İKİ kova: dar (`ip|kullanıcı`, ×1) hesabı korur,
     //    geniş (`ip`, ×5) spraying'i yakalar. Orada tek-IP kilidi ANLAMSIZDIR:
     //    tüm ziyaretçiler kenar IP'sinden gelir ve şifresini yanlış giren ilk
@@ -189,7 +190,7 @@ export class AuthController {
 
     try {
       const result = await AuthService.login(body.username, body.password, ctx);
-      resetLoginLockout(lockoutKey);
+      settleLoginSuccess(lockoutKey, "account");
 
       // SystemLog'a AUTH event (Sistem Kayıtları sayfası bunu okur).
       void AuditService.logEvent({
@@ -290,7 +291,7 @@ export class AuthController {
     };
     try {
       const result = await AuthService.loginWithCard(body.cardCode, ctx);
-      resetLoginLockout(lockoutKey);
+      settleLoginSuccess(lockoutKey, "device");
       void AuditService.logEvent({
         category: "AUTH",
         action: "LOGIN_SUCCESS",
@@ -376,7 +377,7 @@ export class AuthController {
     };
     try {
       const result = await AuthService.loginWithQuickPin(body.pin, ctx);
-      resetLoginLockout(lockoutKey);
+      settleLoginSuccess(lockoutKey, "device");
       void AuditService.logEvent({
         category: "AUTH",
         action: "LOGIN_SUCCESS",
@@ -630,7 +631,7 @@ export class AuthController {
     };
     try {
       const result = await AuthService.changeOwnPassword(userId, body.currentPassword, body.newPassword, ctx);
-      resetLoginLockout(lockoutKey);
+      settleLoginSuccess(lockoutKey, "account");
       res.status(200).json({
         success: true,
         data: { token: result.token, user: result.user },

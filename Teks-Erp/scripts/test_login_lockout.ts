@@ -3,7 +3,7 @@
 // Çalıştır: npx tsx scripts/test_login_lockout.ts
 // Doğrulananlar:
 //   1. N ardışık yanlış PIN → eşik aşılınca sonraki istek 429 (LOGIN_LOCKED + retryAfterSec).
-//   2. Başarılı giriş sayacı SIFIRLAR (reset) — sonraki yanlışlar baştan sayılır.
+//   2. Y4: başarılı PIN önceki yanlışları SİLMEZ (yalnız kendi rezervasyonunu geri alır).
 //   3. Escalate: ceza turu escalateAfter'a varınca KISA ceza yerine UZUN ceza uygulanır.
 //   4. Kart girişi de aynı kilide tabi (N yanlış kart → 429).
 //   5. pinLockoutEnabled=false → reserveLoginAttempt hep {blocked:false} (kilit uygulanmaz).
@@ -153,21 +153,23 @@ async function main() {
     check("1.5 retryAfterSec ≈ 60 (kısa ceza)", (bl.retryAfterSec ?? 0) > 0 && (bl.retryAfterSec ?? 0) <= 60, `${bl.retryAfterSec}`);
 
     // =====================================================================
-    // 2) Başarılı giriş sayacı SIFIRLAR
+    // 2) Y4 (2026-11-13): başarılı PIN sayacı SIFIRLAMAZ — kimlik cihazdır,
+    //    başarı önceki yanlışların sahibini kanıtlamaz; araya geçerli PIN
+    //    sokan saldırgan sınırsız deneyemesin (test_login_lockout_success_settle).
     // =====================================================================
     const ipB = `10.9.0.2-${ts}`; usedKeys.push(ipB);
-    // 2 yanlış (fails=2, henüz blok yok) → sonra DOĞRU pin → reset.
+    // 2 yanlış (fails=2) → DOĞRU pin (kendi rezervasyonu geri alınır, fails=2 kalır).
     await invoke(AuthController.loginQuickPin, { body: { pin: wrongPin }, ip: ipB });
     await invoke(AuthController.loginQuickPin, { body: { pin: wrongPin }, ip: ipB });
     const okLogin = await invoke(AuthController.loginQuickPin, { body: { pin: realPin }, ip: ipB });
     const okData = okLogin.jsonBody as { success?: boolean; data?: { token?: string } } | undefined;
     check("2a doğru PIN → 200 + token", okLogin.statusCode === 200 && typeof okData?.data?.token === "string", `status=${okLogin.statusCode}`);
-    // Reset çalıştıysa: sıfırdan 2 yanlış hâlâ blok DEĞİL (eşik 3). Reset olmasaydı
-    // pre=2 + 1. yanlış = 3 → blok kurulur, 2. yanlış → 429 olurdu.
+    // Sayaç kalır: 1. yanlış eşiği (3) kurar ama doğrulamaya geçer (401),
+    // 2. yanlış 429. Eski davranışta (reset) ikisi de 401'di.
     const afterReset1 = await invoke(AuthController.loginQuickPin, { body: { pin: wrongPin }, ip: ipB });
     const afterReset2 = await invoke(AuthController.loginQuickPin, { body: { pin: wrongPin }, ip: ipB });
-    check("2b başarı SONRASI 1. yanlış → 401 (sayaç sıfırlandı)", is401(afterReset1.nextError));
-    check("2c başarı SONRASI 2. yanlış → 429 DEĞİL (401)", is401(afterReset2.nextError) && !is429Locked(afterReset2.nextError).ok);
+    check("2b başarı SONRASI 1. yanlış → 401 (eşiği kurar)", is401(afterReset1.nextError), String(afterReset1.nextError));
+    check("2c Y4: başarı SONRASI 2. yanlış → 429 (sayaç sıfırlanmadı)", is429Locked(afterReset2.nextError).ok, String(afterReset2.nextError));
 
     // =====================================================================
     // 3) Escalate → uzun ceza (modül-seviye: rounds escalateAfter'a varınca)

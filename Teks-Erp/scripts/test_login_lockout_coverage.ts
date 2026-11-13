@@ -69,7 +69,7 @@ async function main(): Promise<void> {
     scanned++;
     const reserveAt = body.indexOf("reserveLoginAttempt(");
     check(`${name}: reserveLoginAttempt çağırıyor`, reserveAt !== -1);
-    check(`${name}: başarıda resetLoginLockout çağırıyor`, body.includes("resetLoginLockout("));
+    check(`${name}: başarıda settleLoginSuccess çağırıyor (Y4)`, body.includes("settleLoginSuccess("));
     check(
       `${name}: kimlik-dışı hatada releaseLoginAttempt çağırıyor`,
       body.includes("releaseLoginAttempt("),
