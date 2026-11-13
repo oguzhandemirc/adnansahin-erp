@@ -41,5 +41,27 @@ export async function recordAudit(db: TesisDbRouter, entry: AuditEntry): Promise
   }
 }
 
+/** Toplu ayak izi (fabrika kullanıcı kümesi): tek kiracı kapsamında tek INSERT; best-effort, iş tx'inin DIŞINDA. */
+export async function recordAuditMany(db: TesisDbRouter, tesisId: string, entries: readonly AuditEntry[]): Promise<void> {
+  if (entries.length === 0) return;
+  try {
+    await withTesis(db, { tesisId }, (tx) =>
+      tx.accountAudit.createMany({
+        data: entries.map((e) => ({
+          tesisId,
+          actor: e.actor,
+          event: e.event,
+          entity: e.entity,
+          entityId: e.entityId ?? null,
+          ...(e.summary === undefined ? {} : { summary: e.summary }),
+        })),
+      }),
+    );
+  } catch (err) {
+    failures++;
+    console.error(`[patron] denetim yazılamadı (${entries.length} satır): ${(err as Error).message}`);
+  }
+}
+
 /** Aktör biçimi: `hesap:<id>` · `satici-cli` · `fabrika:<kurulumId>` · `sistem`. */
 export const accountActor = (accountId: string): string => `hesap:${accountId}`;
