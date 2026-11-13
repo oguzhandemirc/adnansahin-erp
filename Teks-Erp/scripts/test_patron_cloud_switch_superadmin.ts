@@ -18,7 +18,7 @@
 //   W1 kapı halkası `next()`e indirildi — kırmızı.
 //   W2 kümeden `patronCloud.inboxEnabled` çıkarıldı — kırmızı.
 // =============================================================================
-import type { NextFunction, Request, Response } from "express";
+import type { IRouter, NextFunction, Request, Response } from "express";
 import prisma, { pool } from "../src/lib/prisma";
 import adminRouter from "../src/routes/admin.routes";
 import { AppError } from "../src/utils/app-error";
@@ -32,12 +32,14 @@ function check(label: string, ok: boolean, extra = ""): void {
   else { fail++; console.log(`❌ ${label}${extra ? " — " + extra : ""}`); }
 }
 
-type Layer = { handle: (req: Request, res: Response, next: NextFunction) => unknown; name: string };
-type RouteLayer = { route?: { path: string; methods: Record<string, boolean>; stack: Layer[] } };
+type Layer = IRouter["stack"][number];
 
+/** PUT /settings/:key zinciri — Express'in tipli `stack`i; yöntem rota katmanlarının `method`unda. */
 function chain(): Layer[] {
-  const stack = (adminRouter as unknown as { stack: RouteLayer[] }).stack;
-  return stack.find((l) => l.route?.path === "/settings/:key" && l.route.methods.put)?.route?.stack ?? [];
+  const route = adminRouter.stack.find(
+    (l) => l.route?.path === "/settings/:key" && l.route.stack.some((s) => s.method === "put"),
+  )?.route;
+  return route?.stack.filter((s) => s.method === "put") ?? [];
 }
 
 /** Tek halka: next(err?) → {advanced, err}; yanıt gönderilirse advanced=false. */

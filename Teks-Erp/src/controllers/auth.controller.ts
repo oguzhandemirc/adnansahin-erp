@@ -589,6 +589,34 @@ export class AuthController {
     }
   }
   /**
+   * @openapi
+   * /api/auth/change-password:
+   *   post:
+   *     tags: [Auth]
+   *     summary: Kendi parolasını değiştir
+   *     description: |
+   *       Normal ya da kısıtlı (passwordChangeRequired) oturumla çağrılır. Yeni parola
+   *       parola kuralından geçer (en az 10 karakter, yaygın/kullanıcı adına dayalı olamaz).
+   *       Başarıda kullanıcının bütün oturumları düşer ve yanıt yeni tam token taşır.
+   *     security: [{ bearerAuth: [] }]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [currentPassword, newPassword]
+   *             properties:
+   *               currentPassword: { type: string }
+   *               newPassword: { type: string }
+   *               clientType: { type: string }
+   *     responses:
+   *       200: { description: Parola değişti; yeni token döner }
+   *       400: { description: Mevcut parola yanlış ya da yeni parola kurala uymuyor }
+   *       401: { description: Token yok ya da geçersiz }
+   *       429: { description: Çok fazla deneme }
+   */
+  /**
    * POST /api/auth/change-password — KENDİ parolasını değiştir (2026-11-13).
    * Normal oturum da kısıtlı oturum (`passwordChangeRequired`) da çağırabilir.
    * Başarıda bu cihaz dahil bütün oturumlar düşer ve yanıt yeni TAM token taşır.
