@@ -13223,3 +13223,13 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Nasıl.** `expo-updates` ve `expo-intent-launcher` bağımlılıktan, `updates`/`runtimeVersion`/kod imzalama yapılandırması `app.json`dan çıktı; `REQUEST_INSTALL_PACKAGES` engellendi. Uygulamada OTA denetimi/indirme ve kendi-APK şeridi kalktı; tek yol uygulama içi Play güncellemesi, zorunluluğu sunucu `minVersion`ı belirler; `minPaketTarihi` istemcide okunmaz (backend alanı yerinde, ayrı dilimde kalkar). `yayinla-ota.mjs` ve `deploy/mobil-yayinla.mjs` silindi; `deploy/kanallar.json` tablet OTA alanlarını taşımaz (kapalı şema reddeder). `build-apk` paketin ETKİN OTA meta verisi taşımadığını ölçer — Expo prebuild expo-updates kurulu değilken de `ENABLED=false` + iki varsayılan yazar, bunlar iz sayılmaz. `feed.cjs`/`manifest.mjs` yalnız backend OTA ucu bekçisi (`test_mobile_update` §9–§10) için kalıntıdır.
 
 **Ölçüm.** `check-kanallar` yeşil + sonda (yeni negatifler: app.json'a OTA, kayda `otaManifest`, package.json'a `expo-updates`, silinen yayıncının dönüşü); `test_kanal_yayin_kapisi` 68/0; `test_surum` 16/0; mobil jest 1303/1303.
+
+## 2026-11-13 — Stok kalem listesi (anlık `stok-kalem`) [PROFİL]
+
+**Karar.** Patron uygulamasında stok Ham/Bitmiş ikiye ayrılır ve kalem bazında (ham: kumaş; bitmiş: kumaş + en + renk + kat) ya da top bazında listelenir; panelde Stok & Ölü Stok'a "Kalem ve top" sekmesi gelir. Veri rapor isteğiyle değil ANLIKLA gider (`stok-kalem`), çünkü patron listeyi sık açar ve boyut sınırın altındadır.
+
+**Ölçüm (yerel prova kopyası, 1008 raf topu).** Ham 254.742 B / gzip 44.844 B (sınır 150 KB); kurulum ~134 ms. Sayılar karne kutularıyla aynı (Ham 342 top, Bitmiş 666 top).
+
+**Yaş.** Top yaşı fabrika takvim günüdür (saat değil): gün içinde sabit kalır, stok değişmedikçe içerik özeti değişmez ve anlık yeniden gönderilmez (iki tur aynı özet, ölçüldü).
+
+**Panel.** "Top bazında" görünümdeyken Excel/PDF top tablosunu basar (bölüm başına sayfa, en eski üstte); kalem görünümünde kalem tablosunu.

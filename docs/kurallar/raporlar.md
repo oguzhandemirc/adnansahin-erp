@@ -41,6 +41,7 @@ Raporlar (karneler, sevk/sipariş/stok/kalite/fire/fason/WIP raporları) ve list
 - Dönem karşılaştırmasını yalnız `_shared.resolveCompareRange` kursun (prev = aynı uzunlukta önceki pencere, prevYear = takvim yılı kaydırması). [inceleme]
 - Panelde yaprak rapor önce cevabı gösterir: katalogdaki soru cümlesi `ReportPageLayout`tan, özet şeridi (`MetricCard`) tablodan önce. [bekçi: reportSummaryCoverage.test.ts]
 - Her yaprak rapora `ReportExportBar` (Excel · PDF · Yazdır) koy; üç çıktı tek `ReportExportSpec`ten türer ve rapor PDF'i `document-render/`e girmez. [bekçi: reportExportCoverage.test.ts]
+- Stok kalem toplarını `getStockKalemRolls`tan al (kalem ucuyla aynı raf kümesi), rulo listesi ucunu kullanma; "Top bazında" görünümde Excel/PDF top tablosunu basar. [bekçi: test_stok_kalem_raporu · stockKalem.test.ts]
 - Excel'de görünen sayı biçimini `lib/number-format`ten türet; rapor spec'i yalnız `REPORT_NUM_FMTS` biçimlerini kullanır. [bekçi: reportNumFmt.guard.test.ts]
 
 ### Filtre, liste, arama
