@@ -18,8 +18,14 @@
 //  §j desteklenmeyen tür → makbuzsuz ret buluta gider; belirsiz hata 3 turda makbuzlu ret; yeniden başlatma
 //     (sayaç sıfırı) ve kaybolan sonuç bildirimi zararsız — ikinci kayıt doğmaz.
 //  §k iş hatası istek yolunu etkilemez: bulut erişilemezken tur fırlatmaz, aynı süreçte API 200.
+//  §l yazar denetimi (F3): yazar = bulut hesabı = fabrika kullanıcısı, işlendiği AN güncel izniyle denetlenir —
+//     bilinmeyen id · pasif · `patron:giris` geri alınmış · `order:write` yok (SIPARIS RET, CARI
+//     geçer) · teknik kullanıcı yazar → makbuzlu RET IS_KURALI "Yetkiniz fabrikada kaldırılmış", kayıt doğmaz;
+//     ret makbuzu kalıcı, izin geri verilince YENİ mesaj işlenir. (UUID olmayan kimlik işleyiciye ulaşmaz: `al`
+//     yanıtı `hesapId: z.uuid()` ile süzülür.)
 //
 // DB: oturumun `_test` veritabanı (koşucu kapısı). Fixture `TEST-D4` damgalı ve `finally`de FK sırasıyla silinir.
+// Yazar kullanıcıları (`TEST-D4-yazar-*`) sert silinmez: izinleri silinir, kullanıcı pasif + silinmiş işaretlenir.
 // §d kısa ad ölçümü `TST-` damgalı 8 harflik adlarla yapılır (katlanmış uzunluk ≤ 8 → kısa ad eşiği).
 // Teknik kullanıcı satırı silinemez (audit FK'sı): bu koşum doğurduysa sonunda kaydı silinir, kullanıcı
 // `TEST-pb-*` adıyla pasif + silinmiş işaretlenir — sonraki koşum yine "doğmadı → doğdu" ölçer.
@@ -30,6 +36,10 @@
 //   · sipariş ayrı tx'te yazıldı (makbuzla aynı tx değil) → §g ×3 ✗ (sipariş kaldı, numara N+2)
 //   · `issueToken` teknik kullanıcı reddi kaldırıldı → §i parola/PIN/kart ✗ — üçü de TOKEN aldı (koruma tek engel)
 //   · benzer ad reddi kaldırıldı → §d ×3 ✗ · yazma ayarı uygunluktan çıkarıldı → §h ×7 ✗ (kullanıcı doğdu, 3 dış istek)
+// NEGATİF SONDA (2026-11-13, F3; ikisi de kırmızı verdi, geri alındı; 96 kontrol):
+//   · `assertAuthorStillAllowed` çağrısı kaldırıldı → §l ×8 ✗ (bilinmeyen/pasif/geri alınmış/siparişsiz/teknik yazar
+//     kayıt açtı; ret makbuzu kalıcılığı da düştü)
+//   · CARI türü `bulut:siparis:yaz` istedi (tür→izin eşlemesi bozuldu) → §l siparişsiz yazarın müşteri kartı ✗
 // =============================================================================
 import http from "node:http";
 import https from "node:https";
@@ -49,6 +59,7 @@ import { ENVELOPE_VERSION, InboxResultRequestSchema, SYNC_PATHS, type InboxOutco
 import { inboxEligibility, type InboxEligibility } from "../src/cloud-sync/eligibility";
 import type { CloudTransport } from "../src/cloud-sync/cloud-client";
 import { generateKeyFile, loadKeyFile } from "../src/lib/cloud-signing/key-file";
+import { reconcilePermissionCatalog } from "../src/jobs/permission-catalog.job";
 import { reconcilePatronCloud, type InboxReconcileDeps, type ReconcileDeps } from "../src/jobs/patron-cloud.jobs";
 import {
   __cloudInboxTimerArmedForTests,
@@ -59,7 +70,7 @@ import {
   startCloudInbox,
   stopCloudInbox,
 } from "../src/jobs/cloud-inbox.job";
-import { PRICE_IGNORED_NOTE, processInboxMessage, UNPROCESSABLE_MESSAGE, UNSUPPORTED_KIND_MESSAGE, type ClaimedMessage } from "../src/services/patron-inbox/inbox.service";
+import { AUTHOR_REVOKED_MESSAGE, PRICE_IGNORED_NOTE, processInboxMessage, UNPROCESSABLE_MESSAGE, UNSUPPORTED_KIND_MESSAGE, type ClaimedMessage } from "../src/services/patron-inbox/inbox.service";
 import { INBOX_CUSTOMER_CONFIG, inboxCardWriter } from "../src/services/patron-inbox/customer-create";
 import { ensurePatronCloudUser, PATRON_CLOUD_USERNAME, readPatronCloudUserId } from "../src/services/patron-cloud-user.service";
 import { PATRON_CLOUD_USER_SETTING_KEY, isReservedSettingKey } from "../src/constants/reserved-settings";
@@ -76,7 +87,8 @@ function check(l: string, ok: boolean, x = ""): void {
 }
 
 const STAMP = "TEST-D4";
-const HESAP_ID = "0d4d4d4d-0000-4000-8000-00000000d4d4";
+/** Telefon yazısının yazarı — fixture fabrika kullanıcısı (`patron:giris` + `order:write` + `customer:write`). */
+let authorId = "";
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 const letters = (n: number): string => Array.from(randomBytes(n), (b) => "BCDFGHJKLMNPRSTVYZ"[b % 18]).join("");
 
@@ -86,9 +98,25 @@ const orderIds = new Set<string>();
 const customerIds = new Set<string>();
 const itemIds: string[] = [];
 const colorIds: string[] = [];
+const authorUserIds: string[] = [];
+
+async function mkAuthor(tag: string, codes: readonly string[], over: Record<string, unknown> = {}): Promise<string> {
+  const u = await prisma.user.create({
+    data: { username: `${STAMP}-yazar-${tag}-${randomBytes(3).toString("hex")}`, fullName: `${STAMP} yazar ${tag}`, passwordHash: await bcrypt.hash(`D4-${randomUUID()}`, 10), ...over },
+    select: { id: true },
+  });
+  authorUserIds.push(u.id);
+  for (const code of codes) {
+    const p = await prisma.permission.findUnique({ where: { code }, select: { id: true } });
+    if (!p) throw new Error(`izin DB'de yok: ${code}`);
+    await prisma.userPermission.create({ data: { userId: u.id, permissionId: p.id } });
+  }
+  return u.id;
+}
+const AUTHOR_CODES = ["patron:giris", "order:write", "customer:write"] as const;
 
 function msg(tur: string, govde: unknown, over: Partial<ClaimedMessage> = {}): ClaimedMessage {
-  const m: ClaimedMessage = { mesajId: randomUUID(), tur, govde, hesapId: HESAP_ID, hesapAdi: `${STAMP} Patron`, olusturulma: new Date().toISOString(), ...over };
+  const m: ClaimedMessage = { mesajId: randomUUID(), tur, govde, hesapId: authorId, hesapAdi: `${STAMP} Patron`, olusturulma: new Date().toISOString(), ...over };
   messageIds.push(m.mesajId);
   return m;
 }
@@ -187,6 +215,8 @@ async function main(): Promise<void> {
 
   try {
     const admin = await ensureTestAdmin();
+    await reconcilePermissionCatalog();
+    authorId = await mkAuthor("tam", AUTHOR_CODES);
 
     // ── §h yazma KAPALI (okuma açık) ─────────────────────────────────────────
     console.log("\n§h yazma ayarı: kapalıyken iş yok · istek yok · teknik kullanıcı doğmaz; açınca doğar; kapatınca durur");
@@ -551,16 +581,54 @@ async function main(): Promise<void> {
     check("⭐ panel detay + liste ucu fiyatsız siparişte 200", det.status === 200 && lst.status === 200, `${det.status}/${lst.status}`);
 
     // ── §g atomiklik ─────────────────────────────────────────────────────────
+    // Makbuz bozucu: hesap adında NUL — sipariş tx'te yazılır (ad siparişe girmez), makbuz satırı PG'de düşer.
     console.log("\n§g atomiklik: sipariş yazıldıktan sonra makbuz düşer → hiçbir şey kalmaz, numara boşluğu yok");
     const g1 = await processInboxMessage(msg("SIPARIS", orderWire()), actor);
     if (g1?.varlikId) orderIds.add(g1.varlikId);
-    const mBad = msg("SIPARIS", orderWire(), { hesapId: "not-a-uuid" });
+    const mBad = msg("SIPARIS", orderWire(), { hesapAdi: `${STAMP} \u0000 bozuk` });
     const gx = await processInboxMessage(mBad, actor);
     const g2 = await processInboxMessage(msg("SIPARIS", orderWire()), actor);
     if (g2?.varlikId) orderIds.add(g2.varlikId);
     check("⭐ makbuz yazılamadı → belirsiz (null), sipariş YOK, makbuz YOK", gx === null && (await ordersFor(mBad.mesajId)) === 0 && (await receiptsFor(mBad.mesajId)) === 0, JSON.stringify(gx));
     check("⭐ geri alınan tx kalem bırakmadı", (await prisma.orderLine.count({ where: { order: { clientToken: mBad.mesajId } } })) === 0);
     check("⭐ numara serisinde boşluk yok (önceki N → sonraki N+1)", !!g1?.belgeNo && !!g2?.belgeNo && seqOf(g2.belgeNo) === seqOf(g1.belgeNo) + 1, `${g1?.belgeNo} → ${g2?.belgeNo}`);
+
+    // ── §l yazar denetimi ────────────────────────────────────────────────────
+    console.log("\n§l yazar denetimi: yetkisi fabrikada kalkan yazarın kaydı makbuzlu RET, kayıt doğmaz");
+    const revoked = await mkAuthor("geri-alinan", AUTHOR_CODES);
+    await prisma.userPermission.deleteMany({ where: { userId: revoked, permission: { code: "patron:giris" } } });
+    const passiveAuthor = await mkAuthor("pasif", AUTHOR_CODES, { isActive: false });
+    const noOrderWrite = await mkAuthor("siparissiz", ["patron:giris", "customer:write"]);
+    const authorCases: Array<[string, string, "SIPARIS" | "CARI"]> = [
+      ["bilinmeyen yazar kimliği", randomUUID(), "SIPARIS"],
+      ["pasif yazar", passiveAuthor, "SIPARIS"],
+      ["`patron:giris` geri alınmış yazar (sipariş)", revoked, "SIPARIS"],
+      ["`patron:giris` geri alınmış yazar (müşteri)", revoked, "CARI"],
+      ["`order:write` olmayan yazar → sipariş", noOrderWrite, "SIPARIS"],
+      ["teknik kullanıcı yazar", actor, "SIPARIS"],
+      ["teknik kullanıcı yazar (müşteri)", actor, "CARI"],
+    ];
+    for (const [label, hesapId, tur] of authorCases) {
+      const m = msg(tur, tur === "SIPARIS" ? orderWire() : cardWire(`${STAMP} Yazar Cari ${letters(10)}`), { hesapId });
+      const cards0 = await telCards();
+      const o = await processInboxMessage(m, actor);
+      const rec = await prisma.cloudInboxReceipt.findUnique({ where: { messageId: m.mesajId }, select: { outcome: true, entityId: true } });
+      const none = tur === "SIPARIS" ? (await ordersFor(m.mesajId)) === 0 : (await telCards()) === cards0;
+      if (o?.varlikId) (tur === "SIPARIS" ? orderIds : customerIds).add(o.varlikId);
+      check(`⭐ ${label} → RET IS_KURALI "Yetkiniz fabrikada kaldırılmış", kayıt yok`,
+        o?.durum === "REDDEDILDI" && o.kod === "IS_KURALI" && o.mesaj === AUTHOR_REVOKED_MESSAGE && none && rec?.outcome === "REDDEDILDI" && rec.entityId === null, `${o?.durum}/${o?.kod}: ${o?.mesaj}`);
+    }
+    const lc = await processInboxMessage(msg("CARI", cardWire(`${STAMP} Siparişsiz Yazar ${letters(10)}`), { hesapId: noOrderWrite }), actor);
+    if (lc?.varlikId) customerIds.add(lc.varlikId);
+    check("`order:write` olmayan ama `customer:write` taşıyan yazarın müşteri kartı İŞLENİR", lc?.durum === "ISLENDI" && !!lc.varlikId, `${lc?.durum}: ${lc?.mesaj}`);
+    const mRetry = msg("SIPARIS", orderWire(), { hesapId: revoked });
+    const lr1 = await processInboxMessage(mRetry, actor);
+    await prisma.userPermission.create({ data: { userId: revoked, permissionId: (await prisma.permission.findUniqueOrThrow({ where: { code: "patron:giris" }, select: { id: true } })).id } });
+    const lr2 = await processInboxMessage(mRetry, actor);
+    check("ret makbuzu kalıcı: izin sonradan geri verilse de aynı mesajId yeniden işlenmez", lr1?.durum === "REDDEDILDI" && canonical(lr1) === canonical(lr2) && (await ordersFor(mRetry.mesajId)) === 0, `${lr2?.durum}`);
+    const lok = await processInboxMessage(msg("SIPARIS", orderWire(), { hesapId: revoked }), actor);
+    if (lok?.varlikId) orderIds.add(lok.varlikId);
+    check("izin geri verilince YENİ mesaj işlenir (denetim güncel izni okur)", lok?.durum === "ISLENDI", `${lok?.durum}: ${lok?.mesaj}`);
 
     // ── §j iş: tür, sınırlı tekrar, yeniden başlatma ─────────────────────────
     console.log("\n§j iş turu: desteklenmeyen tür · 3 denemede makbuzlu ret · yeniden başlatma ve kayıp bildirim zararsız");
@@ -635,7 +703,7 @@ async function main(): Promise<void> {
   }
 }
 
-/** FK sırası: makbuz → kalem → sipariş → alias → cari (hesap + şube) → renk izni → ürün/renk → teknik kullanıcı kaydı. */
+/** FK sırası: makbuz → kalem → sipariş → alias → cari (hesap + şube) → renk izni → ürün/renk → teknik kullanıcı kaydı → yazarlar. */
 async function temizlik(createdTechId: string | null): Promise<void> {
   const receipts = await prisma.cloudInboxReceipt.findMany({ where: { messageId: { in: messageIds } }, select: { entityId: true, kind: true } });
   for (const r of receipts) if (r.entityId) (r.kind === "SIPARIS" ? orderIds : customerIds).add(r.entityId);
@@ -656,6 +724,8 @@ async function temizlik(createdTechId: string | null): Promise<void> {
     await prisma.systemSetting.deleteMany({ where: { key: PATRON_CLOUD_USER_SETTING_KEY } });
     await prisma.user.update({ where: { id: createdTechId }, data: { username: `TEST-pb-${createdTechId.slice(0, 8)}`, isActive: false, deletedAt: new Date() } });
   }
+  await prisma.userPermission.deleteMany({ where: { userId: { in: authorUserIds } } });
+  for (const id of authorUserIds) await prisma.user.update({ where: { id }, data: { isActive: false, deletedAt: new Date() } }).catch(() => undefined);
 }
 
 main()

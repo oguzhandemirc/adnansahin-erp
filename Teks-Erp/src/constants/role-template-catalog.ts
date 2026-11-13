@@ -670,8 +670,14 @@ export const ROLE_TEMPLATE_CATALOG: readonly RoleTemplateEntry[] = [
  * genişler — bu yüzden "Admin (Tam Yetki)" bir daha bayatlayamaz.
  */
 export function resolveRoleTemplateCodes(entry: RoleTemplateEntry): readonly string[] {
-  return entry.mode === "all" ? PERMISSION_CATALOG.map((p) => p.code) : entry.codes;
+  return entry.mode === "all" ? PERMISSION_CATALOG.map((p) => p.code).filter((c) => !ALL_MODE_EXCLUDED.has(c)) : entry.codes;
 }
+
+/**
+ * `mode:"all"`ın DIŞINDA kalan kodlar — "her şey" kuralının gerekçeli istisnası. `patron:giris` fabrika
+ * kullanıcısının parola özetini patron bulutuna taşır; şablon uygulamasıyla örtük gelmesin, kişi kişi atansın.
+ */
+export const ALL_MODE_EXCLUDED: ReadonlySet<string> = new Set(["patron:giris"]);
 
 /**
  * Dar (tek iş fonksiyonu) rollerde BİLİNÇLİ olarak yer almayan izinler.
@@ -691,6 +697,8 @@ export const ROLE_COVERAGE_EXEMPT: Readonly<Record<string, string>> = {
     "Ekran değil, Tezgah-içi yetenek (2026-09-14): top indirmeyi geri alır — defterden satır düşürür (`loom:doff-revoke` tablet eşi, `shipping:undo-dispatch` sınıfı). Varsayılan operatör paketine GİRMEZ, panelden seçili kişiye verilir.",
   "mobile:is-emri-duzelt":
     "Ekran değil, Hızlı İş Emri içi yetenek (hareket defteri D5): açılmış iş emrinin rengini/enini/sipariş bağını değiştirir ve kartı yeniden basar. İş emri açmaktan ayrı sorumluluk → varsayılan operatör paketine GİRMEZ, panelden seçili kişiye verilir.",
+  "patron:giris":
+    "Telefon girişi (2026-11-13): parola özeti buluta gider — hiçbir pakete girmez, panelden kişi kişi açık atamayla verilir; 'Admin (Tam Yetki)' de taşımaz (`ALL_MODE_EXCLUDED`).",
   "mobile:kk1-yari-mamul":
     "Ekran değil, KK1-içi yetenek (2026-08-17): dışarıdan alınan yarı mamul kabulü. Renkli mal kabulü açar; yanlışlıkla kullanılırsa top ham stoğa 'boyalı' düşer → varsayılan operatör paketine GİRMEZ, panelden seçili kişiye verilir.",
   // 2026-08-14: goods-receipt:* muafları KALDIRILDI — artık dar bir rol

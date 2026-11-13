@@ -29,6 +29,8 @@ import {
   type OrderMessage,
 } from "../../cloud-sync/wire";
 import { finishInboxOrder, insertInboxOrderTx, prepareInboxOrder } from "./order-create";
+import { cloudAuthorHolds } from "../../cloud-sync/users-export";
+import { CLOUD_PERMISSION_CODES } from "../../cloud-sync/user-permission-map";
 import { finishInboxCard, inboxCardWriter, type SimilarCustomer } from "./customer-create";
 
 /** Audit yükündeki kaynak künyesi — ayak izi; iş kararı buradan türetilmez. */
@@ -37,6 +39,13 @@ export const PATRON_CLOUD_SOURCE = "PATRON_BULUTU";
 export const UNSUPPORTED_KIND_MESSAGE = "Bu kayıt türü bu kurulumda desteklenmiyor; yalnız yeni sipariş ve yeni müşteri işlenir.";
 export const UNPROCESSABLE_MESSAGE = "Kayıt fabrikada işlenemedi (beklenmeyen hata, tekrar denemeleri tükendi). Fabrikaya bildirin.";
 export const PRICE_IGNORED_NOTE = "birim fiyat bu kurulumda telefondan alınmaz, yok sayıldı";
+export const AUTHOR_REVOKED_MESSAGE = "Yetkiniz fabrikada kaldırılmış; telefondan kayıt açılamadı. Fabrikadaki yöneticinize başvurun.";
+
+/** Yazar = bulut hesabı = fabrika kullanıcısı; işlendiği AN güncel fabrika izniyle denetlenir (kullanıcı listesiyle aynı süzgeç). */
+const KIND_CLOUD_PERMISSION: Readonly<Record<InboxKind, string>> = { SIPARIS: CLOUD_PERMISSION_CODES.siparisYaz, CARI: CLOUD_PERMISSION_CODES.cariYaz };
+async function assertAuthorStillAllowed(authorId: string, kind: InboxKind): Promise<void> {
+  if (!(await cloudAuthorHolds(authorId, KIND_CLOUD_PERMISSION[kind]))) throw new InboxRejection("IS_KURALI", AUTHOR_REVOKED_MESSAGE);
+}
 
 /** Bulutun `al` yanıtındaki tek kayıt — tür burada SERBEST dizidir: tanınmayan tür de makbuzlu retle cevaplanır. */
 export interface ClaimedMessage {
@@ -240,6 +249,7 @@ export async function processInboxMessage(msg: ClaimedMessage, actorUserId: stri
   try {
     const fast = await replay.replayIfAny(msg.mesajId);
     if (fast) return fast;
+    await assertAuthorStillAllowed(msg.hesapId, kind);
     if (kind === "SIPARIS") {
       const parsed = OrderMessageSchema.safeParse(msg.govde);
       if (!parsed.success) throw new InboxRejection("GOVDE_GECERSIZ", "Sipariş gövdesi sözleşmeye uymuyor.");

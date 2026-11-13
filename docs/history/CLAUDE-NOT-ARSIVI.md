@@ -13233,3 +13233,11 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Yaş.** Top yaşı fabrika takvim günüdür (saat değil): gün içinde sabit kalır, stok değişmedikçe içerik özeti değişmez ve anlık yeniden gönderilmez (iki tur aynı özet, ölçüldü).
 
 **Panel.** "Top bazında" görünümdeyken Excel/PDF top tablosunu basar (bölüm başına sayfa, en eski üstte); kalem görünümünde kalem tablosunu.
+
+## 2026-11-13 — Patron üyeliği = Electron şifresi: fabrika kullanıcı listesi buluta gider [ÇEKİRDEK]
+
+**Karar (kullanıcı onaylı plan `PLAN-uyelik-electron-sifresi`).** Patron telefonuna giriş fabrika kullanıcı adı + Electron şifresiyle olur; bulut hesabı fabrika kullanıcısının kopyasıdır (`accounts.id = users.id`). Fabrika yeni imzalı uca (`POST /v1/kullanicilar`) her gönderimde TAM kümeyi yollar; kümede olmayan kapatılır. Giriş izni tek yeni kod `patron:giris` (ADMIN/web), birebir açık atamayla: `*` jokeri ve "Admin (Tam Yetki)" şablonu taşımaz (`ALL_MODE_EXCLUDED` — şablonu uygulayan yönetici, kişinin parola özetini habersiz buluta yollamasın). Telefon izinleri fabrikada türetilir (`cloud-sync/user-permission-map.ts`), bulut yöneticisi ⇐ `admin:users`.
+
+**Değişmezler.** Süperadmin/sistem/teknik kullanıcı hiç gitmez (sorgu + yüklem, iki kat); açık select, PIN/kart/TOTP/oturum sayacı okunmaz; log yalnız sayı; katalog ve sözleşme sürümü değişmez; migration yok.
+
+**Dilimler (fabrika).** W tel sözleşmesi iki uçta bayt-eşit · F1 izin + türetme + dışa aktarım + `scripts/patron-bulut-kullanicilar.ts --kuru` · F2 fabrika işi (`jobs/cloud-users.job.ts`) · F3 gelen kutusu yazarın güncel iznini denetler. Bulut servis/uç kodu (C1–C4) ve sürüm (F4) ayrı dilimlerdir.
