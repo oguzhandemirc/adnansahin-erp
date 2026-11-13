@@ -1,16 +1,12 @@
 // İki adımlı doğrulama İSTEĞE BAĞLI (kullanıcı kararı 2026-11-12): giriş kapalı hesapta kod alanı göstermez, sunucu
-// `DOGRULAMA_KODU_GEREKLI` derse ikinci adımda ister · davet TOTP'siz tamamlanır · bağlamada kod yalnız istenirse ·
-// profil sayfası açar (parola → anahtar/karekod → ilk kod) ve kapatır (parola + kod) · karekod yalnız otpauth çizer.
+// `DOGRULAMA_KODU_GEREKLI` derse ikinci adımda ister · hata cümleleri sade ve tek (aynı 401 → aynı cümle; 503 fabrika
+// bağlantısı yok açıklanır) · davet/kayıt girişi YOK · profil sayfası açar (parola → anahtar/karekod → ilk kod) ve kapatır (parola + kod) · karekod yalnız otpauth çizer.
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { ApiError } from "../src/api/client";
 
 const OTPAUTH = "otpauth://totp/Adnan%20%C5%9Eahin%20Y%C3%B6netim:a%40ornek.invalid?secret=JBSWY3DPEHPK3PXP&issuer=Adnan%20%C5%9Eahin%20Y%C3%B6netim&algorithm=SHA1&digits=6&period=30";
 const kodGerekli = () => new ApiError(401, "DOGRULAMA_KODU_GEREKLI", "Doğrulama kodu gerekli");
 const mockApi = {
-  inviteInspect: jest.fn(async () => ({ ad: "Ayşe", eposta: "a@ornek.invalid", tesisAd: "Tesis", bitis: "2026-12-01T00:00:00.000Z", totpKurulumuBekliyor: false })),
-  inviteAccept: jest.fn(async () => ({ eposta: "a@ornek.invalid", durum: "AKTIF" as const })),
-  inviteConfirm: jest.fn(),
-  inviteLink: jest.fn(),
   twoFactorBegin: jest.fn(async () => ({ totpSirri: "JBSWY3DPEHPK3PXP", otpauth: OTPAUTH })),
   twoFactorConfirm: jest.fn(async () => ({ acik: true, acilis: "2026-11-12T10:00:00.000Z" })),
   twoFactorDisable: jest.fn(async () => ({ acik: false, acilis: null })),
@@ -18,15 +14,14 @@ const mockApi = {
 const mockLogin = jest.fn();
 const mockReplace = jest.fn();
 jest.mock("../src/state/session", () => ({ useSession: () => ({ api: mockApi, login: mockLogin, phase: "giris", configured: true, offline: false }) }));
-jest.mock("expo-router", () => ({ useRouter: () => ({ replace: mockReplace, push: jest.fn() }), useLocalSearchParams: () => ({ davet: "davet-kodu" }), Redirect: () => null }));
+jest.mock("expo-router", () => ({ useRouter: () => ({ replace: mockReplace, push: jest.fn() }), Redirect: () => null }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 // mock'lar kurulduktan SONRA yüklenir.
-const Invite = (require("../app/davet") as { default: () => React.JSX.Element }).default;
 const Login = (require("../app/giris") as { default: () => React.JSX.Element }).default;
 const { TotpQr } = require("../src/ui/TotpQr") as typeof import("../src/ui/TotpQr");
 const { TwoFactorSheet } = require("../src/ui/IkiAdimliDogrulama") as typeof import("../src/ui/IkiAdimliDogrulama");
-const { TextInput } = require("react-native") as typeof import("react-native");
+const { LOGIN_ERROR, LOGIN_HELP, loginErrorMessage } = require("../src/lib/giris-hata") as typeof import("../src/lib/giris-hata");
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -56,46 +51,55 @@ describe("giriş", () => {
     expect(mockLogin).toHaveBeenLastCalledWith({ kullaniciAdi: "ali", parola: "gizli-parola-123", totp: "123456" });
   });
 
-  it("yanlış parola: ileti gösterilir, kod adımına geçilmez", async () => {
-    mockLogin.mockRejectedValueOnce(new ApiError(401, "GIRIS_BASARISIZ", "Kullanıcı adı, parola ya da doğrulama kodu hatalı"));
+  async function parolaGonder(err: unknown): Promise<void> {
+    mockLogin.mockRejectedValueOnce(err);
     render(<Login />);
     fireEvent.changeText(screen.getByTestId("kullaniciAdi"), "ali");
     fireEvent.changeText(screen.getByTestId("parola"), "yanlis");
     await act(async () => fireEvent.press(screen.getByTestId("devam")));
-    expect(screen.getByTestId("giris-hata")).toBeTruthy();
-    expect(screen.queryByTestId("totp")).toBeNull();
-  });
-});
-
-describe("davet", () => {
-  async function parolaAdimi(): Promise<void> {
-    render(<Invite />);
-    await act(async () => fireEvent.press(screen.getByText("Devam")));
   }
 
-  it("⭐ TOTP'siz tamamlanır: parola → hesap etkin; karekod/anahtar adımı yok, onay çağrılmaz", async () => {
-    await parolaAdimi();
-    const alanlar = screen.UNSAFE_getAllByType(TextInput).filter((x) => x.props.secureTextEntry);
-    fireEvent.changeText(alanlar[0]!, "cok-guclu-parola-1");
-    fireEvent.changeText(alanlar[1]!, "cok-guclu-parola-1");
-    await act(async () => fireEvent.press(screen.getByTestId("davet-kabul")));
-    expect(mockApi.inviteAccept).toHaveBeenCalledWith("davet-kodu", "cok-guclu-parola-1");
-    expect(screen.getByText("Hesabınız etkin. Şimdi giriş yapabilirsiniz.")).toBeTruthy();
-    expect(screen.queryByTestId("totp-karekod")).toBeNull();
-    expect(mockApi.inviteConfirm).not.toHaveBeenCalled();
+  it("⭐ yanlış parola: TEK sade cümle (hangi alan yanlış söylenmez), kod adımına geçilmez", async () => {
+    await parolaGonder(new ApiError(401, "GIRIS_BASARISIZ", "Kullanıcı adı, parola ya da doğrulama kodu hatalı"));
+    expect(screen.getByTestId("giris-hata")).toBeTruthy();
+    expect(screen.queryByText(/Kullanıcı adı, parola ya da doğrulama kodu/)).toBeNull(); // sunucunun ham iletisi değil
+    expect(screen.getByText(LOGIN_ERROR.parola)).toBeTruthy();
+    expect(screen.queryByTestId("totp")).toBeNull();
   });
 
-  it("mevcut hesabı bağlama: kod alanı yalnız sunucu isterse görünür", async () => {
-    mockApi.inviteLink.mockRejectedValueOnce(kodGerekli()).mockResolvedValueOnce({ eposta: "a@ornek.invalid", durum: "AKTIF" });
-    await parolaAdimi();
-    fireEvent.press(screen.getByTestId("davet-bagla"));
-    expect(screen.queryByTestId("bagla-totp")).toBeNull();
-    fireEvent.changeText(screen.getByTestId("bagla-parola"), "gizli-parola-123");
-    await act(async () => fireEvent.press(screen.getByTestId("bagla-gonder")));
-    expect(mockApi.inviteLink).toHaveBeenLastCalledWith({ davet: "davet-kodu", eposta: "a@ornek.invalid", parola: "gizli-parola-123" });
-    fireEvent.changeText(screen.getByTestId("bagla-totp"), "654321");
-    await act(async () => fireEvent.press(screen.getByTestId("bagla-gonder")));
-    expect(mockApi.inviteLink).toHaveBeenLastCalledWith({ davet: "davet-kodu", eposta: "a@ornek.invalid", parola: "gizli-parola-123", totp: "654321" });
+  it("⭐ 503 FABRIKA_BAGLANTISI_YOK: fabrikaya ulaşılamadığı açıklanır", async () => {
+    await parolaGonder(new ApiError(503, "FABRIKA_BAGLANTISI_YOK", "Fabrikayla bağlantı uzun süredir yok"));
+    expect(screen.getByText(LOGIN_ERROR.fabrikaYok)).toBeTruthy();
+  });
+
+  it("kod adımında 401: kod cümlesi; Geri parola adımına döner ve hatayı siler", async () => {
+    mockLogin.mockRejectedValueOnce(kodGerekli()).mockRejectedValueOnce(new ApiError(401, "GIRIS_BASARISIZ", "x"));
+    render(<Login />);
+    fireEvent.changeText(screen.getByTestId("kullaniciAdi"), "ali");
+    fireEvent.changeText(screen.getByTestId("parola"), "dogru");
+    await act(async () => fireEvent.press(screen.getByTestId("devam")));
+    fireEvent.changeText(screen.getByTestId("totp"), "000000");
+    await act(async () => fireEvent.press(screen.getByTestId("giris")));
+    expect(screen.getByText(LOGIN_ERROR.kod)).toBeTruthy();
+    fireEvent.press(screen.getByTestId("geri"));
+    expect(screen.getByTestId("kullaniciAdi")).toBeTruthy();
+    expect(screen.queryByTestId("giris-hata")).toBeNull();
+  });
+
+  it("davet/kayıt girişi yok; alt not hesabın fabrikada olduğunu söyler", () => {
+    render(<Login />);
+    expect(screen.queryByTestId("davet-git")).toBeNull();
+    expect(screen.queryByText(/davet/i)).toBeNull();
+    expect(screen.getByText(LOGIN_HELP)).toBeTruthy();
+  });
+
+  it("hata eşlemesi: aynı 401 her kodda aynı cümle; hız sınırı, ağ, bilinmeyen sunucu iletisi", () => {
+    for (const code of ["GIRIS_BASARISIZ", "HESAP_KILITLI", "X"]) expect(loginErrorMessage(new ApiError(401, code, "ham"), "parola")).toBe(LOGIN_ERROR.parola);
+    expect(loginErrorMessage(new ApiError(401, "GIRIS_BASARISIZ", "ham"), "kod")).toBe(LOGIN_ERROR.kod);
+    expect(loginErrorMessage(new ApiError(429, "HIZ_SINIRI", "ham"), "parola")).toBe(LOGIN_ERROR.hiz);
+    expect(loginErrorMessage(new ApiError(0, "AG_HATASI", "ham"), "parola")).toBe(LOGIN_ERROR.ag);
+    // 503 ama başka kod: sunucunun kendi Türkçe iletisi
+    expect(loginErrorMessage(new ApiError(503, "BAKIM", "Bakımdayız"), "parola")).toBe("Bakımdayız");
   });
 });
 

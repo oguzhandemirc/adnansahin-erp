@@ -27,7 +27,7 @@ describe("ekran adları (P1, P3, P4)", () => {
       stok: "app/(app)/(tabs)/stok.tsx",
       raporlar: "app/(app)/raporlar/index.tsx",
       "gelen-kutusu": "app/(app)/gelen-kutusu/index.tsx",
-      hesaplar: "app/(app)/hesaplar/index.tsx",
+      "disa-aktar": "app/(app)/disa-aktar.tsx",
       bildirimler: "app/(app)/bildirimler.tsx",
       profil: "app/(app)/profil.tsx",
     };

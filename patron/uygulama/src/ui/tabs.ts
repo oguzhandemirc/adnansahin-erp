@@ -41,7 +41,7 @@ export const NAV_GROUPS: readonly { readonly title: string; readonly modules: re
   { title: "Operasyon", modules: ["sevkiyat"] },
   { title: "İş", modules: ["raporlar"] },
   // Gönderdiklerim ikincil denetim listesidir (kayıt onay beklemez): hesap grubunda, öne çıkmaz.
-  { title: "Hesap", modules: ["bildirimler", "hesaplar", "gelen-kutusu", "profil"] },
+  { title: "Hesap", modules: ["bildirimler", "gelen-kutusu", "disa-aktar", "profil"] },
 ];
 
 export const MORE_GROUPS = NAV_GROUPS;

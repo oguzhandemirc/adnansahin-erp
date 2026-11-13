@@ -2,7 +2,7 @@
 // Okumalar `veri.ts`ten gelir; yazmalar reddedilir. Kısa gecikme iskelet ve yenileme durumlarını gösterir.
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
 import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT } from "../api/wire";
-import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_HESAPLAR, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
+import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
 
 const GECIKME_MS = 350;
 
@@ -66,8 +66,18 @@ function listele(projeksiyon: string, q: Query | undefined) {
 function oku(path: string, q: Query | undefined): unknown {
   const p = path.split("/").filter(Boolean).map(decodeURIComponent);
   if (path === "/oturum") return ornekOturum();
-  if (path === "/oturum/tesisler") return ornekGiris().tesisler;
   if (path === "/oturum/dogrulama") return { acik: false, acilis: null };
+  if (path === "/disa-aktar") {
+    return {
+      hizmet: ornekOturum().hizmet,
+      kumeler: [
+        { ad: "siparis", tur: "KAYIT", adet: 128, bicimler: ["json", "csv"] },
+        { ad: "cari-kart", tur: "KAYIT", adet: 46, bicimler: ["json", "csv"] },
+        { ad: "ozet.siparis", tur: "ANLIK", adet: 1, bicimler: ["json"] },
+        { ad: "hesaplar", tur: "BULUT", adet: 3, bicimler: ["json", "csv"] },
+      ],
+    };
+  }
   if (p[0] === "anlik" && p[1]) {
     const veri = ORNEK_ANLIK()[p[1]];
     if (veri === undefined) throw yok();
@@ -98,16 +108,15 @@ function oku(path: string, q: Query | undefined): unknown {
   }
   if (path === "/bildirimler") return BOS_SAYFA;
   if (path === "/bildirim/ayarlar") return ORNEK_BILDIRIM();
-  if (path === "/hesaplar") return ORNEK_HESAPLAR();
   if (path === "/cihazlar") return [];
   throw yok();
 }
 
 function yaz(path: string): unknown {
-  if (path === "/oturum/ac" || path === "/oturum/gecis") return ornekGiris();
+  if (path === "/oturum/ac") return ornekGiris();
   if (path === "/oturum/kapat") return null;
   // Kurulum adımı gösterilebilsin diye örnek anahtar (RFC 6238 örneği; gerçek bir hesaba bağlı değil); onay yazılmaz.
-  if (path === "/oturum/dogrulama/baslat") return { totpSirri: "JBSWY3DPEHPK3PXP", otpauth: "otpauth://totp/Adnan%20%C5%9Eahin%20Y%C3%B6netim:ornek%40ornek.invalid?secret=JBSWY3DPEHPK3PXP&issuer=Adnan%20%C5%9Eahin%20Y%C3%B6netim&algorithm=SHA1&digits=6&period=30" };
+  if (path === "/oturum/dogrulama/baslat") return { totpSirri: "JBSWY3DPEHPK3PXP", otpauth: "otpauth://totp/Adnan%20%C5%9Eahin%20Y%C3%B6netim:ornek.patron?secret=JBSWY3DPEHPK3PXP&issuer=Adnan%20%C5%9Eahin%20Y%C3%B6netim&algorithm=SHA1&digits=6&period=30" };
   if (path === "/tazele") return { zil: false, sonrakiMs: 60_000 };
   throw new ApiError(403, "ORNEK_VERI", "Örnek veri kipinde fabrikaya yazılmaz");
 }

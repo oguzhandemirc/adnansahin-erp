@@ -14,9 +14,15 @@
 //      404 · e-posta gövdeli giriş 400
 //   §8 kapanış ve kimlik silmesi: kümeden çıkan hesabın bildirim cihazı tikte PASİF · 30. günde ad + kullanıcı adı
 //      tombstone, damga dolu · fabrika hesabı yeniden gönderince AKTİF, damga NULL, kullanıcı adı geri, giriş döner
+//   §9 kilitli yazarın bekleyen mesajı FABRİKAYA VERİLMEZ: kilit, hesabın hiç alınmamış BEKLIYOR mesajını ret
+//      makbuzuyla (`YAZAR_YETKISIZ`) kapatır, sayı denetimde · daha önce alınmış (claim_count > 0) mesaja dokunmaz ·
+//      başka hesabın mesajına dokunmaz · fabrikanın `al` çağrısı kilitli yazarın mesajını DÖNDÜRMEZ · kilitten önce
+//      çözülmüş oturumla (uçuştaki istek) yazım 403, satır doğmaz
 // NEGATİF SONDALAR (2026-11-14, dosya DIŞI, her biri geri alındı; geri yüklenince 47/47): kilit oturumu kapatmıyor →
 // §1d §2c ❌ (45/47) · `requestUserResend` damgayı sıfırlamıyor → §4b ❌ (46/47) · cihaz tiki PASİF yerine AKTİF hesabı
 // arıyor → §8c ❌ (46/47) · yeniden açılışta `identityPurgedAt: null` düştü → §8f §8g ❌ (45/47, uç 500).
+// §9 sondaları (2026-11-14, dosya DIŞI, geri alındı): kilitte `rejectLockedAuthorPending` çağrılmıyor → §9b §9c §9f §9i ❌ ·
+// yazımda `lockAuthorFactors` çağrılmıyor → §9g §9h ❌ · ret süzgecinden `claim_count = 0` düştü → §9b §9d §9f ❌.
 // Koşum: npx tsx scripts/test_hesap_acil_cli.ts   (kendi *_test DB'si; CLI tek tesis ister — koşucu sırayla koşar)
 // =============================================================================
 import { spawnSync } from "node:child_process";
@@ -28,6 +34,8 @@ import { withTesis } from "../src/lib/tenant";
 import { CloudError } from "../src/lib/errors";
 import { deactivateClosedAccountDevices, purgeClosedIdentities, IDENTITY_PURGE_DAYS } from "../src/services/maintenance";
 import { disableAccountTwoFactor, reasonFromArgs, requestUserResend, setCloudLock, VENDOR_ACTOR } from "../src/services/vendor-admin.service";
+import { resolveSession } from "../src/auth/session.service";
+import { AUTHOR_INELIGIBLE_RESULT, createInboxMessage } from "../src/services/inbox.service";
 import {
   PATRON_KOKU,
   TEST_PAROLASI,
@@ -226,6 +234,56 @@ async function kapanis(o: Ortam, k: TestKurulumu, kalan: TestHesabi, giden: Test
   kontrol("§8g yeniden açılan hesap fabrika parolasıyla girer", await girer(o, { ...giden, sir: "" }));
 }
 
+const siparisGovdesi = () => ({ cariKartId: randomUUID(), doviz: "TRY", kalemler: [{ urunId: randomUUID(), miktar: "12.5" }] });
+
+async function mesajYaz(o: Ortam, h: TestHesabi): Promise<string> {
+  const mesajId = randomUUID();
+  const r = await api(o, "POST", "/api/gelen-kutusu", { belirtec: h.belirtec, govde: { mesajId, tur: "SIPARIS", govde: siparisGovdesi() } });
+  if (r.status !== 201) throw new Error(`mesaj yazılamadı: ${r.status} ${r.json.details?.code ?? ""}`);
+  return mesajId;
+}
+
+async function mesajDurumu(o: Ortam, tesisId: string, mesajId: string) {
+  return withTesis(o.goc, { tesisId }, (tx) => tx.inboxMessage.findUnique({ where: { tesisId_messageId: { tesisId, messageId: mesajId } } }));
+}
+
+async function kilitliYazar(o: Ortam, k: TestKurulumu): Promise<void> {
+  console.log("\n§9 kilitli yazarın bekleyen mesajı fabrikaya verilmez");
+  const yaz = ["bulut:oturum", "bulut:siparis:oku", "bulut:siparis:yaz"];
+  const y = await hesapKur(o, k.tesisId, yaz, { dogrulama: false });
+  y.belirtec = await girisYap(o, y);
+  const komsu = await hesapKur(o, k.tesisId, yaz, { dogrulama: false });
+  komsu.belirtec = await girisYap(o, komsu);
+  const bekleyen = await mesajYaz(o, y);
+  const alinmis = await mesajYaz(o, y);
+  const komsununki = await mesajYaz(o, komsu);
+  // "Alınmış" mesaj: fabrika bir kez aldı, claim süresi doldu ve bakım geri koydu (claim_count > 0, BEKLIYOR).
+  await withTesis(o.goc, { tesisId: k.tesisId }, (tx) => tx.inboxMessage.update({ where: { tesisId_messageId: { tesisId: k.tesisId, messageId: alinmis } }, data: { claimCount: 1 } }));
+  const ucusta = await resolveSession(o.ctx, y.belirtec);
+  kontrol("§9a ön koşul: oturum çözüldü (kilitten önce uçuşta olan istek)", ucusta !== null);
+
+  const r = await setCloudLock(o.goc, { tesisId: k.tesisId, username: y.kullaniciAdi, lock: true, reason: GEREKCE }, o.saat.simdi());
+  kontrol("§9b kilit: 1 bekleyen mesaj kapandı", r.changed && r.messages === 1, JSON.stringify(r));
+  const m = await mesajDurumu(o, k.tesisId, bekleyen);
+  const sonuc = (m?.result ?? {}) as { kod?: string };
+  kontrol("§9c hiç alınmamış mesaj REDDEDILDI · makbuz YAZAR_YETKISIZ · işlenme damgalı", m?.status === "REDDEDILDI" && sonuc.kod === AUTHOR_INELIGIBLE_RESULT.kod && m.processedAt !== null, JSON.stringify(m));
+  const a = await mesajDurumu(o, k.tesisId, alinmis);
+  kontrol("§9d daha önce alınmış mesaja dokunulmaz (fabrika işlemiş olabilir)", a?.status === "BEKLIYOR", a?.status);
+  kontrol("§9e başka hesabın mesajına dokunulmaz", (await mesajDurumu(o, k.tesisId, komsununki))?.status === "BEKLIYOR");
+  const iz = await denetim(o, k.tesisId, y.accountId, "HESAP_BULUT_KILIDI");
+  kontrol("§9f denetimde kapanan mesaj sayısı", JSON.stringify(iz[0]?.summary ?? {}).includes('"mesaj":1'), JSON.stringify(iz[0]?.summary));
+
+  if (!ucusta) return;
+  const yeniId = randomUUID();
+  const ret = await hata(() => createInboxMessage(o.ctx, ucusta, { mesajId: yeniId, tur: "SIPARIS", govde: siparisGovdesi() }));
+  kontrol("§9g uçuştaki oturumla yazım 403 YETKISIZ (yazım tx'i kilidi görür)", ret === "403 YETKISIZ", ret);
+  kontrol("§9h reddedilen yazımın satırı doğmadı", (await mesajDurumu(o, k.tesisId, yeniId)) === null);
+
+  const al = await imzali(o, k, "/v1/gelen-kutusu/al", { govde: { v: 1, enFazla: 50 } });
+  const ids = ((al.json as unknown as { kayitlar?: { mesajId: string }[] }).kayitlar ?? []).map((x) => x.mesajId);
+  kontrol("§9i fabrikanın al çağrısı kilitli yazarın bekleyen mesajını DÖNDÜRMEZ; komşununkini döndürür", al.status === 200 && !ids.includes(bekleyen) && ids.includes(komsununki), `${al.status} ${JSON.stringify(ids)}`);
+}
+
 async function main(): Promise<void> {
   const o = await ortamKur();
   const k = await tesisKur(o, { ad: "Bekçi Acil CLI" });
@@ -244,6 +302,7 @@ async function main(): Promise<void> {
     await sokum(o, h, belirtec);
     const giden = await hesapKur(o, k.tesisId, ["bulut:oturum"], { dogrulama: false });
     await kapanis(o, k, h, giden);
+    await kilitliYazar(o, k);
   } finally {
     await temizleTesis(o, k.tesisId);
     await o.kapat();

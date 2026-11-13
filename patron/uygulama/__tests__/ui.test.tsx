@@ -3,8 +3,7 @@ import { ConfirmButton } from "../src/ui/kit";
 
 const mockSession = {
   permissions: [] as string[], facility: null as unknown, offline: false, offlineSince: null as string | null,
-  facilities: [] as { id: string; ad: string; hizmet: string }[], facilityId: null as string | null, switchError: null as string | null,
-  switchFacility: jest.fn(async (_id: string) => true),
+  facilityId: null as string | null,
 };
 const mockRouter = { navigate: jest.fn(), push: jest.fn(), back: jest.fn(), canGoBack: () => false, replace: jest.fn() };
 jest.mock("../src/state/session", () => ({ useSession: () => mockSession }));
@@ -13,7 +12,6 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 
 // mock'lar kurulduktan SONRA yüklenir.
 const { FacilityName, SideNav, Screen } = require("../src/ui/Frame") as typeof import("../src/ui/Frame");
-const { FacilitySwitchButton } = require("../src/ui/FacilitySwitcher") as typeof import("../src/ui/FacilitySwitcher");
 const { Text } = require("react-native") as typeof import("react-native");
 
 describe("izinli menü", () => {
@@ -22,7 +20,7 @@ describe("izinli menü", () => {
     render(<SideNav />);
     expect(screen.getByTestId("menu-siparisler")).toBeTruthy();
     expect(screen.queryByTestId("menu-raporlar")).toBeNull();
-    expect(screen.queryByTestId("menu-hesaplar")).toBeNull();
+    expect(screen.queryByTestId("menu-disa-aktar")).toBeNull();
     expect(screen.getByText("Adnan Şahin Yönetim")).toBeTruthy(); // tesis adı yoksa uygulama adı (kimlik.json)
   });
   it("tesis adı hesaptan gelir", () => {
@@ -30,14 +28,14 @@ describe("izinli menü", () => {
     mockSession.permissions = ["bulut:hesap:yonet"];
     render(<SideNav />);
     expect(screen.getByText("Örnek Tekstil")).toBeTruthy();
-    expect(screen.getByTestId("menu-hesaplar")).toBeTruthy();
+    expect(screen.getByTestId("menu-disa-aktar")).toBeTruthy();
     mockSession.facility = null;
   });
   it("ray sırası sekmelerle aynı; Operasyon, İş ve Hesap grupları ardından gelir", () => {
     mockSession.permissions = ["bulut:siparis:oku", "bulut:uretim:oku", "bulut:sevkiyat:oku", "bulut:rapor:oku", "bulut:cari:oku", "bulut:stok:oku", "bulut:siparis:yaz", "bulut:hesap:yonet"];
     render(<SideNav />);
     const order = screen.getAllByTestId(/^menu-/).map((n) => String(n.props.testID).slice(5));
-    expect(order).toEqual(["pano", "siparisler", "uretim", "stok", "cariler", "sevkiyat", "raporlar", "bildirimler", "hesaplar", "gelen-kutusu", "profil"]);
+    expect(order).toEqual(["pano", "siparisler", "uretim", "stok", "cariler", "sevkiyat", "raporlar", "bildirimler", "gelen-kutusu", "disa-aktar", "profil"]);
     expect(screen.getByText("Operasyon")).toBeTruthy();
     expect(screen.getByText("İş")).toBeTruthy();
     expect(screen.getByText("Hesap")).toBeTruthy();
@@ -55,7 +53,7 @@ describe("izinli menü", () => {
     mockSession.permissions = ["bulut:oturum"];
     mockSession.offline = true;
     mockSession.offlineSince = new Date().toISOString();
-    render(<Screen title="Hesaplar" module="hesaplar"><Text>GIZLI</Text></Screen>);
+    render(<Screen module="disa-aktar"><Text>GIZLI</Text></Screen>);
     expect(screen.queryByText("GIZLI")).toBeNull();
     expect(screen.getByText("Bu bölümü görme yetkiniz yok")).toBeTruthy();
     expect(screen.getByTestId("bant-cevrimdisi")).toBeTruthy();
@@ -116,46 +114,13 @@ describe("yıkıcı işlem onayı", () => {
   });
 });
 
-describe("fabrika değiştir (çok tesis)", () => {
-  const facility = { tesis: { id: "t1", ad: "Bir Tekstil", saklamaAy: 13 }, hesap: { ad: "A" }, esitleme: null };
-  afterEach(() => {
-    mockSession.facility = null;
-    mockSession.facilities = [];
-    mockSession.facilityId = null;
-    mockSession.switchError = null;
-  });
-  it("tek tesiste seçici yok: ad düz metin, profil satırı yok", () => {
-    mockSession.facility = facility;
-    mockSession.facilityId = "t1";
-    mockSession.facilities = [{ id: "t1", ad: "Bir Tekstil", hizmet: "ACIK" }];
-    render(<><FacilityName /><FacilitySwitchButton /></>);
+describe("tesis adı (tek tesis; geçiş yok)", () => {
+  it("ad düz metin, seçici yok", () => {
+    mockSession.facility = { tesis: { id: "t1", ad: "Bir Tekstil", saklamaAy: 13 }, hesap: { ad: "A" }, esitleme: null };
+    render(<FacilityName />);
     expect(screen.getByText("Bir Tekstil")).toBeTruthy();
     expect(screen.queryByTestId("tesis-secici")).toBeNull();
-    expect(screen.queryByTestId("fabrika-degistir")).toBeNull();
-  });
-  it("çok tesiste dokunuş DOĞRUDAN modal açar: etkin işaretli, salt okunur rozetli; seçim geçer ve panoya döner", async () => {
-    mockSession.facility = facility;
-    mockSession.facilityId = "t1";
-    mockSession.facilities = [{ id: "t1", ad: "Bir Tekstil", hizmet: "ACIK" }, { id: "t2", ad: "İki Dokuma", hizmet: "SALT_OKUNUR" }];
-    render(<FacilityName />);
-    expect(screen.queryByTestId("tesis-modal")).toBeNull();
-    fireEvent.press(screen.getByTestId("tesis-secici"));
-    expect(screen.getByTestId("tesis-modal")).toBeTruthy();
-    expect(screen.getByText("Etkin")).toBeTruthy();
-    expect(screen.getByTestId("tesis-rozet-t2")).toBeTruthy();
-    expect(screen.queryByTestId("tesis-rozet-t1")).toBeNull();
-    fireEvent.press(screen.getByTestId("tesis-t2"));
-    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith("/pano"));
-    expect(mockSession.switchFacility).toHaveBeenCalledWith("t2");
-  });
-  it("profilde çok tesiste 'Fabrika değiştir' satırı modal açar; geçiş hatası gösterilir", () => {
-    mockSession.facilities = [{ id: "t1", ad: "Bir", hizmet: "ACIK" }, { id: "t2", ad: "İki", hizmet: "ACIK" }];
-    mockSession.facilityId = "t1";
-    mockSession.switchError = "Bu fabrikaya geçiş yetkiniz yok; fabrika listesi yenilendi.";
-    render(<FacilitySwitchButton />);
-    fireEvent.press(screen.getByTestId("fabrika-degistir"));
-    expect(screen.getByTestId("tesis-modal")).toBeTruthy();
-    expect(screen.getByTestId("tesis-gecis-hatasi")).toBeTruthy();
+    mockSession.facility = null;
   });
 });
 

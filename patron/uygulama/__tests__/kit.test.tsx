@@ -24,8 +24,8 @@ describe("Rozet + sözlük", () => {
       expect(statusEntry(v).label).not.toBe(v);
     }
   });
-  it("tonlar: ret/hata/kilit kritik, işlendi/hazır/aktif iyi, bekliyor uyarı", () => {
-    expect(["REDDEDILDI", "HATA", "KILITLI"].map((v) => statusEntry(v).tone)).toEqual(["kritik", "kritik", "kritik"]);
+  it("tonlar: ret/hata kritik, işlendi/hazır/aktif iyi, bekliyor uyarı", () => {
+    expect(["REDDEDILDI", "HATA"].map((v) => statusEntry(v).tone)).toEqual(["kritik", "kritik"]);
     expect(["ISLENDI", "HAZIR", "AKTIF"].map((v) => statusEntry(v).tone)).toEqual(["iyi", "iyi", "iyi"]);
     expect(statusEntry("BEKLIYOR").tone).toBe("uyari");
   });

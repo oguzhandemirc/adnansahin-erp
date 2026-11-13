@@ -9,7 +9,7 @@ import { Loading } from "../../src/ui/kit";
 import { MODAL_EKRANLAR, useGezinme } from "../../src/ui/hareket/gezinme";
 import { useTokens } from "../../src/ui/theme-context";
 
-// Sekmeler ilk beyan edilir ki yığının ilk ekranı bir modal ("hesaplar/yeni") olmasın.
+// Sekmeler ilk beyan edilir ki yığının ilk ekranı bir modal ("raporlar/yeni") olmasın.
 export const unstable_settings = { initialRouteName: "(tabs)" };
 
 export default function AppLayout() {

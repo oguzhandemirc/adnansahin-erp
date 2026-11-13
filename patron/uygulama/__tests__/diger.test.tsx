@@ -1,24 +1,17 @@
-// "Diğer" dilimi ekranları: profilden Görünüm'e geçiş · hesap ayrıntısında ham izin kodu görünmez ·
+// "Diğer" dilimi ekranları: profilden Görünüm'e geçiş · profilde parola yalnız bilgi (fabrikada değişir) ·
 // gelen kutusu süzgeci sunucuya gider (istemci süzmez) · Diğer'de bekleyen rozeti · gövde özeti · kısa yoklama.
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
 import type { InboxItem } from "../src/api/wire";
-import type { LegacyAccount as Account } from "../src/api/eski-uyelik";
 
 const mockApi = {
   inboxList: jest.fn(async (_p: unknown) => ({ kayitlar: [], sonraki: null })),
-  accountUpdate: jest.fn(async (_id: string, b: { izinler: string[] }) => ({ ...ACC, izinler: b.izinler })),
-  accountList: jest.fn(),
-  permissions: jest.fn(),
-  changePassword: jest.fn(),
   twoFactorStatus: jest.fn(async () => ({ acik: false, acilis: null })),
 };
 const mockSession = {
-  api: mockApi, permissions: ["bulut:hesap:yonet", "bulut:siparis:yaz"] as string[], facility: { tesis: { id: "t", ad: "Örnek Tekstil", saklamaAy: 13 }, hesap: { ad: "Ayşe Yılmaz", eposta: "a@ornek.invalid" }, esitleme: null } as unknown,
-  facilities: [] as unknown[], facilityId: "t", offline: false, offlineSince: null, switchError: null, logout: jest.fn(),
+  api: mockApi, permissions: ["bulut:hesap:yonet", "bulut:siparis:yaz"] as string[], facility: { tesis: { id: "t", ad: "Örnek Tekstil", saklamaAy: 13 }, hesap: { ad: "Ayşe Yılmaz", kullaniciAdi: "ayse" }, esitleme: null } as unknown,
+  facilityId: "t", offline: false, offlineSince: null, logout: jest.fn(),
 };
-const ACC: Account = { id: "h1", eposta: "b@ornek.invalid", ad: "Bora Kaya", durum: "AKTIF", izinler: ["bulut:siparis:oku"], sonGiris: null, davetBitis: null, olusturulma: "2026-10-01T00:00:00Z" };
-const CATALOG = { izinler: ["bulut:ozet:oku", "bulut:siparis:oku", "bulut:rapor:oku", "bulut:hesap:yonet"], sablonlar: { SATIS: ["bulut:ozet:oku", "bulut:siparis:oku"], PATRON: ["bulut:ozet:oku", "bulut:siparis:oku", "bulut:rapor:oku", "bulut:hesap:yonet"] } };
 const mockRemote: { calls: { key: string | null; fetcher: () => Promise<unknown> }[]; data: Record<string, unknown> } = { calls: [], data: {} };
 jest.mock("../src/state/session", () => ({ useSession: () => mockSession }));
 jest.mock("../src/state/useRemote", () => ({
@@ -34,7 +27,6 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 
 // mock'lar kurulduktan SONRA yüklenir.
 const Profile = (require("../app/(app)/profil") as typeof import("../app/(app)/profil")).default;
-const AccountDetail = (require("../app/(app)/hesaplar/[id]") as typeof import("../app/(app)/hesaplar/[id]")).default;
 const Inbox = (require("../app/(app)/gelen-kutusu/index") as typeof import("../app/(app)/gelen-kutusu/index")).default;
 const More = (require("../app/(app)/diger") as typeof import("../app/(app)/diger")).default;
 const { ThemeProvider, useTokens } = require("../src/ui/theme-context") as typeof import("../src/ui/theme-context");
@@ -67,34 +59,16 @@ describe("profil: görünüm", () => {
     expect(screen.getByTestId("profil-rol").props.accessibilityLabel).toBe("Rol: Yönetici");
     expect(screen.getByText("Ayşe Yılmaz")).toBeTruthy();
   });
-  it("parola değişimi ayrı sayfada açılır", () => {
+  it("parola telefonda değişmez: satır yalnız bilgi; hesap silme ve fabrika değiştir YOK", () => {
     render(<Profile />);
-    expect(screen.queryByTestId("parola-sayfasi")).toBeNull();
-    fireEvent.press(screen.getByTestId("parola-degistir"));
-    expect(screen.getByTestId("parola-sayfasi")).toBeTruthy();
-  });
-});
-
-describe("hesap ayrıntısı: izinler", () => {
-  it("⭐ izinler Türkçe ad + açıklamayla, gruplu; ham kod ekranda YOK; kayıt aynı uca gider", async () => {
-    mockRemote.data = { hesaplar: [ACC], izinler: CATALOG };
-    render(<AccountDetail />);
-    expect(screen.queryAllByText(/bulut:/)).toHaveLength(0);
-    expect(screen.getByText("Siparişleri görme")).toBeTruthy();
-    expect(screen.getAllByText("Hesap yönetimi").length).toBeGreaterThan(0);
-    expect(screen.getByText("RAPOR")).toBeTruthy(); // blok başlığı TR büyük harf
-    expect(screen.getByTestId("hesap-rol").props.accessibilityLabel).toBe("Rol: Çalışan");
-    fireEvent.press(screen.getByText("Raporlar"));
-    expect(screen.getByTestId("izin-degisti")).toBeTruthy();
-    await act(async () => fireEvent.press(screen.getByTestId("izin-kaydet")));
-    expect(mockApi.accountUpdate).toHaveBeenCalledWith("h1", expect.objectContaining({ izinler: ["bulut:siparis:oku", "bulut:rapor:oku"] }));
-  });
-  it("şablon çipi kümeyi doldurur (kaydetmez)", () => {
-    mockRemote.data = { hesaplar: [ACC], izinler: CATALOG };
-    render(<AccountDetail />);
-    fireEvent.press(screen.getByTestId("sablon-PATRON"));
-    expect(screen.getByTestId("sablon-PATRON").props.accessibilityState).toEqual(expect.objectContaining({ checked: true }));
-    expect(mockApi.accountUpdate).not.toHaveBeenCalled();
+    expect(screen.getByTestId("parola-bilgi").props.accessibilityLabel).toBe("Parolanı fabrikadaki yöneticin değiştirir");
+    expect(screen.getByText("Fabrikadaki yöneticin değiştirir")).toBeTruthy();
+    expect(screen.getByTestId("parola-bilgi").props.accessibilityRole).toBeUndefined();
+    expect(screen.queryByTestId("parola-degistir")).toBeNull();
+    expect(screen.queryByTestId("hesap-sil-git")).toBeNull();
+    expect(screen.queryByTestId("fabrika-degistir")).toBeNull();
+    expect(screen.getByText("ayse")).toBeTruthy();
+    expect(screen.getByTestId("dogrulama-git")).toBeTruthy();
   });
 });
 
@@ -117,7 +91,8 @@ describe("gelen kutusu", () => {
     expect([...new Set(keys)]).toEqual(["gelen-kutusu:REDDEDILDI"]);
     expect(screen.queryByTestId("gelen-rozet")).toBeNull();
     expect(screen.getByTestId("menu-gelen-kutusu")).toBeTruthy();
-    expect(screen.getByTestId("menu-hesaplar")).toBeTruthy();
+    expect(screen.getByTestId("menu-disa-aktar")).toBeTruthy();
+    expect(screen.queryByTestId("menu-hesaplar")).toBeNull();
   });
   it("hata alan kayıt: satırda Hata rozeti + ret nedeni; işlenen kayıtta rozet yok", () => {
     const base = { mesajId: "m1", tur: "CARI" as const, govde: { ad: "Deneme Cari" }, hesapAdi: "A", olusturulma: new Date().toISOString(), islenme: null, iptal: null };

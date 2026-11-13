@@ -1,27 +1,23 @@
 // Oturum bağlamı: belirteç (gizli depo) + tesis durumu (`GET /oturum`) + izinler. Çevrimdışıyken son
 // oturum görüntüsü önbellekten gelir ve YAZMA kapalıdır. 401 → belirteç silinir, giriş ekranı.
-// Çok tesis: tek bulut kimliği birden çok fabrikaya erişir; geçiş yeni belirteç + yeni kapsam alır, diğer tesisin
-// önbelleği (ayrık kapsam) durur; çıkış ve yeni giriş bütün önbelleği siler.
+// Hesap fabrikanın malıdır (kullanıcı adı + fabrika parolası; bulut tek tesisli, tesis geçişi yok); çıkış ve yeni giriş
+// bütün önbelleği siler.
 // Tazelik (K1): öne gelince ve değişim akışında fabrika damgası değişince `refresh()`; "Son eşitleme" = fabrika
 // veri anı (`esitleme.ufuk`, paketin ufku), bulutun alım anı değil. Belirteç yenileme ucu sunucuda yok — dokunulmaz.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ApiError, createClient, errorMessage } from "../api/client";
+import { ApiError, createClient } from "../api/client";
 import { createApi, type Api } from "../api/endpoints";
-import type { FacilityChoice, FacilityStatus, LoginResponse } from "../api/wire";
+import type { FacilityStatus, LoginResponse } from "../api/wire";
 import { apiBaseUrl } from "../lib/config";
 import { clearCache, createCache, openingCacheHygiene, type Cache } from "./cache";
 import { createFeedFetcher, useChangeFeed, type FeedMode } from "./changes";
 import { useForeground } from "./useForeground";
 import { legacyPlainStore, plainStore, secretStore } from "./store";
 import { applyServerFactoryTimezone } from "../lib/factory-time";
-import { UYGULAMA_ADI } from "../lib/kimlik";
 import { ornekIstemci } from "../ornek/kapi";
 
 const TOKEN_KEY = "patron.belirtec";
 const SCOPE_KEY = "patron.kapsam";
-/** Son seçilen tesis — yalnız kimlik (veri değil); girişte ipucu olarak gider, çıkışta kalır. */
-export const LAST_FACILITY_KEY = "patron.sonTesis";
-export const SWITCH_DENIED = "TESIS_GECISI_YOK";
 
 export type Phase = "yukleniyor" | "giris" | "hazir";
 
@@ -32,10 +28,6 @@ export interface SessionValue {
   readonly facility: FacilityStatus | null;
   /** Etkin tesis (kapsamdan); oturumsuzken null. */
   readonly facilityId: string | null;
-  /** Erişilebilen tesisler; eski sunucu listeyi vermezse yalnız etkin tesis. */
-  readonly facilities: readonly FacilityChoice[];
-  /** Son tesis geçişinin Türkçe hata iletisi (başarılı geçiş ya da yeni girişte silinir). */
-  readonly switchError: string | null;
   readonly permissions: readonly string[];
   readonly offline: boolean;
   readonly offlineSince: string | null;
@@ -50,8 +42,6 @@ export interface SessionValue {
   logout(): Promise<void>;
   /** `GET /oturum` yeniden okunur (uçuştayken ikinci çağrı aynı sözü alır); oturumsuzken null. */
   refresh(): Promise<FacilityStatus | null>;
-  /** Başka tesise geç; reddedilirse `false` ve `switchError` dolar, etkin tesis değişmez. */
-  switchFacility(tesisId: string): Promise<boolean>;
 }
 
 const Ctx = createContext<SessionValue | null>(null);
@@ -82,9 +72,6 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
   const [phase, setPhase] = useState<Phase>("yukleniyor");
   const [facility, setFacility] = useState<FacilityStatus | null>(null);
   const [scope, setScope] = useState<string | null>(null);
-  const [choices, setChoices] = useState<readonly FacilityChoice[]>([]);
-  const [switchError, setSwitchError] = useState<string | null>(null);
-  const switching = useRef(false);
   const [offline, setOffline] = useState(false);
   const [offlineSince, setOfflineSince] = useState<string | null>(null);
   const base = apiBaseUrl();
@@ -98,8 +85,6 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
     await clearCache(plainStore);
     setFacility(null);
     setScope(null);
-    setChoices([]);
-    setSwitchError(null);
     setPhase("giris");
   }, []);
 
@@ -125,33 +110,17 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
     [api, markOnline],
   );
 
-  /** Tesis listesi: yanıtta geldiyse o; yoksa `GET /oturum/tesisler` (eski sunucu → boş = tek tesis). */
-  const loadChoices = useCallback(
-    async (c: Cache, given?: readonly FacilityChoice[]) => {
-      if (given) return setChoices(given);
-      try {
-        setChoices((await c.load("tesisler", () => api.facilities())).data);
-      } catch {
-        setChoices([]);
-      }
-    },
-    [api],
-  );
-
-  /** Giriş ve geçiş yanıtını benimser: belirteç + kapsam gizli depoya, tesis + liste yüklenir. */
+  /** Giriş yanıtını benimser: belirteç + kapsam gizli depoya, tesis durumu yüklenir. */
   const adopt = useCallback(
     async (r: LoginResponse) => {
       token.current = r.belirtec;
       const s = `${r.tesisId}:${r.hesap.id}`;
       await secretStore.set(TOKEN_KEY, r.belirtec).catch(() => undefined);
       await secretStore.set(SCOPE_KEY, s).catch(() => undefined);
-      await plainStore.set(LAST_FACILITY_KEY, r.tesisId).catch(() => undefined);
       setScope(s);
-      const c = createCache(plainStore, s);
-      await loadFacility(c);
-      await loadChoices(c, r.tesisler);
+      await loadFacility(createCache(plainStore, s));
     },
-    [loadFacility, loadChoices],
+    [loadFacility],
   );
 
   useEffect(() => {
@@ -170,9 +139,7 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
       token.current = t;
       setScope(s);
       try {
-        const c = createCache(plainStore, s);
-        await loadFacility(c);
-        await loadChoices(c);
+        await loadFacility(createCache(plainStore, s));
         if (alive) setPhase("hazir");
       } catch (err) {
         if (!alive) return;
@@ -183,22 +150,13 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
     return () => {
       alive = false;
     };
-  }, [loadFacility, loadChoices, ornek, adopt, api]);
+  }, [loadFacility, ornek, adopt, api]);
 
   const login = useCallback(
     async (b: { kullaniciAdi: string; parola: string; totp?: string }) => {
-      const hint = await plainStore.get(LAST_FACILITY_KEY).catch(() => null);
-      const plain = { ...b, istemci: platform };
-      // Eski sunucu gövdeyi sıkı doğrular (bilinmeyen `tesisId` → 400, faktörlere gelmeden): ipucusuz bir kez daha.
-      const r = hint
-        ? await api.login({ ...plain, tesisId: hint }).catch((err: unknown) => {
-            if (err instanceof ApiError && err.kind === "GECERSIZ") return api.login(plain);
-            throw err;
-          })
-        : await api.login(plain);
-      // Yeni giriş başka kimlik olabilir: bütün önbellek (her tesisin) silinir.
+      const r = await api.login({ ...b, istemci: platform });
+      // Yeni giriş başka kimlik olabilir: bütün önbellek silinir.
       await clearCache(plainStore);
-      setSwitchError(null);
       await adopt(r);
       setPhase("hazir");
     },
@@ -206,38 +164,12 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
   );
 
   const logout = useCallback(async () => {
-    // Tek kimlik, tek oturum hissi: bütün tesislerdeki oturumlar kapanır.
+    // Hesabın bütün cihazlardaki oturumları kapanır.
     await api.logout({ hepsi: true }).catch(() => undefined);
     await reset();
   }, [api, reset]);
 
   const facilityId = scope ? (scope.split(":")[0] ?? null) : null;
-
-  const switchFacility = useCallback(
-    async (tesisId: string) => {
-      if (tesisId === facilityId) return true;
-      if (switching.current) return false;
-      switching.current = true;
-      setSwitchError(null);
-      try {
-        const r = await api.switchFacility(tesisId);
-        await adopt(r);
-        return true;
-      } catch (err) {
-        if (err instanceof ApiError && err.kind === "OTURUM") return false; // reset zaten koştu
-        if (err instanceof ApiError && err.status === 403 && err.code === SWITCH_DENIED) {
-          if (cache) await loadChoices(cache);
-          setSwitchError("Bu fabrikaya geçiş yetkiniz yok; fabrika listesi yenilendi.");
-        } else {
-          setSwitchError(errorMessage(err));
-        }
-        return false;
-      } finally {
-        switching.current = false;
-      }
-    },
-    [api, adopt, cache, facilityId, loadChoices],
-  );
 
   const inflight = useRef<Promise<FacilityStatus | null> | null>(null);
   const refresh = useCallback((): Promise<FacilityStatus | null> => {
@@ -277,8 +209,6 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
     cache,
     facility,
     facilityId,
-    facilities: choices.length > 0 ? choices : facility ? [{ id: facility.tesis.id, ad: facility.tesis.ad ?? UYGULAMA_ADI, hizmet: facility.hizmet?.asama ?? "ACIK" }] : [],
-    switchError,
     permissions: facility?.hesap.izinler ?? [],
     offline,
     offlineSince,
@@ -289,7 +219,6 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
     login,
     logout,
     refresh,
-    switchFacility,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

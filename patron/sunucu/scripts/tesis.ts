@@ -115,8 +115,8 @@ async function main(): Promise<number> {
         const lock = komut === "kullanici-kilitle";
         const reason = reasonFromArgs(a, lock);
         const r = await setCloudLock(db, { tesisId: await soleFacility(db), username: need(a, "kullanici"), lock, ...(reason ? { reason } : {}) });
-        if (!r.changed && !r.sessions) console.log(`ℹ️  hesap ${r.accountId}: değişiklik yok (zaten ${lock ? "kilitli" : "açık"})`);
-        else if (lock) console.log(`✅ hesap ${r.accountId} bulutta kilitlendi — ${r.sessions ?? 0} oturum kapandı; denetime yazıldı`);
+        if (!r.changed && !r.sessions && !r.messages) console.log(`ℹ️  hesap ${r.accountId}: değişiklik yok (zaten ${lock ? "kilitli" : "açık"})`);
+        else if (lock) console.log(`✅ hesap ${r.accountId} bulutta kilitlendi — ${r.sessions ?? 0} oturum kapandı, ${r.messages ?? 0} bekleyen mesaj fabrikaya verilmeden kapandı; denetime yazıldı`);
         else console.log(`✅ hesap ${r.accountId} bulut kilidi kalktı — denetime yazıldı`);
         break;
       }

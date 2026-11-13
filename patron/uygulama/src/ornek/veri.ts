@@ -42,7 +42,7 @@ export function ornekOturum(): FacilityStatus {
 }
 
 export function ornekGiris(): LoginResponse {
-  return { belirtec: "ornek", bitis: sonra(30), hesap, tesisId: "ornek-tesis", tesisler: [{ id: "ornek-tesis", ad: "Örnek Fabrika (önizleme)", hizmet: "ACIK" }] };
+  return { belirtec: "ornek", bitis: sonra(30), hesap, tesisId: "ornek-tesis" };
 }
 
 const donem = (carpan: number) => ({
@@ -218,15 +218,6 @@ export function ORNEK_BILDIRIM() {
     esikler: { hamStokAlt: 50000, bitmisStokAlt: null, gecikenKalemUst: null, gunlukUretimAlt: null, gunlukUretimSaati: 17, esitlemeGecikmeDk: 60 },
   };
   return { etkin, kaynak: "TESIS", hesap: null, tesis: etkin, turler: turler.map(([tur, ad, aciklama]) => ({ tur, ad, aciklama, izinli: true })), gonderim: "gercek", webPushAnahtari: null };
-}
-
-/** Hesaplar (örnek): yönetici + çalışan + davetli. */
-export function ORNEK_HESAPLAR() {
-  return [
-    { id: "ornek-hesap", eposta: "ornek@ornek.invalid", ad: "Örnek Patron", durum: "AKTIF", izinler: ORNEK_IZINLER, sonGiris: once(0, 0.1), davetBitis: null, olusturulma: once(90) },
-    { id: "h2", eposta: "deneme@ornek.invalid", ad: "Deneme Satış", durum: "AKTIF", izinler: ["bulut:oturum", "bulut:siparis:oku"], sonGiris: once(1, 2), davetBitis: null, olusturulma: once(60) },
-    { id: "h3", eposta: "numune@ornek.invalid", ad: "Numune Planlama", durum: "DAVETLI", izinler: ["bulut:oturum"], sonGiris: null, davetBitis: sonra(3), olusturulma: once(1) },
-  ];
 }
 
 const kayit = (id: string, k: Record<string, unknown>): ProjectionRecord => ({ id, kayit: k, surum: once(0, 0.05) });

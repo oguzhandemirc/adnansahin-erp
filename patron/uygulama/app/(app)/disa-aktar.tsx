@@ -3,24 +3,24 @@
 // doğan veri); dosya yalnız web sürümünde kaydedilir (telefon uygulamasına dosya paketi eklenmedi).
 import { useState } from "react";
 import { Platform, Text, View } from "react-native";
-import { errorMessage } from "../../../src/api/client";
-import type { ExportDataset, ExportFormat } from "../../../src/api/wire";
-import { canSaveFiles, saveDownloadedFile, type BrowserLike } from "../../../src/lib/export-file";
-import { formatDateTime, formatNumber } from "../../../src/lib/format";
-import { EXPORT_DATASET_LABEL } from "../../../src/lib/labels/diger";
-import { humanize } from "../../../src/lib/present";
-import { useSession } from "../../../src/state/session";
-import { useRemote } from "../../../src/state/useRemote";
-import { GroupNote } from "../../../src/ui/diger/parts";
-import { Screen } from "../../../src/ui/Frame";
-import { IconTile } from "../../../src/ui/ortak";
-import { DOMAIN_TONE } from "../../../src/ui/tokens";
-import { Banner, Button } from "../../../src/ui/kit";
-import { BosDurum, HataDurumu, Iskelet, ListeBlogu } from "../../../src/ui/ortak";
-import { makeStyles } from "../../../src/ui/theme-context";
-import { space, tabularNums, typography } from "../../../src/ui/tokens";
-import { EMPTY_ICON } from "../../../src/ui/icons";
-import { UYGULAMA_ADI } from "../../../src/lib/kimlik";
+import { errorMessage } from "../../src/api/client";
+import type { ExportDataset, ExportFormat } from "../../src/api/wire";
+import { canSaveFiles, saveDownloadedFile, type BrowserLike } from "../../src/lib/export-file";
+import { formatDateTime, formatNumber } from "../../src/lib/format";
+import { EXPORT_DATASET_LABEL } from "../../src/lib/labels/diger";
+import { humanize } from "../../src/lib/present";
+import { useSession } from "../../src/state/session";
+import { useRemote } from "../../src/state/useRemote";
+import { GroupNote } from "../../src/ui/diger/parts";
+import { Screen } from "../../src/ui/Frame";
+import { IconTile } from "../../src/ui/ortak";
+import { DOMAIN_TONE } from "../../src/ui/tokens";
+import { Banner, Button } from "../../src/ui/kit";
+import { BosDurum, HataDurumu, Iskelet, ListeBlogu } from "../../src/ui/ortak";
+import { makeStyles } from "../../src/ui/theme-context";
+import { space, tabularNums, typography } from "../../src/ui/tokens";
+import { EMPTY_ICON } from "../../src/ui/icons";
+import { UYGULAMA_ADI } from "../../src/lib/kimlik";
 
 const browser: BrowserLike | undefined = typeof window === "undefined" ? undefined : (window as unknown as BrowserLike);
 
@@ -50,7 +50,7 @@ export default function ExportScreen() {
 
   const hizmet = r.data?.hizmet;
   return (
-    <Screen title="Dışa aktar" module="hesaplar" onRefresh={r.reload} refreshing={r.refreshing}>
+    <Screen module="disa-aktar" onRefresh={r.reload} refreshing={r.refreshing}>
       {hizmet?.asama === "SALT_OKUNUR" && hizmet.saltOkunurBitis ? (
         <Banner tone="warn" testID="disa-aktar-sure" text={`Hizmet sona erdi; dökümü ${formatDateTime(hizmet.saltOkunurBitis)} tarihine kadar alabilirsiniz. Sonra veriler imha edilir.`} />
       ) : null}

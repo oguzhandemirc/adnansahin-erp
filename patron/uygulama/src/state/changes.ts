@@ -211,7 +211,7 @@ export function startChangeFeed(d: FeedDeps): FeedHandle {
 
 /**
  * Oturum düzeyinde TEK abonelik: `enabled` (oturum hazır) ∧ ön plan iken döngü koşar; arka plana geçince ya da
- * oturum düşünce durur ve açık istek iptal edilir. `resetKey` değişince (tesis geçişi) sayaç sıfırdan başlar.
+ * oturum düşünce durur ve açık istek iptal edilir. `resetKey` değişince (yeni oturum) sayaç sıfırdan başlar.
  */
 export function useChangeFeed(o: {
   enabled: boolean;

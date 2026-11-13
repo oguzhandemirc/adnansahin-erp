@@ -29,7 +29,7 @@ export const MODULE_ICON: Readonly<Record<ModuleKey, { readonly domain: Domain; 
   stok: { domain: "stok", icon: DOMAIN_ICON.stok },
   raporlar: { domain: "raporlar", icon: DOMAIN_ICON.raporlar },
   "gelen-kutusu": { domain: "gelenKutusu", icon: DOMAIN_ICON.gelenKutusu },
-  hesaplar: { domain: "genel", icon: "key-outline" },
+  "disa-aktar": { domain: "genel", icon: "download-outline" },
   bildirimler: { domain: "genel", icon: "notifications-outline" },
   profil: { domain: "genel", icon: "person-circle-outline" },
 };

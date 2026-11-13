@@ -1,13 +1,11 @@
 // Uygulamanın çağırdığı HER uç burada (yol şablonu + yöntem). Ayna bekçisi bu tabloyu sunucunun
 // `API_ROUTES`uyla karşılaştırır — sunucuda olmayan uca istek yazılamaz.
 import type { ApiClient, DownloadedFile, Query } from "./client";
-import type { LegacyAccount as Account, AccountDeletion, AccountInviteResult, InviteAccepted, InviteConfirmed, InviteInfo, PermissionCatalog } from "./eski-uyelik";
 import type {
   Device,
   CustomerMessageBody,
   ExportFormat,
   ExportManifest,
-  FacilityChoice,
   TwoFactorSetup,
   TwoFactorStatus,
   FacilityStatus,
@@ -35,21 +33,12 @@ import type {
 
 export const ENDPOINTS = {
   login: ["post", "/oturum/ac"],
-  inviteInspect: ["post", "/davet/incele"],
-  inviteAccept: ["post", "/davet/kabul"],
-  inviteConfirm: ["post", "/davet/onay"],
-  inviteLink: ["post", "/davet/bagla"],
   session: ["get", "/oturum"],
   logout: ["post", "/oturum/kapat"],
-  facilities: ["get", "/oturum/tesisler"],
-  switchFacility: ["post", "/oturum/gecis"],
-  changePassword: ["post", "/oturum/parola"],
-  deleteOwnAccount: ["post", "/oturum/hesap-sil"],
   twoFactorStatus: ["get", "/oturum/dogrulama"],
   twoFactorBegin: ["post", "/oturum/dogrulama/baslat"],
   twoFactorConfirm: ["post", "/oturum/dogrulama/onay"],
   twoFactorDisable: ["post", "/oturum/dogrulama/kapat"],
-  permissions: ["get", "/izinler"],
   list: ["get", "/veri/:projeksiyon"],
   record: ["get", "/veri/:projeksiyon/:id"],
   snapshot: ["get", "/anlik/:projeksiyon"],
@@ -64,11 +53,6 @@ export const ENDPOINTS = {
   reportList: ["get", "/raporlar"],
   reportGet: ["get", "/raporlar/:id"],
   reportCancel: ["post", "/raporlar/:id/iptal"],
-  accountList: ["get", "/hesaplar"],
-  accountCreate: ["post", "/hesaplar"],
-  accountUpdate: ["patch", "/hesaplar/:id"],
-  accountStatus: ["post", "/hesaplar/:id/durum"],
-  accountReset: ["post", "/hesaplar/:id/sifirla"],
   deviceRegister: ["post", "/cihazlar"],
   deviceList: ["get", "/cihazlar"],
   deviceRemove: ["post", "/cihazlar/:id/kaldir"],
@@ -96,15 +80,6 @@ export function pathOf(name: Name, params: Readonly<Record<string, string>> = {}
   });
 }
 
-/** Eski e-posta girişi gövdesi (sunucuda geçici uyumluluk; davet duman betiği kullanır) — C4'te kalkar. */
-export interface LegacyEmailLogin {
-  readonly eposta: string;
-  readonly parola: string;
-  readonly totp?: string;
-  readonly istemci?: "mobil" | "web";
-  readonly tesisId?: string;
-}
-
 export interface ListParams {
   readonly imlec?: string;
   readonly limit?: number;
@@ -125,26 +100,14 @@ export interface ListParams {
 export function createApi(c: ApiClient) {
   const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, siparisId: p.siparisId, fasonFirmaId: p.fasonFirmaId, ara: p.ara, suzgec: p.suzgec, sirala: p.sirala, yon: p.yon });
   return {
-    // `LegacyEmailLogin` yalnız davet duman betiği içindir (eski e-posta girişi) — C4'te kalkar.
-    login: (b: LoginRequest | LegacyEmailLogin) => c.post<LoginResponse>(pathOf("login"), b),
-    inviteInspect: (davet: string) => c.post<InviteInfo>(pathOf("inviteInspect"), { davet }),
-    inviteAccept: (davet: string, parola: string) => c.post<InviteAccepted>(pathOf("inviteAccept"), { davet, parola }),
-    inviteConfirm: (davet: string, totp: string) => c.post<InviteConfirmed>(pathOf("inviteConfirm"), { davet, totp }),
-    /** Mevcut bulut kimliğini davetin tesisine bağlar (yeni hesap açmaz). */
-    inviteLink: (b: { davet: string; eposta: string; parola: string; totp?: string }) => c.post<InviteConfirmed>(pathOf("inviteLink"), b),
+    /** Fabrika kullanıcı adı + fabrika parolası. Ret: 401 `GIRIS_BASARISIZ` · 401 `DOGRULAMA_KODU_GEREKLI` · 503 `FABRIKA_BAGLANTISI_YOK`. */
+    login: (b: LoginRequest) => c.post<LoginResponse>(pathOf("login"), b),
     session: () => c.get<FacilityStatus>(pathOf("session")),
     logout: (b: { hepsi?: boolean } = {}) => c.post<null>(pathOf("logout"), b),
-    facilities: () => c.get<FacilityChoice[]>(pathOf("facilities")),
-    /** Yeni belirteç döner; eski oturum sunucuda kapanır. Ret: 403 `TESIS_GECISI_YOK`. */
-    switchFacility: (tesisId: string) => c.post<LoginResponse>(pathOf("switchFacility"), { tesisId }),
-    changePassword: (b: { mevcutParola: string; yeniParola: string; totp?: string }) => c.post<null>(pathOf("changePassword"), b),
     twoFactorStatus: () => c.get<TwoFactorStatus>(pathOf("twoFactorStatus")),
     twoFactorBegin: (parola: string) => c.post<TwoFactorSetup>(pathOf("twoFactorBegin"), { parola }),
     twoFactorConfirm: (totp: string) => c.post<TwoFactorStatus>(pathOf("twoFactorConfirm"), { totp }),
     twoFactorDisable: (b: { parola: string; totp: string }) => c.post<TwoFactorStatus>(pathOf("twoFactorDisable"), b),
-    /** Kendi hesabını silme: kimlik + bütün tesis üyelikleri kapanır, oturumlar düşer. Ret: 400 `GIRIS_BASARISIZ` · 409 `SON_YONETICI`. */
-    deleteOwnAccount: (b: { parola: string; totp?: string }) => c.post<AccountDeletion>(pathOf("deleteOwnAccount"), b),
-    permissions: () => c.get<PermissionCatalog>(pathOf("permissions")),
     list: (projeksiyon: string, p: ListParams = {}) => c.get<Page<ProjectionRecord>>(pathOf("list", { projeksiyon }), q(p)),
     record: (projeksiyon: string, id: string) => c.get<ProjectionRecord>(pathOf("record", { projeksiyon, id })),
     snapshot: (projeksiyon: string) => c.get<Snapshot>(pathOf("snapshot", { projeksiyon })),
@@ -161,12 +124,6 @@ export function createApi(c: ApiClient) {
     reportList: (p: { imlec?: string; limit?: number } = {}) => c.get<Page<ReportRequest>>(pathOf("reportList"), p),
     reportGet: (id: string) => c.get<ReportRequestDetail>(pathOf("reportGet", { id })),
     reportCancel: (id: string) => c.post<ReportRequest>(pathOf("reportCancel", { id }), {}),
-    accountList: () => c.get<Account[]>(pathOf("accountList")),
-    accountCreate: (b: { clientToken: string; eposta: string; ad: string; sablon?: string; izinler?: string[] }) =>
-      c.post<AccountInviteResult>(pathOf("accountCreate"), b),
-    accountUpdate: (id: string, b: { clientToken: string; ad?: string; izinler?: string[] }) => c.patch<Account>(pathOf("accountUpdate", { id }), b),
-    accountStatus: (id: string, b: { clientToken: string; durum: "AKTIF" | "KILITLI" | "PASIF" }) => c.post<Account>(pathOf("accountStatus", { id }), b),
-    accountReset: (id: string, clientToken: string) => c.post<AccountInviteResult>(pathOf("accountReset", { id }), { clientToken }),
     deviceRegister: (b: { platform: "ios" | "android" | "web"; belirtec: string; ad?: string }) => c.post<Device>(pathOf("deviceRegister"), b),
     deviceList: () => c.get<Device[]>(pathOf("deviceList")),
     deviceRemove: (id: string) => c.post<Device>(pathOf("deviceRemove", { id }), {}),

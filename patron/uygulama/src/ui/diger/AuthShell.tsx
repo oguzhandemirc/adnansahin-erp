@@ -1,4 +1,4 @@
-// Giriş/davet kabuğu: her temada lacivert zemin + uygulama adı (`kimlik.json`) + opak
+// Giriş kabuğu: her temada lacivert zemin + uygulama adı (`kimlik.json`) + opak
 // form kartı. Lacivert zemindeki metin `onNavy` token'larındandır (zemin her temada koyu).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StatusBar } from "expo-status-bar";
@@ -21,9 +21,9 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
   const t = useTokens();
   const s = useStyles();
   const azalt = useHareketAzalt();
-  // Marka her ekranda AYNI yükseklikte durur (ortalanınca kart boyu değişen giriş ↔ davet geçişinde zıplıyordu).
+  // Marka her ekranda AYNI yükseklikte durur (ortalanınca kart boyu değişen parola ↔ kod geçişinde zıplıyordu).
   const { height } = useWindowDimensions();
-  // Giriş ↔ davet ↔ doğrulama adımı: zemin ve marka sabit kalır, yalnız kart (başlığa anahtarlı) hafif aşağıdan solar.
+  // Parola ↔ doğrulama adımı: zemin ve marka sabit kalır, yalnız kart (başlığa anahtarlı) hafif aşağıdan solar.
   const anim = (sira: number) => (azalt || Platform.OS === "web" ? undefined : girisAnimasyonu(sira, false));
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[s.flex, { backgroundColor: t.color.primary }]}>
@@ -50,7 +50,7 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
           {subtitle ? <Text style={s.subtitle}>{subtitle}</Text> : null}
           <View style={s.body}>{children}</View>
         </Animated.View>
-        {footer ? <Animated.View key={`alt-${title}`} entering={anim(1)} style={s.footer}>{footer}</Animated.View> : null}
+        {footer ? <Animated.View key={`alt-${title}`} entering={anim(1)} style={s.footer}>{typeof footer === "string" ? <Text style={s.footerText}>{footer}</Text> : footer}</Animated.View> : null}
         <View style={s.secure}>
           <Ionicons name="lock-closed" size={13} color={t.color.onPrimary} />
           <Text style={s.secureText}>Parola ile korunur · doğrulama kodu isteğe bağlı</Text>
@@ -76,6 +76,7 @@ const useStyles = makeStyles((t) => ({
   subtitle: { ...typography.subhead, color: t.textSecondary, marginTop: space.xs },
   body: { marginTop: space.l },
   footer: { marginTop: space.l },
+  footerText: { ...typography.footnote, color: t.color.onPrimary, textAlign: "center" as const, paddingHorizontal: space.m },
   secure: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "center" as const, gap: space.xs, marginTop: space.xl },
   secureText: { ...typography.footnote, color: t.color.onPrimary },
 }));
