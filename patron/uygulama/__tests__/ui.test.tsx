@@ -21,7 +21,7 @@ describe("izinli menü", () => {
     mockSession.permissions = ["bulut:oturum", "bulut:siparis:oku"];
     render(<SideNav />);
     expect(screen.getByTestId("menu-siparisler")).toBeTruthy();
-    expect(screen.queryByTestId("menu-finans")).toBeNull();
+    expect(screen.queryByTestId("menu-raporlar")).toBeNull();
     expect(screen.queryByTestId("menu-hesaplar")).toBeNull();
     expect(screen.getByText("Adnan Şahin Yönetim")).toBeTruthy(); // tesis adı yoksa uygulama adı (kimlik.json)
   });
@@ -34,10 +34,10 @@ describe("izinli menü", () => {
     mockSession.facility = null;
   });
   it("ray sırası sekmelerle aynı; Operasyon, İş ve Hesap grupları ardından gelir", () => {
-    mockSession.permissions = ["bulut:siparis:oku", "bulut:uretim:oku", "bulut:sevkiyat:oku", "bulut:kasa:oku", "bulut:cari:oku", "bulut:stok:oku", "bulut:siparis:yaz", "bulut:hesap:yonet"];
+    mockSession.permissions = ["bulut:siparis:oku", "bulut:uretim:oku", "bulut:sevkiyat:oku", "bulut:rapor:oku", "bulut:cari:oku", "bulut:stok:oku", "bulut:siparis:yaz", "bulut:hesap:yonet"];
     render(<SideNav />);
     const order = screen.getAllByTestId(/^menu-/).map((n) => String(n.props.testID).slice(5));
-    expect(order).toEqual(["pano", "siparisler", "uretim", "stok", "cariler", "sevkiyat", "finans", "bildirimler", "hesaplar", "gelen-kutusu", "profil"]);
+    expect(order).toEqual(["pano", "siparisler", "uretim", "stok", "cariler", "sevkiyat", "raporlar", "bildirimler", "hesaplar", "gelen-kutusu", "profil"]);
     expect(screen.getByText("Operasyon")).toBeTruthy();
     expect(screen.getByText("İş")).toBeTruthy();
     expect(screen.getByText("Hesap")).toBeTruthy();
@@ -55,7 +55,7 @@ describe("izinli menü", () => {
     mockSession.permissions = ["bulut:oturum"];
     mockSession.offline = true;
     mockSession.offlineSince = new Date().toISOString();
-    render(<Screen title="Finans" module="finans"><Text>GIZLI</Text></Screen>);
+    render(<Screen title="Hesaplar" module="hesaplar"><Text>GIZLI</Text></Screen>);
     expect(screen.queryByText("GIZLI")).toBeNull();
     expect(screen.getByText("Bu bölümü görme yetkiniz yok")).toBeTruthy();
     expect(screen.getByTestId("bant-cevrimdisi")).toBeTruthy();

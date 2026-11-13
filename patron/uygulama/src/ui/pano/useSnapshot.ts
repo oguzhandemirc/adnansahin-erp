@@ -1,5 +1,5 @@
 // Anlık kancası: `anlik:<projeksiyon>` anahtarı → değişim akışındaki projeksiyon adıyla AYNI etiket (`ozet.stok`,
-// `saglik`…), böylece fabrika paketi gelince yalnız ilgili kutu tazelenir. İzinsizken anahtar `null` (istek yok).
+// `stok-karnesi`…), böylece fabrika paketi gelince yalnız ilgili kutu tazelenir. İzinsizken anahtar `null` (istek yok).
 import type { Snapshot } from "../../api/wire";
 import { useSession } from "../../state/session";
 import { useRemote, type Remote } from "../../state/useRemote";

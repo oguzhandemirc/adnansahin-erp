@@ -1,20 +1,19 @@
 // =============================================================================
-// DB ROLLERİ (MERKEZ) — uygulama + eşitleme rolünü kurar/hizalar ve MERKEZ yetkilerini `src/lib/db-grants.ts`ten
-// verir (yalnız yönlendirme tabloları). Tesis DB'lerinin rolleri/yetkileri hazırlayıcıdadır (`tesis-db-hazirlik.ts`).
+// DB ROLLERİ — uygulama + eşitleme rolünü kurar/hizalar ve yetkilerini `src/lib/db-grants.ts`ten verir (tek
+// veritabanı: kiracı + kimlik tabloları aynı DB'de; tablo + kolon düzeyi).
 //   npx tsx scripts/db-rolleri.ts            (her `prisma migrate deploy`dan SONRA; idempotent)
 // Roller KÜME düzeyindedir, migration'a girmez. Ad + parola çalışma URL'lerinden (`DATABASE_URL`,
 // `ESITLEME_DATABASE_URL`) okunur, işlemi GÖÇ rolü (`GOC_DATABASE_URL`, tablo sahibi) yapar.
 // İki çalışma rolü: LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE; DB'ye bağlanma PUBLIC'ten
-// geri alınır (REVOKE CONNECT). Parola çıktıya/loga YAZILMAZ. Üçüncüsü destek rolü (`<db>_destek`, göçte NOLOGIN
-// doğar): yalnız SELECT (SUPPORT_GRANTS, sır kolonları hariç); giriş yetkisine bu betik dokunmaz (runbook).
+// geri alınır (REVOKE CONNECT). Parola çıktıya/loga YAZILMAZ. Destek rolü YOKTUR (Adnan'da satıcı yok).
 // =============================================================================
 import { Client } from "pg";
 import { loadEnvFile } from "../src/lib/env";
-import { MERKEZ_APP_GRANTS, MERKEZ_SYNC_COLUMN_GRANTS, MERKEZ_SYNC_GRANTS, supportRoleName } from "../src/lib/db-grants";
-import { applySupportRole, ensureLoginRole, grantAll, ident, markDatabase } from "../src/lib/db-roles";
-import { CENTRAL_MARK, assertCentralName } from "../src/lib/tesis-db-ad";
+import { APP_COLUMN_GRANTS, APP_GRANTS, SYNC_COLUMN_GRANTS, SYNC_GRANTS } from "../src/lib/db-grants";
+import { ensureLoginRole, grantAll, ident } from "../src/lib/db-roles";
 
 const ROLE_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
+const DATABASE_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
 
 export interface RoleSpec {
   readonly name: string;
@@ -37,7 +36,8 @@ export function databaseName(url: string): string {
 export async function applyRoles(env: NodeJS.ProcessEnv = process.env): Promise<{ app: string; sync: string; database: string }> {
   const goc = env.GOC_DATABASE_URL;
   if (!goc || !env.DATABASE_URL || !env.ESITLEME_DATABASE_URL) throw new Error("GOC_DATABASE_URL, DATABASE_URL ve ESITLEME_DATABASE_URL zorunlu");
-  const database = assertCentralName(databaseName(goc));
+  const database = databaseName(goc);
+  if (!DATABASE_NAME.test(database)) throw new Error("GOC_DATABASE_URL: veritabanı adı biçimsiz (küçük harf, rakam, _)");
   if (database.startsWith("tekserp_fabrika_")) throw new Error("Fabrika verisi sınıfındaki DB'ye rol kurulmaz");
   for (const u of [env.DATABASE_URL, env.ESITLEME_DATABASE_URL]) {
     if (databaseName(u) !== database) throw new Error("Çalışma URL'leri göç URL'iyle AYNI veritabanını göstermeli");
@@ -53,11 +53,8 @@ export async function applyRoles(env: NodeJS.ProcessEnv = process.env): Promise<
     await ensureLoginRole(client, sync.name, sync.password);
     await client.query(`REVOKE CONNECT ON DATABASE ${ident(database)} FROM PUBLIC`);
     await client.query(`GRANT CONNECT ON DATABASE ${ident(database)} TO ${ident(app.name)}, ${ident(sync.name)}`);
-    // Merkezde yalnız yönlendirme yetkileri; kiracı tabloları merkezde boş + yetkisiz (tesis DB'leri hazırlayıcıda).
-    await grantAll(client, app.name, MERKEZ_APP_GRANTS, {});
-    await grantAll(client, sync.name, MERKEZ_SYNC_GRANTS, MERKEZ_SYNC_COLUMN_GRANTS);
-    await applySupportRole(client, database, supportRoleName(database), {});
-    await markDatabase(client, database, CENTRAL_MARK);
+    await grantAll(client, app.name, APP_GRANTS, APP_COLUMN_GRANTS);
+    await grantAll(client, sync.name, SYNC_GRANTS, SYNC_COLUMN_GRANTS);
   } finally {
     await client.end();
   }

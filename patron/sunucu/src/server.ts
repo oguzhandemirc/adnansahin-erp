@@ -1,7 +1,7 @@
 // PATRON BULUTU SUNUCUSU — tek süreç, tek dinleyici (`/v1/*` fabrika kanalı + `/api/*` hesap API'si).
-// Açılış (fail-closed): yapılandırma → iki merkez rolü RLS'i ATLAYAMAZ (süper kullanıcı ya da BYPASSRLS
-// ise sunucu KALKMAZ) → tesis DB anahtarı → iki yönlendirici (uygulama · eşitleme; tesis DB'leri istek anında)
-// → TOTP sır anahtarı → web çıktısı (verildiyse yoksa KALKMAZ) → dinleyici → bakım işi.
+// Açılış (fail-closed): yapılandırma → giriş dizini anahtarı → iki bağlantı (uygulama · eşitleme; TEK veritabanı)
+// → iki rol de RLS'i ATLAYAMAZ (süper kullanıcı ya da BYPASSRLS ise sunucu KALKMAZ) → TOTP sır anahtarı →
+// dinleyici → bakım işi.
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
@@ -11,7 +11,6 @@ import { loadConfig } from "./config";
 import { roleBypassesRls } from "./lib/db";
 import { loadEnvFile } from "./lib/env";
 import { TesisDbRouter } from "./lib/tesis-db";
-import { expectedSchemaVersion } from "./lib/tesis-goc";
 import { createApp } from "./http/app";
 import { changeHub } from "./services/change-feed";
 import type { CloudContext } from "./services/context";
@@ -40,26 +39,25 @@ async function main(): Promise<void> {
   mkdirSync(config.ANAHTAR_DIZINI, { recursive: true, mode: 0o700 });
   const keyPath = facilityDbKeyPath({ TESIS_ROL_ANAHTARI_DOSYASI: config.TESIS_ROL_ANAHTARI_DOSYASI, ANAHTAR_DIZINI: config.ANAHTAR_DIZINI }, process.cwd());
   const key = FacilityDbKey.load(keyPath.file, { create: !keyPath.explicit });
-  const schemaVersion = expectedSchemaVersion();
-  const app = new TesisDbRouter({ role: "uygulama", centralUrl: config.DATABASE_URL, key, schemaVersion });
-  const sync = new TesisDbRouter({ role: "esitleme", centralUrl: config.ESITLEME_DATABASE_URL, key, schemaVersion });
+  const app = new TesisDbRouter({ role: "uygulama", url: config.DATABASE_URL, key });
+  const sync = new TesisDbRouter({ role: "esitleme", url: config.ESITLEME_DATABASE_URL, key });
   for (const router of [app, sync]) {
-    const r = await roleBypassesRls(router.central);
-    if (r.bypass) throw new Error(`${router.central.label} rolü (${r.role}) RLS'i atlayabiliyor (süper kullanıcı/BYPASSRLS) — kiracı yalıtımı yok, açılış DURDU`);
+    const r = await roleBypassesRls(router.db);
+    if (r.bypass) throw new Error(`${router.db.label} rolü (${r.role}) RLS'i atlayabiliyor (süper kullanıcı/BYPASSRLS/tablo sahibi) — kiracı yalıtımı yok, açılış DURDU`);
   }
   const ctx: CloudContext = {
     config,
     app,
     sync,
     secrets: SecretBox.load(config.ANAHTAR_DIZINI, { create: true }),
-    directory: new InstallationDirectory(sync, config),
-    doorbell: createDoorbell(config),
+    directory: new InstallationDirectory(sync),
+    doorbell: createDoorbell(),
     now: () => Date.now(),
     notifications: createNotificationRuntime(config),
   };
   const server = http.createServer(createApp(ctx));
   const address = await listen(server, config.PORT, config.BIND);
-  console.log(`PATRON_DINLIYOR port=${address.port} kurulumKaynagi=${config.KURULUM_KAYNAGI} web=${config.PATRON_WEB_DIZINI ? "acik" : "yok"}`);
+  console.log(`PATRON_DINLIYOR port=${address.port}`);
 
   const maintenance = new MaintenanceScheduler(ctx);
   maintenance.start();

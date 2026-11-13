@@ -1,5 +1,5 @@
 // Stok — "ne var, kaç gündür duruyor": ham · yarı mamul · bitmiş (metre + top) · ölü stok uyarısı · yaş dağılımı ·
-// müşteri malı (emanet, PB1: `emanet-bakiye`) · kalem/top listesi (Ham | Bitmiş; anlık `stok-kalem`, `src/ui/stok`) · ürün bazında
+// kalem/top listesi (Ham | Bitmiş; anlık `stok-kalem`, `src/ui/stok`) · ürün bazında
 // tablo. Kutular ve ürün tablosu `stok-karnesi`nden (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
 // Ürün tablosu tek belgenin içidir (sayfasız, bulut sıralamaz/süzmez) → başlık sıralamasız, süzgeç/arama yok; yalnız sütun
 // seçimi profilde (`tablo.stok`). Yaş dağılımı açılır-kapanır: varsayılan kapalı, durum cihazda (`useAcikKapali`).
@@ -14,7 +14,6 @@ import { useAcikKapali } from "../../../src/ui/ortak/useAcikKapali";
 import { arr, num, obj, pct, qty, str } from "../../../src/ui/pano/read";
 import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
-import { ConsignedSection } from "../../../src/ui/fason/FasonCards";
 import { StokKalemBolumu } from "../../../src/ui/stok/StokKalemBolumu";
 import { azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
 import { SutunSecici } from "../../../src/ui/tablo/Seciciler";
@@ -121,8 +120,6 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
           </AcilirKart>
         </KademeliGiris>
       ) : null}
-
-      <ConsignedSection scorecardOzet={o} />
 
       <KademeliGiris sira={3} style={s.blok}>
         <StokKalemBolumu />

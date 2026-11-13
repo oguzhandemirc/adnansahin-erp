@@ -22,7 +22,7 @@ const mockApi = {
   list: jest.fn(async (_p: string, _o?: unknown) => ({ kayitlar: [] as unknown[], sonraki: null })),
   refresh: jest.fn(async () => ({ zil: false, sonrakiMs: 60_000 })),
 };
-const TUM = ["bulut:ozet:oku", "bulut:siparis:oku", "bulut:sevkiyat:oku", "bulut:uretim:oku", "bulut:stok:oku", "bulut:cari-bakiye:oku", "bulut:rapor:oku"];
+const TUM = ["bulut:ozet:oku", "bulut:siparis:oku", "bulut:sevkiyat:oku", "bulut:uretim:oku", "bulut:stok:oku", "bulut:rapor:oku"];
 const mockSession = {
   api: mockApi,
   cache: null as ReturnType<typeof createCache> | null,
@@ -58,7 +58,7 @@ beforeEach(() => {
   mockSession.permissions = TUM;
 });
 
-const istenen = () => mockApi.snapshot.mock.calls.map((c) => c[0]).filter((p) => p !== "saglik");
+const istenen = () => mockApi.snapshot.mock.calls.map((c) => c[0]);
 
 describe("düzen işlemleri (saf)", () => {
   it("bilinmeyen, tekrarlanan ve izinsiz anahtar düşer; bozuk kayıt varsayılana döner", () => {
@@ -115,7 +115,7 @@ describe("Pano verisi yalnız ekli kutudan", () => {
     expect(JSON.parse(mockPlain.map.get(D.DUZEN_ANAHTARI)!)).toEqual(["uretim"]);
 
     fireEvent.press(screen.getByTestId("kutu-ekle"));
-    expect(screen.queryByTestId("katalog-alacak")).toBeTruthy();
+    expect(screen.queryByTestId("katalog-stokYas")).toBeTruthy();
     fireEvent.press(screen.getByTestId("katalog-sevk"));
     expect(JSON.parse(mockPlain.map.get(D.DUZEN_ANAHTARI)!)).toEqual(["uretim", "sevk"]);
     fireEvent.press(screen.getByTestId("kutu-ekle-kapat"));
@@ -135,7 +135,7 @@ describe("Pano verisi yalnız ekli kutudan", () => {
     fireEvent.press(screen.getByTestId("pano-duzenle"));
     fireEvent.press(screen.getByTestId("kutu-ekle"));
     expect(screen.getByTestId("katalog-fason")).toBeTruthy();
-    expect(screen.queryByTestId("katalog-alacak")).toBeNull();
+    expect(screen.queryByTestId("katalog-stokYas")).toBeNull();
     expect(screen.queryByTestId("katalog-sevk")).toBeNull();
   });
 });

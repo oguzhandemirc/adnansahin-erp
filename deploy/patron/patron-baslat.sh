@@ -1,11 +1,11 @@
 #!/bin/sh
-# Patron konteyner girişi: DB URL'lerini ve satıcı iç API belirtecini docker SECRET dosyalarından kurar,
+# Patron konteyner girişi: DB URL'lerini ve anahtar yollarını docker SECRET dosyalarından kurar,
 # komutu çalıştırır — sırlar imaj yapılandırmasına ve `docker inspect`e girmez. Rol (PATRON_ROL) hangi sırların
 # okunacağını belirler; her rol YALNIZ kendi sırlarını okur ve hepsini ZORUNLU sayar (en az yetki) — tek istisna
 # güvenlik bildirimi sırları (guvenlik_telegram_*): İSTEĞE BAĞLI, okunamazsa kanal KAPALI:
-#   sunucu  → uygulama + eşitleme parolası · tesis rol anahtarı · iç API belirteci (boş = kapalı)
-#   goc     → göç + uygulama + eşitleme parolası · tesis rol anahtarı (migrate deploy · db-rolleri · tesis CLI'leri)
-#   hazirla → göç parolası · tesis rol anahtarı (tesis-db izle; uygulama parolasını ALMAZ)
+#   sunucu  → uygulama + eşitleme parolası · tesis rol anahtarı (giriş dizini anahtarı; ad eski düzenden)
+#   goc     → göç (patron_goc, süper kullanıcı DEĞİL) + uygulama + eşitleme parolası · tesis rol anahtarı
+#             (migrate deploy · db-rolleri · tesis CLI'si)
 # ROL TABLOSU test_compose_sirlari §2'nin tek kaynağıdır: compose'un `secrets:` listesi bununla birebir eşleşmeli.
 # Parolalar URL güvenli olmalı (onaltılık üretilir; runbook §3). Ortamda hazır verilen değer sırrın yerine geçer.
 set -eu
@@ -15,9 +15,8 @@ DB="${DB_HOST:-patron-db}:5432/${DB_ADI:-patron}?schema=public"
 
 rol_sirlari() {
   case "$1" in
-    sunucu) echo "uygulama_parolasi esitleme_parolasi tesis_rol_anahtari ic_api_belirteci guvenlik_telegram_bot_token guvenlik_telegram_chat_id" ;;
+    sunucu) echo "uygulama_parolasi esitleme_parolasi tesis_rol_anahtari guvenlik_telegram_bot_token guvenlik_telegram_chat_id" ;;
     goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi tesis_rol_anahtari" ;;
-    hazirla) echo "goc_parolasi tesis_rol_anahtari" ;;
     *) return 1 ;;
   esac
 }
@@ -46,7 +45,7 @@ parola() {
 }
 
 ROL="${PATRON_ROL:-sunucu}"
-SIRLAR="$(rol_sirlari "$ROL")" || { echo "[patron] tanınmayan PATRON_ROL: $ROL (sunucu|goc|hazirla)" >&2; exit 1; }
+SIRLAR="$(rol_sirlari "$ROL")" || { echo "[patron] tanınmayan PATRON_ROL: $ROL (sunucu|goc)" >&2; exit 1; }
 
 for sir in $SIRLAR; do
   case "$sir" in
@@ -71,15 +70,6 @@ for sir in $SIRLAR; do
         sir_var tesis_rol_anahtari
         TESIS_ROL_ANAHTARI_DOSYASI="$S/tesis_rol_anahtari"
         export TESIS_ROL_ANAHTARI_DOSYASI
-      fi ;;
-    ic_api_belirteci)
-      # Boş sır dosyası = iç API kapalı (KURULUM_KAYNAGI=kayit); biçim denetimi sunucunun yapılandırmasında.
-      if [ -z "${SATICI_IC_API_BELIRTECI:-}" ]; then
-        sir_var ic_api_belirteci
-        if [ -s "$S/ic_api_belirteci" ]; then
-          SATICI_IC_API_BELIRTECI="$(tr -d '\r\n' < "$S/ic_api_belirteci")"
-          export SATICI_IC_API_BELIRTECI
-        fi
       fi ;;
     guvenlik_telegram_bot_token)
       # Güvenlik bildirimi (B3) İSTEĞE BAĞLI: sır okunamazsa yol verilmez → kanal KAPALI, sunucu yine açılır.

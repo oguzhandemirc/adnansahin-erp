@@ -2,7 +2,7 @@
 // gecikme göstergesi YOK (kullanıcı kararı). Her değer fabrikadan; uygulama hesap ve tarih karşılaştırması yapmaz.
 import type { ProjectionRecord } from "../../api/wire";
 import type { StatusKind } from "../tokens";
-import { formatMoney, formatNumber } from "../../lib/format";
+import { formatNumber } from "../../lib/format";
 import { isOpenOrder, orderStatus, orderStatusShort } from "../../lib/labels/siparis";
 import { ListeSatiri, Rozet, type RozetTonu } from "../ortak";
 
@@ -18,15 +18,13 @@ export const ROZET_TONU: Readonly<Record<StatusKind, RozetTonu>> = { iyi: "succe
 /** Satır metinleri (test ve erişilebilirlik aynı kaynaktan). */
 export function orderRowText(r: ProjectionRecord, showCustomer = true) {
   const k = asObj(r.kayit);
-  const f = asObj(r.finans);
   const no = str(k.siparisNo) ?? "—";
   const durum = orderStatus(k.durum);
   // Açık miktar ölçülen (metre) kalemlerin toplamıdır (fabrika `acikMiktar`); kapanmış siparişte gösterilmez.
   const open = isOpenOrder(k.durum) && present(k.acikMiktar) ? `${formatNumber(k.acikMiktar)} m` : null;
-  const amount = present(f.tutar) ? formatMoney(f.tutar, str(k.doviz) ?? "TRY") : null;
   const title = showCustomer ? (str(k.musteriAdi) ?? "—") : no;
-  const label = [title, showCustomer ? no : null, durum.label, open ? `açık ${open}` : null, amount].filter(Boolean).join(", ");
-  return { title, no, status: durum, short: orderStatusShort(k.durum), open, amount, label };
+  const label = [title, showCustomer ? no : null, durum.label, open ? `açık ${open}` : null].filter(Boolean).join(", ");
+  return { title, no, status: durum, short: orderStatusShort(k.durum), open, label };
 }
 
 export function OrderRow({ r, onPress, showCustomer = true, ayrac }: { r: ProjectionRecord; onPress?: () => void; showCustomer?: boolean; ayrac?: boolean }) {

@@ -221,7 +221,7 @@ async function yazarBolumu(o: Ortam): Promise<void> {
 async function main(): Promise<void> {
   const o = await ortamKur();
   const k = await tesisKur(o);
-  const kapali = await tesisKur(o, { bitis: new Date(Date.now() - 1000) });
+  const kapali = await tesisKur(o, { aktif: false });
   try {
     const satis = await hesapKur(o, k.tesisId, ["bulut:siparis:oku", "bulut:siparis:yaz", "bulut:cari:yaz"]);
     const okur = await hesapKur(o, k.tesisId, ["bulut:siparis:oku"]);
@@ -229,7 +229,7 @@ async function main(): Promise<void> {
     await yazmaBolumu(o, k, satis, okur);
     const kapaliHesap = await hesapKur(o, kapali.tesisId, ["bulut:siparis:yaz"]);
     const r = await yaz(o, kapaliHesap);
-    kontrol("§1j tesisin aboneliği bitmişse yazma → 403 PATRON_BULUT_KAPALI", r.status === 403 && r.json.details?.code === "PATRON_BULUT_KAPALI");
+    kontrol("§1j fabrikanın kurulum kaydı pasifse yazma → 403 PATRON_BULUT_KAPALI", r.status === 403 && r.json.details?.code === "PATRON_BULUT_KAPALI");
     const alinan = await almaBolumu(o, k, satis);
     await iptalBolumu(o, k, satis, baska, alinan[0]!);
     await sonucBolumu(o, k, satis, alinan);

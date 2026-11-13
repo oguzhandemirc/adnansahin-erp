@@ -1,4 +1,4 @@
-// Hata gövdesi backend/satıcı ile aynı: {success:false, message:<TR>, details:{code}}. 503 yalnız tesis DB'si hazır değilken (TEKRAR_DENEYIN).
+// Hata gövdesi backend/satıcı ile aynı: {success:false, message:<TR>, details:{code}}. (tek DB: tesis DB'si hazırlık 503'ü yok).
 // Günlüğe istek gövdesi/başlığı yazılmaz (imzalı istek, parola, TOTP, davet/oturum belirteci, iş verisi).
 import type { NextFunction, Request, Response } from "express";
 import { CloudError, retryConflict, type CloudCode } from "../lib/errors";

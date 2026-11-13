@@ -1,5 +1,5 @@
 // Bulut hata tipi — gövde backend/satıcı ile aynı: {success:false, message:<TR>, details:{code}}.
-// Kod `details.code` altındadır (kök `code` YOK). 503 yalnız tesis DB'si hazır değilken (`TEKRAR_DENEYIN`).
+// Kod `details.code` altındadır (kök `code` YOK). (tek DB; tesis DB'si hazırlık 503'ü yok).
 import type { ProtocolErrorCode } from "../lisans-protokol";
 import { FACTORY_CHANNEL_ERROR_CODES } from "../wire/esitleme";
 
@@ -22,7 +22,6 @@ export const CLOUD_ERROR_CODES = [
   "AKTIF_YONETICI_VAR",
   "IZIN_BILINMIYOR",
   "RAPOR_BULUTTA_YOK",
-  "HIZMET_KAPANDI",
   "KURULUM_BASKA_TESISTE",
   "TESIS_GECISI_YOK",
   "KIMLIK_PAYLASIMLI",

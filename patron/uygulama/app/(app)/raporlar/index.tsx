@@ -1,12 +1,12 @@
-// Raporlar merkezi (şartname §4.9): kategori kartları (rapor ailesi; yalnız izinli raporlar sayılır — finans izni
-// yoksa Finans kartı hiç çizilmez) → seçili kategorinin rapor listesi → isteklerim (durum rozetli) → hazır görünümler
+// Raporlar merkezi (şartname §4.9): kategori kartları (rapor ailesi; yalnız izinli raporlar sayılır — izinli
+// raporu olmayan aile kartı hiç çizilmez) → seçili kategorinin rapor listesi → isteklerim (durum rozetli) → hazır görünümler
 // (fabrikanın hesapladığı anlıklar; dokununca ilgili ekran). Bekleyen istek varken ekran kısa yoklama yapar.
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { can } from "../../../src/lib/access";
 import { formatDateTime, formatNumber } from "../../../src/lib/format";
-import { REPORT_FAMILY_LABEL, reportDomain, reportFamily, reportPending, reportTitle } from "../../../src/lib/labels/finans";
+import { REPORT_FAMILY_LABEL, reportDomain, reportFamily, reportPending, reportTitle } from "../../../src/lib/labels/rapor";
 import { catalogEntries, requestable, type CatalogEntry } from "../../../src/lib/reports";
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";

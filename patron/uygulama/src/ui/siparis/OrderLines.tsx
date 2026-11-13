@@ -1,9 +1,9 @@
-// Sipariş kalemleri ve cari hareketleri: SUNUCU kimlik süzgeciyle (`siparisId` · `cariHesapId`) okunan listeler.
+// Sipariş kalemleri: SUNUCU kimlik süzgeciyle (`siparisId`) okunan liste.
 // Süzgeç yalnız sunucu beyan ettiyse çağrılır (`useListCapability`); istemci listeyi süzmez, değerler fabrikadan.
 import { useEffect, useRef } from "react";
 import type { ProjectionRecord } from "../../api/wire";
-import { formatDate, formatMoney, formatNumber } from "../../lib/format";
-import { cariKindLabel, cariTxnSourceLabel, unitLabel } from "../../lib/labels/siparis";
+import { formatNumber } from "../../lib/format";
+import { unitLabel } from "../../lib/labels/siparis";
 import { MODULE_ICON } from "../icons";
 import { ListeBlogu, ListeSatiri } from "../ortak";
 import { asObj, str } from "./OrderRow";
@@ -60,42 +60,4 @@ export function OrderLines({ list, tick = 0 }: { list: RemoteList; tick?: number
       <ListStates list={list} empty="Bu siparişin kalemi yok" icon={MODULE_ICON.siparisler.icon} iskeletSatir={2} testID="siparis-kalem" />
     </>
   );
-}
-
-/** Hareket satırı: kaynak (sözlükten) · tarih · borç/alacak; tutar yalnız `.finans` alt satırı geldiyse. */
-export function movementRowText(r: ProjectionRecord) {
-  const k = asObj(r.kayit);
-  const f = r.finans === undefined || r.finans === null ? null : asObj(r.finans);
-  const doviz = str(k.doviz) ?? "TRY";
-  // Fabrika satırı tek yönlüdür (borç ya da alacak, diğeri 0): sıfır olmayan taraf gösterilir.
-  const side = f && present(f.borc) && Number(f.borc) !== 0 ? { label: "Borç", v: f.borc } : f && present(f.alacak) ? { label: "Alacak", v: f.alacak } : null;
-  return {
-    title: cariTxnSourceLabel(k.kaynak),
-    subtitle: [formatDate(k.tarih), side?.label, str(k.aciklama)].filter(Boolean).join(" · "),
-    value: side ? formatMoney(side.v, doviz) : undefined,
-  };
-}
-
-function AccountMovements({ account, titled, tick }: { account: ProjectionRecord; titled: boolean; tick: number }) {
-  const list = useRemoteList("cari-hareket", { cariHesapId: account.id }, { limit: 10, tags: ["cari-hareket", "cari-hesap"] });
-  useReloadOn(tick, list);
-  return (
-    <>
-      {list.items.length > 0 ? (
-        <ListeBlogu baslik={titled ? `Son hareketler · ${cariKindLabel(asObj(account.kayit).tur)}` : "Son hareketler"} testID={`cari-hareketleri-${account.id}`}>
-          {list.items.map((r, i) => {
-            const x = movementRowText(r);
-            return <ListeSatiri key={r.id} birincil={x.title} ikincil={x.subtitle} deger={x.value} ayrac={i > 0} testID={`hareket-${r.id}`} />;
-          })}
-        </ListeBlogu>
-      ) : null}
-      <ListStates list={list} empty="Bu hesapta hareket yok" icon={MODULE_ICON.finans.icon} testID={`cari-hareket-${account.id}`} />
-    </>
-  );
-}
-
-/** Carinin her muhasebe hesabı için son hareketler (`cari-hareket` `cariHesapId` taşır, `cariKartId` taşımaz). */
-export function CustomerMovements({ accounts, tick = 0 }: { accounts: readonly ProjectionRecord[]; tick?: number }) {
-  if (accounts.length === 0) return null;
-  return <>{accounts.map((a) => <AccountMovements key={a.id} account={a} titled={accounts.length > 1} tick={tick} />)}</>;
 }

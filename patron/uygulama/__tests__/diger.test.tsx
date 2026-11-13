@@ -17,7 +17,7 @@ const mockSession = {
   facilities: [] as unknown[], facilityId: "t", offline: false, offlineSince: null, switchError: null, logout: jest.fn(),
 };
 const ACC: Account = { id: "h1", eposta: "b@ornek.invalid", ad: "Bora Kaya", durum: "AKTIF", izinler: ["bulut:siparis:oku"], sonGiris: null, davetBitis: null, olusturulma: "2026-10-01T00:00:00Z" };
-const CATALOG = { izinler: ["bulut:ozet:oku", "bulut:siparis:oku", "bulut:kasa:oku", "bulut:hesap:yonet"], sablonlar: { SATIS: ["bulut:ozet:oku", "bulut:siparis:oku"], PATRON: ["bulut:ozet:oku", "bulut:siparis:oku", "bulut:kasa:oku", "bulut:hesap:yonet"] } };
+const CATALOG = { izinler: ["bulut:ozet:oku", "bulut:siparis:oku", "bulut:rapor:oku", "bulut:hesap:yonet"], sablonlar: { SATIS: ["bulut:ozet:oku", "bulut:siparis:oku"], PATRON: ["bulut:ozet:oku", "bulut:siparis:oku", "bulut:rapor:oku", "bulut:hesap:yonet"] } };
 const mockRemote: { calls: { key: string | null; fetcher: () => Promise<unknown> }[]; data: Record<string, unknown> } = { calls: [], data: {} };
 jest.mock("../src/state/session", () => ({ useSession: () => mockSession }));
 jest.mock("../src/state/useRemote", () => ({
@@ -81,12 +81,12 @@ describe("hesap ayrıntısı: izinler", () => {
     expect(screen.queryAllByText(/bulut:/)).toHaveLength(0);
     expect(screen.getByText("Siparişleri görme")).toBeTruthy();
     expect(screen.getAllByText("Hesap yönetimi").length).toBeGreaterThan(0);
-    expect(screen.getByText("FİNANS")).toBeTruthy(); // blok başlığı TR büyük harf
+    expect(screen.getByText("RAPOR")).toBeTruthy(); // blok başlığı TR büyük harf
     expect(screen.getByTestId("hesap-rol").props.accessibilityLabel).toBe("Rol: Çalışan");
-    fireEvent.press(screen.getByText("Kasa"));
+    fireEvent.press(screen.getByText("Raporlar"));
     expect(screen.getByTestId("izin-degisti")).toBeTruthy();
     await act(async () => fireEvent.press(screen.getByTestId("izin-kaydet")));
-    expect(mockApi.accountUpdate).toHaveBeenCalledWith("h1", expect.objectContaining({ izinler: ["bulut:siparis:oku", "bulut:kasa:oku"] }));
+    expect(mockApi.accountUpdate).toHaveBeenCalledWith("h1", expect.objectContaining({ izinler: ["bulut:siparis:oku", "bulut:rapor:oku"] }));
   });
   it("şablon çipi kümeyi doldurur (kaydetmez)", () => {
     mockRemote.data = { hesaplar: [ACC], izinler: CATALOG };

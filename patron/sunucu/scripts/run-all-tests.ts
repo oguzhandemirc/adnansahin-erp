@@ -8,7 +8,7 @@
 import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import path from "node:path";
-import { sweepTestFacilityDbs } from "./lib/tesis-db-temizlik";
+import { supurTestVerisi } from "./lib/test-temizlik";
 import { hedefDbKapisi } from "./lib/test-ortam";
 
 const DIZIN = __dirname;
@@ -25,9 +25,9 @@ if (dosyalar.length === 0) {
   process.exit(2);
 }
 async function main(): Promise<void> {
-  // Önceki turların (çöken bekçi, elle ölçüm) tesis DB artıkları: yalnız bu `_test` merkezine ait adlar.
-  const supurulen = await sweepTestFacilityDbs(process.env.GOC_DATABASE_URL!);
-  console.log(`Patron bulutu bekçileri — hedef DB ${db} — ${dosyalar.length} dosya · süpürülen tesis DB ${supurulen}\n`);
+  // Önceki turların (çöken bekçi, elle ölçüm) artıkları: yalnız bu `_test` DB'sinde.
+  const supurulen = await supurTestVerisi(process.env.GOC_DATABASE_URL!);
+  console.log(`Patron bulutu bekçileri — hedef DB ${db} — ${dosyalar.length} dosya · süpürülen tesis ${supurulen}\n`);
   runAll();
 }
 
@@ -58,6 +58,6 @@ function runAll(): void {
 }
 
 main().catch((err: Error) => {
-  console.error(`⛔ Tesis DB süpürmesi başarısız: ${err.message}`);
+  console.error(`⛔ Bekçi verisi süpürmesi başarısız: ${err.message}`);
   process.exit(2);
 });

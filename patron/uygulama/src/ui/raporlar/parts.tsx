@@ -1,8 +1,8 @@
 // Rapor ekranı parçaları: katalog satırı (simge karesi), durum rozeti (+ hesaplanırken nabız), parametre
-// satırları. Başlık/durum sözlükten (`labels/finans`); sayılar fabrikanın, uygulama hesaplamaz.
+// satırları. Başlık/durum sözlükten (`labels/rapor`); sayılar fabrikanın, uygulama hesaplamaz.
 import { ActivityIndicator, Text, View } from "react-native";
 import { formatDate, formatDateTime, formatNumber } from "../../lib/format";
-import { REPORT_PARAM, REPORT_STATUS, reportDomain } from "../../lib/labels/finans";
+import { REPORT_PARAM, REPORT_STATUS, reportDomain } from "../../lib/labels/rapor";
 import { humanize, isHiddenKey } from "../../lib/present";
 import type { IconName } from "../icons";
 import { ListeBlogu, ListeSatiri, Rozet, STATUS_ROZET_TONU } from "../ortak";

@@ -1,0 +1,17 @@
+# Patron API sitesi (yalnız API; panel/web arayüzü YOK). Caddy `adnan-ag` ağından patron-api:4620'ye konuşur;
+# patron-api'nin yayınlanmış portu YOKTUR. Cloudflare yok: Caddy X-Forwarded-For'u istemci adresiyle KURAR (gelen
+# başlığa güvenmez — trusted_proxies yok), sunucu onu IC_VEKIL_AGLARI (adnan-ag alt ağı) üzerinden okur.
+# Hız sınırı sunucudadır (/api geneli API_HIZ_DK, geçersiz belirteç OTURUM_RED_HIZ_DK, giriş GIRIS_HIZ_DK, /v1
+# V1_HIZ_DK): standart Caddy imajında rate_limit eklentisi yok, özel derleme bilinçli olarak yapılmadı.
+{$PATRON_ALAN_ADI} {
+	import guvenlik
+	encode zstd gzip
+	# Yalnız bilinen ad alanları sunucuya geçer; iç/yönetim yolu ya da başka her şey kenarda 404.
+	@api path /api/* /v1/* /saglik
+	handle @api {
+		reverse_proxy patron-api:4620
+	}
+	handle {
+		respond 404
+	}
+}

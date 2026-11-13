@@ -1,6 +1,6 @@
 // E2 bekçisi: sipariş satırı müşteri adı ("—"), durum sözlükten (ham enum yok), yazma izni/çevrimdışı düğme kapısı,
 // süzgeç ve arama SUNUCUYA parametre olarak gider (istemci süzmez), sipariş ayrıntısı kendi rotasına açılır.
-// P6: kalem listesi (`siparisId`), sipariş araması + görünüm çipleri, cari hareketleri (`cariHesapId`) YALNIZ sunucu
+// P6: kalem listesi (`siparisId`), sipariş araması + görünüm çipleri YALNIZ sunucu
 // `/oturum` `liste` yeteneğinde beyan ettiyse; eski sunucuda (alan yok) E2 görünümü kalır.
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import type { ReactElement } from "react";
@@ -28,16 +28,15 @@ const OrderDetail = (require("../app/(app)/(tabs)/siparisler/[id]") as { default
 const Customers = (require("../app/(app)/(tabs)/cariler/index") as { default: () => ReactElement }).default;
 const CustomerDetail = (require("../app/(app)/(tabs)/cariler/[id]") as { default: () => ReactElement }).default;
 const { listCapability } = require("../src/ui/siparis/capabilities") as typeof import("../src/ui/siparis/capabilities");
-const { lineRowText, movementRowText } = require("../src/ui/siparis/OrderLines") as typeof import("../src/ui/siparis/OrderLines");
+const { lineRowText } = require("../src/ui/siparis/OrderLines") as typeof import("../src/ui/siparis/OrderLines");
 const { LIST_ID_FILTERS, LIST_SEARCH } = require("../src/api/wire") as typeof import("../src/api/wire");
 const { orderStatus, orderStatusShort, ORDER_STATUS } = require("../src/lib/labels/siparis") as typeof import("../src/lib/labels/siparis");
-const { cariLockView } = require("../src/lib/cari-lock") as typeof import("../src/lib/cari-lock");
 const { orderRowText } = require("../src/ui/siparis/OrderRow") as typeof import("../src/ui/siparis/OrderRow");
 const { openRecord } = require("../src/ui/nav") as typeof import("../src/ui/nav");
 
 const ID1 = "11111111-1111-4111-8111-111111111111";
 const ID2 = "22222222-2222-4222-8222-222222222222";
-const rec = (id: string, kayit: Record<string, unknown>, finans?: Record<string, unknown>) => ({ id, kayit, ...(finans ? { finans } : {}), surum: "2026-10-22T09:00:00.000Z" });
+const rec = (id: string, kayit: Record<string, unknown>) => ({ id, kayit, surum: "2026-10-22T09:00:00.000Z" });
 const page = (...kayitlar: unknown[]) => ({ kayitlar, sonraki: null });
 
 async function settle() {
@@ -76,13 +75,12 @@ describe("§1 sipariş satırı", () => {
     expect(screen.getByTestId(`siparis-satir-${ID2}`).props.accessibilityLabel).toContain("Henüz gönderilmedi");
   });
 
-  it("açık miktar fabrikadan, birimli; tutar yalnız finans alt satırı geldiyse para birimiyle", () => {
-    const a = orderRowText(rec(ID1, { siparisNo: "SP-1", durum: "PARTIAL_SHIPPED", acikMiktar: "1250.5", doviz: "USD", termin: "2026-11-01" }, { tutar: "1000" }) as never);
+  it("açık miktar fabrikadan, birimli; tutar hiç yazılmaz (finans buluta gitmez)", () => {
+    const a = orderRowText(rec(ID1, { siparisNo: "SP-1", durum: "PARTIAL_SHIPPED", acikMiktar: "1250.5", doviz: "USD", termin: "2026-11-01" }) as never);
     expect(a.open).toBe("1.250,5 m");
-    expect(a.amount).toBe("1.000 $");
+    expect(a.label).not.toMatch(/\$|USD/);
     const b = orderRowText(rec(ID1, { siparisNo: "SP-1", durum: "COMPLETED", acikMiktar: "0", doviz: "USD" }) as never);
     expect(b.open).toBeNull(); // kapanmış siparişte açık miktar yok
-    expect(b.amount).toBeNull(); // finans alt satırı yok → tutar yok
   });
 });
 
@@ -207,9 +205,9 @@ describe("§5 sipariş ayrıntısı", () => {
     expect(router.push).toHaveBeenLastCalledWith({ pathname: "/kayit/[projeksiyon]/[id]", params: { projeksiyon: "sevkiyat", id: ID2 } });
   });
 
-  it("başlık kartı: müşteri yoksa \"—\", durum ve yön sözlükten, tutar finans geldiyse", async () => {
+  it("başlık kartı: müşteri yoksa \"—\", durum ve yön sözlükten; tutar kartı yok", async () => {
     mockParams = { id: ID1 };
-    mockRecord.mockResolvedValue(rec(ID1, { siparisNo: "SP-7", durum: "PENDING", yon: "EXPORT", doviz: "EUR", gecikmis: true, termin: "2026-10-01", acikMiktar: "40", kalemSayisi: 2 }, { tutar: "2500" }));
+    mockRecord.mockResolvedValue(rec(ID1, { siparisNo: "SP-7", durum: "PENDING", yon: "EXPORT", doviz: "EUR", gecikmis: true, termin: "2026-10-01", acikMiktar: "40", kalemSayisi: 2 }));
     render(<OrderDetail />);
     await settle();
     expect(mockRecord).toHaveBeenCalledWith("siparis", ID1);
@@ -217,7 +215,7 @@ describe("§5 sipariş ayrıntısı", () => {
     expect(screen.getByText("Henüz onaylanmadı")).toBeTruthy();
     expect(screen.queryByText("Gecikti")).toBeNull(); // termin rozeti yok
     expect(screen.getByText("İhracat")).toBeTruthy();
-    expect(screen.getByTestId("siparis-tutar").props.accessibilityLabel).toContain("2.500 €");
+    expect(screen.queryByTestId("siparis-tutar")).toBeNull();
     expect(screen.queryByText(/PENDING|EXPORT/)).toBeNull();
   });
 
@@ -327,92 +325,6 @@ describe("§7 P6 sipariş araması + görünüm süzgeci (modal)", () => {
     expect(yeni.idFilter("siparis", "siparisId")).toBe(false);
     expect(yeni.search("siparis")?.alanlar).toContain("musteriAdi");
     expect(listCapability({ liste: { kimlikSuzgecleri: {}, aranabilir: ["bilinmeyen"] } } as never).search("bilinmeyen")).toBeNull();
-  });
-});
-
-describe("§8 P6 cari hareketleri (sunucu `cariHesapId` süzgeci)", () => {
-  const HESAP = "33333333-3333-4333-8333-333333333333";
-  const byProjection = (p: string) => {
-    if (p === "cari-hesap") return Promise.resolve(page(rec(HESAP, { tur: "CUSTOMER", cariKartId: ID1 }, { bakiyeler: [] })));
-    if (p === "cari-hareket") return Promise.resolve(page(rec("h1", { cariHesapId: HESAP, kaynak: "INVOICE", tarih: "2026-10-20T08:00:00.000Z", doviz: "TRY" }, { borc: "1500", alacak: "0" })));
-    return Promise.resolve(page());
-  };
-
-  beforeEach(() => {
-    mockSession.permissions = [...mockSession.permissions, "bulut:cari-bakiye:oku"];
-    mockParams = { id: ID1 };
-    mockRecord.mockResolvedValue(rec(ID1, { ad: "Deniz Tekstil", kod: "C-1", musteriRolu: true }));
-    mockList.mockImplementation(byProjection);
-  });
-
-  it("yetenek varsa her hesabın hareketleri `cariHesapId` ile; kaynak sözlükten, tutar finanstan", async () => {
-    mockSession.facility = YENI_SUNUCU;
-    render(<CustomerDetail />);
-    await settle();
-    await settle();
-    expect(mockList).toHaveBeenCalledWith("cari-hareket", expect.objectContaining({ cariHesapId: HESAP }));
-    expect(mockList).not.toHaveBeenCalledWith("cari-hareket", expect.objectContaining({ cariKartId: expect.anything() }));
-    expect(screen.getByText("SON HAREKETLER")).toBeTruthy();
-    expect(screen.getByText("Fatura")).toBeTruthy();
-    expect(screen.queryByText(/INVOICE/)).toBeNull();
-  });
-
-  it("eski sunucu → hareket İSTENMEZ, bölüm yok", async () => {
-    render(<CustomerDetail />);
-    await settle();
-    await settle();
-    expect(mockList).not.toHaveBeenCalledWith("cari-hareket", expect.anything());
-    expect(screen.queryByText("Son hareketler")).toBeNull();
-  });
-
-  it("hareket satırı: sıfır olmayan taraf; finans yoksa tutar yok", () => {
-    const a = movementRowText(rec("h", { kaynak: "PAYMENT", tarih: "2026-10-20T08:00:00.000Z", doviz: "USD" }, { borc: "0", alacak: "200" }) as never);
-    expect(a.title).toBe("Tahsilat / Ödeme");
-    expect(a.subtitle).toContain("Alacak");
-    expect(a.value).toBe("200 $");
-    expect(movementRowText(rec("h", { kaynak: "INVOICE", tarih: "2026-10-20T08:00:00.000Z" }) as never).value).toBeUndefined();
-  });
-});
-
-describe("§9 D4-I6 cari kilidi rozeti (fabrika `cari-hesap.kilit`)", () => {
-  const HESAP = "44444444-4444-4444-8444-444444444444";
-  const KILIT = { durum: "AKTIF", kilitId: "k1", kapsam: ["SEVK", "FATURA"], sebepKodu: "BORC", baslangic: "2026-10-30T07:00:00.000Z", acilis: null };
-  const withLock = (kayit: Record<string, unknown>) => (p: string) =>
-    Promise.resolve(p === "cari-hesap" ? page(rec(HESAP, { tur: "CUSTOMER", cariKartId: ID1, ...kayit }, { bakiyeler: [] })) : page());
-
-  beforeEach(() => {
-    mockSession.permissions = [...mockSession.permissions, "bulut:cari-bakiye:oku"];
-    mockParams = { id: ID1 };
-    mockRecord.mockResolvedValue(rec(ID1, { ad: "Deniz Tekstil", kod: "C-1", musteriRolu: true }));
-  });
-
-  it("aktif kilit → Kilitli rozeti + kapsam/sebep/tarih fabrikadan, uygulama hesaplamaz", async () => {
-    mockList.mockImplementation(withLock({ kilit: KILIT }));
-    render(<CustomerDetail />);
-    await settle();
-    await settle();
-    expect(screen.getByTestId(`cari-kilit-${HESAP}`)).toBeTruthy();
-    expect(screen.getByTestId(`cari-kilit-ayrinti-${HESAP}`).props.children).toBe("Durdurulan: sevk · fatura onayı · Sebep: Borç · 30.10.2026 10:00 itibarıyla");
-  });
-
-  it("açılmış kilit ya da null → rozet yok; eski fabrika (alan yok) → 'güncellenince gelir'", async () => {
-    mockList.mockImplementation(withLock({ kilit: { ...KILIT, durum: "ACILDI", acilis: "2026-10-30T09:00:00.000Z" } }));
-    render(<CustomerDetail />);
-    await settle();
-    await settle();
-    expect(screen.queryByTestId(`cari-kilit-${HESAP}`)).toBeNull();
-    expect(screen.queryByTestId(`cari-kilit-bilinmiyor-${HESAP}`)).toBeNull();
-    expect(cariLockView({ kilit: null })).toEqual({ state: "YOK" });
-    expect(cariLockView({})).toEqual({ state: "BILINMIYOR", text: "Kilit bilgisi fabrika güncellenince gelir" });
-  });
-
-  it("eski fabrika satırı ekranda 'fabrika güncellenince gelir' yazar", async () => {
-    mockList.mockImplementation(withLock({}));
-    render(<CustomerDetail />);
-    await settle();
-    await settle();
-    expect(screen.getByTestId(`cari-kilit-bilinmiyor-${HESAP}`)).toBeTruthy();
-    expect(screen.queryByTestId(`cari-kilit-${HESAP}`)).toBeNull();
   });
 });
 

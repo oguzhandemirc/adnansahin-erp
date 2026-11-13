@@ -1,13 +1,13 @@
-// ÜYELİK — tek bulut kimliği (merkez `identities`: e-posta özeti + parola + TOTP) birden çok tesise üyelikle
-// (`login_routes`: kimlik → tesis + hesap) erişir. Üyeliğin ETKİNLİĞİ tesis DB'sinde sorulur: hesap AKTİF ve aynı
-// kimliğe bağlı olmalı (dizin bayatlayabilir; tesis DB'si tek doğruluk kaynağıdır). KİLİTLİ üyelik listede yoktur.
-// Tesis DB'si yoksa (imha) ya da hazır değilse üyelik görünmez — bir tesisin arızası öbürlerine girişi kesmez.
+// ÜYELİK — bulut kimliği (`identities`: e-posta özeti + parola + TOTP) tesise üyelikle (`login_routes`: kimlik → tesis +
+// hesap) erişir. Adnan'da TEK veritabanı ve TEK tesis vardır; "merkez"/"tesis DB'si" adları eski çok-DB düzeninden kalır
+// (kimlik dilimi "Electron şifresi" bu modeli yeniden yazacak). Üyeliğin ETKİNLİĞİ hesap satırında sorulur: hesap AKTİF ve
+// aynı kimliğe bağlı olmalı (dizin bayatlayabilir; hesap satırı tek doğruluk kaynağıdır). KİLİTLİ üyelik listede yoktur.
 import type { Identity, SessionCloseReason } from "@prisma/client";
 import type { Tx } from "../lib/db";
 import { CloudError } from "../lib/errors";
 import { withCentral, withTesis } from "../lib/tenant";
 import type { CloudContext } from "../services/context";
-import { loadServiceFacts, serviceState, type ServicePhase } from "../services/service-lifecycle";
+import type { ServicePhase } from "../wire/api";
 
 export interface MembershipRoute {
   readonly tesisId: string;
@@ -39,16 +39,16 @@ export async function membershipRoute(ctx: CloudContext, identityId: string, tes
 
 const unreachable = (err: unknown): boolean => err instanceof CloudError && (err.status === 404 || err.status === 503);
 
-/** Üyelik tesisinde etkin mi: hesap AKTİF ∧ aynı kimlik; tesis adı ve hizmet aşamasıyla. Değilse/ulaşılamıyorsa null. */
+/** Üyelik tesisinde etkin mi: hesap AKTİF ∧ aynı kimlik; tesis adıyla. Değilse/ulaşılamıyorsa null. Hizmet aşaması Adnan'da
+ *  HEP `ACIK` (tek tesis, süresiz; lisans/hizmet sonu yok — ayıklama D5); tel alanı sözleşme için durur. */
 export async function activeMembershipIn(ctx: CloudContext, identityId: string, route: MembershipRoute, nowMs: number): Promise<ActiveMembership | null> {
   try {
     return await withTesis(ctx.app, { tesisId: route.tesisId }, async (tx) => {
       const a = await tx.account.findUnique({ where: { id: route.accountId }, select: { status: true, identityId: true } });
       if (!a || a.status !== "AKTIF" || a.identityId !== identityId) return null;
-      const facts = await loadServiceFacts(tx, route.tesisId);
-      if (!facts) return null;
       const f = await tx.facility.findUnique({ where: { tesisId: route.tesisId }, select: { name: true } });
-      return { tesisId: route.tesisId, accountId: route.accountId, ad: f?.name ?? "", hizmet: serviceState(facts, nowMs).phase };
+      if (!f) return null;
+      return { tesisId: route.tesisId, accountId: route.accountId, ad: f.name, hizmet: "ACIK" };
     });
   } catch (err) {
     if (unreachable(err)) return null;

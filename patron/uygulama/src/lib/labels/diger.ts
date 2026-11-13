@@ -26,12 +26,11 @@ export function inboxKind(tur: unknown): KindLabel {
 }
 
 /** Hesap şablonları (sunucu `ROLE_TEMPLATES`; kolaylıktır, kaynak değil). */
-export type AccountTemplate = "PATRON" | "MUHASEBE" | "SATIS";
-export const ACCOUNT_TEMPLATES: readonly AccountTemplate[] = ["PATRON", "MUHASEBE", "SATIS"];
+export type AccountTemplate = "PATRON" | "SATIS";
+export const ACCOUNT_TEMPLATES: readonly AccountTemplate[] = ["PATRON", "SATIS"];
 export const ACCOUNT_TEMPLATE: Readonly<Record<AccountTemplate, { readonly ad: string; readonly aciklama: string; readonly icon: IconName }>> = {
   PATRON: { ad: "Tam yetki", aciklama: "Bütün bölümler ve hesap yönetimi", icon: "shield-checkmark-outline" },
-  MUHASEBE: { ad: "Muhasebe", aciklama: "Finans, cari bakiyeleri ve raporlar; cari talebi", icon: "calculator-outline" },
-  SATIS: { ad: "Satış", aciklama: "Sipariş, sevkiyat, üretim ve stok; fiyatsız; sipariş ve cari talebi", icon: "briefcase-outline" },
+  SATIS: { ad: "Satış", aciklama: "Sipariş, sevkiyat, üretim ve stok; sipariş ve cari talebi", icon: "briefcase-outline" },
 };
 
 export const DEVICE_PLATFORM: Readonly<Record<string, { readonly ad: string; readonly icon: IconName }>> = {
@@ -51,9 +50,6 @@ export const NOTIFICATION_KIND: Readonly<Record<NotificationKind, KindLabel>> = 
   "geciken-siparis": { ad: "Geciken sipariş", domain: "siparisler", icon: "time-outline" },
   "gunluk-uretim": { ad: "Günlük üretim", domain: "uretim", icon: "construct-outline" },
   "esitleme-gecikti": { ad: "Eşitleme gecikti", domain: "genel", icon: "sync-outline" },
-  "yedek-basarisiz": { ad: "Yedek alınamadı", domain: "genel", icon: "server-outline" },
-  "cek-vadesi": { ad: "Çek/senet vadesi", domain: "finans", icon: "calendar-outline" },
-  "cari-kilit": { ad: "Cari kilidi", domain: "finans", icon: "lock-closed-outline" },
 };
 
 export function notificationKind(tur: unknown): KindLabel {
@@ -76,7 +72,6 @@ export const NOTIFICATION_SKIP: Readonly<Record<string, string>> = {
 /** Dışa aktarma kümesi adları: bulut kataloğundaki her kök projeksiyon + bulutta doğan küme (`labels.test` §4 eşler). */
 export const EXPORT_DATASET_LABEL: Readonly<Record<string, string>> = {
   urun: "Ürünler",
-  hizmet: "Hizmetler",
   renk: "Renkler",
   depo: "Depolar",
   istasyon: "İstasyonlar",
@@ -85,46 +80,25 @@ export const EXPORT_DATASET_LABEL: Readonly<Record<string, string>> = {
   "fason-firma": "Fason firmalar",
   siparis: "Siparişler",
   "siparis-kalemi": "Sipariş kalemleri",
-  teklif: "Teklifler",
-  "teklif-kalemi": "Teklif kalemleri",
-  "standart-maliyet": "Standart maliyetler",
   sevkiyat: "Sevkiyatlar",
   "dogrudan-sevk": "Doğrudan sevkler",
   cuval: "Çuvallar",
   iade: "İadeler",
   get "is-emri"() { return TERIM.terbiyeIsEmri.cogul; },
-  "cari-hesap": "Cari hesaplar",
-  "cari-hareket": "Cari hareketleri",
-  kasa: "Kasalar",
-  banka: "Banka hesapları",
-  "kasa-hareketi": "Kasa hareketleri",
-  "cek-senet": "Çek ve senetler",
-  "cek-hareketi": "Çek hareketleri",
-  fatura: "Faturalar",
-  "fatura-kalemi": "Fatura kalemleri",
-  "tahsilat-odeme": "Tahsilat ve ödemeler",
-  fiyat: "Fiyatlar",
   "ozet.stok": "Stok özeti",
   "ozet.siparis": "Sipariş özeti",
   "ozet.uretim": "Üretim özeti",
   "ozet.sevkiyat": "Sevkiyat özeti",
   "ozet.fason": "Fason özeti",
-  "ozet-finans": "Finans özeti",
-  "ozet-masraf": "Masraf özeti",
-  "karlilik-ozet": "Kârlılık özeti",
-  "emanet-bakiye": "Müşteri malı (emanet) bakiyesi",
   "fason-acik": "Fasondaki işler",
-  "hizmet-geliri": "Hizmet geliri",
   "stok-karnesi": "Stok karnesi",
   "stok-kalem": "Stok kalem listesi",
   "acik-siparis-karsilama": "Açık sipariş karşılama",
   "rapor-katalogu": "Rapor kataloğu",
   "uretim-akisi": "Üretim akışı",
-  saglik: "Fabrika sağlığı",
   tesis: "Tesis bilgisi",
   "cari-ozeti": "Cari özetleri",
   "gelen-kutusu": "Gelen kutusu (sipariş/cari talepleri)",
   hesaplar: "Bulut hesapları",
   "hesap-denetimi": "Hesap güvenlik kaydı",
-  "destek-erisimi": "Destek erişim kaydı",
 };

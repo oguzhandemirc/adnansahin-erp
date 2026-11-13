@@ -35,7 +35,7 @@ describe("bildirim dokunuşu (çok tesis)", () => {
   });
   it("geçiş reddedilirse rota AÇILMAZ", async () => {
     const { order, d } = deps("t1", false);
-    await expect(openNotification({ rota: "/finans", tesisId: "t9" }, d)).resolves.toBe(false);
+    await expect(openNotification({ rota: "/stok", tesisId: "t9" }, d)).resolves.toBe(false);
     expect(order).toEqual(["gecis:t9"]);
   });
   it("güvensiz rota → ne geçiş ne rota", async () => {

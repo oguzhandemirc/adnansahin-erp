@@ -3,7 +3,7 @@
 //   §1 tekrar gönderim YOK: aynı olay iki turda tek satır, tek gönderim (pozitif: yeni gün yeni olay)
 //   §2 sessiz saatte gönderilmez → bitişe ertelenir (deneme hakkı yanmaz); bitişte gider · sessiz kapalı → hemen gider
 //   §3 kapalı türe / "bildirim yok"a gönderilmez (ATLANDI) · açık tür gider · sonradan açılınca eski olay GİTMEZ
-//   §4 izinsiz hesaba gitmez: finans içerikli çek bildirimi yalnız finans izinli hesaba; doğuştan sonra izni
+//   §4 izinsiz hesaba gitmez: stok eşiği bildirimi yalnız stok izinli hesaba; doğuştan sonra izni
 //      düşürülen hesaba gönderim anında da gitmez
 //   §5 gelen kutusu sonucu yalnız yazana; eşik yalnız karşılaştırma (eşik = değer → olay yok)
 //   §6 tesis saati: gün anahtarı ve sessiz saat ANLIK `tesis.saatDilimi`nden (RLS altında okunur; yoksa İstanbul)
@@ -93,32 +93,31 @@ async function main(): Promise<void> {
     kontrol("§3d pozitif: varsayılana dönen hesap (tür açık) alır", k3.sent === 1 && t.sent.length === 4, JSON.stringify(k3));
 
     console.log("\n§4 izin");
-    const fin = await hesapKur(o, k.tesisId, ["bulut:cari-bakiye:oku", "bulut:cek:oku"]);
-    const finsiz = await hesapKur(o, k.tesisId, ["bulut:ozet:oku", "bulut:cek:oku"]);
+    const izinli = await hesapKur(o, k.tesisId, ["bulut:ozet:oku", "bulut:stok:oku"]);
+    const izinsiz = await hesapKur(o, k.tesisId, ["bulut:ozet:oku"]);
     const tf = new RecordingTransport();
-    const tokFin = await cihazKaydet(o, fin);
-    const tokFinsiz = await cihazKaydet(o, finsiz);
-    for (const h of [fin, finsiz]) await ayarYaz(o, h, ayar({ esikler: { gecikenKalemUst: null } }));
-    await anlikYaz(o, k.tesisId, "ozet-finans", { kasalar: [], bankalar: [], cekDurum: [], yaslandirma: [], cekVade: [{ kova: "SOON", tur: "ALINAN", doviz: "TRY", adet: 2, tutar: "45000.00" }] });
+    const tokIzinli = await cihazKaydet(o, izinli);
+    const tokIzinsiz = await cihazKaydet(o, izinsiz);
+    for (const h of [izinli, izinsiz]) await ayarYaz(o, h, ayar({ esikler: { gecikenKalemUst: null, hamStokAlt: 100 } }));
+    await anlikYaz(o, k.tesisId, "ozet.stok", { hamMiktar: 45, bitmisMiktar: 500 });
     await tur(o, k.tesisId, tf);
-    const cek = await bildirimler(o, k.tesisId, "cek-vadesi");
-    const finsizSatir = cek.find((n) => n.accountId === finsiz.accountId);
-    kontrol("§4a ⭐ finans izni olmayan hesaba finans bildirimi GİTMEZ (IZIN_YOK)", finsizSatir?.skipReason === "IZIN_YOK" && !tf.sent.some((s) => s.target.token === tokFinsiz));
-    kontrol("§4b pozitif: finans izinli hesap alır (tutar içerir)", tf.sent.some((s) => s.target.token === tokFin && s.msg.body.includes("45000.00")));
-    kontrol("§4c izinsiz 'a' hesabı (sipariş izni) çek bildirimi almaz", cek.find((n) => n.accountId === a.accountId)?.skipReason === "IZIN_YOK");
+    const stok = await bildirimler(o, k.tesisId, "stok-esigi");
+    const izinsizSatir = stok.find((n) => n.accountId === izinsiz.accountId);
+    kontrol("§4a ⭐ stok izni olmayan hesaba stok bildirimi GİTMEZ (IZIN_YOK)", izinsizSatir?.skipReason === "IZIN_YOK" && !tf.sent.some((s) => s.target.token === tokIzinsiz));
+    kontrol("§4b pozitif: stok izinli hesap alır (fabrikanın sayısıyla)", tf.sent.some((s) => s.target.token === tokIzinli && s.msg.body.includes("45")));
     o.saat.ilerlet(DAY);
-    await ayarYaz(o, fin, ayar({ esikler: { gecikenKalemUst: null }, sessiz: simdikiSessiz(o.saat.simdi(), 30) }));
+    await ayarYaz(o, izinli, ayar({ esikler: { gecikenKalemUst: null, hamStokAlt: 100 }, sessiz: simdikiSessiz(o.saat.simdi(), 30) }));
     await tur(o, k.tesisId, tf);
-    const dogan = (await bildirimler(o, k.tesisId, "cek-vadesi")).filter((n) => n.accountId === fin.accountId).at(-1)!;
-    await withTesis(o.goc, { tesisId: k.tesisId }, (tx) => tx.account.update({ where: { id: fin.accountId }, data: { permissions: ["bulut:ozet:oku"] } }));
+    const dogan = (await bildirimler(o, k.tesisId, "stok-esigi")).filter((n) => n.accountId === izinli.accountId).at(-1)!;
+    await withTesis(o.goc, { tesisId: k.tesisId }, (tx) => tx.account.update({ where: { id: izinli.accountId }, data: { permissions: ["bulut:ozet:oku"] } }));
     const once = tf.sent.length;
     o.saat.ilerlet(40 * 60_000);
     await tur(o, k.tesisId, tf);
-    const gec = (await bildirimler(o, k.tesisId, "cek-vadesi")).filter((n) => n.accountId === fin.accountId).at(-1)!;
+    const gec = (await bildirimler(o, k.tesisId, "stok-esigi")).filter((n) => n.accountId === izinli.accountId).at(-1)!;
     kontrol("§4d ⭐ doğuşta izinliydi (BEKLIYOR), izni düştü → gönderim anında GİTMEZ (IZIN_YOK)", dogan.status === "BEKLIYOR" && tf.sent.length === once && gec.skipReason === "IZIN_YOK", `${dogan.status} → ${gec.status}/${gec.skipReason}`);
 
     console.log("\n§5 gelen kutusu + eşik karşılaştırması");
-    await gelenKutusuBolumu(o, k.tesisId, a, finsiz);
+    await gelenKutusuBolumu(o, k.tesisId, a, izinsiz);
 
     console.log("\n§6 tesis saati (ANLIK tesis.saatDilimi)");
     await tesisSaatiBolumu(o);

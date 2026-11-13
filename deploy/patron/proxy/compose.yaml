@@ -1,0 +1,55 @@
+# =============================================================================
+# ADNAN VDS TERS VEKİLİ (Caddy) — VDS /opt/adnan/proxy/compose.yaml bu dosyanın birebir kopyasıdır
+# =============================================================================
+# Dışa açılan TEK kapsayıcı: 80 (ACME + HTTPS'e yönlendirme) ve 443 (TCP + HTTP/3 UDP). `adnan-ag` ağını BU proje
+# kurar (sabit alt ağ: patron-api istemci adresini yalnız bu ağdan gelen X-Forwarded-For'dan okur) — önce bu
+# proje, sonra ../patron ayağa kalkar.
+# `.env` (0600, repoya GİRMEZ): PATRON_ALAN_ADI · ACME_EPOSTA · ADNAN_AG_ALT_AGI (ör. 172.31.250.0/28; patron/.env'de
+# AYNI değer).
+# Sertlik: kök FS salt okunur · bütün yetenekler düşük, yalnız NET_BIND_SERVICE (80/443) · no-new-privileges ·
+# bellek/pid tavanı. Kapsayıcı kullanıcısı imajın varsayılanı (root, ama yeteneksiz): root olmayan kullanıcı
+# no-new-privileges altında dosya yeteneğiyle 80/443'e bağlanamaz ve /data hacmi root'a aittir — bilinçli seçim.
+# =============================================================================
+name: proxy
+
+services:
+  caddy:
+    # Özetle sabit (çok mimarili dizin özeti, 2026-11-13); güncelleme = yeni özet + bakım penceresi.
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    container_name: caddy
+    restart: unless-stopped
+    read_only: true
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PATRON_ALAN_ADI: ${PATRON_ALAN_ADI:?PATRON_ALAN_ADI gerekli}
+      ACME_EPOSTA: ${ACME_EPOSTA:?ACME_EPOSTA gerekli}
+    volumes:
+      - ./caddy:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    tmpfs:
+      - /tmp:mode=1777
+    networks: [adnan-ag]
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 200
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+volumes:
+  caddy_data:
+  caddy_config:
+networks:
+  adnan-ag:
+    name: adnan-ag
+    ipam:
+      config:
+        - subnet: ${ADNAN_AG_ALT_AGI:?ADNAN_AG_ALT_AGI gerekli}

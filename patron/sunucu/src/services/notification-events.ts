@@ -10,7 +10,6 @@ import { withTesis } from "../lib/tenant";
 import type { NotificationKind, NotificationSettings } from "../wire/api";
 import type { CloudContext } from "./context";
 import { loadFacilitySettings, resolveSettings } from "./notification-settings.service";
-import { CARI_LOCK_SOURCE, CARI_NAME_SOURCE, cariLockText, loadCariLocks, type CariLockFact } from "./notification-cari-lock";
 
 export interface Candidate {
   readonly accountId: string;
@@ -29,20 +28,16 @@ export interface FacilityFacts {
   readonly snapshots: ReadonlyMap<string, unknown>;
   readonly lastPackageAt: Date | null;
   readonly inbox: readonly { readonly messageId: string; readonly accountId: string; readonly kind: string; readonly status: string }[];
-  /** `cari-hesap.kilit` dolu satırlar (D4-I6) + koyması doğmuş (hesap|anahtar) kümesi; verilmezse olay yok. */
-  readonly cariLocks?: readonly CariLockFact[];
-  readonly seenLockKeys?: ReadonlySet<string>;
 }
 
-/** Olayların okunduğu anlık projeksiyonlar (katalogdaki `source`lar; KAYIT kaynağı `cari-hesap` ayrı okunur). */
-export const SNAPSHOT_SOURCES: readonly string[] = [...new Set(Object.values(KIND_RULES).map((r) => r.source).filter((s): s is string => s !== null && s !== CARI_LOCK_SOURCE))];
-const READ_SOURCES: readonly string[] = [...SNAPSHOT_SOURCES, FACILITY_TIMEZONE_SOURCE, CARI_LOCK_SOURCE, CARI_NAME_SOURCE];
+/** Olayların okunduğu anlık projeksiyonlar (katalogdaki `source`lar). */
+export const SNAPSHOT_SOURCES: readonly string[] = [...new Set(Object.values(KIND_RULES).map((r) => r.source).filter((s): s is string => s !== null))];
+const READ_SOURCES: readonly string[] = [...SNAPSHOT_SOURCES, FACILITY_TIMEZONE_SOURCE];
 
 const INBOX_WINDOW_MS = 24 * 3_600_000;
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const fmt = (n: number): string => n.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
-const DUE_LABEL: Readonly<Record<string, string>> = { OVERDUE: "vadesi geçmiş", SOON: "vadesi yaklaşan" };
 
 /** Saf değerlendirme: hesap × olay adayları (izin/tür/sessiz kararı YAZIMDA ve GÖNDERİMDE verilir). */
 export function evaluate(f: FacilityFacts): Candidate[] {
@@ -51,8 +46,6 @@ export function evaluate(f: FacilityFacts): Candidate[] {
   const stock = obj(f.snapshots.get("ozet.stok"));
   const orders = obj(f.snapshots.get("ozet.siparis"));
   const production = obj(f.snapshots.get("ozet.uretim"));
-  const backup = obj(obj(f.snapshots.get("saglik")).yedek);
-  const cheques = obj(f.snapshots.get("ozet-finans")).cekVade;
   for (const a of f.accounts) {
     const e = a.settings.esikler;
     const add = (kind: NotificationKind, dedupKey: string, text: { title: string; body: string; route: string | null }) =>
@@ -70,22 +63,6 @@ export function evaluate(f: FacilityFacts): Candidate[] {
     if (f.lastPackageAt && f.nowMs - f.lastPackageAt.getTime() > e.esitlemeGecikmeDk * 60_000) {
       const dk = Math.floor((f.nowMs - f.lastPackageAt.getTime()) / 60_000);
       add("esitleme-gecikti", `esitleme-gecikti:${f.lastPackageAt.toISOString()}`, { title: "Fabrikadan veri gelmiyor", body: `Son eşitleme ${dk} dakika önce`, route: "/pano" });
-    }
-    if (backup.hukum === "kritik" || backup.hukum === "uyari") {
-      const last = typeof backup.sonGeceYedegi === "string" ? backup.sonGeceYedegi : "yok";
-      const age = num(backup.yasSaat);
-      add("yedek-basarisiz", `yedek-basarisiz:${last}`, { title: "Gece yedeği alınamadı", body: age === null ? "Fabrikada gece yedeği bulunamadı" : `Son gece yedeği ${fmt(age)} saat önce`, route: "/pano" });
-    }
-    if (Array.isArray(cheques)) {
-      const rows = cheques.map(obj).filter((c) => (c.kova === "OVERDUE" || c.kova === "SOON") && (num(c.adet) ?? 0) > 0);
-      if (rows.length > 0) {
-        const text = rows.slice(0, 3).map((c) => `${DUE_LABEL[String(c.kova)]} ${String(c.tur)} ${String(c.adet)} adet ${String(c.tutar)} ${String(c.doviz)}`).join(" · ");
-        add("cek-vadesi", `cek-vadesi:${day}`, { title: "Çek/senet vadesi", body: text.slice(0, 480), route: "/finans" });
-      }
-    }
-    for (const lock of f.cariLocks ?? []) {
-      const text = cariLockText(lock, a.id, f.seenLockKeys ?? new Set());
-      if (text) add("cari-kilit", text.dedupKey, text);
     }
   }
   for (const m of f.inbox) {
@@ -120,7 +97,6 @@ export async function generateForFacility(ctx: CloudContext, tesisId: string, no
       select: { messageId: true, accountId: true, kind: true, status: true },
     });
     const snapshots = new Map(snaps.map((s) => [s.projection, s.data]));
-    const locks = await loadCariLocks(tx, tesisId);
     const candidates = evaluate({
       nowMs,
       timeZone: facilityTimeZoneAt(snapshots.get(FACILITY_TIMEZONE_SOURCE), nowMs),
@@ -128,8 +104,6 @@ export async function generateForFacility(ctx: CloudContext, tesisId: string, no
       snapshots,
       lastPackageAt: state?.lastPackageAt ?? null,
       inbox,
-      cariLocks: locks.facts,
-      seenLockKeys: locks.seen,
     });
     if (candidates.length === 0) return 0;
     const perms = new Map(accounts.map((a) => [a.id, effectivePermissions(a.permissions)]));

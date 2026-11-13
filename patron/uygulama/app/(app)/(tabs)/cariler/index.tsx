@@ -1,6 +1,6 @@
 // Cariler (şartname §4.7): yapışkan veri tablosu — arama (ad/kod), süzgeç (rol + aktiflik), sütun seçimi, sıralanabilir
-// başlık. Süzme/sıralama SUNUCUDA (`useVeriTablosu`), görünüm tercihi profilde (`tablo.cari-kart`). Bakiye ayrıntıda
-// (`cari-hesap`, cari kart satırı bakiye taşımaz).
+// başlık. Süzme/sıralama SUNUCUDA (`useVeriTablosu`), görünüm tercihi profilde (`tablo.cari-kart`). Bakiye yok
+// (finans buluta gitmez).
 import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import type { ProjectionRecord } from "../../../../src/api/wire";

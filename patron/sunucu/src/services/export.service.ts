@@ -1,11 +1,9 @@
 // DIŞA AKTARMA (Ek-6/A §4.2) — tesis yöneticisi (`bulut:hesap:yonet`) Bulut Kopyası'nın ve bulutta doğan verinin
-// dökümünü JSON ya da CSV alır. Hizmet açıkken ve bittikten sonraki 90 gün (SALT_OKUNUR) açıktır; KAPALI'da oturum
-// zaten açılmaz. Kurallar:
+// dökümünü JSON ya da CSV alır (Adnan'da hizmet aşaması hep açık; manifestin `hizmet` alanı sabit). Kurallar:
 //   · Projeksiyonlar hesabın OKUYABİLDİĞİ kadardır: tx `app.projeksiyonlar`ı oturumla aynı açar (RLS), izinsiz alt
-//     satır (`.finans`/`.kisisel`) dökümde de yoktur; yöneticiye ayrı bir kapı YOK.
+//     satır (`.kisisel`) dökümde de yoktur; yöneticiye ayrı bir kapı YOK.
 //   · Kolonlar saklı satırın kendi alanlarıdır (fabrika kataloğunun opt-in kolonları); bulut kolon EKLEMEZ.
-//   · Bulutta doğan veri sırsız görünümle: hesaplar (parola/TOTP/davet yok), gelen kutusu, hesap denetimi, destek
-//     erişim kaydı (Ek-6/B §3.3: Lisans Alan kendi tesisine ait erişim kayıtlarını görür).
+//   · Bulutta doğan veri sırsız görünümle: hesaplar (parola/TOTP/davet yok), gelen kutusu, hesap denetimi.
 //   · Sayfalı akış: her sayfa kendi kısa kiracı tx'i (uzun tx yok); bitince ayak izi `DISA_AKTARIM`.
 import { Prisma } from "@prisma/client";
 import type { SessionContext } from "../auth/session.service";
@@ -19,7 +17,7 @@ import { ADMIN_PERMISSION, accountView } from "./account.service";
 import type { CloudContext } from "./context";
 import { rowView, selectRows, visibleSubRows, type Row } from "./data.service";
 import { messageView } from "./inbox.service";
-import { loadServiceFacts, serviceState } from "./service-lifecycle";
+import { OPEN_SERVICE } from "./facility-gate";
 
 const PAGE = 500;
 
@@ -69,17 +67,16 @@ async function jsonKeys(ctx: CloudContext, s: SessionContext, projection: string
 
 function recordDataset(ctx: CloudContext, s: SessionContext, def: ProjectionDef): Dataset {
   const sub = visibleSubRows(s, def);
-  let layout: { root: string[]; finans: string[]; kisisel: string[] } | null = null;
+  let layout: { root: string[]; kisisel: string[] } | null = null;
   return {
     name: def.name,
     kind: "KAYIT",
     async columns() {
       layout = {
         root: await jsonKeys(ctx, s, def.name),
-        finans: sub.finans ? await jsonKeys(ctx, s, `${def.name}.finans`) : [],
         kisisel: sub.kisisel ? await jsonKeys(ctx, s, `${def.name}.kisisel`) : [],
       };
-      return ["id", ...layout.root, ...layout.finans.map((k) => `finans.${k}`), ...layout.kisisel.map((k) => `kisisel.${k}`), "surum"];
+      return ["id", ...layout.root, ...layout.kisisel.map((k) => `kisisel.${k}`), "surum"];
     },
     async *pages() {
       let cursor: Prisma.Sql = Prisma.empty;
@@ -97,12 +94,11 @@ function recordDataset(ctx: CloudContext, s: SessionContext, def: ProjectionDef)
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
-function flatCells(r: Row, layout: { root: string[]; finans: string[]; kisisel: string[] } | null): Record<string, unknown> {
+function flatCells(r: Row, layout: { root: string[]; kisisel: string[] } | null): Record<string, unknown> {
   const out: Record<string, unknown> = { id: r.record_id, surum: r.version_at.toISOString() };
   if (!layout) return out;
   const data = obj(r.data);
   for (const k of layout.root) out[k] = data[k];
-  for (const k of layout.finans) out[`finans.${k}`] = obj(r.finans)[k];
   for (const k of layout.kisisel) out[`kisisel.${k}`] = obj(r.kisisel)[k];
   return out;
 }
@@ -140,7 +136,6 @@ const page = (cursor: string | undefined) => ({ orderBy: [{ createdAt: "desc" as
 const INBOX_COLUMNS = ["mesajId", "tur", "durum", "hesapId", "hesapAdi", "olusturulma", "islenme", "iptal", "govde", "sonuc"];
 const ACCOUNT_COLUMNS = ["id", "eposta", "ad", "durum", "izinler", "sonGiris", "davetBitis", "olusturulma"];
 const AUDIT_COLUMNS = ["id", "aktor", "olay", "varlik", "varlikId", "ozet", "zaman"];
-const SUPPORT_COLUMNS = ["id", "kim", "talep", "gerekce", "kapsam", "acilis", "bitis", "kapanis", "kapanisNedeni"];
 
 function cloudDatasets(ctx: CloudContext, s: SessionContext): Dataset[] {
   const scope = { tesisId: s.tesisId };
@@ -172,27 +167,6 @@ function cloudDatasets(ctx: CloudContext, s: SessionContext): Dataset[] {
           (r) => cells({ id: r.id, aktor: r.actor, olay: r.event, varlik: r.entity, varlikId: r.entityId, ozet: r.summary, zaman: r.createdAt.toISOString() }),
         ),
     },
-    {
-      name: "destek-erisimi",
-      kind: "BULUT",
-      columns: async () => SUPPORT_COLUMNS,
-      pages: () =>
-        byIdPages(
-          (c) => withTesis(ctx.app, scope, (tx) => tx.supportAccess.findMany({ where: scope, ...page(c) })),
-          (r) =>
-            cells({
-              id: r.id,
-              kim: r.dbUser,
-              talep: r.ticket,
-              gerekce: r.reason,
-              kapsam: r.scope,
-              acilis: r.createdAt.toISOString(),
-              bitis: r.expiresAt.toISOString(),
-              kapanis: r.closedAt?.toISOString() ?? null,
-              kapanisNedeni: r.closeReason,
-            }),
-        ),
-    },
   ];
 }
 
@@ -202,7 +176,6 @@ async function cloudCounts(ctx: CloudContext, s: SessionContext): Promise<Record
     "gelen-kutusu": await tx.inboxMessage.count({ where: scope }),
     hesaplar: await tx.account.count({ where: scope }),
     "hesap-denetimi": await tx.accountAudit.count({ where: scope }),
-    "destek-erisimi": await tx.supportAccess.count({ where: scope }),
   }));
 }
 
@@ -210,24 +183,21 @@ async function cloudCounts(ctx: CloudContext, s: SessionContext): Promise<Record
 
 export async function exportManifest(ctx: CloudContext, s: SessionContext): Promise<ExportManifest> {
   requireAdmin(s);
-  const nowMs = ctx.now();
   const roots = readableRoots(s);
-  const { counts, facts } = await withTesis(ctx.app, { tesisId: s.tesisId, projections: s.projections }, async (tx) => ({
-    counts: await tx.$queryRaw<{ projection: string; n: number }[]>`
+  const counts = await withTesis(ctx.app, { tesisId: s.tesisId, projections: s.projections }, (tx) =>
+    tx.$queryRaw<{ projection: string; n: number }[]>`
       SELECT projection, count(*)::int AS n FROM projection_rows
        WHERE tesis_id = ${s.tesisId}::uuid AND deleted_at IS NULL AND projection = ANY(${roots.map((r) => r.name)}::text[])
        GROUP BY projection`,
-    facts: await loadServiceFacts(tx, s.tesisId),
-  }));
+  );
   const byName = new Map(counts.map((c) => [c.projection, c.n]));
   const cloud = await cloudCounts(ctx, s);
-  const state = facts ? serviceState(facts, nowMs) : null;
   const kumeler: ExportDataset[] = [
     ...roots.map((d): ExportDataset => ({ ad: d.name, tur: d.root.kind === "ANLIK" ? "ANLIK" : "KAYIT", adet: byName.get(d.name) ?? 0, bicimler: d.root.kind === "ANLIK" ? ["json"] : ["json", "csv"] })),
     ...Object.entries(cloud).map(([ad, adet]): ExportDataset => ({ ad, tur: "BULUT", adet, bicimler: ["json", "csv"] })),
   ];
   return {
-    hizmet: { asama: state?.phase ?? "KAPALI", bitis: state?.endedAt?.toISOString() ?? null, saltOkunurBitis: state?.readOnlyUntil?.toISOString() ?? null },
+    hizmet: OPEN_SERVICE,
     kumeler,
   };
 }

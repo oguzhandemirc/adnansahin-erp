@@ -1,4 +1,4 @@
-// E1 (Pano · Üretim · Sevkiyat): izinsiz kart çizilmez · Dikkat şeridi `saglik` başarısızsa kritik madde ·
+// E1 (Pano · Üretim · Sevkiyat): izinsiz kart çizilmez · finans/sağlık anlığı istenmez ·
 // çalışan hesabında "Görebildiğin alanlar" · Üretim sade (anlık, dönemsiz) · kayıt rozeti tonu = anlam.
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import type React from "react";
@@ -31,7 +31,6 @@ const FIXTURES: Record<string, unknown> = {
       { id: "s2", kod: "KRS", ad: "Kurşun", tur: "PROCESS_QC", kuyruk: 110, aktif: 0, bugunTamamlanan: 60, bugunSevk: 0 },
     ],
   },
-  saglik: { yedek: { hukum: "ok", yasSaat: 3 } },
 };
 
 const mockApi = {
@@ -68,14 +67,13 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 // mock'lar kurulduktan SONRA yüklenir.
 const Dashboard = (require("../app/(app)/(tabs)/pano") as { default: () => React.ReactElement }).default;
 const Production = (require("../app/(app)/(tabs)/uretim") as { default: () => React.ReactElement }).default;
-const { attentionItems, areaSummary, dueRows } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
+const { areaSummary } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
 const L = require("../src/lib/labels/uretim") as typeof import("../src/lib/labels/uretim");
 
 beforeEach(() => {
   mockSession.cache = createCache(mockMem(), "t1:h1", () => new Date("2026-10-22T09:00:00Z"));
   mockApi.snapshot.mockClear();
   mockApi.list.mockClear();
-  FIXTURES.saglik = { yedek: { hukum: "ok", yasSaat: 3 } };
 });
 
 describe("Pano", () => {
@@ -83,21 +81,11 @@ describe("Pano", () => {
     mockSession.permissions = ["bulut:oturum", "bulut:ozet:oku", "bulut:siparis:oku"];
     render(<Dashboard />);
     expect(await screen.findByTestId("kutu-siparis")).toBeTruthy();
-    expect(screen.queryByTestId("kutu-alacak")).toBeNull();
     expect(screen.queryByTestId("kutu-uretim")).toBeNull();
     await waitFor(() => expect(mockApi.snapshot).toHaveBeenCalledWith("ozet.siparis"));
     expect(mockApi.snapshot).not.toHaveBeenCalledWith("ozet-finans");
+    expect(mockApi.snapshot).not.toHaveBeenCalledWith("saglik");
     expect(mockApi.snapshot).not.toHaveBeenCalledWith("ozet.uretim");
-  });
-
-  it("§2 gece yedeği alınamadıysa başlık altında kritik bant", async () => {
-    FIXTURES.saglik = { yedek: { hukum: "kritik", yasSaat: null } };
-    mockSession.permissions = ["bulut:oturum", "bulut:ozet:oku", "bulut:siparis:oku"];
-    render(<Dashboard />);
-    expect(await screen.findByTestId("bant-yedek")).toBeTruthy();
-    const [first] = attentionItems({ health: { yedek: { hukum: "kritik" } }, orders: { gecikenKalem: 0 } });
-    expect(first).toMatchObject({ key: "yedek", tone: "kritik" });
-    expect(attentionItems({ health: { yedek: { hukum: "ok" } } })).toEqual([]);
   });
 
   it("§3 çalışan (özet izni yok): 'Görebildiğin alanlar', kutu ve istek yok", async () => {
@@ -182,20 +170,6 @@ describe("kayıt durumu tonu = anlam (tek kaynak `labels/uretim`)", () => {
 });
 
 describe("okuyucular", () => {
-  it("dueRows toplamaz; TL ve alınan önce gelir", () => {
-    const rows = dueRows(
-      {
-        cekVade: [
-          { kova: "SOON", tur: "ISSUED", doviz: "USD", adet: 1, tutar: "100" },
-          { kova: "SOON", tur: "ISSUED", doviz: "TRY", adet: 2, tutar: "200" },
-          { kova: "SOON", tur: "RECEIVED", doviz: "TRY", adet: 3, tutar: "300" },
-          { kova: "LATER", tur: "RECEIVED", doviz: "TRY", adet: 9, tutar: "900" },
-        ],
-      },
-      ["SOON"],
-    );
-    expect(rows.map((r) => `${r.currency}/${r.kind}/${r.amount}`)).toEqual(["TRY/RECEIVED/300", "TRY/ISSUED/200", "USD/ISSUED/100"]);
-  });
   it("areaSummary ham anahtar basmaz", () => {
     const text = areaSummary("ozet.siparis", { acikKalem: 12, karsilanmaYuzde: 64 });
     expect(text).toContain("açık kalem");
@@ -206,6 +180,5 @@ describe("okuyucular", () => {
     expect(text).toBe("Bu ay 1.200 m");
     expect(text).not.toMatch(/zamanında|—/);
     expect(areaSummary("ozet.sevkiyat", { buAy: { sevkMiktari: 1200, zamanindaYuzde: 92.4 } })).toContain("%92,4 zamanında");
-    expect(attentionItems({ orders: { acikKalem: 4 } }).map((x) => x.key)).not.toContain("geciken");
   });
 });

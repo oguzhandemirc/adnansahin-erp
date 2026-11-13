@@ -14,7 +14,6 @@ import { accountActor, recordAudit } from "../lib/audit";
 import { CloudError } from "../lib/errors";
 import { withCentral, withLookup, withTesis } from "../lib/tenant";
 import type { CloudContext } from "../services/context";
-import { loadServiceFacts, serviceState } from "../services/service-lifecycle";
 import { activeMembershipIn, activeMemberships, closeIdentitySessions, identityByEmail, lockedMembership, membershipRoute, type ActiveMembership, type MembershipRoute } from "./membership";
 import { loginThrottleFor } from "./login-throttle";
 import { assertPasswordStrength, burnPasswordCheck, hashPassword, verifyPassword } from "./password";
@@ -75,7 +74,6 @@ export const twoFactorOn = (i: Pick<Identity, "totpEnabledAt" | "totpSecretSeale
 export const codeRequired = (status: 400 | 401): CloudError => new CloudError(status, "DOGRULAMA_KODU_GEREKLI", "Doğrulama kodu gerekli");
 
 const loginFailed = (): CloudError => new CloudError(401, "GIRIS_BASARISIZ", "E-posta, parola ya da doğrulama kodu hatalı");
-const serviceClosed = (): CloudError => new CloudError(403, "HIZMET_KAPANDI", "Adnan Şahin Yönetim hizmeti sona erdi ve salt okuma süresi doldu; veriler imha sürecinde");
 const switchDenied = (): CloudError => new CloudError(403, "TESIS_GECISI_YOK", "Bu tesise geçiş yapılamıyor");
 
 /** Başarısız girişin en kısa yanıt süresi (gerçek saat): DB'ye yazan dal ile yazmayan dal süreden ayırt edilmesin. */
@@ -107,7 +105,7 @@ export interface LoginInput {
   readonly client: "mobil" | "web" | null;
   /** İstemci adresi (vekil başlığı ya da soket); güvenlik kaydına 30 gün girer. */
   readonly ip: string | null;
-  /** Tesis ipucu (son seçilen); üyelik değilse ya da hizmeti KAPALI ise ada göre ilk açık tesis. */
+  /** Tesis ipucu (son seçilen); üyelik değilse ada göre ilk tesis. */
   readonly tesisId?: string;
 }
 
@@ -135,14 +133,10 @@ function contextOf(account: Account, sessionId: string, expiresAt: Date): Sessio
   };
 }
 
-/** Üyelik tesisinde oturum: hizmet KAPALI → "KAPALI"; hesap bu arada etkinlikten/kimlikten çıktıysa null (atomik claim). */
+/** Üyelik tesisinde oturum: hesap bu arada etkinlikten/kimlikten çıktıysa null (atomik claim). */
 async function openSession(ctx: CloudContext, identityId: string, m: MembershipRoute, g: { client: string | null; nowMs: number; expiresAt: Date }) {
   const { token, digest } = newToken(m.tesisId);
   const opened = await withTesis(ctx.app, { tesisId: m.tesisId }, async (tx) => {
-    const facts = await loadServiceFacts(tx, m.tesisId);
-    if (!facts) return null;
-    // Hizmet bitince 90 gün salt okuma (giriş AÇIK); süre dolunca giriş kapanır (Ek-6/A §4.2).
-    if (serviceState(facts, g.nowMs).phase === "KAPALI") return "KAPALI" as const;
     const claim = await tx.account.updateMany({ where: { id: m.accountId, status: "AKTIF", identityId }, data: { lastLoginAt: new Date(g.nowMs) } });
     if (claim.count === 0) return null;
     const session = await tx.session.create({
@@ -150,14 +144,12 @@ async function openSession(ctx: CloudContext, identityId: string, m: MembershipR
     });
     return { session, account: await tx.account.findUniqueOrThrow({ where: { id: m.accountId } }) };
   });
-  if (opened === null || opened === "KAPALI") return opened;
+  if (opened === null) return null;
   return { token, session: contextOf(opened.account, opened.session.id, g.expiresAt) };
 }
 
-const openable = (ms: readonly ActiveMembership[], hint: string | undefined): ActiveMembership | undefined => {
-  const open = ms.filter((m) => m.hizmet !== "KAPALI");
-  return open.find((m) => m.tesisId === hint?.toLowerCase()) ?? open[0];
-};
+const openable = (ms: readonly ActiveMembership[], hint: string | undefined): ActiveMembership | undefined =>
+  ms.find((m) => m.tesisId === hint?.toLowerCase()) ?? ms[0];
 
 export async function login(ctx: CloudContext, g: LoginInput): Promise<OpenedSession> {
   const startedMs = Date.now();
@@ -186,10 +178,8 @@ export async function login(ctx: CloudContext, g: LoginInput): Promise<OpenedSes
     await registerFailure(ctx, identity.id, target, { nowMs, ip: g.ip });
     return failAfterFloor(startedMs);
   }
-  if (target.hizmet === "KAPALI") throw serviceClosed();
   const expiresAt = new Date(nowMs + ctx.config.OTURUM_AZAMI_GUN * 86_400_000);
   const opened = await openSession(ctx, identity.id, target, { client: g.client, nowMs, expiresAt });
-  if (opened === "KAPALI") throw serviceClosed();
   if (!opened) {
     await registerFailure(ctx, identity.id, target, { nowMs, ip: g.ip });
     return failAfterFloor(startedMs);
@@ -219,7 +209,7 @@ async function claimSecondFactor(ctx: CloudContext, identity: Identity, code: st
   return withCentral(ctx.app, {}, (tx) => tx.identity.updateMany(totpStepClaim(identity.id, totp.step)));
 }
 
-/** Bearer belirtecinden oturum: kapalı · süresi dolmuş · hesap AKTİF değil · hizmet KAPALI (90 gün doldu) → null. */
+/** Bearer belirtecinden oturum: kapalı · süresi dolmuş · hesap AKTİF değil → null. */
 export async function resolveSession(ctx: CloudContext, token: string | undefined): Promise<SessionContext | null> {
   const tesisId = token ? tokenTesis(token) : null;
   if (!token || !tesisId) return null;
@@ -235,8 +225,6 @@ export async function resolveSession(ctx: CloudContext, token: string | undefine
     }
     const account = await tx.account.findUnique({ where: { id: row.accountId } });
     if (!account || account.status !== "AKTIF") return null;
-    const facts = await loadServiceFacts(tx, row.tesisId);
-    if (!facts || serviceState(facts, nowMs).phase === "KAPALI") return null;
     if (nowMs - row.lastUsedAt.getTime() > TOUCH_INTERVAL_MS) {
       await tx.session.updateMany({ where: { id: row.id, closedAt: null }, data: { lastUsedAt: new Date(nowMs) } });
     }
@@ -250,7 +238,7 @@ export async function listFacilities(ctx: CloudContext, s: SessionContext): Prom
 }
 
 /**
- * Tesis değişimi: hedefte AYNI kimliğe bağlı AKTİF hesap + hizmeti KAPALI olmayan tesis ⇒ orada yeni oturum, eskisi
+ * Tesis değişimi: hedefte AYNI kimliğe bağlı AKTİF hesap ⇒ orada yeni oturum, eskisi
  * CIKIS ile kapanır (claim: aynı oturumla iki geçiş iki oturum doğurmaz). TOTP sorulmaz; ömür ilk girişten devralınır.
  * Ret tek: 403 `TESIS_GECISI_YOK` (tesisin varlığı/üyeliğin durumu söylenmez).
  */
@@ -260,7 +248,7 @@ export async function switchFacility(ctx: CloudContext, s: SessionContext, tesis
   const identityId = s.identityId;
   const route = await membershipRoute(ctx, identityId, tesisId.toLowerCase());
   const target = route ? await activeMembershipIn(ctx, identityId, route, nowMs) : null;
-  if (!target || target.hizmet === "KAPALI") throw switchDenied();
+  if (!target) throw switchDenied();
   const old = await withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => {
     const closed = await tx.session.updateMany({ where: { id: s.sessionId, closedAt: null }, data: { closedAt: new Date(nowMs), closeReason: "CIKIS" } });
     return closed.count === 0 ? null : tx.session.findUnique({ where: { id: s.sessionId }, select: { client: true } });
@@ -269,7 +257,7 @@ export async function switchFacility(ctx: CloudContext, s: SessionContext, tesis
   await recordAudit(ctx.app, { tesisId: s.tesisId, actor: accountActor(s.accountId), event: "CIKIS", entity: "Account", entityId: s.accountId, summary: { sebep: "TESIS_GECISI" } });
   const expiresAt = new Date(Math.min(s.expiresAt.getTime(), nowMs + ctx.config.OTURUM_AZAMI_GUN * 86_400_000));
   const opened = await openSession(ctx, identityId, target, { client: old.client, nowMs, expiresAt });
-  if (!opened || opened === "KAPALI") throw switchDenied();
+  if (!opened) throw switchDenied();
   await recordAudit(ctx.app, { tesisId: target.tesisId, actor: accountActor(target.accountId), event: "TESIS_GECISI", entity: "Account", entityId: target.accountId, summary: { oturumId: opened.session.sessionId } });
   return { ...opened, expiresAt, facilities: choices(await activeMemberships(ctx, identityId, nowMs)) };
 }

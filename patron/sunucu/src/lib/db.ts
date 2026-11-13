@@ -1,7 +1,7 @@
 // Prisma istemcileri (Prisma 7 + pg sürücü bağdaştırıcısı). Sunucu İKİ rolle bağlanır — uygulama
 // (hesap API'si) ve eşitleme (fabrika kanalı + bakım) — ikisi de NOSUPERUSER NOBYPASSRLS; göç rolü
-// (tablo sahibi) yalnız migration ve satıcı CLI'sidir. İstemciler yönlendiricinin (`lib/tesis-db.ts`) içindedir:
-// merkez + tesis başına küçük havuz. Her sorgu `lib/tenant.ts` kapsamından geçer (kapsamsız sorgu RLS'te HATA).
+// (tablo sahibi) yalnız migration ve satıcı CLI'sidir. İstemci rol başına tektir (`lib/tesis-db.ts`; tek
+// veritabanı). Her sorgu `lib/tenant.ts` kapsamından geçer (kapsamsız sorgu RLS'te HATA).
 import { PrismaClient, Prisma } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
@@ -33,14 +33,19 @@ export async function closeDatabase(db: Database): Promise<void> {
   await db.pool.end().catch(() => undefined);
 }
 
-/** Rol RLS'i atlayabiliyor mu (süper kullanıcı ya da BYPASSRLS)? Açılış kapısı: evetse sunucu KALKMAZ. */
+/**
+ * Rol RLS'i atlayabiliyor mu: süper kullanıcı · BYPASSRLS · ya da `public` tablolarının SAHİBİ (göç rolü; sahip FORCE'a
+ * tabidir ama politikayı kapatıp düşürebilir — VDS'te göç rolü süper kullanıcı değildir). Açılış kapısı: evetse KALKMAZ.
+ */
 export async function roleBypassesRls(db: Database): Promise<{ role: string; bypass: boolean }> {
-  const r = await db.pool.query<{ rolname: string; rolsuper: boolean; rolbypassrls: boolean }>(
-    "SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user",
+  const r = await db.pool.query<{ rolname: string; rolsuper: boolean; rolbypassrls: boolean; owner: boolean }>(
+    `SELECT rolname, rolsuper, rolbypassrls,
+            EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tableowner = current_user) AS owner
+       FROM pg_roles WHERE rolname = current_user`,
   );
   const row = r.rows[0];
   if (!row) return { role: "?", bypass: true };
-  return { role: row.rolname, bypass: row.rolsuper || row.rolbypassrls };
+  return { role: row.rolname, bypass: row.rolsuper || row.rolbypassrls || row.owner };
 }
 
 export type Tx = Prisma.TransactionClient;

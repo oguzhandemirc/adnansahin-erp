@@ -4,7 +4,6 @@
 // açar ve yönetici kalmadığında sıfırlar — tesiste AKTİF yönetici varken yönetici daveti/yükseltmesi RED,
 // yalnız açık zorlama (talep no + gerekçe) ile ve denetime yazılarak. Her eylem `satici-cli` aktörüyle düşer.
 // Paylaşımlı (birden çok tesise üye) kimliğin sırrını YALNIZ satıcı sıfırlar (`resetIdentity`, her zaman zorlamayla).
-import type { LicenseClass } from "@prisma/client";
 import { createInvite } from "../auth/invite.service";
 import { closeIdentitySessions, identityEngagedOutside, membershipRoutes } from "../auth/membership";
 import { normalizeEmail } from "../auth/session.service";
@@ -13,7 +12,7 @@ import { publicKeyFromX } from "../lisans-protokol";
 import { recordAudit } from "../lib/audit";
 import { CloudError, notFound, stateConflict } from "../lib/errors";
 import { uniqueViolationOn } from "../lib/prisma-errors";
-import { withCentral, withTesis } from "../lib/tenant";
+import { listReadyFacilities, withCentral, withTesis } from "../lib/tenant";
 import type { Tx } from "../lib/db";
 import { ADMIN_PERMISSION, assertEmailFreeInFacility, emailInUseHere } from "./account.service";
 import { bindInstallationRoute, safeKeyId } from "./installation-directory";
@@ -21,6 +20,16 @@ import type { TesisDbRouter } from "../lib/tesis-db";
 
 export const VENDOR_ACTOR = "satici-cli";
 export const RETENTION_CHOICES: readonly (number | null)[] = [3, 13, 25, null];
+
+/**
+ * Adnan bulutu TEK TESİSLİDİR (tek veritabanı): kayıtlı tesis varsa yalnız AYNI kimlikle yeniden açılır (ad/saklama
+ * güncellemesi); başka kimlik 409 `DURUM_CAKISMASI`. Kapı satıcı CLI'sindedir (`tesis.ts tesis-ac`); bekçiler aynı DB'de
+ * rastgele tesisleri servis yolundan (`openFacility`) açar.
+ */
+export async function assertSingleFacility(db: TesisDbRouter, tesisId: string): Promise<void> {
+  const others = (await listReadyFacilities(db)).filter((t) => t !== tesisId.toLowerCase());
+  if (others.length > 0) throw new CloudError(409, "DURUM_CAKISMASI", `Bu bulut tek tesislidir; kayıtlı tesis ${others[0]} — ikinci tesis açılamaz`);
+}
 
 export async function openFacility(db: TesisDbRouter, g: { tesisId: string; name: string; retentionMonths?: number | null }) {
   if (g.retentionMonths !== undefined && !RETENTION_CHOICES.includes(g.retentionMonths)) throw new CloudError(400, "GOVDE_GECERSIZ", "Saklama 3, 13, 25 ay ya da 'tumu' olmalı");
@@ -35,35 +44,19 @@ export async function openFacility(db: TesisDbRouter, g: { tesisId: string; name
   return row;
 }
 
-export async function setFacilityStatus(db: TesisDbRouter, g: { tesisId: string; status: "AKTIF" | "PASIF" }) {
-  const r = await withTesis(db, { tesisId: g.tesisId }, (tx) => tx.facility.updateMany({ where: { tesisId: g.tesisId }, data: { status: g.status } }));
-  if (r.count === 0) throw notFound("Tesis");
-  await recordAudit(db, { tesisId: g.tesisId, actor: VENDOR_ACTOR, event: `TESIS_${g.status}`, entity: "Facility", entityId: g.tesisId });
-}
-
 export interface InstallationInput {
   readonly tesisId: string;
   readonly installationId: string;
   readonly publicKeyX: string;
-  readonly licenseClass: LicenseClass;
-  readonly modules: readonly string[];
-  readonly cloudUntil: Date | null;
-  readonly handedOver?: boolean;
   readonly active?: boolean;
 }
 
-export async function registerInstallation(db: TesisDbRouter, g: InstallationInput, nowMs: number = Date.now()) {
+export async function registerInstallation(db: TesisDbRouter, g: InstallationInput) {
   if (!publicKeyFromX(g.publicKeyX)) throw new CloudError(400, "GOVDE_GECERSIZ", "Kurulum açık anahtarı biçimsiz (Ed25519 x, base64url)");
   const fields = {
     publicKeyX: g.publicKeyX,
     keyId: safeKeyId(g.publicKeyX),
-    licenseClass: g.licenseClass,
-    modules: [...g.modules],
-    cloudUntil: g.cloudUntil,
-    handedOver: g.handedOver ?? false,
     active: g.active ?? true,
-    source: "KAYIT" as const,
-    refreshedAt: new Date(nowMs),
   };
   if (!(await bindInstallationRoute(db, g.installationId, g.tesisId))) throw new CloudError(409, "KURULUM_BASKA_TESISTE", "Bu kurulum başka bir tesise kayıtlı; kurulum tesis değiştiremez");
   const row = await withTesis(db, { tesisId: g.tesisId }, (tx) =>
@@ -75,7 +68,7 @@ export async function registerInstallation(db: TesisDbRouter, g: InstallationInp
     event: "KURULUM_KAYDI",
     entity: "Installation",
     entityId: g.installationId,
-    summary: { sinif: g.licenseClass, patronBulut: g.modules.includes("patron-bulut"), bitis: g.cloudUntil?.toISOString() ?? null },
+    summary: { aktif: fields.active },
   });
   return row;
 }
@@ -99,8 +92,8 @@ export function overrideFromArgs(a: Readonly<Record<string, string | undefined>>
 }
 
 /**
- * Tesiste AKTİF hesap yöneticisi varsa satıcı yönetici açamaz/yükseltemez (yönetim tesisindedir; destek erişimi
- * ayrı, kayıtlı yoldur). Zorlama yalnız açık talep + gerekçeyle; dönen sayı denetim özetine girer.
+ * Tesiste AKTİF hesap yöneticisi varsa satıcı yönetici açamaz/yükseltemez (yönetim tesisindedir).
+ * Zorlama yalnız açık talep + gerekçeyle; dönen sayı denetim özetine girer.
  */
 async function assertNoActiveAdmin(tx: Tx, tesisId: string, override: VendorOverride | undefined): Promise<number> {
   const active = await tx.account.count({ where: { tesisId, status: "AKTIF", permissions: { has: ADMIN_PERMISSION } } });

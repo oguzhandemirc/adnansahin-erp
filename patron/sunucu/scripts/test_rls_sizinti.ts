@@ -1,13 +1,13 @@
 // =============================================================================
-// RLS SIZINTI BEKÇİSİ — tesis DB'sinin İÇİNDE kiracı yalıtımı DB DÜZEYİNDE (sözleşme §9.2–9.3; ikinci katman —
-// birinci katman tesis başına ayrı DB, `test_tesis_db_yalitimi`). Merkezde yalnız yönlendirme yetkileri (§1 merkez).
+// RLS SIZINTI BEKÇİSİ — TEK veritabanında kiracı yalıtımı DB DÜZEYİNDE (sözleşme §9.2–9.3). Adnan bulutu tek
+// tesislidir; bekçi yine iki tesis satırı açar ve RLS'in ikisini ayırdığını ölçer (`tesis_id` kalktığında kalkar).
 // Ham `pg` bağlantısıyla (uygulama katmanı atlanarak) ölçer; kapı SQL'dedir, koda güvenilmez:
 //   §1 şema: her tablo RLS ENABLE + FORCE + `tesis_yalitimi`; tablo kümesi ↔ CLOUD_TABLES ↔ migration
 //      listesi birebir; rol yetkileri (tablo + KOLON düzeyi) ↔ db-grants.ts BİREBİR; iki rol NOSUPERUSER NOBYPASSRLS.
 //   §2 `app.tesis_id` AYARSIZ bağlantı → HATA (sıfır satır) · SIFIRLANMIŞ (önceki tx SET LOCAL) → HATA.
 //   §3 tesis A kapsamında B'nin satırı görünmez (liste, kimlikle doğrudan, projeksiyon) · WITH CHECK:
 //      A kapsamında B'ye yazılamaz · ön-kiracı arama yalnız TEK anahtarlı satırı açar.
-//   §4 alan izni (RESTRICTIVE): izinsiz alt satır (`siparis.finans`) doğrudan SQL'le de 0 satır.
+//   §4 alan izni (RESTRICTIVE): izinsiz alt satır (`cari-kart.kisisel`) doğrudan SQL'le de 0 satır.
 //   §5 rol ayrımı: uygulama rolü projeksiyona YAZAMAZ; eşitleme rolü hesap tablosunu OKUYAMAZ — tek istisna gelen
 //      kutusu claim'inin yazar sorgusu (`accounts`ta yalnız kimlik · tesis · durum · izin; e-posta, ad ve sırlar RED);
 //      uygulama rolü denetim satırında yalnız `summary`yi (IP alanı silmesi) güncelleyebilir.
@@ -20,7 +20,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { Client } from "pg";
-import { APP_COLUMN_GRANTS, APP_GRANTS, CLOUD_TABLES, MERKEZ_APP_GRANTS, MERKEZ_SYNC_COLUMN_GRANTS, MERKEZ_SYNC_GRANTS, ROUTING_TABLES, SYNC_COLUMN_GRANTS, SYNC_GRANTS, type ColumnGrants } from "../src/lib/db-grants";
+import { APP_COLUMN_GRANTS, APP_GRANTS, CLOUD_TABLES, ROUTING_TABLES, SYNC_COLUMN_GRANTS, SYNC_GRANTS, type ColumnGrants } from "../src/lib/db-grants";
 import { NO_TENANT, withTesis } from "../src/lib/tenant";
 import { PATRON_KOKU, hesapKur, imzali, kontrol, ortamKur, paket, girdi, sonuc, temizleTesis, tesisKur, tesisUrl, type Ortam } from "./lib/test-ortam";
 
@@ -52,7 +52,7 @@ async function kapsamda<T>(c: Client, ayar: Record<string, string>, fn: () => Pr
 
 type RolBeyani = readonly [label: string, role: string, want: Readonly<Record<string, readonly string[]>>, wantColumns: ColumnGrants];
 
-/** §1 bir DB'de (merkez ya da tesis): şema aynıdır, yetkiler DB'nin sınıfına göre beyandan. */
+/** §1 şema + rol yetkileri (tek DB). */
 async function semaBolumu(etiket: string, gocUrl: string, roller: readonly RolBeyani[]): Promise<void> {
   console.log(`\n§1 şema (${etiket}): RLS + FORCE + politika + yetkiler`);
   const goc = await istemci(gocUrl);
@@ -113,7 +113,7 @@ async function semaBolumu(etiket: string, gocUrl: string, roller: readonly RolBe
 }
 
 async function ayarsizBolumu(o: Ortam, a: { tesisId: string }): Promise<void> {
-  console.log("\n§2 app.tesis_id ayarsız/sıfırlanmış → HATA, sıfır satır (tesis DB'si)");
+  console.log("\n§2 app.tesis_id ayarsız/sıfırlanmış → HATA, sıfır satır");
   const c = await istemci(tesisUrl(o, a.tesisId, "uygulama"));
   try {
     let hepsiHata = true;
@@ -134,10 +134,10 @@ async function ayarsizBolumu(o: Ortam, a: { tesisId: string }): Promise<void> {
 }
 
 async function capraz(o: Ortam, a: { tesisId: string; hesap: string; eposta: string }, b: { tesisId: string; hesap: string }): Promise<void> {
-  console.log("\n§3 tesis A'nın DB'sinde B görünmez · WITH CHECK · ön-kiracı arama (RLS ikinci katman)");
+  console.log("\n§3 tesis A kapsamında B görünmez · WITH CHECK · ön-kiracı arama");
   const c = await istemci(tesisUrl(o, a.tesisId, "uygulama"));
   try {
-    const ayarA = { "app.tesis_id": a.tesisId, "app.projeksiyonlar": "siparis,siparis.finans" };
+    const ayarA = { "app.tesis_id": a.tesisId, "app.projeksiyonlar": "siparis,cari-kart,cari-kart.kisisel" };
     const hesaplar = await kapsamda(c, ayarA, () => c.query<{ tesis_id: string }>("SELECT tesis_id FROM accounts"));
     kontrol("§3a A kapsamında hesap listesi yalnız A", hesaplar.rows.length > 0 && hesaplar.rows.every((r) => r.tesis_id === a.tesisId), `${hesaplar.rows.length} satır`);
     const dogrudan = await kapsamda(c, ayarA, () => c.query("SELECT * FROM accounts WHERE id = $1", [b.hesap]));
@@ -151,7 +151,7 @@ async function capraz(o: Ortam, a: { tesisId: string; hesap: string; eposta: str
     const guncelle = await kapsamda(c, ayarA, () => c.query("UPDATE accounts SET name = 'ele gecirildi' WHERE id = $1", [b.hesap]));
     kontrol("§3e A kapsamında B'nin hesabını güncelleme 0 satır", guncelle.rowCount === 0);
     const arama = await kapsamda(c, { "app.tesis_id": NO_TENANT, "app.giris_eposta": a.eposta }, () => c.query("SELECT id FROM accounts"));
-    kontrol("§3f e-postayla ön-kiracı giriş araması KALKTI (kimlik merkezde): `app.giris_eposta` hiçbir hesabı açmaz", arama.rowCount === 0);
+    kontrol("§3f e-postayla ön-kiracı giriş araması KALKTI (kimlik `identities`te): `app.giris_eposta` hiçbir hesabı açmaz", arama.rowCount === 0);
     const aramaYan = await kapsamda(c, { "app.tesis_id": NO_TENANT, "app.giris_eposta": a.eposta, "app.projeksiyonlar": "siparis" }, () =>
       c.query("SELECT count(*)::int AS n FROM projection_rows"),
     );
@@ -167,9 +167,9 @@ async function alanIzni(o: Ortam, a: { tesisId: string }): Promise<void> {
   try {
     const n = async (liste: string, proj: string) =>
       (await kapsamda(c, { "app.tesis_id": a.tesisId, "app.projeksiyonlar": liste }, () => c.query<{ n: number }>("SELECT count(*)::int AS n FROM projection_rows WHERE projection = $1", [proj]))).rows[0]!.n;
-    kontrol("§4a izinli (siparis,siparis.finans) → finans satırı 1", (await n("siparis,siparis.finans", "siparis.finans")) === 1);
-    kontrol("§4b yalnız siparis izni → siparis.finans 0 satır", (await n("siparis", "siparis.finans")) === 0);
-    kontrol("§4c yalnız siparis izni → siparis 1 satır", (await n("siparis", "siparis")) === 1);
+    kontrol("§4a izinli (cari-kart,cari-kart.kisisel) → kişisel satır 1", (await n("cari-kart,cari-kart.kisisel", "cari-kart.kisisel")) === 1);
+    kontrol("§4b yalnız cari-kart izni → cari-kart.kisisel 0 satır", (await n("cari-kart", "cari-kart.kisisel")) === 0);
+    kontrol("§4c yalnız cari-kart izni → cari-kart 1 satır", (await n("cari-kart", "cari-kart")) === 1);
     const bos = await kapsamda(c, { "app.tesis_id": a.tesisId, "app.projeksiyonlar": "" }, () => c.query<{ n: number }>("SELECT count(*)::int AS n FROM projection_rows"));
     kontrol("§4d boş projeksiyon listesi → 0 satır", bos.rows[0]!.n === 0);
   } finally {
@@ -230,8 +230,7 @@ async function yardimci(o: Ortam, a: { tesisId: string }): Promise<void> {
   kontrol("§6a sıfır UUID ile withTesis RED", await red(() => withTesis(o.ctx.app, { tesisId: NO_TENANT }, async () => 1)));
   kontrol("§6b biçimsiz tesis RED", await red(() => withTesis(o.ctx.app, { tesisId: "x' OR 1=1 --" }, async () => 1)));
   kontrol("§6c '*' projeksiyon RED", await red(() => withTesis(o.ctx.app, { tesisId: a.tesisId, projections: ["*"] }, async () => 1)));
-  kontrol("§6d kapsamsız Prisma sorgusu (uygulama rolü, tesis DB'si) HATA", await red(() => o.ctx.app.withFacilityClient(a.tesisId, (db) => db.account.findMany({ take: 1 }))));
-  kontrol("§6d2 merkezde kiracı tablosu (uygulama rolü) HATA", await red(() => o.ctx.app.centralClient.account.findMany({ take: 1 })));
+  kontrol("§6d kapsamsız Prisma sorgusu (uygulama rolü) HATA", await red(() => o.ctx.app.prisma.account.findMany({ take: 1 })));
   const ok = await withTesis(o.ctx.app, { tesisId: a.tesisId }, (tx) => tx.account.count());
   kontrol("§6e kapsamlı sorgu çalışır", ok >= 1, `${ok} hesap`);
 }
@@ -260,7 +259,7 @@ function acilis(url: string): Promise<{ kod: number | null; cikti: string }> {
 async function acilisKapisi(o: Ortam): Promise<void> {
   console.log("\n§7 açılış kapısı");
   const kotu = await acilis(process.env.GOC_DATABASE_URL!);
-  kontrol("§7a RLS'i atlayabilen rol (göç = süper kullanıcı) ile sunucu KALKMAZ", kotu.kod === 1 && /RLS'i atlayabiliyor/.test(kotu.cikti), kotu.cikti.trim().split("\n").pop()?.slice(0, 100));
+  kontrol("§7a RLS'i atlayabilen rol (göç = tablo sahibi; süper kullanıcı olsun olmasın) ile sunucu KALKMAZ", kotu.kod === 1 && /RLS'i atlayabiliyor/.test(kotu.cikti), kotu.cikti.trim().split("\n").pop()?.slice(0, 100));
   const iyi = await acilis(o.ctx.config.DATABASE_URL);
   kontrol("§7b çalışma rolüyle sunucu kalkar", /PATRON_DINLIYOR/.test(iyi.cikti), iyi.cikti.trim().split("\n")[0]?.slice(0, 80));
 }
@@ -279,18 +278,15 @@ async function main(): Promise<void> {
         ufuk,
         kayitlar: [
           girdi("siparis", { yaz: [{ id, siparisNo: `S-${k.tesisId.slice(0, 4)}`, durum: "ACIK" }], yeni: { t: ufuk.toISOString(), k: "000000000001" } }),
-          girdi("siparis.finans", { yaz: [{ id, tutar: "100.00" }], yeni: { t: ufuk.toISOString(), k: "000000000001" } }),
+          girdi("cari-kart", { yaz: [{ id, ad: "Bekçi", kod: "C-1" }], yeni: { t: ufuk.toISOString(), k: "000000000001" } }),
+          girdi("cari-kart.kisisel", { yaz: [{ id, yetkili: "Ayşe" }], yeni: { t: ufuk.toISOString(), k: "000000000001" } }),
         ],
       });
       const r = await imzali(o, k, "/v1/esitle", { govde: p });
       if (r.status !== 200) throw new Error(`fikstür paketi: ${r.status} ${JSON.stringify(r.json)}`);
     }
     const kullanici = (url: string) => decodeURIComponent(new URL(url).username);
-    await semaBolumu("merkez", process.env.GOC_DATABASE_URL!, [
-      ["uygulama", kullanici(o.ctx.config.DATABASE_URL), MERKEZ_APP_GRANTS, {}],
-      ["eşitleme", kullanici(o.ctx.config.ESITLEME_DATABASE_URL), MERKEZ_SYNC_GRANTS, MERKEZ_SYNC_COLUMN_GRANTS],
-    ]);
-    await semaBolumu("tesis A", tesisUrl(o, kA.tesisId, "goc"), [
+    await semaBolumu("tek DB", tesisUrl(o, kA.tesisId, "goc"), [
       ["uygulama", kullanici(tesisUrl(o, kA.tesisId, "uygulama")), APP_GRANTS, APP_COLUMN_GRANTS],
       ["eşitleme", kullanici(tesisUrl(o, kA.tesisId, "esitleme")), SYNC_GRANTS, SYNC_COLUMN_GRANTS],
     ]);

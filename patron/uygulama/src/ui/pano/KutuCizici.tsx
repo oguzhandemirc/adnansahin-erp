@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import type { Snapshot } from "../../api/wire";
 import { can } from "../../lib/access";
-import { formatCountPossessive, formatDate, formatMoney } from "../../lib/format";
+import { formatCountPossessive, formatDate } from "../../lib/format";
 import { lookup } from "../../lib/labels";
 import { ORDER_STATUS } from "../../lib/labels/siparis";
 import { PERIOD_LABEL, SHIPMENT_STATUS, UNIT, type PeriodKey } from "../../lib/labels/uretim";
@@ -20,7 +20,6 @@ import { ActivityList, BosDurum, HataDurumu, IconTile, Iskelet, SectionCard, Sta
 import type { RemoteList } from "../siparis/useRemoteList";
 import { makeStyles, useTokens } from "../theme-context";
 import { space, typography } from "../tokens";
-import { MachineStopsCard } from "./MachineStopsCard";
 import { FlowStrip } from "./production";
 import { arr, num, obj, period, qty, str } from "./read";
 import { kutu, type KutuAnahtari } from "./kutular";
@@ -184,14 +183,13 @@ function sonSevkler(r: RemoteList, router: Router) {
 function sonSiparisler(r: RemoteList, router: Router) {
   return r.items.slice(0, 5).map((x) => {
     const k = obj(x.kayit);
-    const f = obj(x.finans);
     return {
       key: x.id,
       baslik: `${str(k.siparisNo) ?? "—"} · ${str(k.musteriAdi) ?? "—"}`,
       alt: `${ORDER_STATUS[String(k.durum) as keyof typeof ORDER_STATUS]?.label ?? lookup({}, k.durum)} · ${formatDate(k.siparisTarihi)}`,
       icon: "receipt-outline" as const,
       ton: "blue" as const,
-      sag: str(f.tutar) ? formatMoney(f.tutar, str(k.doviz) ?? "TRY") : `${qty(k.acikMiktar)} ${UNIT.metre}`,
+      sag: `${qty(k.acikMiktar)} ${UNIT.metre}`,
       onPress: () => openRecord(router, "siparis", x.id),
     };
   });
@@ -214,15 +212,6 @@ export const KUTU_CIZICI: Readonly<Record<KutuAnahtari, (b: KutuBaglami) => Reac
       git="/fason"
       degerler={(v) => (num(obj(v).acikTop) === null ? [] : [{ deger: qty(obj(v).acikTop), birim: UNIT.top }])}
       ipucu={(v) => (num(obj(v).boyahanedeTop) === null ? "şu an fasonda" : `${formatCountPossessive(obj(v).boyahanedeTop)} boyahanede`)}
-    />
-  ),
-  alacak: (b) => (
-    <Gosterge
-      b={b}
-      a="alacak"
-      git="/finans"
-      degerler={(v) => arr(obj(v).yaslandirma).map((r) => ({ deger: formatMoney(r.acikToplam, String(r.doviz)) }))}
-      ipucu={(v) => (arr(obj(v).yaslandirma).length > 1 ? "para birimleri ayrı" : "açık alacak")}
     />
   ),
   hizliIslemler: (b) => <HizliIslemler b={b} />,
@@ -250,7 +239,6 @@ export const KUTU_CIZICI: Readonly<Record<KutuAnahtari, (b: KutuBaglami) => Reac
     const r = b.liste.siparis;
     return <Kart a="sonSiparisler" r={listeDurum(r)} eylem="Tümü" onEylem={() => b.router.push("/siparisler" as never)}>{() => <ActivityList items={r ? sonSiparisler(r, b.router) : []} bos="Henüz sipariş yok" />}</Kart>;
   },
-  makineDurus: () => <MachineStopsCard />,
 };
 
 const useStyles = makeStyles((t) => ({

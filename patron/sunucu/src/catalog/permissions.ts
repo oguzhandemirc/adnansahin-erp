@@ -9,15 +9,7 @@ export const CLOUD_PERMISSIONS = [
   "bulut:uretim:oku",
   "bulut:stok:oku",
   "bulut:cari:oku",
-  "bulut:cari-bakiye:oku",
-  "bulut:kasa:oku",
-  "bulut:cek:oku",
-  "bulut:fatura:oku",
-  "bulut:tahsilat:oku",
-  "bulut:fiyat:oku",
   "bulut:rapor:oku",
-  "bulut:teklif:oku",
-  "bulut:maliyet:oku",
   "bulut:siparis:yaz",
   "bulut:cari:yaz",
   "bulut:hesap:yonet",
@@ -29,15 +21,6 @@ export const IMPLICIT_PERMISSION: CloudPermission = "bulut:oturum";
 /** Atanabilir izinler (örtük izin dışındakiler). */
 export const ASSIGNABLE_PERMISSIONS: readonly CloudPermission[] = CLOUD_PERMISSIONS.filter((p) => p !== IMPLICIT_PERMISSION);
 
-const FINANCE_READ: readonly CloudPermission[] = [
-  "bulut:cari:oku",
-  "bulut:cari-bakiye:oku",
-  "bulut:kasa:oku",
-  "bulut:cek:oku",
-  "bulut:fatura:oku",
-  "bulut:tahsilat:oku",
-  "bulut:fiyat:oku",
-];
 const OPERATIONS_READ: readonly CloudPermission[] = [
   "bulut:ozet:oku",
   "bulut:siparis:oku",
@@ -47,11 +30,10 @@ const OPERATIONS_READ: readonly CloudPermission[] = [
   "bulut:rapor:oku",
 ];
 
-/** Rol şablonları (kolaylık): Patron hepsi · Muhasebe finans + cari yazma + rapor · Satış finanssız; teklifi görür, maliyeti/marjı görmez. */
-export const ROLE_TEMPLATES: Readonly<Record<"PATRON" | "MUHASEBE" | "SATIS", readonly CloudPermission[]>> = {
+/** Rol şablonları (kolaylık): Patron hepsi · Satış operasyon okuma + kişisel cari + yazma (Adnan'da finans izni YOK). */
+export const ROLE_TEMPLATES: Readonly<Record<"PATRON" | "SATIS", readonly CloudPermission[]>> = {
   PATRON: ASSIGNABLE_PERMISSIONS,
-  MUHASEBE: ["bulut:ozet:oku", "bulut:rapor:oku", ...FINANCE_READ, "bulut:cari:yaz"],
-  SATIS: [...OPERATIONS_READ, "bulut:cari:oku", "bulut:teklif:oku", "bulut:siparis:yaz", "bulut:cari:yaz"],
+  SATIS: [...OPERATIONS_READ, "bulut:cari:oku", "bulut:siparis:yaz", "bulut:cari:yaz"],
 };
 export type RoleTemplate = keyof typeof ROLE_TEMPLATES;
 

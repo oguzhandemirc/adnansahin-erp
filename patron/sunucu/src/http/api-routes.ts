@@ -10,7 +10,7 @@ import { ASSIGNABLE_PERMISSIONS, ROLE_TEMPLATES } from "../catalog/permissions";
 import { CloudError, badRequest } from "../lib/errors";
 import { createAccount, listAccountAudit, listAccounts, resetAccount, setAccountStatus, updateAccount } from "../services/account.service";
 import type { CloudContext } from "../services/context";
-import { ANAHTAR_SUZGEC_AZAMI, LIST_ID_FILTER_KEYS, LIST_MEMBER_FILTER_KEYS, LIST_KEY_FILTER_KEYS, LIST_SORT_DIRS, type ListSortDir, type LoginResponse, type PermissionCatalog } from "../wire/api";
+import { LIST_ID_FILTER_KEYS, LIST_MEMBER_FILTER_KEYS, LIST_SORT_DIRS, type ListSortDir, type LoginResponse, type PermissionCatalog } from "../wire/api";
 import { facilityStatus, getCustomerSummary, getProjectionRecord, getSnapshot, listProjection } from "../services/data.service";
 import { deactivateDevice, listDevices, registerDevice } from "../services/device.service";
 import { requestSnapshotRefresh } from "../services/doorbell";
@@ -22,7 +22,7 @@ import { EXPORT_ROUTES } from "./export-routes";
 import { OptionalCode, OWN_FACTOR_ROUTES } from "./own-factor-routes";
 import { NOTIFICATION_ROUTES } from "./notification-routes";
 import { VIEW_PREF_ROUTES } from "./view-pref-routes";
-import { clientAddress, rateLimit } from "./rate-limit";
+import { clientAddress, invalidTokenGate, rateLimit } from "./rate-limit";
 
 export type { ApiCall, ApiRouteDef } from "./api-route-kit";
 
@@ -128,7 +128,7 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
     kimlik: "OKUMA",
     handler: async (c) => {
       const { cursor, limit } = page(c);
-      return { data: await listProjection(c.ctx, s(c), String(c.req.params[PROJECTION]), { cursor, limit, durum: text(c, "durum", 40), kimlik: Object.fromEntries([...new Set([...LIST_ID_FILTER_KEYS, ...LIST_MEMBER_FILTER_KEYS])].map((k) => [k, text(c, k, 40)])), anahtar: Object.fromEntries(LIST_KEY_FILTER_KEYS.map((k) => [k, text(c, k, ANAHTAR_SUZGEC_AZAMI + 1)])), ara: text(c, "ara", 200), suzgec: text(c, "suzgec", 120), sirala: text(c, "sirala", 40), yon: sortDir(text(c, "yon", 10)) }) };
+      return { data: await listProjection(c.ctx, s(c), String(c.req.params[PROJECTION]), { cursor, limit, durum: text(c, "durum", 40), kimlik: Object.fromEntries([...new Set([...LIST_ID_FILTER_KEYS, ...LIST_MEMBER_FILTER_KEYS])].map((k) => [k, text(c, k, 40)])), ara: text(c, "ara", 200), suzgec: text(c, "suzgec", 120), sirala: text(c, "sirala", 40), yon: sortDir(text(c, "yon", 10)) }) };
     },
   },
   { method: "get", path: `/veri/:${PROJECTION}/:id`, auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await getProjectionRecord(c.ctx, s(c), String(c.req.params[PROJECTION]), String(c.req.params.id)) }) },
@@ -290,16 +290,22 @@ function jsonOnlyWrites(req: Request, _res: Response, next: NextFunction): void 
 export function createApiRouter(ctx: CloudContext): Router {
   const router = express.Router();
   router.use(noStore);
+  router.use(rateLimit({ perMinute: ctx.config.API_HIZ_DK, config: ctx.config }));
   router.use(jsonOnlyWrites);
   router.use(express.json({ limit: "256kb", strict: true }));
   const loginLimit = rateLimit({ perMinute: ctx.config.GIRIS_HIZ_DK, config: ctx.config });
+  const tokenGate = invalidTokenGate({ perMinute: ctx.config.OTURUM_RED_HIZ_DK, config: ctx.config });
   for (const def of API_ROUTES) {
     const guards = def.auth === "ACIK" ? [loginLimit] : [];
     router[def.method](def.path, ...guards, async (req: Request, res: Response) => {
       let session: SessionContext | null = null;
       if (def.auth === "OTURUM") {
+        if (tokenGate.blocked(req, res)) return;
         session = await resolveSession(ctx, bearer(req));
-        if (!session) throw new CloudError(401, "OTURUM_YOK", "Oturum yok ya da süresi doldu; yeniden giriş yapın");
+        if (!session) {
+          tokenGate.failed(req);
+          throw new CloudError(401, "OTURUM_YOK", "Oturum yok ya da süresi doldu; yeniden giriş yapın");
+        }
       }
       const r = await def.handler({ ctx, req, session });
       if ("file" in r) return sendFile(res, r.file);

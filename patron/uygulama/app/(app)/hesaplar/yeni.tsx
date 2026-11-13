@@ -46,7 +46,7 @@ export default function NewAccount() {
           return (
             <CheckRow key={k} kind="radio" checked={sablon === k} onPress={() => setSablon(k)} testID={`sablon-${k}`}
               title={ACCOUNT_TEMPLATE[k].ad} subtitle={n ? `${ACCOUNT_TEMPLATE[k].aciklama} · ${n} izin` : ACCOUNT_TEMPLATE[k].aciklama}
-              icon={ACCOUNT_TEMPLATE[k].icon} domain={k === "PATRON" ? "genel" : k === "MUHASEBE" ? "finans" : "siparisler"} />
+              icon={ACCOUNT_TEMPLATE[k].icon} domain={k === "PATRON" ? "genel" : "siparisler"} />
           );
         })}
       </ListeBlogu>

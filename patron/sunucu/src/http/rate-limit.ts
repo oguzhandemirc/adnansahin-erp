@@ -99,25 +99,60 @@ export function clientAddress(req: Pick<Request, "headers" | "socket">, config: 
   return peer || "?";
 }
 
-export function rateLimit(g: { perMinute: number; config: TrustConfig }) {
+/** IP başına dakikalık pencere sayacı (süreç içi; yeniden başlatma sıfırlar). `hit` sayar ve sınırı aştıysa true döner. */
+function windowCounter(perMinute: number) {
   const windows = new Map<string, { start: number; count: number }>();
+  return {
+    /** Pencerede sınır DOLDU mu (saymadan): `perMinute` sayımdan sonraki istek durur. */
+    full(key: string, now: number): { blocked: boolean; retryAfter: number } {
+      const w = windows.get(key);
+      if (!w || now - w.start >= 60_000) return { blocked: false, retryAfter: 0 };
+      return { blocked: w.count >= perMinute, retryAfter: Math.ceil((w.start + 60_000 - now) / 1000) };
+    },
+    hit(key: string, now: number): { blocked: boolean; first: boolean; retryAfter: number } {
+      if (windows.size > 10_000) for (const [k, w] of windows) if (now - w.start >= 60_000) windows.delete(k);
+      const w = windows.get(key);
+      if (!w || now - w.start >= 60_000) {
+        windows.set(key, { start: now, count: 1 });
+        return { blocked: perMinute < 1, first: false, retryAfter: 60 };
+      }
+      w.count++;
+      return { blocked: w.count > perMinute, first: w.count === perMinute + 1, retryAfter: Math.ceil((w.start + 60_000 - now) / 1000) };
+    },
+  };
+}
+
+function tooMany(res: Response, retryAfter: number): void {
+  res.set("Retry-After", String(retryAfter));
+  res.status(429).json({ success: false, message: "Çok fazla istek; biraz sonra deneyin", details: { code: "HIZ_SINIRI" } });
+}
+
+export function rateLimit(g: { perMinute: number; config: TrustConfig }) {
+  const counter = windowCounter(g.perMinute);
   return (req: Request, res: Response, next: NextFunction): void => {
-    const now = Date.now();
-    if (windows.size > 10_000) for (const [k, w] of windows) if (now - w.start >= 60_000) windows.delete(k);
-    const key = clientAddress(req, g.config);
-    const w = windows.get(key);
-    if (!w || now - w.start >= 60_000) {
-      windows.set(key, { start: now, count: 1 });
-      next();
-      return;
-    }
-    w.count++;
-    if (w.count === g.perMinute + 1) securityEvent("HIZ_SINIRI");
-    if (w.count > g.perMinute) {
-      res.set("Retry-After", String(Math.ceil((w.start + 60_000 - now) / 1000)));
-      res.status(429).json({ success: false, message: "Çok fazla istek; biraz sonra deneyin", details: { code: "HIZ_SINIRI" } });
-      return;
-    }
+    const r = counter.hit(clientAddress(req, g.config), Date.now());
+    if (r.first) securityEvent("HIZ_SINIRI");
+    if (r.blocked) return tooMany(res, r.retryAfter);
     next();
+  };
+}
+
+/**
+ * Geçersiz belirteç kapısı (O8): biçimi doğru ama geçersiz her Bearer bir DB araması yapar. IP başına dakikada `perMinute`
+ * başarısız çözümlemeden sonra o IP'nin oturumlu istekleri DB'ye inmeden 429 alır (pencere sonuna dek). Yalnız
+ * BAŞARISIZLIK sayılır; geçerli oturumlu istek sayacı ilerletmez.
+ */
+export function invalidTokenGate(g: { perMinute: number; config: TrustConfig }) {
+  const counter = windowCounter(g.perMinute);
+  return {
+    /** İstek DB'ye inmeden: bu IP sınırı aştıysa true (yanıt yazıldı). */
+    blocked(req: Request, res: Response): boolean {
+      const r = counter.full(clientAddress(req, g.config), Date.now());
+      if (r.blocked) tooMany(res, r.retryAfter);
+      return r.blocked;
+    },
+    failed(req: Request): void {
+      if (counter.hit(clientAddress(req, g.config), Date.now()).first) securityEvent("HIZ_SINIRI");
+    },
   };
 }

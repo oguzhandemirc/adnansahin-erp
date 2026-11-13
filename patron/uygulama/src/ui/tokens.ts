@@ -38,13 +38,12 @@ export type TileTone = "violet" | "blue" | "sky" | "teal" | "green" | "amber" | 
 export const TILE_TONES: readonly TileTone[] = ["violet", "blue", "sky", "teal", "green", "amber", "orange", "rose"];
 
 /** Alan kimliği (eski ad): rengi yalnız "hangi iş" der, iyi/kötü söylemez. */
-export type Domain = "uretim" | "siparisler" | "sevkiyat" | "finans" | "cariler" | "stok" | "fason" | "raporlar" | "gelenKutusu" | "genel";
+export type Domain = "uretim" | "siparisler" | "sevkiyat" | "cariler" | "stok" | "fason" | "raporlar" | "gelenKutusu" | "genel";
 
 /** Alan → simge karesi tonu (panel `box-meta.ts` eşlemesi). */
 export const DOMAIN_TONE: Readonly<Record<Domain, TileTone | "primary">> = {
   uretim: "violet",
   siparisler: "blue",
-  finans: "sky",
   stok: "teal",
   sevkiyat: "green",
   raporlar: "amber",

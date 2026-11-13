@@ -5,8 +5,8 @@
 //      cihaz pasif · ayak izi HESAP_KENDINI_SILDI · aynı üçlüyle giriş 401
 //   §3 ikinci çağrı: aynı belirteç 401 OTURUM_YOK, durum ve kapanış anı değişmez (idempotent, zararsız)
 //   §4 son yönetici: 409 SON_YONETICI (`details.tesisler`), hesap/kimlik/oturum aynen · ikinci yönetici varken silinir
-//   §5 çok tesisli kimlik: başka tesiste son yöneticiyse HİÇBİR tesis değişmez · değilse A + C (AKTİF) + D (KİLİTLİ)
-//      üyelikleri PASİF, öteki tesisteki oturum da 401, kimlik PASİF · başka kimlik etkilenmez
+//   §5 (çok tesisli kimlik) KALDIRILDI: tek DB'de `accounts_email_etkin_key` bir e-postayı tek AKTİF hesapla sınırlar;
+//      çok üyelikli kimlik davranışı kimlik diliminde yeniden yazılacak.
 //   §6 tek kaynak: 30. günde bakımın MEVCUT silmesi hesabı ve kimliği tombstone'a çeker (29. günde dokunmaz)
 //   §7 geri alma yolu: silmeden sonra yönetici aynı e-postayı yeniden davet edebilir (201)
 //   §8 bekleyen davet: başka tesiste KABUL edilmiş ama onaylanmamış davet (hesap DAVETLİ, kimliğe bağlı, üyelik satırı
@@ -41,14 +41,6 @@ async function giris(o: Ortam, h: Pick<TestHesabi, "eposta" | "sir">, tesisId?: 
   return api(o, "POST", "/api/oturum/ac", { govde: { eposta: h.eposta, parola: TEST_PAROLASI, totp: totpKodu(h.sir, o.saat.simdi()), ...(tesisId ? { tesisId } : {}) } });
 }
 const belirtecOf = (r: Yanit): string => (r.json.data as { belirtec: string }).belirtec;
-
-/** Kimliğin başka tesise üyeliği (göç rolüyle — `test_coklu_tesis` kalıbı). */
-async function uyeEkle(o: Ortam, tesisId: string, h: TestHesabi, g: { status: "AKTIF" | "KILITLI"; izinler: readonly string[] }): Promise<string> {
-  const k = await kimlik(o, h.eposta);
-  const a = await withTesis(o.goc, { tesisId }, (tx) => tx.account.create({ data: { tesisId, email: h.eposta, name: "Ortak Patron", permissions: [...g.izinler], status: g.status, identityId: k!.id } }));
-  await withCentral(o.goc, {}, (tx) => tx.loginRoute.create({ data: { identityId: k!.id, tesisId, accountId: a.id } }));
-  return a.id;
-}
 
 async function yanlisFaktor(o: Ortam, a: string, k: TestHesabi): Promise<void> {
   console.log("\n§1 yanlış faktör");
@@ -106,24 +98,6 @@ async function sonYonetici(o: Ortam, b: string): Promise<void> {
   await hesapKur(o, b, YONETICI);
   const r2 = await sil(o, y);
   kontrol("§4d ikinci aktif yönetici varken yönetici kendini silebilir", r2.status === 200 && (await hesap(o, b, y.accountId))?.status === "PASIF", String(r2.status));
-}
-
-async function cokTesis(o: Ortam, t: { a: string; c: string; d: string }, baskasi: TestHesabi): Promise<void> {
-  console.log("\n§5 çok tesisli kimlik");
-  const m = await hesapKur(o, t.a, OKUMA);
-  const mC = await uyeEkle(o, t.c, m, { status: "AKTIF", izinler: YONETICI });
-  const mD = await uyeEkle(o, t.d, m, { status: "KILITLI", izinler: OKUMA });
-  const r1 = await sil(o, m);
-  kontrol("§5a C'de son yönetici → 409 SON_YONETICI, A'daki oturumdan da", r1.status === 409 && r1.json.details?.code === "SON_YONETICI" && ((r1.json.details?.tesisler ?? []) as { id: string }[]).map((x) => x.id).join() === t.c, JSON.stringify(r1.json.details));
-  kontrol("§5b HİÇBİR tesis değişmez (A AKTİF, C AKTİF, D KİLİTLİ, kimlik AKTİF)", (await hesap(o, t.a, m.accountId))?.status === "AKTIF" && (await hesap(o, t.c, mC))?.status === "AKTIF" && (await hesap(o, t.d, mD))?.status === "KILITLI" && (await kimlik(o, m.eposta))?.status === "AKTIF");
-  await withTesis(o.goc, { tesisId: t.c }, (tx) => tx.account.update({ where: { id: mC }, data: { permissions: OKUMA } }));
-  const cOturum = belirtecOf(await giris(o, m, t.c));
-  const r2 = await sil(o, m);
-  const durumlar = [(await hesap(o, t.a, m.accountId))?.status, (await hesap(o, t.c, mC))?.status, (await hesap(o, t.d, mD))?.status].join(",");
-  kontrol("§5c 200 · tesisSayisi 3 · A + C + D (KİLİTLİ dahil) PASİF", r2.status === 200 && (r2.json.data as AccountDeletion).tesisSayisi === 3 && durumlar === "PASIF,PASIF,PASIF", `${r2.status} ${durumlar}`);
-  kontrol("§5d öteki tesisteki oturum da düşer (C 401)", (await oturum(o, cOturum)) === 401 && (await oturum(o, m.belirtec)) === 401);
-  kontrol("§5e kimlik PASİF; her tesiste ayak izi", (await kimlik(o, m.eposta))?.status === "PASIF" && (await olaylar(o, t.c, mC)).includes("HESAP_KENDINI_SILDI") && (await olaylar(o, t.d, mD)).includes("HESAP_KENDINI_SILDI"));
-  kontrol("§5f başka kimlik etkilenmez", (await kimlik(o, baskasi.eposta))?.status === "AKTIF" && (await oturum(o, baskasi.belirtec)) === 200);
 }
 
 async function otuzGun(o: Ortam, a: string, k: TestHesabi, kapanis: number): Promise<void> {
@@ -187,7 +161,7 @@ async function bekleyenDavet(o: Ortam, t: { a: string; e: string }): Promise<voi
 
 async function main(): Promise<void> {
   const o = await ortamKur();
-  const t = { a: (await tesisKur(o)).tesisId, b: (await tesisKur(o)).tesisId, c: (await tesisKur(o)).tesisId, d: (await tesisKur(o)).tesisId, e: (await tesisKur(o)).tesisId };
+  const t = { a: (await tesisKur(o)).tesisId, b: (await tesisKur(o)).tesisId, e: (await tesisKur(o)).tesisId };
   try {
     const yonA = await hesapKur(o, t.a, YONETICI);
     const k = await hesapKur(o, t.a, OKUMA);
@@ -195,7 +169,6 @@ async function main(): Promise<void> {
     const { kapanis } = await mutluYol(o, t.a, k);
     await ikinciCagri(o, t.a, k, kapanis);
     await sonYonetici(o, t.b);
-    await cokTesis(o, t, yonA);
     await bekleyenDavet(o, t);
     await geriAlma(o, t.a, yonA, k.eposta);
     await otuzGun(o, t.a, k, kapanis);

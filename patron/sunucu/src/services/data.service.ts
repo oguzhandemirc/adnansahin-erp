@@ -1,6 +1,6 @@
 // VERİ API'si — projeksiyon okuma; İZİN SÜZMESİ SUNUCUDA, iki katmanda: (1) uygulama kapısı — hesap
 // projeksiyonun izin kümesini taşımıyorsa 403; (2) RLS — tx `app.projeksiyonlar`ı hesabın okuyabildiği
-// adlarla açar, izinsiz alt satır (`.finans` · `.kisisel`) DB düzeyinde görünmez (sol birleşimde NULL).
+// adlarla açar, izinsiz alt satır (`.kisisel`) DB düzeyinde görünmez (sol birleşimde NULL).
 // Bulut hesap yapmaz: satır fabrikanın hesapladığı hâliyle döner; süzgeç yalnız saklı alan eşitliği.
 import { Prisma } from "@prisma/client";
 import type { SessionContext } from "../auth/session.service";
@@ -8,9 +8,9 @@ import { projectionDef, type ProjectionDef } from "../catalog/projections";
 import { badRequest, forbidden, notFound } from "../lib/errors";
 import { foldSql, searchCondition } from "../lib/search";
 import { NO_TENANT, withTesis } from "../lib/tenant";
-import { ANAHTAR_SUZGEC_AZAMI, ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_MEMBER_FILTER_KEYS, LIST_MEMBER_FILTERS, LIST_KEY_FILTER_KEYS, LIST_KEY_FILTERS, LIST_SEARCH, LIST_SORT, SUZGEC_AZAMI, type CustomerSummary, type ListFilterOption, type ListSortDir, type ListSortKind, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListMemberFilterKey, type ListKeyFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
+import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_MEMBER_FILTER_KEYS, LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, SUZGEC_AZAMI, type CustomerSummary, type ListFilterOption, type ListSortDir, type ListSortKind, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListMemberFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
 import type { CloudContext } from "./context";
-import { loadServiceFacts, serviceState } from "./service-lifecycle";
+import { OPEN_SERVICE } from "./facility-gate";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -23,9 +23,8 @@ function readableDef(s: SessionContext, name: string, kind: "KAYIT" | "ANLIK"): 
 }
 
 /** Hesabın görebildiği alt satırlar (uygulama kapısı; RLS aynı kararı DB'de verir). */
-export function visibleSubRows(s: SessionContext, def: ProjectionDef): { finans: boolean; kisisel: boolean } {
-  const can = (sub: "finans" | "kisisel") => (def.root.subRows ?? []).includes(sub) && s.projections.includes(`${def.name}.${sub}`);
-  return { finans: can("finans"), kisisel: can("kisisel") };
+export function visibleSubRows(s: SessionContext, def: ProjectionDef): { kisisel: boolean } {
+  return { kisisel: (def.root.subRows ?? []).includes("kisisel") && s.projections.includes(`${def.name}.kisisel`) };
 }
 
 export interface ListQuery {
@@ -34,8 +33,6 @@ export interface ListQuery {
   readonly durum?: string;
   /** Kimlik süzgeçleri (`LIST_ID_FILTERS` beyanı); beyansız projeksiyonda 400. */
   readonly kimlik?: Partial<Readonly<Record<ListIdFilterKey | ListMemberFilterKey, string>>>;
-  /** Fabrika anahtarı süzgeçleri (`LIST_KEY_FILTERS` beyanı); beyansız projeksiyonda 400. */
-  readonly anahtar?: Partial<Readonly<Record<ListKeyFilterKey, string>>>;
   /** Seçici araması (`LIST_SEARCH`teki projeksiyonlar); imleç aynı terimle devam eder. */
   readonly ara?: string;
   /** Virgüllü süzgeç değerleri (grup başına en çok bir). */
@@ -77,9 +74,7 @@ function searchFilters(name: string, q: ListQuery): Prisma.Sql[] {
 /** Literal ifade: `projection_rows_cari_idx` (`data->>'cariKartId'`) parametreli anahtarla eşleşmez. */
 const ID_FIELD_SQL: Readonly<Record<ListIdFilterKey, Prisma.Sql>> = {
   cariKartId: Prisma.sql`r.data->>'cariKartId'`,
-  cariHesapId: Prisma.sql`r.data->>'cariHesapId'`,
   siparisId: Prisma.sql`r.data->>'siparisId'`,
-  teklifId: Prisma.sql`r.data->>'teklifId'`,
   urunId: Prisma.sql`r.data->>'urunId'`,
 };
 
@@ -106,29 +101,10 @@ function idFilters(name: string, q: ListQuery): Prisma.Sql[] {
   return out;
 }
 
-/** Literal ifade (parametreli JSON yolu yok); değer fabrikanın anahtarıdır, bulut onu yalnız eşitler. */
-const KEY_FIELD_SQL: Readonly<Record<ListKeyFilterKey, Prisma.Sql>> = {
-  kategoriAnahtari: Prisma.sql`r.data->>'kategoriAnahtari'`,
-};
-
-/** Anahtar süzgeçleri: beyansız projeksiyonda ya da azamiden uzun değerde 400 (fail-closed; sessiz kırpma yok). */
-function keyFilters(name: string, q: ListQuery): Prisma.Sql[] {
-  const out: Prisma.Sql[] = [];
-  for (const key of LIST_KEY_FILTER_KEYS) {
-    const v = q.anahtar?.[key];
-    if (v === undefined) continue;
-    if (!LIST_KEY_FILTERS[key].includes(name)) throw badRequest(`Bu listede ${key} süzgeci yok`);
-    if (v.length > ANAHTAR_SUZGEC_AZAMI) throw badRequest(`${key} en çok ${ANAHTAR_SUZGEC_AZAMI} karakter`);
-    out.push(Prisma.sql`AND ${KEY_FIELD_SQL[key]} = ${v}`);
-  }
-  return out;
-}
-
 /** İstemcinin özellik kapısı: eski sunucu bu alanı göndermez, tanımadığı parametreyi de yok sayar. */
 export const LIST_CAPABILITIES: ListCapabilities = {
   kimlikSuzgecleri: LIST_ID_FILTERS,
   aranabilir: Object.keys(LIST_SEARCH),
-  anahtarSuzgecleri: LIST_KEY_FILTERS,
   siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])),
   uyelikSuzgecleri: Object.fromEntries(Object.entries(LIST_MEMBER_FILTERS).map(([k, p]) => [k, Object.keys(p)])),
 };
@@ -215,15 +191,13 @@ export interface Row {
   sort_at: Date;
   /** Yalnız sıralı listede: sıralama anahtarının metni (imleç için). */
   sort_key?: string | null;
-  finans: unknown;
   kisisel: unknown;
 }
 
-export function rowView(r: Row, sub: { finans: boolean; kisisel: boolean }): ProjectionRecord {
+export function rowView(r: Row, sub: { kisisel: boolean }): ProjectionRecord {
   return {
     id: r.record_id,
     kayit: r.data,
-    ...(sub.finans ? { finans: r.finans ?? null } : {}),
     ...(sub.kisisel ? { kisisel: r.kisisel ?? null } : {}),
     surum: r.version_at.toISOString(),
   };
@@ -234,9 +208,8 @@ export function selectRows(s: SessionContext, def: ProjectionDef, q: { readonly 
   const { where, limit, sort = null } = q;
   const key = sort ? Prisma.sql`, (${sortKeySql(sort.field, sort.kind)})::text AS sort_key` : Prisma.empty;
   return Prisma.sql`
-    SELECT r.record_id, r.data, r.version_at, r.sort_at, f.data AS finans, k.data AS kisisel${key}
+    SELECT r.record_id, r.data, r.version_at, r.sort_at, k.data AS kisisel${key}
       FROM projection_rows r
-      LEFT JOIN projection_rows f ON f.tesis_id = r.tesis_id AND f.projection = ${`${def.name}.finans`} AND f.record_id = r.record_id AND f.deleted_at IS NULL
       LEFT JOIN projection_rows k ON k.tesis_id = r.tesis_id AND k.projection = ${`${def.name}.kisisel`} AND k.record_id = r.record_id AND k.deleted_at IS NULL
      WHERE r.tesis_id = ${s.tesisId}::uuid AND r.projection = ${def.name} AND r.deleted_at IS NULL ${where}
      ORDER BY ${sortOrderSql(sort)}
@@ -246,7 +219,7 @@ export function selectRows(s: SessionContext, def: ProjectionDef, q: { readonly 
 export async function listProjection(ctx: CloudContext, s: SessionContext, name: string, q: ListQuery): Promise<Page<ProjectionRecord>> {
   const def = readableDef(s, name, "KAYIT");
   if (q.durum !== undefined && !/^[A-Z][A-Z0-9_]{0,39}$/.test(q.durum)) throw badRequest("durum biçimsiz");
-  const filters: Prisma.Sql[] = [...idFilters(def.name, q), ...keyFilters(def.name, q), ...searchFilters(def.name, q)];
+  const filters: Prisma.Sql[] = [...idFilters(def.name, q), ...searchFilters(def.name, q)];
   if (q.durum) filters.push(Prisma.sql`AND r.data->>'durum' = ${q.durum}`);
   const sort = sortSpec(def.name, q);
   if (q.cursor && sort) filters.push(sortCursorFilter(sort, decodeSortCursor(q.cursor)));
@@ -303,16 +276,14 @@ export async function getCustomerSummary(ctx: CloudContext, s: SessionContext, c
   return { cariKartId: id, son12AyBaslangic: row.baslangic, ozet: (row.ozet ?? null) as CustomerSummary | null, surum: row.version_at.toISOString() };
 }
 
-/** Ekranın üst şeridi: tesis adı · son eşitleme · sözleşme uyarısı · takılan ufuk · görülebilir projeksiyonlar · hizmet aşaması. */
+/** Ekranın üst şeridi: tesis adı · son eşitleme · sözleşme uyarısı · takılan ufuk · görülebilir projeksiyonlar · hizmet (hep ACIK). */
 export async function facilityStatus(ctx: CloudContext, s: SessionContext): Promise<FacilityStatus> {
   const nowMs = ctx.now();
-  const { facility, state, facts } = await withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => ({
+  const { facility, state } = await withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => ({
     facility: await tx.facility.findUnique({ where: { tesisId: s.tesisId } }),
     state: await tx.syncState.findUnique({ where: { tesisId: s.tesisId } }),
-    facts: await loadServiceFacts(tx, s.tesisId),
   }));
   const stuckMs = state ? nowMs - state.horizonChangedAt.getTime() : 0;
-  const service = facts ? serviceState(facts, nowMs) : { phase: "KAPALI" as const, endedAt: null, readOnlyUntil: null };
   return {
     tesis: { id: s.tesisId, ad: facility?.name ?? null, saklamaAy: facility?.retentionMonths ?? null },
     hesap: { id: s.accountId, ad: s.accountName, eposta: s.email, izinler: [...s.permissions].sort() },
@@ -326,7 +297,7 @@ export async function facilityStatus(ctx: CloudContext, s: SessionContext): Prom
           fabrikaSurumu: state.appVersion,
         }
       : null,
-    hizmet: { asama: service.phase, bitis: service.endedAt?.toISOString() ?? null, saltOkunurBitis: service.readOnlyUntil?.toISOString() ?? null },
+    hizmet: OPEN_SERVICE,
     liste: LIST_CAPABILITIES,
   };
 }

@@ -1,19 +1,23 @@
 # =============================================================================
-# ADNAN ŞAHİN PATRON BULUTU — VDS /opt/adnan/patron/compose.yaml bu dosyanın birebir kopyasıdır
+# ADNAN ŞAHİN PATRON BULUTU — VDS /opt/adnan/patron/compose.yaml bu dosyanın birebir kopyasıdır (tek tesis, yalnız API)
 # =============================================================================
-# Değerler sunucudaki 0600 `.env`ten (repoya GİRMEZ): POSTGRES_USER · POSTGRES_DB · POSTGRES_PASSWORD (göç rolü =
-# DB'nin önyükleme süper kullanıcısı) · PATRON_IMAJ (adnan-patron:<sha>) · ADNAN_AG_ALT_AGI (Caddy'nin ortak ağı).
-# Sırlar `sirlar/` altında dosya (root:10001 0440): uygulama_parolasi · esitleme_parolasi (yalnız harf/rakam) ·
-# tesis_rol_anahtari (32 bayt base64url) · ic_api_belirteci (BOŞ = satıcı iç API'si kapalı, KURULUM_KAYNAGI=kayit).
-# TOTP sarma anahtarı `anahtarlar/patron-totp.key` (10001 0600) önceden üretilir; birim salt okunur bağlanır.
+# `.env` (0600, repoya GİRMEZ; PAROLA TAŞIMAZ): POSTGRES_USER (önyükleme süper kullanıcısı; yalnız kapsayıcı içi
+# yerel soket — yedek) · POSTGRES_DB · PATRON_IMAJ (adnan-patron:<sha>) · ADNAN_AG_ALT_AGI (proxy/ projesinin ağı).
+# Sırlar `sirlar/` altında dosya (HEPSİ root:10001 0440; db ek grup 10001 ile yalnız kendine bağlanan ikisini okur),
+# hepsi yalnız harf/rakam:
+#   db_kok_parolasi · goc_parolasi (göç rolü patron_goc — süper kullanıcı DEĞİL, db-init/10-goc-rolu.sh kurar) ·
+#   uygulama_parolasi · esitleme_parolasi · tesis_rol_anahtari (giriş dizini = kimlik e-posta özeti HMAC anahtarı,
+#   32 bayt base64url; ad eski düzenden kalır) · isteğe bağlı guvenlik_telegram_bot_token / guvenlik_telegram_chat_id.
+# TOTP sarma anahtarı `anahtarlar/patron-totp.key` (10001 0600, 32 bayt base64url); birim salt okunur bağlanır — sunucu
+# onu ÜRETEMEZ, ilk açılıştan önce elle konur (README § İlk kurulum 1; yoksa api EROFS ile açılmaz).
 #
-# PORT YAYINI YOK: Docker yayınlanan portta ufw'yi atlar. Dışa yalnız Caddy (proxy/ projesi, 80/443) açıktır;
-# Caddy `adnan-ag` ağından `patron-api:4620`e konuşur. DB yalnız `ic` (internal) ağda.
+# PORT YAYINI YOK: Docker yayınlanan portta ufw'yi atlar. Dışa yalnız Caddy (../proxy projesi, 80/443) açıktır;
+# Caddy `adnan-ag` ağından `patron-api:4620`ye konuşur. DB yalnız `ic` (internal) ağda.
+# Her kapsayıcı: root DEĞİL · kök FS salt okunur · bütün yetenekler düşük · no-new-privileges · bellek/pid tavanı.
 #
-# Tek seferlik göç + rol hizası + tesis CLI'leri (elle, önce yedek):
+# Tek seferlik göç + rol hizası ve tesis CLI'si (elle, önce yedek):
 #   docker compose --profile goc run --rm goc
 #   docker compose --profile goc run --rm goc node dist-cli/scripts/tesis.js <komut> …
-#   docker compose --profile goc run --rm goc node dist-cli/scripts/tesis-db.js hazirla
 # =============================================================================
 name: patron
 
@@ -28,13 +32,21 @@ x-sertlik: &sertlik
 
 services:
   db:
-    image: postgres:17-alpine
+    <<: *sertlik
+    # Özetle sabit (çok mimarili dizin özeti, 2026-11-13); güncelleme = yeni özet + bakım penceresi.
+    image: postgres:17-alpine@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065
     container_name: patron-db
     restart: unless-stopped
-    env_file: .env
+    user: "70:70"
+    # Sır dosyaları root:10001 0440: db yalnız kendine bağlanan iki sırrı (kök + göç parolası) bu grupla okur.
+    group_add: ["10001"]
     environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER gerekli}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB gerekli}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_kok_parolasi
       TZ: Europe/Istanbul
       PGTZ: UTC
+    secrets: [db_kok_parolasi, goc_parolasi]
     command:
       - postgres
       - -c
@@ -55,8 +67,13 @@ services:
       - timezone=UTC
     shm_size: 256m
     mem_limit: 1536m
+    pids_limit: 200
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    tmpfs:
+      - /var/run/postgresql:uid=70,gid=70,mode=0775
+      - /tmp:mode=1777
     networks: [ic]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -80,11 +97,10 @@ services:
       PORT: "4620"
       BIND: 0.0.0.0
       DB_ADI: ${POSTGRES_DB:?POSTGRES_DB gerekli}
-      KURULUM_KAYNAGI: kayit
       # Cloudflare yok: Caddy (adnan-ag) iç vekildir; istemci adresi onun X-Forwarded-For son halkasından.
       IC_VEKIL_AGLARI: ${ADNAN_AG_ALT_AGI:?ADNAN_AG_ALT_AGI gerekli (adnan-ag alt ağı)}
       BILDIRIM_KIPI: kapali
-    secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari, ic_api_belirteci]
+    secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]
     volumes:
       - ./anahtarlar:/anahtarlar:ro
     tmpfs:
@@ -112,9 +128,10 @@ services:
     environment:
       PATRON_ROL: goc
       DB_ADI: ${POSTGRES_DB}
-      GOC_DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER gerekli}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}@patron-db:5432/${POSTGRES_DB}?schema=public
-    command: ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node dist-cli/scripts/db-rolleri.js && node dist-cli/scripts/tesis-db.js goc"]
-    secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]
+    command: ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node dist-cli/scripts/db-rolleri.js"]
+    secrets: [goc_parolasi, uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]
+    volumes:
+      - ./anahtarlar:/anahtarlar:ro
     tmpfs:
       - /tmp:mode=1777
     networks: [ic]
@@ -123,14 +140,16 @@ services:
     pids_limit: 100
 
 secrets:
+  db_kok_parolasi:
+    file: ./sirlar/db_kok_parolasi
+  goc_parolasi:
+    file: ./sirlar/goc_parolasi
   uygulama_parolasi:
     file: ./sirlar/uygulama_parolasi
   esitleme_parolasi:
     file: ./sirlar/esitleme_parolasi
   tesis_rol_anahtari:
     file: ./sirlar/tesis_rol_anahtari
-  ic_api_belirteci:
-    file: ./sirlar/ic_api_belirteci
 
 volumes:
   pgdata:

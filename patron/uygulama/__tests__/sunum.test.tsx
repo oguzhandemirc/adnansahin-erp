@@ -1,6 +1,6 @@
 // R1-BULUT bekçisi — v2 rapor sonucu (`RaporSunumu`) görünümü: §1 ana sayı birimli biçimlenir, "ölçülemedi" 0'a
 // çökmez · §2 kıyas yönü/rengi fabrikanın `yon`/`durum`undan (uygulama kıyas hesaplamaz) · §3 boş tablo "kayıt yok" ·
-// §4 ayrıntı ekranı v2 anahtarında sunumu, eski anahtarda jenerik görünümü çizer · §5 istek gövdesi (aralık adları,
+// §4 ayrıntı ekranı tanınan v2 anahtarında sunumu (Adnan'da liste boş), diğerlerinde jenerik görünümü çizer · §5 istek gövdesi (aralık adları,
 // v2'de süzgeç sorulmaz) ve eski uygulamanın tanımadığı anahtarı listelememesi.
 import { act, render, screen } from "@testing-library/react-native";
 import type React from "react";
@@ -133,13 +133,14 @@ describe("§4 ayrıntı ekranı", () => {
     id: "00000000-0000-4000-8000-000000000001", raporAnahtari, aile: raporAnahtari.split("/")[0], parametreler: {}, durum: "HAZIR", hataKodu: null,
     olusturulma: "2026-10-25T09:00:00Z", tamamlanma: "2026-10-25T09:01:00Z", sonuc: { veri, hesaplandi: "2026-10-25T09:01:00Z", kaynakUfuk: null },
   });
-  it("v2 anahtarı + sunum → SunumGorunumu", async () => {
+  it("Adnan'da v2 anahtarı yok: sunum zarfı gelse de jenerik görünüm (PRESENTATION_REPORT_KEYS boş)", async () => {
+    expect(reports.PRESENTATION_REPORT_KEYS).toEqual([]);
     mockParams.value = { id: "00000000-0000-4000-8000-000000000001" };
     mockApi.reportGet.mockResolvedValue(istek("sales/sevkiyat", sample()));
     render(<ReportDetail />);
     await flush();
-    expect(screen.getByTestId("sunum")).toBeTruthy();
-    expect(screen.queryByTestId("rapor-sonuc")).toBeNull();
+    expect(screen.getByTestId("rapor-sonuc")).toBeTruthy();
+    expect(screen.queryByTestId("sunum")).toBeNull();
   });
   it("eski anahtar → bugünkü jenerik görünüm (değişmedi)", async () => {
     mockParams.value = { id: "00000000-0000-4000-8000-000000000001" };
@@ -169,7 +170,11 @@ describe("§5 istek gövdesi ve tanınan anahtarlar", () => {
   it("her v2 anahtarı izin eşlemesinde; kişi adlı üretim akışı buluttan istenemez", () => {
     for (const k of reports.PRESENTATION_REPORT_KEYS) expect(Object.keys(reports.REPORT_KEY_PERMISSION)).toContain(k);
     expect(reports.requestable("production/uretim-akisi", ["bulut:rapor:oku", "bulut:uretim:oku"])).toBe(false);
-    expect(reports.requestable("sales/sevkiyat", ["bulut:rapor:oku", "bulut:sevkiyat:oku"])).toBe(true);
+    expect(reports.requestable("inventory/scorecard", ["bulut:rapor:oku", "bulut:stok:oku"])).toBe(true);
+    // Fabrikanın sunmadığı eski v2 / finans / dokuma anahtarları istenemez.
+    for (const k of ["sales/sevkiyat", "finance/alacaklar", "maliyet/karlilik", "dokuma/duruslar", "production/makine-duruslari"]) {
+      expect(reports.requestable(k, ["bulut:rapor:oku", "bulut:siparis:oku", "bulut:sevkiyat:oku", "bulut:uretim:oku", "bulut:stok:oku"])).toBe(false);
+    }
     // Uygulamanın tanımadığı (eşlemede olmayan) anahtar listede çizilmez — eski uygulama yeni anahtarı görmez.
     expect(reports.requestable("sales/gelecek-rapor", ["bulut:rapor:oku", "bulut:siparis:oku"])).toBe(false);
   });

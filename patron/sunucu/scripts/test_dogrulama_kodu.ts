@@ -1,7 +1,7 @@
 // =============================================================================
 // DOĞRULAMA KODU (TOTP) İSTEĞE BAĞLI + HESAP YAŞAM DÖNGÜSÜ BEKÇİSİ (kullanıcı kararı 2026-11-12), gerçek HTTP:
-//   §1 DB seddi: AKTİF kimlik parolasız · açık doğrulama sırsız/onaysız · AKTİF hesap kimliksiz DOĞAMAZ (CHECK); göç
-//      bugün sırrı + son adımı olan kimliği AÇIK bırakır (sessizce kapatma yok)
+//   §1 DB seddi: AKTİF kimlik parolasız · açık doğrulama sırsız/onaysız · AKTİF hesap kimliksiz DOĞAMAZ (CHECK) (eski
+//      göçün geri doldurma sondası §1d temel göçe squash ile kalktı: VDS sıfırdan kurulur, eski veri yok)
 //   §2 davet: incele → zayıf/yaygın parola RED → kabul hesabı HEMEN AKTİF eder (yanıtta sır yok) → kodsuz giriş →
 //      davet tek kullanımlık
 //   §3 giriş (doğrulaması AÇIK): kod yoksa YALNIZ doğru paroladan sonra `DOGRULAMA_KODU_GEREKLI`; yanlış parolada durum
@@ -14,17 +14,15 @@
 // Koşum: npx tsx scripts/test_dogrulama_kodu.ts
 // =============================================================================
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { LOGIN_FAILURE_FLOOR_MS } from "../src/auth/session.service";
 import { withCentral, withTesis } from "../src/lib/tenant";
 import { disableIdentityTwoFactor, inviteFacilityAdmin } from "../src/services/vendor-admin.service";
-import { PATRON_KOKU, TEST_PAROLASI, api, dogrulamaAc, girisYap, hesapKur, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, totpKodu, type Ortam, type TestHesabi } from "./lib/test-ortam";
+import { TEST_PAROLASI, api, dogrulamaAc, girisYap, hesapKur, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, totpKodu, type Ortam, type TestHesabi } from "./lib/test-ortam";
 
 const sed = (p: Promise<unknown>): Promise<string> => p.then(() => "gecti", (e: Error) => /violates check constraint "(\w+)"/.exec(e.message)?.[1] ?? e.message.slice(0, 80));
 
 async function dbSeddi(o: Ortam, tesisId: string): Promise<void> {
-  console.log("\n§1 DB seddi + göç");
+  console.log("\n§1 DB seddi");
   const ozet = () => o.anahtar.emailDigest(`sed-${randomUUID().slice(0, 8)}@ornek.test`);
   const parolasiz = await sed(withCentral(o.goc, {}, (tx) => tx.identity.create({ data: { emailDigest: ozet(), status: "AKTIF" } })));
   kontrol("§1a parolasız AKTİF kimlik DB'de doğamaz (merkez CHECK)", parolasiz === "identities_active_needs_password_check", parolasiz);
@@ -32,15 +30,6 @@ async function dbSeddi(o: Ortam, tesisId: string): Promise<void> {
   kontrol("§1b sırsız/onaysız AÇIK doğrulama DB'de doğamaz (merkez CHECK)", sirsiz === "identities_totp_enabled_check", sirsiz);
   const hesap = await sed(withTesis(o.goc, { tesisId }, (tx) => tx.account.create({ data: { tesisId, email: `sed-${randomUUID().slice(0, 8)}@ornek.test`, name: "Sed", permissions: [], status: "AKTIF" } })));
   kontrol("§1c kimliksiz AKTİF hesap DB'de doğamaz (tesis CHECK)", hesap === "accounts_active_needs_identity_check", hesap);
-  // Göçün geri doldurma ifadesi göç dosyasından okunup göç öncesi biçimdeki iki kimliğe uygulanır.
-  const goc = readFileSync(path.join(PATRON_KOKU, "prisma/migrations/20261112120000_dogrulama_istege_bagli/migration.sql"), "utf8");
-  const guncelle = /UPDATE "identities"[^;]+;/.exec(goc)?.[0] ?? "";
-  const eski = await withCentral(o.goc, {}, (tx) => tx.identity.create({ data: { emailDigest: ozet(), status: "AKTIF", passwordHash: "scrypt$x", totpSecretSealed: "muhur", totpLastStep: 1 } }));
-  const kapali = await withCentral(o.goc, {}, (tx) => tx.identity.create({ data: { emailDigest: ozet(), status: "AKTIF", passwordHash: "scrypt$x" } }));
-  await withCentral(o.goc, {}, (tx) => tx.$executeRawUnsafe(guncelle));
-  const [e2, k2] = await withCentral(o.goc, {}, async (tx) => [await tx.identity.findUnique({ where: { id: eski.id } }), await tx.identity.findUnique({ where: { id: kapali.id } })]);
-  kontrol("§1d ⭐ göç: bugün TOTP'si kurulu kimlik AÇIK kalır · sırsız kimlik kapalı", guncelle !== "" && e2?.totpEnabledAt !== null && k2?.totpEnabledAt === null);
-  await withCentral(o.goc, {}, (tx) => tx.identity.updateMany({ where: { id: { in: [eski.id, kapali.id] } }, data: { status: "PASIF", closedAt: new Date(), totpEnabledAt: null } }));
 }
 
 async function davetBolumu(o: Ortam, tesisId: string): Promise<void> {

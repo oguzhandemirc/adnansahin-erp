@@ -7,7 +7,7 @@ import { tabularNums, typography } from "../tokens";
 export interface DonutSlice {
   readonly label: string;
   readonly value: number;
-  /** Token'dan okunmuş renk (ör. `t.domain.finans.fg`, `t.status.iyi.fill`). */
+  /** Token'dan okunmuş renk (ör. `t.domain.stok.fg`, `t.status.iyi.fill`). */
   readonly color: string;
 }
 

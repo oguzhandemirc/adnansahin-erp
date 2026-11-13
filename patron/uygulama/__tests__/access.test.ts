@@ -7,10 +7,9 @@ describe("izin görünürlüğü (istemci yalnız gizler)", () => {
   it("izinsiz hesap yalnız pano + bildirimler + profil görür", () => {
     expect(keys(["bulut:oturum"])).toEqual(["pano", "bildirimler", "profil"]);
   });
-  it("satış şablonu: finans ve hesaplar YOK, gelen kutusu VAR", () => {
+  it("satış şablonu: hesaplar YOK, gelen kutusu VAR", () => {
     const k = keys(["bulut:oturum", "bulut:ozet:oku", "bulut:siparis:oku", "bulut:sevkiyat:oku", "bulut:uretim:oku", "bulut:stok:oku", "bulut:rapor:oku", "bulut:cari:oku", "bulut:siparis:yaz", "bulut:cari:yaz"]);
     expect(k).toContain("gelen-kutusu");
-    expect(k).not.toContain("finans");
     expect(k).not.toContain("hesaplar");
   });
   it("hesaplar yalnız tesis yöneticisine", () => {
@@ -20,7 +19,6 @@ describe("izin görünürlüğü (istemci yalnız gizler)", () => {
   it("pano kartı gereken izinlerin HEPSİNİ ister", () => {
     expect(visibleCards(["bulut:siparis:oku"]).map((c) => c.projection)).toEqual([]);
     expect(visibleCards(["bulut:ozet:oku", "bulut:siparis:oku"]).map((c) => c.projection)).toEqual(["ozet.siparis"]);
-    expect(visibleCards(["bulut:cari-bakiye:oku"]).map((c) => c.projection)).toEqual(["ozet-finans"]);
   });
 });
 

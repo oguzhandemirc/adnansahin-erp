@@ -1,7 +1,7 @@
 // =============================================================================
 // SAKLAMA İŞİ BEKÇİSİ (sözleşme §9.5) — tesis başına 3 · 13 · 25 ay · tümü, saat ENJEKTE:
-//   §1 OLGU: saklama tarihi süreyi aşan satır düşer; alt satırı (`.finans`) ve kalemi (+ kalemin alt
-//      satırı) KÖKLE BİRLİKTE düşer; süre içindeki satır ve BOYUT (tarihsiz) KALIR
+//   §1 OLGU: saklama tarihi süreyi aşan satır düşer; kalemi KÖKLE BİRLİKTE düşer; süre içindeki satır ve
+//      BOYUT (tarihsiz) KALIR (Adnan'da OLGU alt satırı yok — `.finans` kesildi)
 //   §2 "tümü" (NULL) tesisinde hiçbir OLGU budanmaz; başka tesisin ayarı bu tesisi ETKİLEMEZ
 //   §3 mezar taşı 7 günden sonra düşer, 7 günden gençse kalır
 //   §4 telemetri: süresi geçmiş nonce · eski paket makbuzu · kapanmış eski oturum · eski işlem makbuzu ·
@@ -28,16 +28,12 @@ async function fikstur(o: Ortam, k: TestKurulumu) {
   const simdi = o.saat.simdi();
   const eskiTarih = simdi - 200 * GUN;
   const yeniTarih = simdi - 20 * GUN;
-  const ids = { eskiSiparis: randomUUID(), yeniSiparis: randomUUID(), eskiKalem: randomUUID(), urun: randomUUID(), eskiFatura: randomUUID(), eskiFaturaKalem: randomUUID() };
+  const ids = { eskiSiparis: randomUUID(), yeniSiparis: randomUUID(), eskiKalem: randomUUID(), urun: randomUUID() };
   const ufuk = simdi - 60_000;
   const w = { t: iso(ufuk), k: "000000000001" };
   const kayitlar = [
     girdi("siparis", { yaz: [{ id: ids.eskiSiparis, siparisTarihi: iso(eskiTarih) }, { id: ids.yeniSiparis, siparisTarihi: iso(yeniTarih) }], yeni: w }),
-    girdi("siparis.finans", { yaz: [{ id: ids.eskiSiparis, tutar: "1.00" }, { id: ids.yeniSiparis, tutar: "2.00" }], yeni: w }),
     girdi("siparis-kalemi", { yaz: [{ id: ids.eskiKalem, siparisId: ids.eskiSiparis, olusturulma: iso(yeniTarih) }], yeni: w }),
-    girdi("siparis-kalemi.finans", { yaz: [{ id: ids.eskiKalem, birimFiyat: "3.00" }], yeni: w }),
-    girdi("fatura", { yaz: [{ id: ids.eskiFatura, tarih: iso(eskiTarih) }], yeni: w }),
-    girdi("fatura-kalemi", { yaz: [{ id: ids.eskiFaturaKalem, faturaId: ids.eskiFatura }], yeni: w }),
     girdi("urun", { yaz: [{ id: ids.urun, ad: "Eski ürün" }], yeni: w }),
   ];
   const r = await imzali(o, k, "/v1/esitle", { govde: paket(k, { ufuk: new Date(ufuk), kayitlar }) });
@@ -84,11 +80,8 @@ async function main(): Promise<void> {
     console.log("\n§1 OLGU saklaması (3 ay)");
     const x = a.ids;
     kontrol("§1a süreyi aşan sipariş düştü", !(await satirVar(o, uc.tesisId, "siparis", x.eskiSiparis)));
-    kontrol("§1b alt satırı (siparis.finans) KÖKLE düştü", !(await satirVar(o, uc.tesisId, "siparis.finans", x.eskiSiparis)));
     kontrol("§1c kalemi (kendi tarihi taze olsa da) KÖKLE düştü", !(await satirVar(o, uc.tesisId, "siparis-kalemi", x.eskiKalem)));
-    kontrol("§1d kalemin alt satırı da düştü", !(await satirVar(o, uc.tesisId, "siparis-kalemi.finans", x.eskiKalem)));
-    kontrol("§1e tarihsiz fatura kalemi faturayla düştü", !(await satirVar(o, uc.tesisId, "fatura-kalemi", x.eskiFaturaKalem)));
-    kontrol("§1f süre içindeki sipariş + alt satırı KALDI", (await satirVar(o, uc.tesisId, "siparis", x.yeniSiparis)) && (await satirVar(o, uc.tesisId, "siparis.finans", x.yeniSiparis)));
+    kontrol("§1f süre içindeki sipariş KALDI", await satirVar(o, uc.tesisId, "siparis", x.yeniSiparis));
     kontrol("§1g BOYUT (ürün) budanmaz", await satirVar(o, uc.tesisId, "urun", x.urun));
 
     console.log("\n§2 'tümü' tesisi");

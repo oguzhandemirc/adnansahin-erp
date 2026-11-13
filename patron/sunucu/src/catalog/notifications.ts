@@ -1,7 +1,6 @@
-// BİLDİRİM KATALOĞU — tür başına kural tek kaynak KODDADIR: kaynak projeksiyon, gereken izinler (HEPSİ),
-// finans sınıfı. Kural (açılışta ölçülür, tutarsız katalog sunucuyu KALDIRMAZ):
-//   · türün izinleri, kaynak projeksiyonun okuma izinlerini KAPSAR (bildirim, okunamayan veriyi sızdırmaz);
-//   · finans içerikli tür en az bir finans okuma izni ister (finans izni olmayan hesaba finans bildirimi gitmez).
+// BİLDİRİM KATALOĞU — tür başına kural tek kaynak KODDADIR: kaynak projeksiyon, gereken izinler (HEPSİ).
+// Kural (açılışta ölçülür, tutarsız katalog sunucuyu KALDIRMAZ): türün izinleri, kaynak projeksiyonun okuma
+// izinlerini KAPSAR (bildirim, okunamayan veriyi sızdırmaz). Adnan'da finans içerikli tür YOKTUR.
 // Ayar şeması (`SettingsSchema`) KATIDIR; tanınmayan anahtar 400. Saat dilimi fabrika günüyle aynı: İstanbul.
 import { z } from "zod";
 import { NOTIFICATION_KINDS, type NotificationKind, type NotificationSettings } from "../wire/api";
@@ -14,18 +13,7 @@ export interface KindRule {
   /** Olayın okunduğu projeksiyon (null = hesabın kendi kaydı / eşitleme durumu). */
   readonly source: string | null;
   readonly permissions: readonly CloudPermission[];
-  readonly finance: boolean;
 }
-
-/** Finans okuma izinleri — finans içerikli tür bunlardan en az birini ister. */
-export const FINANCE_PERMISSIONS: readonly CloudPermission[] = [
-  "bulut:cari-bakiye:oku",
-  "bulut:kasa:oku",
-  "bulut:cek:oku",
-  "bulut:fatura:oku",
-  "bulut:tahsilat:oku",
-  "bulut:fiyat:oku",
-];
 
 export const KIND_RULES: Readonly<Record<NotificationKind, KindRule>> = {
   "gelen-kutusu-sonucu": {
@@ -33,56 +21,30 @@ export const KIND_RULES: Readonly<Record<NotificationKind, KindRule>> = {
     description: "Gönderdiğiniz sipariş/cari fabrikada işlendi ya da reddedildi",
     source: null,
     permissions: ["bulut:oturum"],
-    finance: false,
   },
   "stok-esigi": {
     label: "Stok eşiği",
     description: "Ham ya da bitmiş stok belirlediğiniz miktarın altına indi (günde en çok bir kez)",
     source: "ozet.stok",
     permissions: ["bulut:ozet:oku", "bulut:stok:oku"],
-    finance: false,
   },
   "geciken-siparis": {
     label: "Geciken sipariş",
     description: "Termini geçmiş açık sipariş kalemi sayısı eşiği aştı (günde en çok bir kez)",
     source: "ozet.siparis",
     permissions: ["bulut:ozet:oku", "bulut:siparis:oku"],
-    finance: false,
   },
   "gunluk-uretim": {
     label: "Günlük üretim",
     description: "Belirlediğiniz saatte bugün tamamlanan üretim eşiğin altında",
     source: "ozet.uretim",
     permissions: ["bulut:ozet:oku", "bulut:uretim:oku"],
-    finance: false,
   },
   "esitleme-gecikti": {
     label: "Eşitleme gecikti",
     description: "Fabrikadan belirlediğiniz süre boyunca veri gelmedi",
     source: null,
     permissions: ["bulut:ozet:oku"],
-    finance: false,
-  },
-  "yedek-basarisiz": {
-    label: "Gece yedeği",
-    description: "Fabrikanın gece yedeği alınamadı ya da gecikti",
-    source: "saglik",
-    permissions: ["bulut:ozet:oku"],
-    finance: false,
-  },
-  "cek-vadesi": {
-    label: "Çek/senet vadesi",
-    description: "Vadesi geçmiş ya da yaklaşan çek/senet var (tutar içerir; günde en çok bir kez)",
-    source: "ozet-finans",
-    permissions: ["bulut:cari-bakiye:oku", "bulut:cek:oku"],
-    finance: true,
-  },
-  "cari-kilit": {
-    label: "Cari kilidi",
-    description: "Fabrikada bir cari kilitlendi ya da kilidi açıldı (her kilit için bir kez)",
-    source: "cari-hesap",
-    permissions: ["bulut:cari-bakiye:oku"],
-    finance: true,
   },
 };
 
@@ -98,7 +60,6 @@ export function catalogProblems(rules: Readonly<Record<string, KindRule>> = KIND
       if (!def) out.push(`${kind}: kaynak projeksiyon yok (${r.source})`);
       else for (const p of def.permissions) if (!r.permissions.includes(p)) out.push(`${kind}: kaynağın izni kapsanmıyor (${p})`);
     }
-    if (r.finance && !r.permissions.some((p) => FINANCE_PERMISSIONS.includes(p))) out.push(`${kind}: finans türü finans izni istemiyor`);
   }
   return out;
 }

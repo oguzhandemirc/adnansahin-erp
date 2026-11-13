@@ -33,7 +33,7 @@ export function ornekOturum(): FacilityStatus {
     esitleme: { sonEsitleme: once(0, 0.05), ufuk: once(0, 0.05), ufukTakildi: false, sozlesmeUyarisi: null, fabrikaSurumu: "örnek" },
     hizmet: { asama: "ACIK", bitis: null, saltOkunurBitis: null },
     liste: {
-      kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "cari-hesap", "iade"], siparisId: ["siparis-kalemi"] },
+      kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "iade"], siparisId: ["siparis-kalemi"] },
       aranabilir: ["cari-kart", "siparis", "sevkiyat", "is-emri"],
       siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])),
       uyelikSuzgecleri: { cariKartId: ["is-emri"], siparisId: ["is-emri"], fasonFirmaId: ["is-emri"] },
@@ -58,7 +58,6 @@ const fasonDonem = (carpan: number) => ({ acikMiktar: Math.round(4200 * carpan),
 export function ORNEK_ANLIK(): Record<string, unknown> {
   return {
     tesis: { saatDilimi: "Europe/Istanbul" },
-    saglik: { yedek: { hukum: "ok", yasSaat: 5 } },
     "ozet.siparis": { acikKalem: 24, acikMiktar: 52300, karsilanmaYuzde: 61.5 },
     "ozet.sevkiyat": { bugun: donem(0.12), buAy: donem(1), gecenAy: donem(1.4), son30Gun: donem(1.6) },
     "ozet.uretim": {
@@ -135,13 +134,10 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
     },
     "stok-kalem": ORNEK_STOK_KALEM(),
     "acik-siparis-karsilama": { ozet: { karsilanmaYuzde: 61.5, acikKalem: 24, gecikenKalem: 0 } },
-    // Finans aileleri de katalogda; örnek hesapta finans izni yok → listelenmez (izinle süzülür).
     "rapor-katalogu": {
       raporlar: [
-        ["sales/siparis-talep", "Sipariş talebi"], ["sales/sevkiyat", "Sevkiyat"], ["sales/acik-siparisler", "Açık siparişler"],
-        ["customer/scorecard", "Müşteri karnesi"], ["quality/kalite", "Kalite"], ["quality/kayip", "Kayıp ve fire"],
-        ["production/makine-duruslari", "Makine duruşları"], ["subcontract/fasoncular", "Fasoncular"],
-        ["inventory/depo", "Depo"], ["inventory/scorecard", "Stok karnesi"], ["finance/alacaklar", "Alacaklar"], ["finance/aging", "Alacak yaşlandırma"],
+        ["sales/order-intake", "Sipariş girişi"], ["sales/shipment-scorecard", "Sevkiyat karnesi"], ["customer/scorecard", "Müşteri karnesi"],
+        ["quality/scorecard", "Kalite karnesi"], ["subcontract/scorecard", "Fason karnesi"], ["inventory/scorecard", "Stok karnesi"],
       ].map(([anahtar, baslik]) => ({ anahtar, baslik, aile: anahtar!.split("/")[0], parametreler: ["dateFrom", "dateTo"] })),
     },
   };
@@ -207,14 +203,13 @@ export function ORNEK_GELEN() {
   };
 }
 
-/** Bildirim ayarları (örnek): tesis varsayılanı; finans türü yok (bu fabrikada finans buluta gitmez). */
+/** Bildirim ayarları (örnek): tesis varsayılanı. */
 export function ORNEK_BILDIRIM() {
   const turler = [
     ["gelen-kutusu-sonucu", "Gönderdiğim kayıt hata aldı", "Fabrika telefondan girilen kaydı kabul etmezse"],
     ["stok-esigi", "Stok eşiği", "Ham ya da bitmiş stok eşiğin altına inince"],
     ["gunluk-uretim", "Günlük üretim", "Günlük üretim eşiğin altında kalırsa"],
     ["esitleme-gecikti", "Fabrikadan veri gelmiyor", "Eşitleme belirlenen süreyi aşınca"],
-    ["yedek-basarisiz", "Yedek alınamadı", "Fabrika yedeği başarısız olursa"],
   ] as const;
   const etkin = {
     acik: true,
@@ -222,7 +217,7 @@ export function ORNEK_BILDIRIM() {
     sessiz: { acik: true, baslangic: "22:00", bitis: "07:00" },
     esikler: { hamStokAlt: 50000, bitmisStokAlt: null, gecikenKalemUst: null, gunlukUretimAlt: null, gunlukUretimSaati: 17, esitlemeGecikmeDk: 60 },
   };
-  return { etkin, kaynak: "TESIS", hesap: null, tesis: etkin, turler: turler.map(([tur, ad, aciklama]) => ({ tur, ad, aciklama, finans: false, izinli: true })), gonderim: "gercek", webPushAnahtari: null };
+  return { etkin, kaynak: "TESIS", hesap: null, tesis: etkin, turler: turler.map(([tur, ad, aciklama]) => ({ tur, ad, aciklama, izinli: true })), gonderim: "gercek", webPushAnahtari: null };
 }
 
 /** Hesaplar (örnek): yönetici + çalışan + davetli. */
@@ -234,7 +229,7 @@ export function ORNEK_HESAPLAR() {
   ];
 }
 
-const kayit = (id: string, k: Record<string, unknown>, finans?: Record<string, unknown>): ProjectionRecord => ({ id, kayit: k, ...(finans ? { finans } : {}), surum: once(0, 0.05) });
+const kayit = (id: string, k: Record<string, unknown>): ProjectionRecord => ({ id, kayit: k, surum: once(0, 0.05) });
 
 const CARILER = [
   { id: "c1", ad: "Örnek Tekstil A.Ş.", kod: "ORN-001", il: "Bursa" },

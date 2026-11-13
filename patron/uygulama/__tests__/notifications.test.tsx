@@ -51,15 +51,15 @@ describe("bildirime dokununca açılan yol", () => {
 
 describe("ayar ekranı görünümü", () => {
   const kinds: NotificationKindInfo[] = [
-    { tur: "geciken-siparis", ad: "Geciken sipariş", aciklama: "Termini geçmiş", finans: false, izinli: true },
-    { tur: "cek-vadesi", ad: "Çek/senet vadesi", aciklama: "Vadesi yaklaşan", finans: true, izinli: false },
+    { tur: "geciken-siparis", ad: "Geciken sipariş", aciklama: "Termini geçmiş", izinli: true },
+    { tur: "stok-esigi", ad: "Stok eşiği", aciklama: "Eşiğin altına inince", izinli: false },
   ];
   it("izni yetmeyen tür açıklanır ve kapatılamaz/açılamaz; ana anahtar formu değiştirir", () => {
     const onChange = jest.fn();
     render(<NotificationSettingsForm form={toForm(SETTINGS)} kinds={kinds} onChange={onChange} dueDates />);
-    expect(screen.getByText("Çek/senet vadesi (finans)")).toBeTruthy();
+    expect(screen.getByText("Stok eşiği")).toBeTruthy();
     expect(screen.getByText("Yetkiniz bu bildirimi almaya yetmiyor")).toBeTruthy();
-    expect(screen.getByTestId("tur-cek-vadesi").props.disabled).toBe(true);
+    expect(screen.getByTestId("tur-stok-esigi").props.disabled).toBe(true);
     expect(screen.getByTestId("tur-geciken-siparis").props.disabled).toBe(false);
     fireEvent(screen.getByTestId("bildirim-ana"), "valueChange", false);
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ acik: false }));
@@ -72,7 +72,7 @@ describe("ayar ekranı görünümü", () => {
     render(<NotificationSettingsForm form={toForm(SETTINGS)} kinds={kinds} onChange={jest.fn()} />);
     expect(screen.queryByTestId("tur-geciken-siparis")).toBeNull();
     expect(screen.queryByText(/Geciken sipariş kalemi/)).toBeNull();
-    expect(screen.getByText("Çek/senet vadesi (finans)")).toBeTruthy();
+    expect(screen.getByText("Stok eşiği")).toBeTruthy();
   });
   it("termin türevi işareti yalnız sayı gelince doğar", () => {
     expect(sendsDueDateDerivatives({ acikKalem: 4 })).toBe(false);

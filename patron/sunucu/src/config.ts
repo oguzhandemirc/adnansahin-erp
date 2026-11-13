@@ -1,7 +1,6 @@
 // Patron bulutu yapılandırması — ortamdan okunur, Zod ile doğrulanır; geçersiz değer açılışı
 // DURDURUR (fail-closed). Üç DB URL'i üç ayrı roldür: göç (tablo sahibi; yalnız migration/CLI),
-// uygulama (hesap API'si; projeksiyona YAZAMAZ) ve eşitleme (fabrika kanalı). Sır (iç API belirteci,
-// DB parolaları) günlüğe yazılmaz.
+// uygulama (hesap API'si; projeksiyona YAZAMAZ) ve eşitleme (fabrika kanalı). Sır (DB parolaları) günlüğe yazılmaz.
 import { isIPv4, isIPv6 } from "node:net";
 import path from "node:path";
 import { z } from "zod";
@@ -33,18 +32,8 @@ const EnvSchema = z
     BIND: z.string().min(1).default("127.0.0.1"),
     /** TOTP sırlarının sarma anahtarı burada (`patron-totp.key`, 0600) — DB'de DEĞİL. */
     ANAHTAR_DIZINI: z.string().min(1).default("anahtarlar"),
-    /** Tesis DB rol parolalarının + giriş dizini özetinin anahtarı (üretim sırrı, salt okunur); yoksa `ANAHTAR_DIZINI/patron-tesis-db.key`. */
+    /** Giriş dizini e-posta özetinin anahtarı (üretim sırrı, salt okunur); yoksa `ANAHTAR_DIZINI/patron-tesis-db.key`. */
     TESIS_ROL_ANAHTARI_DOSYASI: z.preprocess((v) => (v === "" ? undefined : v), z.string().min(1).optional()),
-    /** Web sürümünün derlenmiş çıktısı (`expo export --platform web`); verilirse `/` altında sunulur, yoksa yalnız API. */
-    PATRON_WEB_DIZINI: z.string().min(1).optional(),
-    /** Kurulum kaydının kaynağı: `kayit` (satıcı CLI'siyle DB'ye yazılmış) · `satici` (iç API + önbellek). */
-    KURULUM_KAYNAGI: z.enum(["kayit", "satici"]).default("kayit"),
-    SATICI_IC_API_URL: z.url().optional(),
-    SATICI_IC_API_BELIRTECI: z.string().min(32).optional(),
-    /** Satıcı iç API önbelleğinin TAZELİK süresi; süre dolunca yeniden sorulur, ulaşılamazsa bayat kayıt kullanılır. */
-    KURULUM_ONBELLEK_DK: positiveInt(1, 1440).default(5),
-    /** Önbellekte OLMAYAN kurulum kimliği için satıcıya dakikada en çok bu kadar soru (rastgele kimlik seli iç API yükü üretmesin). */
-    KURULUM_SORGU_BUTCE_DK: positiveInt(1, 10_000).default(60),
     /** İstemci adresini taşıyan vekil başlığı; YALNIZ güvenilen kenar ağından gelen bağlantıda okunur. */
     VEKIL_IP_BASLIGI: z.string().min(1).optional(),
     /** Başlığa güvenilen kenar vekilleri (CIDR, virgüllü); verilmezse yerleşik Cloudflare aralıkları. */
@@ -57,6 +46,10 @@ const EnvSchema = z
     GIRIS_ESIGI: positiveInt(3, 50).default(5),
     KILIT_DK: positiveInt(1, 1440).default(15),
     GIRIS_HIZ_DK: positiveInt(1, 1000).default(20),
+    /** Hesap API'si (/api/*) geneli IP başına dakikalık sınır (O8; telefon kullanımı dakikada onlarca istektir). */
+    API_HIZ_DK: positiveInt(30, 100000).default(600),
+    /** IP başına dakikada geçersiz Bearer çözümlemesi; aşılınca o IP'nin oturumlu istekleri DB'ye inmeden 429. */
+    OTURUM_RED_HIZ_DK: positiveInt(5, 10000).default(30),
     DAVET_GECERLILIK_SAAT: positiveInt(1, 720).default(72),
     /** Fabrika kanalı (/v1/*) IP başına dakikalık hız sınırı. */
     V1_HIZ_DK: positiveInt(10, 100000).default(600),
@@ -90,9 +83,6 @@ const EnvSchema = z
     if (c.BILDIRIM_KIPI === "gercek" && !c.BILDIRIM_VAPID_KONU) {
       ctx.addIssue({ code: "custom", message: "BILDIRIM_KIPI=gercek için BILDIRIM_VAPID_KONU zorunlu", path: ["BILDIRIM_VAPID_KONU"] });
     }
-    if (c.KURULUM_KAYNAGI === "satici" && (!c.SATICI_IC_API_URL || !c.SATICI_IC_API_BELIRTECI)) {
-      ctx.addIssue({ code: "custom", message: "KURULUM_KAYNAGI=satici için SATICI_IC_API_URL ve SATICI_IC_API_BELIRTECI zorunlu", path: ["KURULUM_KAYNAGI"] });
-    }
   });
 
 export type CloudConfig = Readonly<z.infer<typeof EnvSchema>>;
@@ -103,6 +93,5 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd: string = p
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Patron bulutu yapılandırması geçersiz — ${issues}`);
   }
-  const web = parsed.data.PATRON_WEB_DIZINI;
-  return Object.freeze({ ...parsed.data, ANAHTAR_DIZINI: path.resolve(cwd, parsed.data.ANAHTAR_DIZINI), PATRON_WEB_DIZINI: web ? path.resolve(cwd, web) : undefined });
+  return Object.freeze({ ...parsed.data, ANAHTAR_DIZINI: path.resolve(cwd, parsed.data.ANAHTAR_DIZINI) });
 }

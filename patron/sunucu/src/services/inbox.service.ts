@@ -74,7 +74,7 @@ export async function createInboxMessage(ctx: CloudContext, s: SessionContext, i
   if (!s.permissions.has(INBOX_WRITE_PERMISSION[input.tur])) throw forbidden("Bu mesaj türünü yazma yetkiniz yok");
   const body = parseBody(input.tur, input.govde);
   const nowMs = ctx.now();
-  await assertFacilityCloudOpen(ctx, s.tesisId, nowMs);
+  await assertFacilityCloudOpen(ctx, s.tesisId);
   const result = await executeWrite(ctx.app, {
     tesisId: s.tesisId,
     accountId: s.accountId,
