@@ -13,13 +13,17 @@
 //   9.  pasif kullanıcının PIN'i çalışmaz
 // =============================================================================
 import prisma from "../src/lib/prisma";
-import { AuthService } from "../src/services/auth.service";
+import { AuthService, type LoginContext } from "../src/services/auth.service";
 import { PermissionManagementService } from "../src/services/permission-management.service";
 import {
   systemSettingService,
   SETTING_KEYS,
   readLoginMethods,
 } from "../src/services/system-setting.service";
+
+// PIN/kart girişi yalnız onaylı saha cihazından (D3 kapısı, `test_pin_field_only`); bu bekçi
+// yöntem/kimlik davranışını sınar, o yüzden çağrılar onaylı bir tablet bağlamıyla yapılır.
+const SAHA: LoginContext = { clientType: "mobile", fieldDevice: { kind: "TABLET" } };
 
 let pass = 0, fail = 0;
 function check(label: string, ok: boolean, extra = "") {
@@ -82,7 +86,7 @@ async function main() {
 
     // 4) pin etkin değilken login-quick-pin 403
     await expectErr("pin etkin değilken 403", "Hızlı PIN ile giriş kapalı", () =>
-      AuthService.loginWithQuickPin("123456"));
+      AuthService.loginWithQuickPin("123456", SAHA));
 
     // 5) elle atama + benzersizlik
     const setRes = await AuthService.setQuickPin(u1.id, { pin: "424242" }, admin.id);
@@ -97,18 +101,18 @@ async function main() {
     // 7) pin etkinken giriş
     await systemSettingService.setFeatureFlags(
       { loginMethods: { enabled: ["list", "pin"], primary: "pin" } }, admin.id);
-    const login = await AuthService.loginWithQuickPin("424242");
+    const login = await AuthService.loginWithQuickPin("424242", SAHA);
     check("doğru PIN → doğru kullanıcı", login.user.username === u1.username);
-    await expectErr("yanlış PIN 401", "tanınmadı", () => AuthService.loginWithQuickPin("000001"));
+    await expectErr("yanlış PIN 401", "tanınmadı", () => AuthService.loginWithQuickPin("000001", SAHA));
 
     // 8) clear → giriş kapanır
     await AuthService.setQuickPin(u1.id, { clear: true }, admin.id);
-    await expectErr("PIN kaldırılınca 401", "tanınmadı", () => AuthService.loginWithQuickPin("424242"));
+    await expectErr("PIN kaldırılınca 401", "tanınmadı", () => AuthService.loginWithQuickPin("424242", SAHA));
 
     // 9) pasif kullanıcının PIN'i çalışmaz
     await AuthService.setQuickPin(u1.id, { pin: "515151" }, admin.id);
     await prisma.user.update({ where: { id: u1.id }, data: { isActive: false } });
-    await expectErr("pasif kullanıcı PIN'i 401", "tanınmadı", () => AuthService.loginWithQuickPin("515151"));
+    await expectErr("pasif kullanıcı PIN'i 401", "tanınmadı", () => AuthService.loginWithQuickPin("515151", SAHA));
 
     // 10) getUserCredentials — panel okuması (PIN + kart kodu geri okunabilir)
     const cred = await AuthService.getUserCredentials(u1.id);

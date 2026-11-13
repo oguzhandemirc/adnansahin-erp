@@ -285,6 +285,8 @@ export class AuthController {
       confirmKick: body.confirmKick,
       isRemote: req.isRemote === true,
       clientVersion: resolveClientVersion(req),
+      // Saha kapısı: yalnız onaylı + aktif cihaz kaydı (device.middleware) — gövdeden değil.
+      fieldDevice: req.device ? { kind: req.device.kind } : null,
     };
     try {
       const result = await AuthService.loginWithCard(body.cardCode, ctx);
@@ -369,6 +371,8 @@ export class AuthController {
       confirmKick: body.confirmKick,
       isRemote: req.isRemote === true,
       clientVersion: resolveClientVersion(req),
+      // Saha kapısı: yalnız onaylı + aktif cihaz kaydı (device.middleware) — gövdeden değil.
+      fieldDevice: req.device ? { kind: req.device.kind } : null,
     };
     try {
       const result = await AuthService.loginWithQuickPin(body.pin, ctx);

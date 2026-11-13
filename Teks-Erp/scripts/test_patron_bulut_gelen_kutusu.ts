@@ -255,8 +255,8 @@ async function main(): Promise<void> {
       try { await f(); return "TOKEN"; } catch (e) { return String((e as { statusCode?: number }).statusCode ?? (e as Error).message); }
     };
     const sPw = await status(() => AuthService.login(PATRON_CLOUD_USERNAME, knownPw));
-    const sPin = await status(() => AuthService.loginWithQuickPin(pin));
-    const sCard = await status(() => AuthService.loginWithCard(`TEKSU:${actor}:${cardToken}`));
+    const sPin = await status(() => AuthService.loginWithQuickPin(pin, { fieldDevice: { kind: "TABLET" } }));
+    const sCard = await status(() => AuthService.loginWithCard(`TEKSU:${actor}:${cardToken}`, { fieldDevice: { kind: "TABLET" } }));
     check("⭐ parola bilinse de giriş 401", sPw === "401", sPw);
     check("⭐ PIN verilse de giriş 401", sPin === "401", sPin);
     check("⭐ kart verilse de giriş 401", sCard === "401", sCard);

@@ -10,8 +10,12 @@
 //   6. PIN girişi "card" modunda da çalışır (fallback)
 // =============================================================================
 import prisma from "../src/lib/prisma";
-import { AuthService } from "../src/services/auth.service";
+import { AuthService, type LoginContext } from "../src/services/auth.service";
 import { systemSettingService, SETTING_KEYS } from "../src/services/system-setting.service";
+
+// PIN/kart girişi yalnız onaylı saha cihazından (D3 kapısı, `test_pin_field_only`); bu bekçi
+// yöntem/kimlik davranışını sınar, o yüzden çağrılar onaylı bir tablet bağlamıyla yapılır.
+const SAHA: LoginContext = { clientType: "mobile", fieldDevice: { kind: "TABLET" } };
 
 let pass = 0, fail = 0;
 function check(label: string, ok: boolean, extra = "") {
@@ -59,7 +63,7 @@ async function main() {
       where: { key: { in: [SETTING_KEYS.AUTH_LOGIN_METHODS, SETTING_KEYS.AUTH_LOGIN_MODE] } },
     });
     await expectErr("card etkin değilken login-card 403", "Kartla giriş kapalı", () =>
-      AuthService.loginWithCard("TEKSU:x:y"));
+      AuthService.loginWithCard("TEKSU:x:y", SAHA));
 
     // 2) kart üret
     const issued = await AuthService.rotateCardToken(testUser.id, admin.id);
@@ -75,20 +79,20 @@ async function main() {
       { loginMethods: { enabled: ["card", "list"], primary: "card" } },
       admin.id,
     );
-    const login1 = await AuthService.loginWithCard(issued.cardCode);
+    const login1 = await AuthService.loginWithCard(issued.cardCode, SAHA);
     check("kartla giriş → JWT + doğru kullanıcı", !!login1.token && login1.user.username === testUser.username);
 
     // 4) rotasyon → eski kart ölür, yeni çalışır
     const rotated = await AuthService.rotateCardToken(testUser.id, admin.id);
     check("rotasyonda rotated=true", rotated.rotated === true);
     await expectErr("eski kart rotasyon sonrası 401", "iptal", () =>
-      AuthService.loginWithCard(issued.cardCode));
-    const login2 = await AuthService.loginWithCard(rotated.cardCode);
+      AuthService.loginWithCard(issued.cardCode, SAHA));
+    const login2 = await AuthService.loginWithCard(rotated.cardCode, SAHA);
     check("yeni kart çalışır", login2.user.userId === testUser.id);
 
     // 5) bozuk format + pasif kullanıcı
     await expectErr("bozuk format 401", "Geçersiz personel kartı", () =>
-      AuthService.loginWithCard("BOZUK-KART"));
+      AuthService.loginWithCard("BOZUK-KART", SAHA));
     await expectErr("pasif kullanıcıya kart üretilemez", "bulunamadı veya pasif", () =>
       AuthService.rotateCardToken(passiveUser.id, admin.id));
 

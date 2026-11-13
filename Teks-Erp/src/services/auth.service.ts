@@ -64,7 +64,18 @@ export interface LoginContext {
    * hangi sürümler görülüyor" sorusunu cevaplayan bir GÖZLEMdir.
    */
   clientVersion?: string | null;
+  /**
+   * İsteği yapan ONAYLI + AKTİF cihaz kaydı (`req.device`, `device.middleware`
+   * `x-device-id`den yalnız APPROVED + isActive satır varsa doldurur). ⚠️ Gövdeden
+   * DEĞİL — istemci uyduramaz (deviceId'yi bilse bile satırın onaylı olması gerekir).
+   * PIN/kart girişinin saha kapısı buna bakar; yoksa `null`/`undefined`.
+   */
+  fieldDevice?: { kind: string } | null;
 }
+
+/** PIN/kart girişi yalnız saha cihazından: kapının ret kodları (`details.code`). */
+export const PIN_FIELD_ONLY = "PIN_FIELD_ONLY";
+export const CARD_FIELD_ONLY = "CARD_FIELD_ONLY";
 
 /** Gövdeden gelen istemci türü. `undefined` = mobil (tarihsel varsayılan). */
 export type LoginClientType = "electron" | "mobile" | "web";
@@ -233,6 +244,7 @@ export class AuthService {
     ctx?: LoginContext
   ): Promise<{ token: string; user: JwtPayload }> {
     this.assertNotRemote(ctx);
+    this.assertFieldDevice(ctx, "card");
     const methods = await readLoginMethods();
     if (!methods.enabled.includes("card")) {
       throw AppError.forbidden(
@@ -261,6 +273,7 @@ export class AuthService {
     ctx?: LoginContext
   ): Promise<{ token: string; user: JwtPayload }> {
     this.assertNotRemote(ctx);
+    this.assertFieldDevice(ctx, "pin");
     const methods = await readLoginMethods();
     if (!methods.enabled.includes("pin")) {
       throw AppError.forbidden(
@@ -449,6 +462,29 @@ export class AuthService {
    */
   private static assertNotRemote(ctx?: LoginContext): void {
     if (ctx?.isRemote) throw AppError.notFound("Kaynak bulunamadı");
+  }
+
+  /**
+   * PIN/kart girişi YALNIZ onaylı + aktif SAHA cihazından (tablet/telefon).
+   *
+   * PIN ve kart kodu tek başına kimliktir; panelden (ya da cihazsız bir betikten)
+   * denenebilseydi 6 haneli uzay masaüstünden taranabilirdi. Ret koşulları:
+   * masaüstü `clientType` (electron/web) · onaylı cihaz kaydı yok
+   * (`fieldDevice` boş) · cihaz türü DESKTOP. ⚠️ PIN/kart DB'ye sorulmadan ÖNCE
+   * çalışır — panel yanıtı PIN'in var olup olmadığını sızdırmaz (kâhin yok); 403
+   * olduğu için deneme kilidine sayılmaz. Mesaj sabittir, PIN/kart değeri taşımaz.
+   * Tablet 1.0.8+ her istekte `x-device-id` gönderir ve açılışta announce eder
+   * (eşleştirme kapalıyken APPROVED doğar) — mevcut saha cihazları geçer.
+   */
+  private static assertFieldDevice(ctx: LoginContext | undefined, method: "pin" | "card"): void {
+    const kind = ctx?.fieldDevice?.kind;
+    if (!isDesktopClient(ctx?.clientType) && kind && kind !== "DESKTOP") return;
+    throw AppError.forbidden(
+      method === "pin"
+        ? "Hızlı PIN ile giriş yalnız onaylı saha cihazından (tablet/telefon) yapılabilir — kullanıcı adı ve parolayla girin"
+        : "Kartla giriş yalnız onaylı saha cihazından (tablet/telefon) yapılabilir — kullanıcı adı ve parolayla girin",
+      { code: method === "pin" ? PIN_FIELD_ONLY : CARD_FIELD_ONLY },
+    );
   }
 
   private static async issueToken(

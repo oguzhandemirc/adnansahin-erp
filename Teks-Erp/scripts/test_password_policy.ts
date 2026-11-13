@@ -25,7 +25,7 @@
 //   S2 helper'da `isCommon` kontrolü kapatıldı — kırmızı.
 //   S3 `resetUserPassword`da kural atlandı — kırmızı.
 // =============================================================================
-import { readFileSync, readdirSync, statSync } from "fs";
+import { readFileSync } from "fs";
 import { join, relative } from "path";
 import prisma, { pool } from "../src/lib/prisma";
 import {
@@ -36,6 +36,7 @@ import {
 import { PermissionManagementService } from "../src/services/permission-management.service";
 import { AppError } from "../src/utils/app-error";
 import { hedefDbEngeli } from "./lib/hedef-db-kapisi";
+import { walkTs } from "./lib/ts-tarama";
 
 let pass = 0;
 let fail = 0;
@@ -51,16 +52,6 @@ function check(label: string, ok: boolean, extra = ""): void {
 
 const ROOT = join(__dirname, "..");
 const SRC = join(ROOT, "src");
-
-function walkTs(dir: string): string[] {
-  const out: string[] = [];
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name);
-    if (statSync(p).isDirectory()) out.push(...walkTs(p));
-    else if (p.endsWith(".ts")) out.push(p);
-  }
-  return out;
-}
 
 // ── §1 SAF KURAL ─────────────────────────────────────────────────────────────
 function section1(): void {

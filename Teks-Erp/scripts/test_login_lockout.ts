@@ -44,7 +44,10 @@ async function invoke(
   handler: (req: Request, res: Response, next: NextFunction) => Promise<void>,
   opts: { body: unknown; ip: string },
 ): Promise<{ statusCode?: number; jsonBody?: unknown; nextError?: unknown }> {
-  const req = { body: opts.body, ip: opts.ip, headers: {}, device: undefined } as unknown as Request;
+  // PIN/kart girişi yalnız onaylı saha cihazından (`test_pin_field_only`): sahte istek onaylı
+  // bir tablet taşır; kova anahtarları IP önekli kaldığı için senaryolar birbirine karışmaz.
+  const device = { id: "tst-lockout", deviceId: "tst-lockout-tablet", name: "TST", machineId: null, kind: "TABLET" };
+  const req = { body: opts.body, ip: opts.ip, headers: {}, device } as unknown as Request;
   let statusCode: number | undefined;
   let jsonBody: unknown;
   const res = {
