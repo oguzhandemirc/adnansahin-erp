@@ -34,8 +34,6 @@ const EnvSchema = z
     ANAHTAR_DIZINI: z.string().min(1).default("anahtarlar"),
     /** Tesis DB rol parolalarının + giriş dizini özetinin anahtarı (üretim sırrı, salt okunur); yoksa `ANAHTAR_DIZINI/patron-tesis-db.key`. */
     TESIS_ROL_ANAHTARI_DOSYASI: z.preprocess((v) => (v === "" ? undefined : v), z.string().min(1).optional()),
-    /** Web sürümünün derlenmiş çıktısı (`expo export --platform web`); verilirse `/` altında sunulur, yoksa yalnız API. */
-    PATRON_WEB_DIZINI: z.string().min(1).optional(),
     /** İstemci adresini taşıyan vekil başlığı; YALNIZ güvenilen kenar ağından gelen bağlantıda okunur. */
     VEKIL_IP_BASLIGI: z.string().min(1).optional(),
     /** Başlığa güvenilen kenar vekilleri (CIDR, virgüllü); verilmezse yerleşik Cloudflare aralıkları. */
@@ -91,6 +89,5 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd: string = p
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Patron bulutu yapılandırması geçersiz — ${issues}`);
   }
-  const web = parsed.data.PATRON_WEB_DIZINI;
-  return Object.freeze({ ...parsed.data, ANAHTAR_DIZINI: path.resolve(cwd, parsed.data.ANAHTAR_DIZINI), PATRON_WEB_DIZINI: web ? path.resolve(cwd, web) : undefined });
+  return Object.freeze({ ...parsed.data, ANAHTAR_DIZINI: path.resolve(cwd, parsed.data.ANAHTAR_DIZINI) });
 }

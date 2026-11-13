@@ -59,7 +59,7 @@ async function main(): Promise<void> {
   };
   const server = http.createServer(createApp(ctx));
   const address = await listen(server, config.PORT, config.BIND);
-  console.log(`PATRON_DINLIYOR port=${address.port} web=${config.PATRON_WEB_DIZINI ? "acik" : "yok"}`);
+  console.log(`PATRON_DINLIYOR port=${address.port}`);
 
   const maintenance = new MaintenanceScheduler(ctx);
   maintenance.start();
