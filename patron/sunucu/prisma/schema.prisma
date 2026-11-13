@@ -239,14 +239,19 @@ model Account {
 /// Hesabın ikinci etkeni — UYGULAMANIN MALI (eşitleme rolü HİÇ erişemez): TOTP sırrı SecretBox ile mühürlü (AAD =
 /// hesap id), son adım, açılış anı; `bulut_kilidi` = bulutta acil kilit (fabrika kapalıyken CLI). CHECK: açık TOTP ⇒ sır + adım.
 model AccountFactor {
-  accountId        String    @id @map("account_id") @db.Uuid
-  tesisId          String    @map("tesis_id") @db.Uuid
-  totpSecretSealed String?   @map("totp_secret_sealed") @db.VarChar(300)
-  totpLastStep     Int?      @map("totp_last_step")
-  totpEnabledAt    DateTime? @map("totp_enabled_at") @db.Timestamptz
-  cloudLock        Boolean   @default(false) @map("bulut_kilidi")
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  accountId          String    @id @map("account_id") @db.Uuid
+  tesisId            String    @map("tesis_id") @db.Uuid
+  totpSecretSealed   String?   @map("totp_secret_sealed") @db.VarChar(300)
+  totpLastStep       Int?      @map("totp_last_step")
+  totpEnabledAt      DateTime? @map("totp_enabled_at") @db.Timestamptz
+  cloudLock          Boolean   @default(false) @map("bulut_kilidi")
+  /// Kaba kuvvet tavanı (C3): `failureWindowStart`tan bu yana başarısız giriş sayısı (sabit 24 sa pencere; tavanı
+  /// aşınca sayaç sıfırlanır ve `tempLockUntil` dolar). Açık oturumlara dokunmaz (uzaktan oturum düşürme olmasın).
+  failureCount       Int       @default(0) @map("basarisiz_sayisi")
+  failureWindowStart DateTime? @map("basarisiz_pencere") @db.Timestamptz
+  tempLockUntil      DateTime? @map("gecici_kilit_bitis") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
@@ -528,20 +533,22 @@ model PackageReceipt {
 
 /// Tesisin eşitleme durumu ("son eşitleme" damgası, sözleşme uyarısı, takılan ufuk).
 model SyncState {
-  tesisId            String   @id @map("tesis_id") @db.Uuid
-  lastPackageAt      DateTime @map("last_package_at") @db.Timestamptz
-  lastInstallationId String   @map("last_installation_id") @db.Uuid
-  contractVersion    Int      @map("contract_version")
-  appVersion         String?  @map("app_version") @db.VarChar(40)
-  horizon            DateTime @map("horizon") @db.Timestamptz
-  horizonChangedAt   DateTime @map("horizon_changed_at") @db.Timestamptz
-  contractWarning    String?  @map("contract_warning") @db.VarChar(40)
+  tesisId            String    @id @map("tesis_id") @db.Uuid
+  lastPackageAt      DateTime  @map("last_package_at") @db.Timestamptz
+  lastInstallationId String    @map("last_installation_id") @db.Uuid
+  contractVersion    Int       @map("contract_version")
+  appVersion         String?   @map("app_version") @db.VarChar(40)
+  horizon            DateTime  @map("horizon") @db.Timestamptz
+  horizonChangedAt   DateTime  @map("horizon_changed_at") @db.Timestamptz
+  contractWarning    String?   @map("contract_warning") @db.VarChar(40)
   /// Değişim sayacı (iş hesabı DEĞİL): kabul edilen veriyle biten her pakette +1; uzun yoklamanın `sayac`ı.
-  changeCounter      BigInt   @default(0) @map("change_counter")
+  changeCounter      BigInt    @default(0) @map("change_counter")
   /// Son artıştaki projeksiyon adları (tekil); içerik taşımaz, okuyan hesabın izniyle süzülür.
-  changedProjections Json     @default("[]") @map("changed_projections")
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  changedProjections Json      @default("[]") @map("changed_projections")
+  /// Fabrikanın son kullanıcı kümesi gönderimi (`POST /v1/kullanicilar`, C3 bayatlık tavanı). NULL ⇒ giriş yok.
+  usersPushedAt      DateTime? @map("kullanici_son_esitleme") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("sync_state")
 }

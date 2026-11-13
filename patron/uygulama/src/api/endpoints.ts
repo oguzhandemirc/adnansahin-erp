@@ -19,6 +19,7 @@ import type {
   InviteAccepted,
   InviteConfirmed,
   InviteInfo,
+  LoginRequest,
   LoginResponse,
   NotificationItem,
   NotificationSettings,
@@ -101,6 +102,15 @@ export function pathOf(name: Name, params: Readonly<Record<string, string>> = {}
   });
 }
 
+/** Eski e-posta girişi gövdesi (sunucuda geçici uyumluluk; davet duman betiği kullanır) — C4'te kalkar. */
+export interface LegacyEmailLogin {
+  readonly eposta: string;
+  readonly parola: string;
+  readonly totp?: string;
+  readonly istemci?: "mobil" | "web";
+  readonly tesisId?: string;
+}
+
 export interface ListParams {
   readonly imlec?: string;
   readonly limit?: number;
@@ -121,7 +131,8 @@ export interface ListParams {
 export function createApi(c: ApiClient) {
   const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, siparisId: p.siparisId, fasonFirmaId: p.fasonFirmaId, ara: p.ara, suzgec: p.suzgec, sirala: p.sirala, yon: p.yon });
   return {
-    login: (b: { eposta: string; parola: string; totp?: string; istemci?: "mobil" | "web"; tesisId?: string }) => c.post<LoginResponse>(pathOf("login"), b),
+    // `LegacyEmailLogin` yalnız davet duman betiği içindir (eski e-posta girişi) — C4'te kalkar.
+    login: (b: LoginRequest | LegacyEmailLogin) => c.post<LoginResponse>(pathOf("login"), b),
     inviteInspect: (davet: string) => c.post<InviteInfo>(pathOf("inviteInspect"), { davet }),
     inviteAccept: (davet: string, parola: string) => c.post<InviteAccepted>(pathOf("inviteAccept"), { davet, parola }),
     inviteConfirm: (davet: string, totp: string) => c.post<InviteConfirmed>(pathOf("inviteConfirm"), { davet, totp }),

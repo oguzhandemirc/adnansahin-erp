@@ -1,4 +1,4 @@
-// Giriş: ① e-posta + parola yeter. Hesapta iki adımlı doğrulama AÇIKSA sunucu (yalnız doğru paroladan sonra)
+// Giriş: ① fabrika kullanıcı adı + fabrika (Electron) parolası yeter (C3; ekranın yeniden tasarımı A1'de). Hesapta iki adımlı doğrulama AÇIKSA sunucu (yalnız doğru paroladan sonra)
 // `DOGRULAMA_KODU_GEREKLI` der → ② doğrulama kodu; kapalıysa kod alanı hiç görünmez. Hata iletisi alanı söylemez.
 // Web duman betiği giriş sayfasında `input` sayar (≥ 2): ① adımda iki alan kalır.
 import { Redirect, useRouter } from "expo-router";
@@ -14,7 +14,7 @@ export default function Login() {
   const { login, phase, configured } = useSession();
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
-  const [eposta, setEposta] = useState("");
+  const [kullaniciAdi, setKullaniciAdi] = useState("");
   const [parola, setParola] = useState("");
   const [totp, setTotp] = useState("");
   const [busy, setBusy] = useState(false);
@@ -26,7 +26,7 @@ export default function Login() {
     setBusy(true);
     setError(null);
     try {
-      await login({ eposta: eposta.trim(), parola, ...(withCode ? { totp: totp.trim() } : {}) });
+      await login({ kullaniciAdi: kullaniciAdi.trim(), parola, ...(withCode ? { totp: totp.trim() } : {}) });
       router.replace("/pano");
     } catch (err) {
       if (!withCode && err instanceof ApiError && err.code === "DOGRULAMA_KODU_GEREKLI") setStep(2);
@@ -40,7 +40,7 @@ export default function Login() {
   return (
     <AuthShell
       title={step === 1 ? "Giriş yap" : "Doğrulama kodu"}
-      subtitle={step === 1 ? "Hesabınızın e-posta adresi ve parolasıyla" : `${eposta.trim()} için doğrulama uygulamanızdaki 6 haneli kodu girin`}
+      subtitle={step === 1 ? "Fabrika programındaki kullanıcı adınız ve parolanızla" : `${kullaniciAdi.trim()} için doğrulama uygulamanızdaki 6 haneli kodu girin`}
       {...(step === 2 ? { step: { at: 2, of: 2 } } : {})}
       footer={step === 1 ? <Button label="Davet kodum var" tone="plain" icon="mail-open-outline" onPress={() => router.push("/davet")} testID="davet-git" /> : null}
     >
@@ -48,10 +48,10 @@ export default function Login() {
       {error ? <Banner tone="error" text={error} testID="giris-hata" /> : null}
       {step === 1 ? (
         <View>
-          <Field label="E-posta" value={eposta} onChangeText={setEposta} autoCapitalize="none" autoComplete="email" keyboardType="email-address" testID="eposta" />
+          <Field label="Kullanıcı adı" value={kullaniciAdi} onChangeText={setKullaniciAdi} autoCapitalize="none" autoCorrect={false} autoComplete="username" testID="kullaniciAdi" />
           <Field label="Parola" value={parola} onChangeText={setParola} secureTextEntry autoComplete="password" testID="parola" />
           <View style={{ height: space.xs }} />
-          <Button label="Giriş yap" icon="log-in-outline" busy={busy} disabled={!configured || eposta.trim() === "" || parola === ""} onPress={() => void submit(false)} testID="devam" />
+          <Button label="Giriş yap" icon="log-in-outline" busy={busy} disabled={!configured || kullaniciAdi.trim() === "" || parola === ""} onPress={() => void submit(false)} testID="devam" />
         </View>
       ) : (
         <View>

@@ -5,6 +5,7 @@
 import express, { type NextFunction, type Request, type Response, type Router } from "express";
 import { z } from "zod";
 import { acceptInvite, confirmInvite, inspectInvite, linkInvite } from "../auth/invite.service";
+import { loginFactoryAccount } from "../auth/factory-login";
 import { listFacilities, login, logout, resolveSession, switchFacility, type OpenedSession, type SessionContext } from "../auth/session.service";
 import { ASSIGNABLE_PERMISSIONS, ROLE_TEMPLATES } from "../catalog/permissions";
 import { CloudError, badRequest } from "../lib/errors";
@@ -35,10 +36,14 @@ function sortDir(v: string | undefined): ListSortDir | undefined {
   return v as ListSortDir;
 }
 
+/** Giriş gövdesi: fabrika hesabı (`kullaniciAdi`, tel `LoginRequest`) ya da eski e-posta (C4'te kalkar). Katı. */
+const loginFields = { parola: z.string().min(1).max(200), totp: OptionalCode, istemci: z.enum(["mobil", "web"]).optional(), tesisId: Uuid.optional() };
+const LoginBody = z.union([z.strictObject({ kullaniciAdi: z.string().min(1).max(100), ...loginFields }), z.strictObject({ eposta: z.string().min(3).max(254), ...loginFields })]);
+
 const loginResponse = (r: OpenedSession): LoginResponse => ({
   belirtec: r.token,
   bitis: r.expiresAt.toISOString(),
-  hesap: { id: r.session.accountId, ad: r.session.accountName, eposta: r.session.email, izinler: [...r.session.permissions].sort() },
+  hesap: { id: r.session.accountId, ad: r.session.accountName, eposta: r.session.email, ...(r.session.kullaniciAdi !== null ? { kullaniciAdi: r.session.kullaniciAdi } : {}), izinler: [...r.session.permissions].sort() },
   tesisId: r.session.tesisId,
   tesisler: r.facilities,
 });
@@ -51,8 +56,12 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
     auth: "ACIK",
     kimlik: { muaf: "oturum doğumu; tekrar yeni oturum açar (eski oturum süresiyle kapanır)" },
     handler: async (c) => {
-      const b = body(c, z.strictObject({ eposta: z.string().min(3).max(254), parola: z.string().min(1).max(200), totp: OptionalCode, istemci: z.enum(["mobil", "web"]).optional(), tesisId: Uuid.optional() }));
-      const r = await login(c.ctx, { email: b.eposta, password: b.parola, totp: b.totp, client: b.istemci ?? null, ip: clientAddress(c.req, c.ctx.config), ...(b.tesisId ? { tesisId: b.tesisId } : {}) });
+      const b = body(c, LoginBody);
+      const common = { password: b.parola, totp: b.totp, client: b.istemci ?? null, ip: clientAddress(c.req, c.ctx.config) };
+      // Birincil: fabrika hesabı (C3). `eposta` gövdesi eski kimlik girişidir — GEÇİCİ UYUMLULUK, C4'te kalkar.
+      const r = "kullaniciAdi" in b
+        ? await loginFactoryAccount(c.ctx, { ...common, username: b.kullaniciAdi })
+        : await login(c.ctx, { ...common, email: b.eposta, ...(b.tesisId ? { tesisId: b.tesisId } : {}) });
       return { data: loginResponse(r) };
     },
   },

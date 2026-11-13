@@ -4,7 +4,7 @@
 //   + öteki arama anahtarlarının SIFIRLANMASI + (varsa) advisory kilit.
 // `true` = SET LOCAL: tx bitince değer düşer (havuzlu bağlantıda sızmaz). Kapsamsız sorgu RLS'te HATA verir.
 // Ön-kiracı aramaları (oturum/davet özeti, kurulum kimliği) tek anahtarlı SELECT kipinde koşar (kiracı = sıfır
-// UUID). Giriş e-postayla ARAMAZ: kimlik (`identities`) üyelikleri (tesis + hesap kimliği) verir, hesap tesis
+// UUID). Fabrika hesabı girişi (C3) kullanıcı adıyla tek anahtarlı arar (`kullanici`). Eski e-posta girişi e-postayla ARAMAZ: kimlik (`identities`) üyelikleri (tesis + hesap kimliği) verir, hesap tesis
 // kapsamında (`withTesis`) okunur. Kimlik tabloları kiracı verisi değildir: `withCentral` (kiracısız tx + kilit).
 import { Prisma } from "@prisma/client";
 import type { Tx } from "./db";
@@ -14,7 +14,7 @@ import type { TesisDbRouter } from "./tesis-db";
 /** Kiracısız kiplerin `app.tesis_id` değeri: geçerli UUID ama hiçbir tesis değil. */
 export const NO_TENANT = "00000000-0000-0000-0000-000000000000";
 
-const LOOKUP_KEYS = ["app.oturum_ozeti", "app.davet_ozeti", "app.kurulum_id", "app.bakim"] as const;
+const LOOKUP_KEYS = ["app.oturum_ozeti", "app.davet_ozeti", "app.kurulum_id", "app.bakim", "app.kullanici_adi"] as const;
 type LookupKey = (typeof LOOKUP_KEYS)[number];
 
 export interface TenantScope {
@@ -30,12 +30,15 @@ export interface TenantScope {
 export type Lookup =
   | { readonly kind: "oturum"; readonly value: string; readonly tesisId: string }
   | { readonly kind: "davet"; readonly value: string; readonly tesisId: string }
-  | { readonly kind: "kurulum"; readonly value: string };
+  | { readonly kind: "kurulum"; readonly value: string }
+  /** Fabrika hesabı girişi (C3): normalleşmiş kullanıcı adı; politika `kullanici_arama` yalnız birebir adı gösterir. */
+  | { readonly kind: "kullanici"; readonly value: string };
 
 const LOOKUP_GUC: Readonly<Record<Lookup["kind"], LookupKey>> = {
   oturum: "app.oturum_ozeti",
   davet: "app.davet_ozeti",
   kurulum: "app.kurulum_id",
+  kullanici: "app.kullanici_adi",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -106,7 +109,7 @@ export async function withTesis<T>(router: TesisDbRouter, scope: TenantScope, fn
  */
 export async function withLookup<T>(router: TesisDbRouter, lookup: Lookup, fn: (tx: Tx) => Promise<T>): Promise<T | null> {
   if (!lookup.value) throw new Error("Boş arama anahtarı");
-  if (lookup.kind !== "kurulum" && (!UUID.test(lookup.tesisId) || lookup.tesisId === NO_TENANT)) return null;
+  if ((lookup.kind === "oturum" || lookup.kind === "davet") && (!UUID.test(lookup.tesisId) || lookup.tesisId === NO_TENANT)) return null;
   return router.prisma.$transaction(async (tx) => {
     await openScope(tx, { tesisId: NO_TENANT, projections: "", set: { [LOOKUP_GUC[lookup.kind]]: lookup.value } });
     return fn(tx);

@@ -8,7 +8,7 @@
 // Kimliğe bağlı BEKLEYEN DAVETLER (kabul edilmiş, onaylanmamış; üyelik satırı yok) aynı kilit altında hazır tesislerde
 // aranır ve aynı arşiv yoluyla kapanır — yoksa eski belirteçle yeniden kabul PASİF kimliği yeniden sırlayıp diriltirdi.
 import { accountEngagedTo, pendingInviteBoundTo, pendingInviteWhere, type MembershipRoute } from "../auth/membership";
-import { ipSummary, totpStepClaim, verifyOwnFactors, wrongFactors, type SessionContext } from "../auth/session.service";
+import { assertNotFactoryAccount, ipSummary, totpStepClaim, verifyOwnFactors, wrongFactors, type SessionContext } from "../auth/session.service";
 import { accountActor, recordAudit } from "../lib/audit";
 import { CloudError, stateConflict } from "../lib/errors";
 import { listReadyFacilities, withCentral, withTesis } from "../lib/tenant";
@@ -82,6 +82,7 @@ async function closePendingInvites(ctx: CloudContext, identityId: string, nowMs:
 }
 
 export async function deleteOwnAccount(ctx: CloudContext, s: SessionContext, g: { password: string; totp?: string | undefined; ip: string | null }): Promise<AccountDeletion> {
+  assertNotFactoryAccount(s, "Bu hesap fabrikanın kullanıcısıdır; bulut erişimini fabrika panelinden yöneticiniz kaldırır");
   const { identity, step, nowMs } = await verifyOwnFactors(ctx, s, g);
   const routes = await withCentral(ctx.app, {}, (tx) => tx.loginRoute.findMany({ where: { identityId: identity.id }, select: { tesisId: true, accountId: true }, orderBy: { tesisId: "asc" } }));
   const blocked = await lastAdminFacilities(ctx, identity.id, routes);

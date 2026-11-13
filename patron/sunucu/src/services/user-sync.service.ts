@@ -8,7 +8,8 @@
 // sürümü karşılaştırır). Özet SecretBox ile mühürlenir (sınıf `parola`, AAD = hesap id); değişim tespiti mührü AÇARAK
 // yapılır (mühür her seferinde farklıdır). Tek tx, İLK ifadesi 9205 `KULLANICI_ESITLEME` kilidi; satır başına atomik
 // claim (`kimlik_surumu` beklenen değer). Denetim tx DIŞINDA, satır başına (özet ve mühür ASLA yazılmaz); log
-// yalnız SAYI. Uygulama rolünün bu kolonlara yazma yetkisi yoktur (bekçi `test_kullanici_esitleme`).
+// yalnız SAYI. Uygulama rolünün bu kolonlara yazma yetkisi yoktur (bekçi `test_kullanici_esitleme`). Her kabul edilen
+// gönderim `sync_state.kullanici_son_esitleme`yi damgalar (C3 bayatlık tavanı, `auth/factory-login.ts`).
 import { createHash } from "node:crypto";
 import { Prisma, type AccountStatus } from "@prisma/client";
 import { invalidAssignments } from "../catalog/permissions";
@@ -172,6 +173,9 @@ export async function applyUserSet(
     });
     const closed = await closeMissing(a, rows, new Set(incomingIds));
     const upserted = await upsertIncoming(a, input.kullanicilar, new Map(rows.map((r) => [r.id, r])));
+    // Bayatlık damgası (C3 giriş tavanı): AYNI tx'te. Satırı ilk eşitleme paketi doğurur; paketten önce gelen küme
+    // damga bırakmaz (giriş 503 kalır — fail-closed) ve fabrikanın bir sonraki gönderimi (≤ 10 dk) damgalar.
+    await tx.syncState.updateMany({ where: { tesisId }, data: { usersPushedAt: new Date(nowMs) } });
     return [...closed, ...upserted];
   });
 

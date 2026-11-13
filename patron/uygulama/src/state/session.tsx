@@ -46,7 +46,7 @@ export interface SessionValue {
   readonly configured: boolean;
   markOnline(online: boolean, savedAt?: string): void;
   /** `totp` yalnız sunucu `DOGRULAMA_KODU_GEREKLI` dedikten sonra (iki adımlı doğrulaması açık hesap). */
-  login(b: { eposta: string; parola: string; totp?: string }): Promise<void>;
+  login(b: { kullaniciAdi: string; parola: string; totp?: string }): Promise<void>;
   logout(): Promise<void>;
   /** `GET /oturum` yeniden okunur (uçuştayken ikinci çağrı aynı sözü alır); oturumsuzken null. */
   refresh(): Promise<FacilityStatus | null>;
@@ -162,7 +162,7 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
       await openingCacheHygiene({ plain: plainStore, legacy: legacyPlainStore, hasSession: Boolean(t && s) });
       if (!alive) return;
       if (ornek) {
-        await adopt(await api.login({ eposta: "", parola: "" }));
+        await adopt(await api.login({ kullaniciAdi: "", parola: "" }));
         if (alive) setPhase("hazir");
         return;
       }
@@ -186,7 +186,7 @@ export function SessionProvider({ children, platform = "mobil" }: { children: Re
   }, [loadFacility, loadChoices, ornek, adopt, api]);
 
   const login = useCallback(
-    async (b: { eposta: string; parola: string; totp?: string }) => {
+    async (b: { kullaniciAdi: string; parola: string; totp?: string }) => {
       const hint = await plainStore.get(LAST_FACILITY_KEY).catch(() => null);
       const plain = { ...b, istemci: platform };
       // Eski sunucu gövdeyi sıkı doğrular (bilinmeyen `tesisId` → 400, faktörlere gelmeden): ipucusuz bir kez daha.

@@ -35,10 +35,10 @@ describe("giriş", () => {
     mockLogin.mockResolvedValue(undefined);
     render(<Login />);
     expect(screen.queryByTestId("totp")).toBeNull();
-    fireEvent.changeText(screen.getByTestId("eposta"), " a@ornek.invalid ");
+    fireEvent.changeText(screen.getByTestId("kullaniciAdi"), " ali ");
     fireEvent.changeText(screen.getByTestId("parola"), "gizli-parola-123");
     await act(async () => fireEvent.press(screen.getByTestId("devam")));
-    expect(mockLogin).toHaveBeenCalledWith({ eposta: "a@ornek.invalid", parola: "gizli-parola-123" });
+    expect(mockLogin).toHaveBeenCalledWith({ kullaniciAdi: "ali", parola: "gizli-parola-123" });
     expect(screen.queryByTestId("totp")).toBeNull();
     expect(mockReplace).toHaveBeenCalledWith("/pano");
   });
@@ -46,20 +46,20 @@ describe("giriş", () => {
   it("⭐ sunucu DOGRULAMA_KODU_GEREKLI derse ikinci adımda kod istenir ve kodla gönderilir", async () => {
     mockLogin.mockRejectedValueOnce(kodGerekli()).mockResolvedValueOnce(undefined);
     render(<Login />);
-    fireEvent.changeText(screen.getByTestId("eposta"), "a@ornek.invalid");
+    fireEvent.changeText(screen.getByTestId("kullaniciAdi"), "ali");
     fireEvent.changeText(screen.getByTestId("parola"), "gizli-parola-123");
     await act(async () => fireEvent.press(screen.getByTestId("devam")));
     expect(screen.getByTestId("totp")).toBeTruthy();
     expect(screen.queryByTestId("giris-hata")).toBeNull();
     fireEvent.changeText(screen.getByTestId("totp"), "12 34 56");
     await act(async () => fireEvent.press(screen.getByTestId("giris")));
-    expect(mockLogin).toHaveBeenLastCalledWith({ eposta: "a@ornek.invalid", parola: "gizli-parola-123", totp: "123456" });
+    expect(mockLogin).toHaveBeenLastCalledWith({ kullaniciAdi: "ali", parola: "gizli-parola-123", totp: "123456" });
   });
 
   it("yanlış parola: ileti gösterilir, kod adımına geçilmez", async () => {
-    mockLogin.mockRejectedValueOnce(new ApiError(401, "GIRIS_BASARISIZ", "E-posta, parola ya da doğrulama kodu hatalı"));
+    mockLogin.mockRejectedValueOnce(new ApiError(401, "GIRIS_BASARISIZ", "Kullanıcı adı, parola ya da doğrulama kodu hatalı"));
     render(<Login />);
-    fireEvent.changeText(screen.getByTestId("eposta"), "a@ornek.invalid");
+    fireEvent.changeText(screen.getByTestId("kullaniciAdi"), "ali");
     fireEvent.changeText(screen.getByTestId("parola"), "yanlis");
     await act(async () => fireEvent.press(screen.getByTestId("devam")));
     expect(screen.getByTestId("giris-hata")).toBeTruthy();
