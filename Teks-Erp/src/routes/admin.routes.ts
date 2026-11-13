@@ -21,7 +21,7 @@ import {
   MODULE_PROFILES,
   MODULE_PROFILE_IDS,
 } from "../constants/module-profiles";
-import { isReservedSettingKey, PROFILE_STAMP_SETTING_KEY } from "../constants/reserved-settings";
+import { isReservedSettingKey, PROFILE_STAMP_SETTING_KEY, SUPERADMIN_WRITE_SETTING_KEYS } from "../constants/reserved-settings";
 import { requireSettingsPassword } from "../middlewares/settings-password.middleware";
 import {
   protectSystemAccountTarget,
@@ -293,7 +293,9 @@ const createUserSchema = z.object({
     .max(40)
     .regex(/^[a-zA-Z0-9]+$/, "Yalnız İngilizce harf ve rakam kullanılabilir (özel karakter, boşluk ve Türkçe karakter yok)"),
   fullName: z.string().trim().min(1, "Ad-soyad gerekli").max(120),
-  password: z.string().min(6, "Şifre en az 6 karakter"),
+  // Uzunluk/yaygın parola kuralı serviste TEK helper'dadır (`password-policy.helper.ts`);
+  // burada yalnız şekil — iki ayrı eşik ayrışmasın.
+  password: z.string().min(1, "Parola gerekli").max(200),
   isActive: z.boolean().optional(),
   // Varsayılan üretim istasyon izinlerini (KK1/KK2/Tambur) ver — default true (saha
   // operatörü). Web/admin kullanıcısı açarken false gönderilir (temiz başlar).
@@ -697,7 +699,8 @@ router.delete(
 );
 
 const resetPasswordSchema = z.object({
-  password: z.string().min(6, "Şifre en az 6 karakter olmalı"),
+  // Kural serviste TEK helper'da (`password-policy.helper.ts`); burada yalnız şekil.
+  password: z.string().min(1, "Parola gerekli").max(200),
 });
 
 /**
@@ -1481,6 +1484,22 @@ router.put(
   // tabloda olmayan anahtar yalnız `admin:settings` (fail-closed).
   (req: Request, res: Response, next: NextFunction) =>
     requirePermissionForEachKey([req.params.key as string], settingKeyWriters)(req, res, next),
+  // Patron bulutu şalterleri (eşitleme / telefondan yazma) YALNIZ SÜPERADMİN
+  // (denetim 2026-11-13 O1): `admin:settings` yetmez. Ayar şifresinden ÖNCE —
+  // süperadmin şifreden muaf, diğerine şifre denemesi yaktırmanın anlamı yok.
+  (req: Request, _res: Response, next: NextFunction) => {
+    const key = req.params.key as string;
+    if (SUPERADMIN_WRITE_SETTING_KEYS.has(key) && req.isSystemAccount !== true) {
+      next(
+        AppError.forbidden("Bu ayarı yalnız en yetkili hesap (sistem yöneticisi) değiştirebilir.", {
+          code: "SUPERADMIN_ONLY",
+          key,
+        }),
+      );
+      return;
+    }
+    next();
+  },
   // ⚠️ İZİNDEN SONRA (2026-09-03 / P3): niyet kapısı yetki kapısının YERİNE
   // geçmez, ARDINA takılır. Ters sırada yetkisiz bir kullanıcı da şifre
   // denemesi yaparak kilit sayacını doldurabilir (meşru yöneticiye DoS).

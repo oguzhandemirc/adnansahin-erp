@@ -20,7 +20,21 @@ import "../types/express-augment";
 /** Anahtar başına deneme durumu: ardışık yanlış (fails), toplam ceza turu
  *  (penaltyRounds — escalate için), blok bitiş zamanı (epoch ms) ve son deneme
  *  anı (lastFailAt — F48 idle-decay için). */
-type FailEntry = { fails: number; penaltyRounds: number; blockedUntil: number; lastFailAt: number };
+type FailEntry = {
+  fails: number;
+  penaltyRounds: number;
+  blockedUntil: number;
+  lastFailAt: number;
+  /** Y4: bu kovaya dokunan son rezervasyonun sıra no'su, kilidi kuran
+   *  rezervasyonun sıra no'su ve o andaki sayaç — eşiği kuran deneme BAŞARILI
+   *  çıkarsa `settleLoginSuccess` yalnız KENDİ kurduğu kilidi geri alabilsin. */
+  lastSeq?: number;
+  lockSeq?: number;
+  lockedAtFails?: number;
+};
+
+/** Rezervasyon sıra sayacı (tek süreç; yalnız eşitlik için kullanılır). */
+let reserveSeq = 0;
 
 const failCounts = new Map<string, FailEntry>();
 /** Bellek tavanı — bu sayının üstünde sweep ile bayat girişler budanır. */
@@ -76,8 +90,11 @@ export function resolveLoginLockoutKey(
 // ayrı dal yazılsaydı zamanla ayrışırlardı).
 // =============================================================================
 
-/** Bir kilit kovası: anahtar + eşik çarpanı (1 = bugünkü eşik). */
-export type LockoutKeySpec = { key: string; budgetMultiplier: number };
+/** Bir kilit kovası: anahtar + eşik çarpanı (1 = bugünkü eşik). `wide` =
+ *  kaynağın (IP) ortak kovası — başarılı giriş onu SIFIRLAMAZ (Y4, bkz.
+ *  `settleLoginSuccess`). Bayraksız kova DAR kovadır (kaynak|kimlik ya da
+ *  eski `string` sözleşmesi). */
+export type LockoutKeySpec = { key: string; budgetMultiplier: number; wide?: boolean };
 
 /**
  * GENİŞ (IP) kovanın bütçe çarpanı. 5 seçildi: varsayılan eşik 5 deneme →
@@ -115,11 +132,17 @@ export function resolveLoginLockoutKeys(
   const { loginLockoutScope, clientIpHeader, clientIpHeaderRemoteOnly } =
     readWebHardeningConfig(env, () => {});
   const ipKey = resolveLoginLockoutKey(req, clientIpHeader, clientIpHeaderRemoteOnly);
-  if (loginLockoutScope === "ip") return [{ key: ipKey, budgetMultiplier: 1 }];
-  return [
-    { key: `${ipKey}|${normalizeIdentity(identity)}`, budgetMultiplier: 1 },
-    { key: ipKey, budgetMultiplier: WIDE_KEY_BUDGET_MULTIPLIER },
-  ];
+  const narrow: LockoutKeySpec = { key: `${ipKey}|${normalizeIdentity(identity)}`, budgetMultiplier: 1 };
+  // Y4 (güvenlik denetimi 2026-11-13): fabrika kipinde de DAR kova tutulur.
+  // Eşiği değiştirmez (geniş kova da ×1 → aynı IP'den 5 hata yine kilit,
+  // spraying kapalı); işi, başarılı girişin YALNIZ o kimliğin kendi
+  // hatalarını geniş kovadan düşebilmesidir. Eskiden tek kova vardı ve
+  // başarılı giriş onu sıfırlıyordu: araya kendi geçerli girişini sokan
+  // saldırgan sınırsız deneme yapıyordu.
+  if (loginLockoutScope === "ip") {
+    return [narrow, { key: ipKey, budgetMultiplier: 1, wide: true }];
+  }
+  return [narrow, { key: ipKey, budgetMultiplier: WIDE_KEY_BUDGET_MULTIPLIER, wide: true }];
 }
 
 /** `string` (eski sözleşme) ya da kova listesi → kova listesi. */
@@ -183,6 +206,7 @@ export async function reserveLoginAttempt(
   // 2) REZERVASYON — her kova kendi eşiğiyle (çarpan 1 = bugünkü eşik).
   let justLocked = false;
   let newBlockMs = 0;
+  const seq = ++reserveSeq;
   for (const spec of specs) {
     const entry = failCounts.get(spec.key)
       ?? { fails: 0, penaltyRounds: 0, blockedUntil: 0, lastFailAt: 0 };
@@ -192,14 +216,22 @@ export async function reserveLoginAttempt(
     if (entry.lastFailAt > 0 && now - entry.lastFailAt > decayMs) {
       const drop = Math.floor((now - entry.lastFailAt) / decayMs);
       entry.penaltyRounds = Math.max(0, entry.penaltyRounds - drop);
+      // Y4: başarılı giriş geniş kovayı artık sıfırlamadığı için hatalar
+      // kendiliğinden ÇÜRÜR — aynı pencere boyunca deneme gelmeyen kovanın
+      // sayacı sıfırdan başlar (ortak NAT'taki ofis gün boyu biriktirmez).
+      // Sürekli deneyen saldırganın sayacı çürümez: her deneme pencereyi tazeler.
+      entry.fails = 0;
     }
     entry.lastFailAt = now;
+    entry.lastSeq = seq;
     entry.fails += 1;
     // Eşik kovanın bütçesiyle ölçeklenir: dar kova ×1 (hesabı korur), geniş
     // (IP) kova ×N (spraying'i yakalar ama tek meşru kullanıcıyı kilitlemez).
     const budget = Math.max(1, attempts * spec.budgetMultiplier);
     if (entry.fails >= budget) {
       entry.penaltyRounds += 1;
+      entry.lockSeq = seq;
+      entry.lockedAtFails = entry.fails;
       entry.fails = 0;
       entry.blockedUntil =
         entry.penaltyRounds >= escalateAfter
@@ -229,26 +261,97 @@ export async function reserveLoginAttempt(
 }
 
 /**
- * Başarılı giriş / brute-force olmayan hata (F49): bu denemenin rezervasyonunu
- * geri al — ardışık sayacı (fails) ve aktif bloğu (blockedUntil) sıfırla.
- * F48: escalation ladder'ı (penaltyRounds) SİLME; başarılı giriş turlar-arası
- * cezayı bypass etmesin (aksi halde araya bir geçerli giriş sokan saldırgan
- * escalation'ı süresiz sıfırlar). penaltyRounds idle-decay ile zamanla çürür.
+ * TAM TEMİZLİK: verilen kovaların sayacını (fails) ve aktif bloğunu
+ * (blockedUntil) sıfırlar, geniş kova dahil. ⚠️ GİRİŞ YOLUNDA KULLANILMAZ —
+ * başarılı giriş `settleLoginSuccess`ten geçer (Y4; bekçi
+ * `test_login_lockout_success_settle` controller'da bu çağrıyı yasaklar).
+ * Yalnız bekçi temizliği ve eski `string` sözleşmesi içindir.
+ * F48: penaltyRounds burada da silinmez (idle-decay ile çürür).
  */
 export function resetLoginLockout(key: string | LockoutKeySpec[]): void {
-  // ⚠️ GENİŞ (IP) kova da sıfırlanır ve bu BİLİNÇLİ. Sıfırlanmasaydı ortak
-  // NAT'taki ofis gün boyunca hatalarını biriktirir (fails yalnız eşikte ya da
-  // burada sıfırlanıyor, kendiliğinden çürümüyor) ve akşama doğru tüm ofis
-  // kilitlenirdi. Bedeli: geçerli bir kimlik bilgisi ELE GEÇİRMİŞ saldırgan araya
-  // başarılı bir giriş sokarak IP bütçesini sıfırlayabilir — ama o noktada zaten
-  // içeridedir. Bu, `penaltyRounds`ın bilinçli olarak SIFIRLANMAMASI kuralıyla
-  // (aşağıdaki F48 notu) aynı dengeye dayanır.
   for (const spec of toSpecs(key)) {
     const e = failCounts.get(spec.key);
     if (!e) continue;
     e.fails = 0;
     e.blockedUntil = 0;
   }
+}
+
+/**
+ * Y4 (güvenlik denetimi 2026-11-13): başarılı girişin kilide etkisi.
+ *
+ * Eskiden başarılı giriş GENİŞ (IP) kovayı da sıfırlıyordu: herhangi bir
+ * operatör hesabı olan kişi 4 yanlış deneme → kendi geçerli girişi → tekrar
+ * döngüsüyle başka hesabın parolasını ya da PIN uzayını SINIRSIZ tarıyordu
+ * (sayaç eşiğe hiç varmadığı için ceza basamağı da artmıyordu).
+ *
+ * - `"account"` (kimlik = HESAP: parola girişi `u:<ad>`, parola değiştirme
+ *   `pwchg:<id>`): DAR kova tamamen sıfırlanır; geniş kovadan YALNIZ bu
+ *   kimliğin kendi hataları düşülür (dar sayaç kadar). Başka hesaba yapılan
+ *   denemeler geniş kovada kalır; geniş kovanın aktif bloğu kaldırılmaz.
+ * - `"device"` (kimlik = CİHAZ: PIN `pin:<cihaz>`, kart `card:<cihaz>`):
+ *   başarı önceki hataların SAHİBİNİ kanıtlamaz (yanlış PIN bir hesaba
+ *   bağlanamaz) → her kovada yalnız bu denemenin rezervasyonu geri alınır.
+ *
+ * Meşru kullanıcının biriken yanlışları `reserveLoginAttempt`teki boşta
+ * çürümeyle (pencere = `longPenaltyMin`) temizlenir.
+ */
+export function settleLoginSuccess(
+  key: string | LockoutKeySpec[],
+  identityKind: "account" | "device",
+): void {
+  const specs = toSpecs(key);
+  // Bu denemenin rezervasyon sıra no'su dar kovadan okunur (dar kova kimliğe özeldir).
+  let mySeq: number | undefined;
+  for (const spec of specs) {
+    if (!spec.wide) mySeq = failCounts.get(spec.key)?.lastSeq ?? mySeq;
+  }
+  if (identityKind === "device") {
+    // Yalnız bu denemenin kendi payı geri alınır; eşiği BU deneme kurduysa o
+    // kilit de geri alınır (sayaç eşik-1'de kalır → sonraki yanlış kilitler).
+    for (const spec of specs) {
+      const e = failCounts.get(spec.key);
+      if (!e) continue;
+      if (lockedBy(e, mySeq)) undoOwnLock(e, 1);
+      else if (e.fails > 0) e.fails -= 1;
+    }
+    return;
+  }
+  let credit = 1; // en az bu denemenin kendi rezervasyonu
+  for (const spec of specs) {
+    if (spec.wide) continue;
+    const e = failCounts.get(spec.key);
+    if (!e) continue;
+    credit = Math.max(credit, lockedBy(e, mySeq) ? (e.lockedAtFails ?? 1) : e.fails);
+    e.fails = 0;
+    e.blockedUntil = 0;
+  }
+  for (const spec of specs) {
+    if (!spec.wide) continue;
+    const e = failCounts.get(spec.key);
+    if (!e) continue;
+    if (lockedBy(e, mySeq)) {
+      // Eşiği BU (başarılı) deneme kurdu: kilit geri alınır, sayaç kilit
+      // öncesine döner ve kimliğin kendi payı düşülür. Kilidi başka bir deneme
+      // kurduysa ya da sonra başka deneme geldiyse bu dal koşmaz.
+      undoOwnLock(e, credit);
+      continue;
+    }
+    e.fails = Math.max(0, e.fails - credit);
+  }
+}
+
+/** Bu denemenin kurduğu kilidi geri al: sayaç kilit öncesine döner, `credit` düşülür. */
+function undoOwnLock(e: FailEntry, credit: number): void {
+  e.blockedUntil = 0;
+  e.penaltyRounds = Math.max(0, e.penaltyRounds - 1);
+  e.fails = Math.max(0, (e.lockedAtFails ?? 0) - credit);
+  e.lockSeq = undefined;
+}
+
+/** Kovanın kilidini `seq` rezervasyonu mu kurdu ve ondan sonra kovaya dokunan olmadı mı? */
+function lockedBy(e: FailEntry, seq: number | undefined): boolean {
+  return seq !== undefined && e.blockedUntil > 0 && e.lockSeq === seq && e.lastSeq === seq;
 }
 
 /**

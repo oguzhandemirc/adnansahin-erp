@@ -46,7 +46,7 @@ async function resolveFixtures(): Promise<void> {
   CUSTOMER = need(await prisma.customer.findFirst({ where: { code: "MUS-001" }, select: { id: true } }), "MUS-001");
   // İzinsiz (0-permission) test kullanıcısı — RBAC 403 senaryosu için.
   const nop = await prisma.user.create({
-    data: { username: NOPERM_USERNAME, fullName: "DS API NoPerm", passwordHash: await AuthService.hashPassword("test123456") },
+    data: { username: NOPERM_USERNAME, fullName: "DS API NoPerm", passwordHash: await AuthService.hashPassword("Bekci-Dusuk-Yetki-48") },
     select: { id: true },
   });
   NOPERM_USER_ID = nop.id;
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     // dev DB fabrika yedeği olduğunda seed'in `admin/123123`'ü geçerli değildir.
     const cred = await ensureTestAdmin();
     const adminTok = await login(cred.username, cred.password);
-    const noPermTok = await login(NOPERM_USERNAME, "test123456");
+    const noPermTok = await login(NOPERM_USERNAME, "Bekci-Dusuk-Yetki-48");
     check("admin login → token", adminTok != null);
     check("izinsiz kullanıcı login → token", noPermTok != null);
     if (!adminTok) throw new Error("admin login başarısız — testler koşamaz");

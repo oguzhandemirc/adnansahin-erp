@@ -94,7 +94,7 @@ async function main(): Promise<void> {
       data: {
         username: damga,
         fullName: `${damga} kullanıcı`,
-        passwordHash: await AuthService.hashPassword("test123456"),
+        passwordHash: await AuthService.hashPassword("Bekci-Dusuk-Yetki-48"),
       },
       select: { id: true, tokenVersion: true },
     });

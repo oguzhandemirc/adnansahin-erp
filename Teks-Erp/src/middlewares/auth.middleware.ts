@@ -90,6 +90,20 @@ export function resetSessionTouchCacheForTest(): void {
   versionWrites.clear();
 }
 
+/** Kısıtlı oturumun (passwordChangeRequired) girebildiği uçlar — `METOT yol`. */
+export const PASSWORD_CHANGE_ALLOWED: ReadonlySet<string> = new Set([
+  "POST /api/auth/change-password",
+  "POST /api/auth/logout",
+]);
+
+function isPasswordChangeAllowed(req: Request): boolean {
+  const raw = req.originalUrl ?? req.url ?? "";
+  const q = raw.indexOf("?");
+  let path = (q === -1 ? raw : raw.slice(0, q)).toLowerCase();
+  while (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+  return PASSWORD_CHANGE_ALLOWED.has(`${req.method.toUpperCase()} ${path}`);
+}
+
 /**
  * Middleware: Verify JWT token from Authorization header.
  * Sets `req.user` with decoded JwtPayload on success.
@@ -168,6 +182,15 @@ export const verifyToken = async (
       const reason = session.revokeReason ?? "";
       const msg = SESSION_REVOKE_MESSAGES[reason] ?? "Oturumunuz sonlandırıldı. Tekrar giriş yapın.";
       throw AppError.unauthorized(msg, { code: "SESSION_REVOKED", reason });
+    }
+    // KISITLI OTURUM (parola kurala uymuyor): YALNIZ parola değiştirme ve çıkış.
+    // Kapı burada, tek yerde: her korumalı uç `verifyToken`dan geçer, yani
+    // izin kontrolü taşımayan uçlar (`/auth/me`, tercihler…) da kapanır.
+    if (payload.passwordChangeRequired === true && !isPasswordChangeAllowed(req)) {
+      throw AppError.forbidden(
+        "Parolanızı değiştirmeden devam edemezsiniz. Paneli güncelleyin ya da yöneticinize başvurun.",
+        { code: "PASSWORD_CHANGE_REQUIRED" },
+      );
     }
     req.user = payload;
     req.isSystemAccount = fresh.isSystemAccount === true;

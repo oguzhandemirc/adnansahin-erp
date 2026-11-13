@@ -39,7 +39,8 @@ function check(label: string, ok: boolean, detail = ""): void {
 }
 
 const DAMGA = `TST-CRED-${Date.now().toString().slice(-8)}`;
-const SIFRE = "test123456";
+// Parola kuralına uyar (zayıf parola masaüstünde KISITLI oturum verir, §1 sessizce 403 olurdu).
+const SIFRE = "Bekci-Kimlik-Okuma-Anahtar-41";
 const olusan: string[] = [];
 
 async function kullaniciYap(ad: string, izinKodlari: string[]): Promise<string> {

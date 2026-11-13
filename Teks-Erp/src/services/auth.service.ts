@@ -20,6 +20,27 @@ import {
 } from "./system-setting.service";
 import { SessionRegistryService } from "./session-registry.service";
 import { TotpAccountService } from "./totp-account.service";
+import { checkPasswordPolicy, newPasswordFields } from "./helpers/password-policy.helper";
+
+/**
+ * Üretilen token'ın KAPSAMI (2026-11-13, parola sıkılaştırma):
+ *  • `full`            — bugünkü davranış.
+ *  • `password-change` — masaüstünde kurala uymayan parolayla giriş: izin [] +
+ *    `passwordChangeRequired` claim'i; `verifyToken` yalnız parola değiştirme ve
+ *    çıkışı geçirir.
+ *  • `mobile-only`     — sahada (mobil istemci) kurala uymayan parolayla giriş:
+ *    eski tablet bu durumu tanımadığı için KİLİTLENMEZ, ama token yalnız
+ *    `mobile:*` izinlerini taşır — `clientType:"mobile"` yazıp tam token almak
+ *    kapalıdır.
+ */
+type TokenScope = "full" | "password-change" | "mobile-only";
+
+/** Sonuçta `passwordChangeRequired` yalnız parola kurala uymadığında `true` döner. */
+export interface LoginResult {
+  token: string;
+  user: JwtPayload;
+  passwordChangeRequired?: boolean;
+}
 
 /** Login çağrılarının istemci bağlamı — Session registry + aynı-tip politika için.
  *  clientType body'den (default 'mobile'); deviceId x-device-id/req.device'den;
@@ -43,7 +64,18 @@ export interface LoginContext {
    * hangi sürümler görülüyor" sorusunu cevaplayan bir GÖZLEMdir.
    */
   clientVersion?: string | null;
+  /**
+   * İsteği yapan ONAYLI + AKTİF cihaz kaydı (`req.device`, `device.middleware`
+   * `x-device-id`den yalnız APPROVED + isActive satır varsa doldurur). ⚠️ Gövdeden
+   * DEĞİL — istemci uyduramaz (deviceId'yi bilse bile satırın onaylı olması gerekir).
+   * PIN/kart girişinin saha kapısı buna bakar; yoksa `null`/`undefined`.
+   */
+  fieldDevice?: { kind: string } | null;
 }
+
+/** PIN/kart girişi yalnız saha cihazından: kapının ret kodları (`details.code`). */
+export const PIN_FIELD_ONLY = "PIN_FIELD_ONLY";
+export const CARD_FIELD_ONLY = "CARD_FIELD_ONLY";
 
 /** Gövdeden gelen istemci türü. `undefined` = mobil (tarihsel varsayılan). */
 export type LoginClientType = "electron" | "mobile" | "web";
@@ -85,6 +117,16 @@ function loadJwtSecret(): string {
 }
 const JWT_SECRET: string = loadJwtSecret();
 
+
+/** Tanınmayan PIN / geçersiz kart cevabı — Y5 reddi de AYNI metni kullanır (kâhin yok). */
+export const PIN_UNKNOWN_MESSAGE = "PIN tanınmadı — yöneticinizden hızlı PIN isteyin";
+export const CARD_UNKNOWN_MESSAGE = "Kart geçersiz veya iptal edilmiş — yöneticiden yeni kart isteyin";
+
+/** Y5: PIN/kartla girişi yasak izin kümesi — süperadmin (`*`) ya da herhangi bir `admin:` izni. */
+export function isPrivilegedForFieldLogin(permissions: readonly string[]): boolean {
+  return permissions.some((p) => p === "*" || p.startsWith("admin:"));
+}
+
 export class AuthService {
   /**
    * Authenticate user and return JWT token.
@@ -95,12 +137,13 @@ export class AuthService {
     username: string,
     password: string,
     ctx?: LoginContext
-  ): Promise<{ token: string; user: JwtPayload }> {
+  ): Promise<LoginResult> {
     const user = await prisma.user.findUnique({
       where: { username },
       select: {
         id: true,
         username: true,
+        fullName: true,
         passwordHash: true,
         isActive: true,
         tokenVersion: true,
@@ -122,9 +165,81 @@ export class AuthService {
     // hiç geçemese bile meşru kullanıcıyı oturumundan atabilirdi.
     await this.assertSecondFactor(user.id, ctx);
 
-    return this.issueToken(
+    // Mevcut parola kurala uyuyor mu? Düz metin YALNIZ burada elde — PIN/kart
+    // girişinde ölçülemez. Uymuyorsa giriş BAŞARILI ama kapsam daralır (bkz.
+    // `TokenScope`). Sonuç sır değildir; parola hiçbir çıktıya girmez.
+    const weak = checkPasswordPolicy(password, { username: user.username, fullName: user.fullName }) !== null;
+    const scope: TokenScope = !weak
+      ? "full"
+      : isDesktopClient(ctx?.clientType)
+        ? "password-change"
+        : "mobile-only";
+    const result = await this.issueToken(
       { id: user.id, username: user.username, tokenVersion: user.tokenVersion },
-      ctx
+      ctx,
+      scope
+    );
+    return weak ? { ...result, passwordChangeRequired: true } : result;
+  }
+
+  /**
+   * KENDİ PAROLASINI DEĞİŞTİR (normal ve kısıtlı oturum). Eski parola doğrulanır,
+   * yeni parola kural helper'ından geçer; `tokenVersion++` + oturum iptaliyle
+   * bu cihaz DAHİL bütün oturumlar düşer ve bu çağrı yeni TAM token döner.
+   *
+   * ⚠️ Yanlış eski parola 400 `CURRENT_PASSWORD_INVALID`dır, 401 DEĞİL: panelin
+   * 401 dalı oturumu kapatır ve kullanıcı yazdığı yeni parolayla birlikte giriş
+   * ekranına atılırdı. Kaba kuvvet sayımını controller bu koda bakarak yapar.
+   * ⚠️ İkinci faktör yeniden sorulmaz: çağıran oturum zaten TOTP'den geçti.
+   */
+  static async changeOwnPassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    ctx?: LoginContext
+  ): Promise<LoginResult> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, username: true, fullName: true, passwordHash: true, isActive: true, tokenVersion: true },
+    });
+    if (!user || !user.isActive) {
+      throw AppError.unauthorized("Hesap pasif veya bulunamadı. Tekrar giriş yapın.");
+    }
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw AppError.badRequest("Mevcut parola yanlış.", { code: "CURRENT_PASSWORD_INVALID" });
+    }
+    if (currentPassword === newPassword) {
+      throw AppError.badRequest("Yeni parola mevcut parolayla aynı olamaz.", {
+        code: "PASSWORD_POLICY",
+        reason: "SAME_AS_CURRENT",
+      });
+    }
+    const passwordFields = await newPasswordFields(newPassword, {
+      username: user.username,
+      fullName: user.fullName,
+    });
+    // ATOMİK CLAIM: okuduğumuz tokenVersion hâlâ geçerliyse yaz. Arada yönetici
+    // sıfırladıysa ya da yetki değiştiyse count=0 → 409 (eski parolayla yarışan
+    // yazım yeni durumu ezmesin).
+    const claimed = await prisma.user.updateMany({
+      where: { id: user.id, isActive: true, tokenVersion: user.tokenVersion },
+      data: { ...passwordFields, tokenVersion: { increment: 1 } },
+    });
+    if (claimed.count === 0) {
+      throw AppError.conflict("Hesap bu sırada değişti. Tekrar giriş yapın.", { code: "SESSION_CHANGED" });
+    }
+    await SessionRegistryService.revokeAllForUser(user.id, "PASSWORD_RESET").catch(() => undefined);
+    await AuditService.log({
+      userId: user.id,
+      action: "UPDATE",
+      tableName: "USER_PASSWORD",
+      recordId: user.id,
+      newData: { username: user.username, selfService: true },
+    }).catch(() => undefined);
+    return this.issueToken(
+      { id: user.id, username: user.username, tokenVersion: user.tokenVersion + 1 },
+      ctx,
+      "full"
     );
   }
 
@@ -139,6 +254,7 @@ export class AuthService {
     ctx?: LoginContext
   ): Promise<{ token: string; user: JwtPayload }> {
     this.assertNotRemote(ctx);
+    this.assertFieldDevice(ctx, "card");
     const methods = await readLoginMethods();
     if (!methods.enabled.includes("card")) {
       throw AppError.forbidden(
@@ -151,8 +267,10 @@ export class AuthService {
       where: { id: m[1], cardToken: m[2].toLowerCase(), isActive: true },
       select: { id: true, username: true, tokenVersion: true },
     });
-    if (!user) {
-      throw AppError.unauthorized("Kart geçersiz veya iptal edilmiş — yöneticiden yeni kart isteyin");
+    // Y5: yönetici hesabı kartla açılmaz — cevap bilinmeyen kartla BİREBİR aynı
+    // (401, aynı metin, aynı kilit sayımı): kartın yönetici hesabına ait olduğu sızmaz.
+    if (!user || (await this.isFieldLoginForbidden(user.id))) {
+      throw AppError.unauthorized(CARD_UNKNOWN_MESSAGE);
     }
     return this.issueToken(user, ctx);
   }
@@ -167,6 +285,7 @@ export class AuthService {
     ctx?: LoginContext
   ): Promise<{ token: string; user: JwtPayload }> {
     this.assertNotRemote(ctx);
+    this.assertFieldDevice(ctx, "pin");
     const methods = await readLoginMethods();
     if (!methods.enabled.includes("pin")) {
       throw AppError.forbidden(
@@ -181,7 +300,12 @@ export class AuthService {
       where: { quickPin: normalized, isActive: true },
       select: { id: true, username: true, tokenVersion: true },
     });
-    if (!user) throw AppError.unauthorized("PIN tanınmadı — yöneticinizden hızlı PIN isteyin");
+    // Y5: süperadmin ve yönetici (`*`, `admin:*`) hesabı PIN'le açılmaz — cevap
+    // tanınmayan PIN'le BİREBİR aynı (401, aynı metin, kilide sayılır): PIN'in
+    // yönetici hesabına ait olduğu sızmaz.
+    if (!user || (await this.isFieldLoginForbidden(user.id))) {
+      throw AppError.unauthorized(PIN_UNKNOWN_MESSAGE);
+    }
     return this.issueToken(user, ctx);
   }
 
@@ -357,13 +481,50 @@ export class AuthService {
     if (ctx?.isRemote) throw AppError.notFound("Kaynak bulunamadı");
   }
 
+  /**
+   * PIN/kart girişi YALNIZ onaylı + aktif SAHA cihazından (tablet/telefon).
+   *
+   * PIN ve kart kodu tek başına kimliktir; panelden (ya da cihazsız bir betikten)
+   * denenebilseydi 6 haneli uzay masaüstünden taranabilirdi. Ret koşulları:
+   * masaüstü `clientType` (electron/web) · onaylı cihaz kaydı yok
+   * (`fieldDevice` boş) · cihaz türü DESKTOP. ⚠️ PIN/kart DB'ye sorulmadan ÖNCE
+   * çalışır — panel yanıtı PIN'in var olup olmadığını sızdırmaz (kâhin yok); 403
+   * olduğu için deneme kilidine sayılmaz. Mesaj sabittir, PIN/kart değeri taşımaz.
+   * Tablet 1.0.8+ her istekte `x-device-id` gönderir ve açılışta announce eder
+   * (eşleştirme kapalıyken APPROVED doğar) — mevcut saha cihazları geçer.
+   */
+  /**
+   * Y5 (güvenlik denetimi 2026-11-13): PIN ve kart tek faktördür; 6 haneli PIN
+   * uzayında her deneme HERHANGİ bir PIN'li hesabı açabilir. Süperadmin (`*`) ve
+   * yönetim izni taşıyan hesap (`admin:*`, `admin:settings`, `admin:users` —
+   * kullanıcı yönetimi kendine `admin:settings` verebildiği için aynı sınıf) bu
+   * yollarla giremez; kullanıcı adı + parola (+ uzakta TOTP) kullanır. Kapı
+   * D3 saha cihazı kapısına EKTİR; izinler `getEffectivePermissions`ten (tek kaynak).
+   */
+  private static async isFieldLoginForbidden(userId: string): Promise<boolean> {
+    const permissions = await this.getEffectivePermissions(userId);
+    return isPrivilegedForFieldLogin(permissions);
+  }
+
+  private static assertFieldDevice(ctx: LoginContext | undefined, method: "pin" | "card"): void {
+    const kind = ctx?.fieldDevice?.kind;
+    if (!isDesktopClient(ctx?.clientType) && kind && kind !== "DESKTOP") return;
+    throw AppError.forbidden(
+      method === "pin"
+        ? "Hızlı PIN ile giriş yalnız onaylı saha cihazından (tablet/telefon) yapılabilir — kullanıcı adı ve parolayla girin"
+        : "Kartla giriş yalnız onaylı saha cihazından (tablet/telefon) yapılabilir — kullanıcı adı ve parolayla girin",
+      { code: method === "pin" ? PIN_FIELD_ONLY : CARD_FIELD_ONLY },
+    );
+  }
+
   private static async issueToken(
     user: {
       id: string;
       username: string;
       tokenVersion: number;
     },
-    ctx?: LoginContext
+    ctx?: LoginContext,
+    scope: TokenScope = "full"
   ): Promise<{ token: string; user: JwtPayload }> {
     // Patron bulutu teknik kullanıcısının GİRİŞ YÖNTEMİ YOKTUR: parolası sıfırlansa ya da PIN/kart verilse bile
     // oturum açılmaz (tek token üreticisi burası; mesaj genel — hesabın varlığını doğrulamaz). Kayıt yoksa no-op.
@@ -475,11 +636,19 @@ export class AuthService {
 
     // jti token'a jwt.sign jwtid ile eklenir — sign payload'ında jti TUTMUYORUZ
     // (jsonwebtoken "jti already present" hatası verir). Dönen JwtPayload jti taşır.
+    // Kapsam daraltması (bkz. `TokenScope`) kanal kapısından SONRA: yalnız mobil
+    // izinli hesap masaüstünde yine CHANNEL_DENIED alır, kısıtlı token değil.
     const signPayload = {
       userId: user.id,
       username: user.username,
-      permissions,
+      permissions:
+        scope === "password-change"
+          ? []
+          : scope === "mobile-only"
+            ? permissions.filter((p) => p.startsWith("mobile:"))
+            : permissions,
       tokenVersion: user.tokenVersion,
+      ...(scope === "password-change" ? { passwordChangeRequired: true } : {}),
     };
     const signOptions: jwt.SignOptions = { jwtid: jti };
     // exp claim = effectiveExpiresAt'a göre saniye (aynı nowMs tabanı → Session.expiresAt
@@ -509,7 +678,11 @@ export class AuthService {
   }
 
   /**
-   * Hash a plain-text password.
+   * KURALSIZ parola hash'i — YALNIZ bekçi/geliştirme fixture'ları içindir
+   * (`scripts/test_*`, `e2e-ortam.ts`). Üretim yolu kullanıcı parolasını
+   * `helpers/password-policy.helper.ts` → `hashNewPassword` ile yazar (kural +
+   * hash tek çağrı); `src/` içinden bu fonksiyonu çağırmak bekçi
+   * `test_password_policy` ile KIRMIZIDIR.
    */
   static async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 10);

@@ -17,7 +17,7 @@ import { AppError } from "../utils/app-error";
 import {
   resolveLoginLockoutKeys,
   reserveLoginAttempt,
-  resetLoginLockout,
+  settleLoginSuccess,
   releaseLoginAttempt,
 } from "../middlewares/login-lockout";
 import "../types/express-augment";
@@ -55,6 +55,13 @@ const loginQuickPinSchema = z.object({
   pin: z.string().regex(/^\d{6}$/, "PIN 6 haneli rakam olmalı"),
   clientType: clientTypeSchema,
   confirmKick: z.boolean().optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Mevcut parola gerekli").max(200),
+  // Uzunluk/yaygın parola kuralı serviste TEK helper'dadır; burada yalnız şekil.
+  newPassword: z.string().min(1, "Yeni parola gerekli").max(200),
+  clientType: clientTypeSchema,
 });
 
 /** Login isteğinden İSTEMCİ SÜRÜMÜNÜ çöz — `Session.clientVersion`e yazılır.
@@ -129,9 +136,10 @@ export class AuthController {
     // devam eder, yani DoS ayağı hiç kapanmaz.
     //
     // ⚠️ ANAHTAR ORTAMA GÖRE İKİ BİÇİMDE (bkz. login-lockout.ts başlığı):
-    //  • Fabrika (TRUST_PROXY yok) → TEK anahtar = req.ip, yani BUGÜNKÜ davranış.
-    //    Kullanıcı adı bilerek katılmaz: soket IP'si zaten cihaz başınadır ve
-    //    kullanıcı adını eklemek password-spraying'e kapı açardı.
+    //  • Fabrika (TRUST_PROXY yok) → geniş kova = req.ip (×1, eşik BUGÜNKÜ gibi:
+    //    aynı IP'den 5 hata kilit, kullanıcı adı değiştirmek spraying'e kapı
+    //    açmaz) + dar kova `ip|kullanıcı` (Y4: başarılı giriş yalnız kendi
+    //    hatalarını geniş kovadan düşebilsin diye; bkz. settleLoginSuccess).
     //  • Ters vekil arkasında → İKİ kova: dar (`ip|kullanıcı`, ×1) hesabı korur,
     //    geniş (`ip`, ×5) spraying'i yakalar. Orada tek-IP kilidi ANLAMSIZDIR:
     //    tüm ziyaretçiler kenar IP'sinden gelir ve şifresini yanlış giren ilk
@@ -182,7 +190,7 @@ export class AuthController {
 
     try {
       const result = await AuthService.login(body.username, body.password, ctx);
-      resetLoginLockout(lockoutKey);
+      settleLoginSuccess(lockoutKey, "account");
 
       // SystemLog'a AUTH event (Sistem Kayıtları sayfası bunu okur).
       void AuditService.logEvent({
@@ -191,6 +199,7 @@ export class AuthController {
         userId: result.user.userId,
         recordId: body.username,
         ipAddress,
+        ...(result.passwordChangeRequired ? { payload: { passwordChangeRequired: true } } : {}),
       });
 
       res.status(200).json({
@@ -198,8 +207,14 @@ export class AuthController {
         data: {
           token: result.token,
           user: result.user,
+          // Parola kurala uymuyor: masaüstünde token KISITLIDIR (yalnız parola
+          // değiştirme + çıkış), sahada yalnız mobil izinlerle. Alanı tanımayan
+          // eski panel izinsiz token'ı "yetkin yok" diye reddeder (fail-closed).
+          ...(result.passwordChangeRequired ? { passwordChangeRequired: true } : {}),
         },
-        message: "Giriş başarılı",
+        message: result.passwordChangeRequired
+          ? "Giriş başarılı — parolanızı değiştirmeniz gerekiyor"
+          : "Giriş başarılı",
       });
     } catch (error) {
       // F49 (kart/PIN ile aynı kural): yalnız 401 brute-force sayılır. 409
@@ -271,10 +286,12 @@ export class AuthController {
       confirmKick: body.confirmKick,
       isRemote: req.isRemote === true,
       clientVersion: resolveClientVersion(req),
+      // Saha kapısı: yalnız onaylı + aktif cihaz kaydı (device.middleware) — gövdeden değil.
+      fieldDevice: req.device ? { kind: req.device.kind } : null,
     };
     try {
       const result = await AuthService.loginWithCard(body.cardCode, ctx);
-      resetLoginLockout(lockoutKey);
+      settleLoginSuccess(lockoutKey, "device");
       void AuditService.logEvent({
         category: "AUTH",
         action: "LOGIN_SUCCESS",
@@ -355,10 +372,12 @@ export class AuthController {
       confirmKick: body.confirmKick,
       isRemote: req.isRemote === true,
       clientVersion: resolveClientVersion(req),
+      // Saha kapısı: yalnız onaylı + aktif cihaz kaydı (device.middleware) — gövdeden değil.
+      fieldDevice: req.device ? { kind: req.device.kind } : null,
     };
     try {
       const result = await AuthService.loginWithQuickPin(body.pin, ctx);
-      resetLoginLockout(lockoutKey);
+      settleLoginSuccess(lockoutKey, "device");
       void AuditService.logEvent({
         category: "AUTH",
         action: "LOGIN_SUCCESS",
@@ -569,6 +588,64 @@ export class AuthController {
       next(error);
     }
   }
+  /**
+   * POST /api/auth/change-password — KENDİ parolasını değiştir (2026-11-13).
+   * Normal oturum da kısıtlı oturum (`passwordChangeRequired`) da çağırabilir.
+   * Başarıda bu cihaz dahil bütün oturumlar düşer ve yanıt yeni TAM token taşır.
+   *
+   * Deneme kilidi giriş uçlarıyla AYNI mekanizma: eski parola tahmini kaba kuvvet
+   * sayılır (400 `CURRENT_PASSWORD_INVALID`); kova kullanıcı başınadır. Rezervasyon
+   * bcrypt'ten ÖNCE (giriş uçlarındaki sıra gerekçesi).
+   */
+  static async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const body = (() => {
+      try {
+        return changePasswordSchema.parse(req.body);
+      } catch (error) {
+        next(error);
+        return null;
+      }
+    })();
+    if (!body) return;
+    const userId = req.user?.userId;
+    if (!userId) {
+      next(AppError.unauthorized("Token bulunamadı"));
+      return;
+    }
+    const lockoutKey = resolveLoginLockoutKeys(req, `pwchg:${userId}`);
+    const lock = await reserveLoginAttempt(lockoutKey);
+    if (lock.blocked) {
+      next(
+        AppError.tooManyRequests(
+          `Çok fazla hatalı deneme. ${lock.retryAfterSec} saniye sonra tekrar deneyin.`,
+          { code: "LOGIN_LOCKED", retryAfterSec: lock.retryAfterSec },
+        ),
+      );
+      return;
+    }
+    const ctx: LoginContext = {
+      clientType: body.clientType,
+      deviceId: resolveLoginDeviceId(req),
+      isRemote: req.isRemote === true,
+      clientVersion: resolveClientVersion(req),
+    };
+    try {
+      const result = await AuthService.changeOwnPassword(userId, body.currentPassword, body.newPassword, ctx);
+      settleLoginSuccess(lockoutKey, "account");
+      res.status(200).json({
+        success: true,
+        data: { token: result.token, user: result.user },
+        message: "Parolanız değiştirildi",
+      });
+    } catch (error) {
+      const isCredentialError =
+        error instanceof AppError &&
+        (error.details as { code?: string } | undefined)?.code === "CURRENT_PASSWORD_INVALID";
+      if (!isCredentialError) releaseLoginAttempt(lockoutKey);
+      next(error);
+    }
+  }
+
   /**
    * GET /api/auth/totp/enroll?token= — kurulum penceresini OKU (QR göster).
    *

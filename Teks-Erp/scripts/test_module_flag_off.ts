@@ -291,7 +291,7 @@ const SONDA_IZINLERI = [
 ];
 
 const TEST_USERNAME = `bekci.modul.${process.pid}`;
-const TEST_PASSWORD = "test123456";
+const TEST_PASSWORD = "Bekci-Dusuk-Yetki-48";
 let testUserId: string | null = null;
 const ilkDegerler = new Map<string, boolean>();
 /**

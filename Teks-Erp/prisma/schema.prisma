@@ -413,6 +413,11 @@ model User {
   id            String    @id @default(uuid()) @db.Uuid
   username      String    @unique @db.VarChar(50)
   passwordHash  String
+  /// Parolanın hangi kural sürümüyle belirlendiği (Y8, 2026-11-13). 0 = kural
+  /// helper'ından geçmeden yazılmış/ölçülmemiş eski parola. Yalnız
+  /// `password-policy.helper` `newPasswordFields` yazar (yarat · sıfırla · kendi
+  /// değiştir · süperadmin kur); patron bulutuna yalnız GÜNCEL sürümlü özet gider.
+  passwordPolicyVersion Int @default(0)
   fullName      String    @db.VarChar(100)
   isActive      Boolean   @default(true)
   // JWT iptal sayacı: yetki grant/revoke/set + şifre sıfırlamada artar. verifyToken

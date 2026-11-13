@@ -21,6 +21,7 @@ Birden çok alanı kesen konvansiyonlar (audit, katman sırası, hata/mesaj söz
 - Electron `webPreferences`: `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`; renderer `electron`/`fs`/`path`/`child_process` import etmez, native API'ye yalnız `window.api` ile ulaşır. [inceleme]
 - Electron renderer'ında token localStorage'a yazılmaz (`safeStorage` + `electron-store`); tek istisna `window.api` olmayan web derlemesidir. [inceleme]
 - Süperadmin kapısı yalnız `Electron/src/lib/superadmin-gate.ts`ten import edilir, kopyası yazılmaz. [inceleme]
+- Depodaki örnek ortam dosyaları (`.env.*`, `example-env*`) sır anahtarlarında ve URL parolasında yalnız yer tutucu taşır (`<…>`, `****`, `BURAYA…`, `change_me…`); 2026-11-13'e kadarki demo JWT değeri hiçbir izlenen dosyaya geri girmez (bekçide yalnız sha256'sı). [bekçi: test_ornek_env_sirsiz]
 
 ### Uzak erişim
 - Uzak/LAN ayrımı soketten (`req.socket.localPort`) çözülür; `clientType` güvenlik sınırı değildir, soket okunamazsa istek LAN sayılır. [bekçi: test_remote_access_guard]
@@ -62,7 +63,7 @@ Birden çok alanı kesen konvansiyonlar (audit, katman sırası, hata/mesaj söz
 - Yeni ekran görünmüyorsa sırayla bak: izin satırı DB'de mi, kullanıcıya atanmış mı, kullanıcı yeniden giriş yaptı mı (JWT bayat).
 
 ## Bekçiler
-Backend: `test_audit_muafiyeti` · `test_audit_depth` · `test_audit_okuma_kaynagi` · `test_p2002_hedef_tek_kaynak` · `test_musteri_adi_kodda_yok` · `test_firma_adi_dondur` · `test_backup` · `test_offsite_sweep` · `test_process_warnings` · `test_remote_access_guard` · `test_totp` · `test_middleware_order` · `test_client_registry` · `test_active_sessions` · `test_session_registry` · `test_boss_overview` · `test_device_pairing_flag` · `test_sack_weigh_source` · `test_bash_guard_scope` · `test_hook_config` · `test_patron_bulut_imza` · `test_patron_bulut_uygunluk`
+Backend: `test_audit_muafiyeti` · `test_ornek_env_sirsiz` · `test_audit_depth` · `test_audit_okuma_kaynagi` · `test_p2002_hedef_tek_kaynak` · `test_musteri_adi_kodda_yok` · `test_firma_adi_dondur` · `test_backup` · `test_offsite_sweep` · `test_process_warnings` · `test_remote_access_guard` · `test_totp` · `test_middleware_order` · `test_client_registry` · `test_active_sessions` · `test_session_registry` · `test_boss_overview` · `test_device_pairing_flag` · `test_sack_weigh_source` · `test_bash_guard_scope` · `test_hook_config` · `test_patron_bulut_imza` · `test_patron_bulut_uygunluk`
 
 İstemci: `discovery-logic.test.ts` · `connected-devices-utils.test.ts` · `discovery-ipc-contract.test.ts` · `boss-shell.test.ts` · `BackupScheduleCard.test.tsx` · `discovery.contract.test.ts` · `discovery.test.ts` · `discovery.service.test.ts` · `pairingGate.test.ts` · `useSackWeigh.test.tsx` · `BarcodeScannerView.test.tsx` · `shortCutQuality.test.ts` · `resolveShortCutConfig.test.ts` · `ModalTextInput.test.tsx`
 

@@ -37,7 +37,7 @@ async function main() {
   try {
     // Pasife alma yolu — kimlikler korunur
     const u1 = await PM.createUser(
-      { username: uname, fullName: "TEST Life", password: "123456", generateMobileCredentials: false },
+      { username: uname, fullName: "TEST Life", password: "Bekci-Parola-2026x", generateMobileCredentials: false },
       admin.id,
     );
     created.push(u1.id);
@@ -74,7 +74,7 @@ async function main() {
 
     // 6) orijinal isimle yeni kullanıcı
     const u2 = await PM.createUser(
-      { username: uname, fullName: "TEST Life 2", password: "123456", generateMobileCredentials: false },
+      { username: uname, fullName: "TEST Life 2", password: "Bekci-Parola-2026x", generateMobileCredentials: false },
       admin.id,
     );
     created.push(u2.id);

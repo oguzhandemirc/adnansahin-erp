@@ -292,6 +292,8 @@ const LOGIN_PATHS = new Set([
   "/api/auth/login",
   "/api/auth/login-card",
   "/api/auth/login-quick-pin",
+  // Kendi parolasını değiştirme de eski parolayı bcrypt'le doğrular → aynı kova.
+  "/api/auth/change-password",
 ]);
 
 /** Sayılmayan metodlar. OPTIONS bilinçli: preflight'ı bloklamak CORS'u bozar

@@ -35,7 +35,13 @@ import prisma from "../src/lib/prisma";
 
 /** Sabit kimlik — üç HTTP testi de bunu kullanır. */
 export const TEST_ADMIN_USERNAME = "TEST-ADMIN";
-export const TEST_ADMIN_PASSWORD = "TestAdmin2026!";
+/**
+ * Parola kuralına (`password-policy.helper.ts`) UYAR — kullanıcı adına dayanmaz.
+ * Eski değer `TestAdmin2026!` kullanıcı adı + yıldı: 2026-11-13'ten beri böyle
+ * bir parolayla giriş KISITLI/mobil kapsamlı token verir ve fixture'ın tam
+ * yetkisi sessizce düşerdi.
+ */
+export const TEST_ADMIN_PASSWORD = "Bekci-Tam-Yetki-Anahtar-26";
 
 /**
  * Koşuma özgü parola üretir. Sabit parola HER veritabanında aynı olduğu için

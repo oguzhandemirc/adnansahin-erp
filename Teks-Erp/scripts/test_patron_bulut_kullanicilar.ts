@@ -7,7 +7,8 @@
 //  §2 türetme tablosu: her bulut izni beklenen fabrika izinlerinden doğar; giriş yoksa boş; finans türetilmez;
 //     her kaynak kod katalogda; her çıktı tel desenine uyar.
 //  §3 dışa aktarım (gerçek DB, kendi fixture'ı): giriş izinli aktif kullanıcı GİDER; pasif · silinmiş · izinsiz ·
-//     süresi geçmiş izin · henüz başlamamış izin · teknik kullanıcı GİTMEZ; süperadmin satırı yüklemde düşer
+//     süresi geçmiş izin · henüz başlamamış izin · teknik kullanıcı · parolası yeni kuralla belirlenmemiş (Y8,
+//     `passwordPolicyVersion` < güncel; sorgu + yüklem) GİTMEZ; süperadmin satırı yüklemde düşer
 //     (sorgu süzgeci ayrıca yapısal ölçülür); sıra `id`, özet yeniden hesaplanabilir.
 //  §4 hijyen: select anahtar kümesi BİREBİR · fixture'ın PIN/kart/TOTP/oturum sayacı ne anahtar ne değer olarak
 //     tel kaydında yok · katı şema fazladan alanı reddeder · kuru koşum aracı parola özeti ve küme özeti basmaz.
@@ -28,6 +29,9 @@
 //   · `cloudUserCandidateWhere`ten `isSystemAccount: false` çıkarıldı → §3 sorgu süzgeci ✗ (46/1)
 //   · `CLOUD_USER_SELECT`e `quickPin: true` eklendi → §4 select kümesi ✗ (46/1)
 //   · `hasPatronLogin` `matchesPermission`e çevrildi (joker geçer) → §1 joker ✗ ×2 (45/2)
+// NEGATİF SONDA Y8 (B, 2026-11-13, bu commit; ikisi de kırmızı verdi, geri alındı):
+//   · `cloudUserCandidateWhere`ten `passwordPolicyVersion` çıkarıldı → §3 sorgu süzgeci ✗
+//   · `isCloudUserCandidate`ten sürüm koşulu çıkarıldı → §3 yüklem ✗ (where tuttuğu için eski kullanıcı yine gitmez)
 // NEGATİF SONDA F2 (B, 2026-11-13, 68 kontrol; dördü de kırmızı verdi, geri alındı → 68/0):
 //   · uzlaştırmanın KAPALI dalında `users.start()` → §5 ✗ (67/1)
 //   · turdan ön koşul sorusu kaldırıldı → §5 kapalıyken küme kuruldu ✗ (67/1)
@@ -60,6 +64,7 @@ import type { CloudEligibility } from "../src/cloud-sync/eligibility";
 import type { CloudHttpRequest, CloudTransport } from "../src/cloud-sync/cloud-client";
 import { generateKeyFile, loadKeyFile } from "../src/lib/cloud-signing/key-file";
 import { reconcilePatronCloud, type ReconcileDeps } from "../src/jobs/patron-cloud.jobs";
+import { PASSWORD_POLICY_VERSION } from "../src/services/helpers/password-policy.helper";
 import {
   __cloudUsersTimerArmedForTests,
   __configureCloudUsersForTests,
@@ -85,7 +90,7 @@ const createdUsers: string[] = [];
 const secrets: string[] = [];
 
 interface Fixture {
-  readonly ok: string; readonly passive: string; readonly deleted: string; readonly noPerm: string;
+  readonly legacy: string; readonly ok: string; readonly passive: string; readonly deleted: string; readonly noPerm: string;
   readonly expired: string; readonly future: string; readonly tech: string; readonly okHash: string;
 }
 
@@ -151,7 +156,7 @@ async function mkUser(tag: string, over: Record<string, unknown> = {}): Promise<
   const totp = randomBytes(20).toString("hex").toUpperCase().slice(0, 32);
   secrets.push(pin, card, totp);
   const u = await prisma.user.create({
-    data: { username: `${STAMP}-${tag}-${randomBytes(3).toString("hex")}`, fullName: `${STAMP} ${tag}`, passwordHash: hash, quickPin: pin, cardToken: card, totpSecret: totp, totpEnabledAt: new Date(), tokenVersion: 7, ...over },
+    data: { username: `${STAMP}-${tag}-${randomBytes(3).toString("hex")}`, fullName: `${STAMP} ${tag}`, passwordHash: hash, passwordPolicyVersion: PASSWORD_POLICY_VERSION, quickPin: pin, cardToken: card, totpSecret: totp, totpEnabledAt: new Date(), tokenVersion: 7, ...over },
     select: { id: true },
   });
   createdUsers.push(u.id);
@@ -181,7 +186,10 @@ async function buildFixture(): Promise<Fixture> {
   await grant(future.id, "patron:giris", { validFrom: new Date(Date.now() + DAY) });
   const tech = await mkUser("teknik");
   await grant(tech.id, "patron:giris");
-  return { ok: ok.id, passive: passive.id, deleted: deleted.id, noPerm: noPerm.id, expired: expired.id, future: future.id, tech: tech.id, okHash: ok.hash };
+  // Y8: parolası yeni kuraldan geçmemiş (sürüm 0 = varsayılan/eski) kullanıcı.
+  const legacy = await mkUser("eski-parola", { passwordPolicyVersion: 0 });
+  await grant(legacy.id, "patron:giris");
+  return { legacy: legacy.id, ok: ok.id, passive: passive.id, deleted: deleted.id, noPerm: noPerm.id, expired: expired.id, future: future.id, tech: tech.id, okHash: ok.hash };
 }
 
 /** Teknik kullanıcı kaydı: yoksa fixture'ı yazar (sonda silinir), varsa olduğu gibi kalır. Dönüş: bu koşum yazdı mı. */
@@ -200,17 +208,18 @@ async function section3(f: Fixture, techId: string): Promise<void> {
   const okRec = set.users.find((u) => u.id === f.ok);
   check("⭐ giriş izinli aktif kullanıcı GİDER, izinleri türetilmiş", !!okRec && sameSet(okRec.izinler, ["bulut:ozet:oku", "bulut:siparis:oku", "bulut:siparis:yaz"]), okRec?.izinler.join(",") ?? "yok");
   check("parola özeti fabrikadaki bcrypt özetiyle aynı (yeniden kodlanmaz)", okRec?.parolaOzeti === f.okHash);
-  const absent: Array<[string, string]> = [["pasif", f.passive], ["silinmiş", f.deleted], ["izinsiz", f.noPerm], ["süresi geçmiş izin", f.expired], ["henüz başlamamış izin", f.future]];
+  const absent: Array<[string, string]> = [["parolası yeni kuralla belirlenmemiş (Y8, sürüm 0)", f.legacy], ["pasif", f.passive], ["silinmiş", f.deleted], ["izinsiz", f.noPerm], ["süresi geçmiş izin", f.expired], ["henüz başlamamış izin", f.future]];
   for (const [label, id] of absent) check(`⭐ ${label} GİTMEZ`, !ids.has(id));
   check(`⭐ teknik kullanıcı GİTMEZ${techId === f.tech ? "" : " (kayıtlı teknik kullanıcı)"}`, !ids.has(techId) && (techId !== f.tech || !ids.has(f.tech)));
   const sys = await prisma.user.findMany({ where: { isSystemAccount: true }, select: { id: true } });
   check("DB'deki süperadmin (varsa) GİTMEZ", sys.every((s) => !ids.has(s.id)), `${sys.length} sistem hesabı`);
-  const fakeSys: CloudUserRow = { id: randomUUID(), username: "x", fullName: "x", passwordHash: "x", isActive: true, deletedAt: null, isSystemAccount: true };
+  const fakeSys: CloudUserRow = { id: randomUUID(), username: "x", fullName: "x", passwordHash: "x", passwordPolicyVersion: PASSWORD_POLICY_VERSION, isActive: true, deletedAt: null, isSystemAccount: true };
   check("⭐ süperadmin satırı yüklemde düşer (birebir giriş izni olsa da)", !isCloudUserCandidate(fakeSys, null, ["patron:giris"]));
   check("kontrol: aynı satır süperadmin değilse yüklemden geçer", isCloudUserCandidate({ ...fakeSys, isSystemAccount: false }, null, ["patron:giris"]));
+  check("⭐ Y8: eski kural sürümlü parola satırı yüklemde düşer", !isCloudUserCandidate({ ...fakeSys, isSystemAccount: false, passwordPolicyVersion: PASSWORD_POLICY_VERSION - 1 }, null, ["patron:giris"]));
   const w = cloudUserCandidateWhere("00000000-0000-4000-8000-000000000001");
-  check("⭐ sorgu süzgeci: aktif ∧ silinmemiş ∧ süperadmin değil ∧ teknik değil ∧ giriş izni satırı",
-    w.isActive === true && w.deletedAt === null && w.isSystemAccount === false && JSON.stringify(w.id) === JSON.stringify({ not: "00000000-0000-4000-8000-000000000001" }) && JSON.stringify(w.permissions).includes("patron:giris"), JSON.stringify(w));
+  check("⭐ sorgu süzgeci: aktif ∧ silinmemiş ∧ süperadmin değil ∧ güncel parola kuralı (Y8) ∧ teknik değil ∧ giriş izni satırı",
+    w.isActive === true && w.deletedAt === null && w.isSystemAccount === false && JSON.stringify(w.passwordPolicyVersion) === JSON.stringify({ gte: PASSWORD_POLICY_VERSION }) && JSON.stringify(w.id) === JSON.stringify({ not: "00000000-0000-4000-8000-000000000001" }) && JSON.stringify(w.permissions).includes("patron:giris"), JSON.stringify(w));
   const sorted = set.users.map((u) => u.id);
   check("küme id'ye göre sıralı, tekrar yok", sorted.join() === [...sorted].sort().join() && new Set(sorted).size === sorted.length);
   check("özet = sha256(JSON(kullanicilar))", set.digest === createHash("sha256").update(JSON.stringify(set.users)).digest("hex") && set.digest === cloudUsersDigest(set.users));
@@ -219,7 +228,7 @@ async function section3(f: Fixture, techId: string): Promise<void> {
 // ── §4 ──────────────────────────────────────────────────────────────────────
 async function section4(f: Fixture): Promise<void> {
   console.log("\n§4 hijyen: açık select, sır yok, katı şema, kuru koşum basmaz");
-  check("⭐ select anahtar kümesi BİREBİR", sameSet(Object.keys(CLOUD_USER_SELECT), ["id", "username", "fullName", "passwordHash", "isActive", "deletedAt", "isSystemAccount"]), Object.keys(CLOUD_USER_SELECT).join(","));
+  check("⭐ select anahtar kümesi BİREBİR", sameSet(Object.keys(CLOUD_USER_SELECT), ["id", "username", "fullName", "passwordHash", "passwordPolicyVersion", "isActive", "deletedAt", "isSystemAccount"]), Object.keys(CLOUD_USER_SELECT).join(","));
   const set = await collectCloudUsers();
   const text = JSON.stringify(set.users);
   check("tel kaydında yasak anahtar yok", !/quickPin|cardToken|totp|tokenVersion|isSystemAccount|passwordHash/i.test(text));

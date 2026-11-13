@@ -35,7 +35,7 @@ async function main() {
   try {
     // 1) default (bayrak yok) → üretim izinleri
     const u1 = await PermissionManagementService.createUser(
-      { username: `test-perm-def-${ts}`, fullName: "TEST Default", password: "123456" },
+      { username: `test-perm-def-${ts}`, fullName: "TEST Default", password: "Bekci-Parola-2026x" },
       admin.id,
     );
     created.push(u1.id);
@@ -45,7 +45,7 @@ async function main() {
 
     // 2) grantOperatorDefaults=true → aynı
     const u2 = await PermissionManagementService.createUser(
-      { username: `test-perm-on-${ts}`, fullName: "TEST On", password: "123456", grantOperatorDefaults: true },
+      { username: `test-perm-on-${ts}`, fullName: "TEST On", password: "Bekci-Parola-2026x", grantOperatorDefaults: true },
       admin.id,
     );
     created.push(u2.id);
@@ -54,7 +54,7 @@ async function main() {
 
     // 3) grantOperatorDefaults=false → sıfır izin
     const u3 = await PermissionManagementService.createUser(
-      { username: `test-perm-off-${ts}`, fullName: "TEST Off", password: "123456", grantOperatorDefaults: false },
+      { username: `test-perm-off-${ts}`, fullName: "TEST Off", password: "Bekci-Parola-2026x", grantOperatorDefaults: false },
       admin.id,
     );
     created.push(u3.id);
