@@ -8,7 +8,7 @@ import { projectionDef, type ProjectionDef } from "../catalog/projections";
 import { badRequest, forbidden, notFound } from "../lib/errors";
 import { foldSql, searchCondition } from "../lib/search";
 import { NO_TENANT, withTesis } from "../lib/tenant";
-import { ANAHTAR_SUZGEC_AZAMI, ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_KEY_FILTER_KEYS, LIST_KEY_FILTERS, LIST_SEARCH, LIST_SORT, SUZGEC_AZAMI, type CustomerSummary, type ListFilterOption, type ListSortDir, type ListSortKind, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListKeyFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
+import { ANAHTAR_SUZGEC_AZAMI, ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_MEMBER_FILTER_KEYS, LIST_MEMBER_FILTERS, LIST_KEY_FILTER_KEYS, LIST_KEY_FILTERS, LIST_SEARCH, LIST_SORT, SUZGEC_AZAMI, type CustomerSummary, type ListFilterOption, type ListSortDir, type ListSortKind, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListMemberFilterKey, type ListKeyFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
 import type { CloudContext } from "./context";
 import { loadServiceFacts, serviceState } from "./service-lifecycle";
 
@@ -33,7 +33,7 @@ export interface ListQuery {
   readonly limit: number;
   readonly durum?: string;
   /** Kimlik süzgeçleri (`LIST_ID_FILTERS` beyanı); beyansız projeksiyonda 400. */
-  readonly kimlik?: Partial<Readonly<Record<ListIdFilterKey, string>>>;
+  readonly kimlik?: Partial<Readonly<Record<ListIdFilterKey | ListMemberFilterKey, string>>>;
   /** Fabrika anahtarı süzgeçleri (`LIST_KEY_FILTERS` beyanı); beyansız projeksiyonda 400. */
   readonly anahtar?: Partial<Readonly<Record<ListKeyFilterKey, string>>>;
   /** Seçici araması (`LIST_SEARCH`teki projeksiyonlar); imleç aynı terimle devam eder. */
@@ -83,15 +83,25 @@ const ID_FIELD_SQL: Readonly<Record<ListIdFilterKey, Prisma.Sql>> = {
   urunId: Prisma.sql`r.data->>'urunId'`,
 };
 
-/** Kimlik süzgeçleri: anahtar projeksiyonun beyanında değilse ya da değer UUID değilse 400 (fail-closed). */
+/** Literal dizi alanı (projeksiyon → `LIST_MEMBER_FILTERS` beyanı); dizi değilse `@>` eşleşmez. */
+const MEMBER_FIELD_SQL: Readonly<Record<string, Prisma.Sql>> = {
+  cariKartIdleri: Prisma.sql`r.data->'cariKartIdleri'`,
+  siparisIdleri: Prisma.sql`r.data->'siparisIdleri'`,
+  fasonFirmaIdleri: Prisma.sql`r.data->'fasonFirmaIdleri'`,
+};
+
+/** Kimlik süzgeçleri: anahtar projeksiyonun (eşitlik ya da üyelik) beyanında değilse ya da değer UUID değilse 400 (fail-closed). */
 function idFilters(name: string, q: ListQuery): Prisma.Sql[] {
   const out: Prisma.Sql[] = [];
-  for (const key of LIST_ID_FILTER_KEYS) {
+  for (const key of new Set<ListIdFilterKey | ListMemberFilterKey>([...LIST_ID_FILTER_KEYS, ...LIST_MEMBER_FILTER_KEYS])) {
     const v = q.kimlik?.[key];
     if (v === undefined) continue;
-    if (!LIST_ID_FILTERS[key].includes(name)) throw badRequest(`Bu listede ${key} süzgeci yok`);
+    const esit = (LIST_ID_FILTERS as Partial<Record<string, readonly string[]>>)[key]?.includes(name) === true;
+    const uyelik = (LIST_MEMBER_FILTERS as Partial<Record<string, Readonly<Record<string, string>>>>)[key]?.[name];
+    if (!esit && uyelik === undefined) throw badRequest(`Bu listede ${key} süzgeci yok`);
     if (!UUID.test(v)) throw badRequest(`${key} biçimsiz`);
-    out.push(Prisma.sql`AND ${ID_FIELD_SQL[key]} = ${v.toLowerCase()}`);
+    if (esit) out.push(Prisma.sql`AND ${ID_FIELD_SQL[key as ListIdFilterKey]} = ${v.toLowerCase()}`);
+    else out.push(Prisma.sql`AND (${MEMBER_FIELD_SQL[uyelik!]}) @> jsonb_build_array(${v.toLowerCase()}::text)`);
   }
   return out;
 }
@@ -120,6 +130,7 @@ export const LIST_CAPABILITIES: ListCapabilities = {
   aranabilir: Object.keys(LIST_SEARCH),
   anahtarSuzgecleri: LIST_KEY_FILTERS,
   siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])),
+  uyelikSuzgecleri: Object.fromEntries(Object.entries(LIST_MEMBER_FILTERS).map(([k, p]) => [k, Object.keys(p)])),
 };
 
 const NUMERIC = "^-?[0-9]+(\\.[0-9]+)?$";

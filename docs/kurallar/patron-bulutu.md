@@ -55,6 +55,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Farklı birimler toplanmaz: sipariş ve açık miktar birim başına ayrı satırdır (`[{birim, miktar}]`). [bekçi: test_patron_bulut_cari_ozeti]
 - Sevk BRÜT'tür, iade ayrı sayıdır ve çıkıştan düşülmez; iptal edilen iade sayılmaz. [bekçi: test_patron_bulut_cari_ozeti]
 - "Son 12 ay"ın başı fabrika gününe hizalanır; veri değişmedikçe anlığın içerik özeti gün içinde değişmez. [bekçi: test_patron_bulut_cari_ozeti]
+- İş emri satırının aşama/fason/müşteri alanları ve `fason-acik` kırılımı ortak okumalardan gelir (`cloud-sync/work-order-facts.ts`: İE'nin topları `whereRollsOfWorkOrders`, Kurşun/Tambur kuyruğu akış panosuyla aynı `production-flow-where.helper`, müşteri `rollupWorkOrderCustomers`, kapanış anı defterden); ikinci tanım yazılmaz. [bekçi: test_patron_bulut_is_emri]
 - Tel sözleşmesi yalnız EKLEYEREK genişler: var olan uç, alan, projeksiyon adı değişmez; yeni alan katalog sürümünü artırır. [inceleme]
 - Sözleşme genişletmesinde kurulum sırası önce bulut, sonra fabrikadır; eski bulut bilinmeyen projeksiyonu yalnız o girdide reddeder (tur KISMI, düşmez) ama reddedilen kayıt her turda baştan, anlık her aralıkta yeniden gönderilir. [inceleme]
 
@@ -82,13 +83,15 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ## Bekçiler
 
-Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
+Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
 Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_dogrulama_kodu` (doğrulama kodu isteğe bağlı · açıkken zorunlu · sızıntı yok · CLI kapatma) · `test_cari_ozeti` · `test_hizmet_sonu` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 
 Rapor isteği hacim ölçümü bekçi değildir, yalnız yerel `_prova`/`_test` veritabanında koşar: `Teks-Erp/scripts/olcum_patron_bulut_rapor.ts` (6 karne × süre, boyut, panel eşitliği, yük altında panel sorgusu gecikmesi).
+
+İş emri projeksiyonu ölçümü bekçi değildir, yalnız yerel `_prova`/`_test` veritabanında koşar: `Teks-Erp/scripts/olcum_patron_is_emri.ts` (tasarım sayıları ↔ kurucu, satır/anlık boyutu; `--ornek=` repo dışına örnek yazar).
 
 Uçtan uca eşitleme ölçümü de bekçi değildir, yalnız yerel `_prova`/`_test` veritabanı ve `127.0.0.1` bulutuyla koşar: `Teks-Erp/scripts/olcum_patron_esitleme_uctan_uca.ts` (ilk TAM, sayım eşleşmesi, artımlı, bulut kapalı/açık, kapatma).
 

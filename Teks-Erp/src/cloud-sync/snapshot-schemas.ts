@@ -81,8 +81,20 @@ export const SNAPSHOT_WIRE_SCHEMAS = {
     /** Fasonda bekleyen top sayısı; `boyahanedeTop` bunun Boyahane kategorili firmalardaki kısmı. */
     acikTop: Num,
     boyahanedeTop: Num,
+    /** Fasondaki topların farklı iş emri ve müşteri sayısı. */
+    isEmriSayisi: Num,
+    musteriSayisi: Num,
+    /** Aktif hizmet kategorilerinin HEPSİ (0'lılar dahil). */
+    kategoriler: z.array(z.strictObject({ kod: Str, ad: Str, acikTop: Num, kalanMiktar: z.string().regex(/^\d+(\.\d+)?$/) })),
     firmalar: z.array(z.strictObject({
       fasonFirmaId: z.string().uuid(), etiket: Str, acikSevk: Num, kalanMiktar: z.string().regex(/^\d+(\.\d+)?$/), acikTop: Num, kategoriler: z.array(Str),
+      enEskiGonderim: IsoOrNull,
+      isEmriSayisi: Num,
+      /** Müşteri = topun iş emrinin `musteriAdi` çözümü; müşterisiz toplar `cariKartId: null` satırında. Top azalan. */
+      musteriler: z.array(z.strictObject({ cariKartId: z.string().uuid().nullable(), ad: Str.nullable(), top: Num, metre: Num })),
+      urunler: z.array(z.strictObject({
+        urunId: z.string().uuid().nullable(), urunAdi: Str.nullable(), renkId: z.string().uuid().nullable(), renkAdi: Str.nullable(), top: Num, metre: Num,
+      })),
     })),
   }),
   "rapor-katalogu": z.strictObject({

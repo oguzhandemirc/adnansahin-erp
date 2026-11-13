@@ -1,7 +1,7 @@
 // TÜRETİLMİŞ ALANLAR — fabrika hesaplar, bulut saklar (§1.1). Her alan katalogda adı geçen
 // TEK KAYNAK yardımcıyı çağırır; formül burada yeniden yazılmaz (liste ekranı ile
 // projeksiyon aynı sayıyı basmak zorunda — "ayrışan yüzey" sınıfı).
-import { ItemUnit, Prisma } from "@prisma/client";
+import { ItemUnit, Prisma, type WorkOrderStatus } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { isActiveLine, isMeasuredLine } from "../services/helpers/order-line-scope.helper";
 import { daysPastDeadline, isDeadlineOpenStatus } from "../services/helpers/order-deadline.helper";
@@ -10,6 +10,11 @@ import { loadSackContentTotals } from "../services/helpers/sack-content-totals.h
 import { currentWorkOrderStep } from "../services/helpers/work-order-current-step.helper";
 import { ACTIVE_ORDER_LINK } from "../services/helpers/order-link.helper";
 import { WorkOrderService } from "../services/workorder.service";
+import { sortLinksByLinkedAt } from "../services/helpers/work-order-customers.helper";
+import {
+  isOpenWorkOrderStatus, loadCloseDates, loadOpenFasonOfWorkOrders, loadRollStagesOfWorkOrders, metreNumber, NO_FASON,
+  STAGE_STATION_SELECT, workOrderStage, WO_ORDER_LINKS_SELECT,
+} from "./work-order-facts";
 
 type RawRow = Record<string, unknown> & { id: string };
 export type DerivedValues = Map<string, Record<string, unknown>>;
@@ -146,27 +151,52 @@ async function workOrderDerived(rows: readonly RawRow[]): Promise<DerivedValues>
     where: { id: { in: ids(rows) } },
     select: {
       id: true,
-      steps: { select: { id: true, stepSequence: true, status: true, stationId: true, station: { select: { name: true } } }, orderBy: { stepSequence: "asc" } },
-      // Seçim liste ekranıyla aynı (`WO_LIST_ORDER_CUSTOMER`); aktif bağ yüklemi tek kaynaktan (koparılmış bağ girmez).
-      orderLinks: {
-        where: ACTIVE_ORDER_LINK,
-        orderBy: { createdAt: "asc" },
-        select: { orderLineId: true, createdAt: true, orderLine: { select: { order: { select: { customer: { select: { id: true, name: true } } } } } } },
+      steps: {
+        select: { id: true, stepSequence: true, status: true, stationId: true, station: { select: STAGE_STATION_SELECT } },
+        orderBy: { stepSequence: "asc" },
       },
+      // Seçim liste ekranıyla aynı (`WO_LIST_ORDER_CUSTOMER`); aktif bağ yüklemi tek kaynaktan (koparılmış bağ girmez).
+      orderLinks: { where: ACTIVE_ORDER_LINK, orderBy: WO_ORDER_LINKS_SELECT.orderBy, select: WO_ORDER_LINKS_SELECT.select },
     },
   });
   // Yöntem canlı dosyada `private`; dosyaya dokunmamak için öğe erişimiyle çağrılır (TS kaçışı, çalışma anı farkı yok).
   const service = new WorkOrderService();
   const meters: MetersFn = service["withProductionMeters"].bind(service);
   const withMeters = await meters(wos);
+  const woIds = ids(rows);
+  const stages = await loadRollStagesOfWorkOrders(woIds);
+  const fason = await loadOpenFasonOfWorkOrders(woIds);
+  const closeDates = await loadCloseDates(rows.map((r) => ({ id: r.id, status: r.status as WorkOrderStatus, cancelledAt: (r.cancelledAt as Date | null) ?? null })));
+  const items = await displayNames("item", rows.map((r) => r.targetItemId));
+  const colors = await displayNames("color", rows.map((r) => r.targetColorId));
+  const rowById = new Map(rows.map((r) => [r.id, r]));
   const out: DerivedValues = new Map();
   for (const w of withMeters) {
+    const r = rowById.get(w.id)!;
+    const open = isOpenWorkOrderStatus(r.status as WorkOrderStatus);
+    const current = currentWorkOrderStep(w.steps);
+    const orders = new Map<string, string>();
+    for (const l of sortLinksByLinkedAt(w.orderLinks)) orders.set(l.orderLine.order.id, l.orderLine.order.orderNumber);
+    const asamaTop = stages.get(w.id) ?? [];
     out.set(w.id, {
       uretilenMetre: new Prisma.Decimal(w.producedMeters),
       girenMetre: new Prisma.Decimal(w.inputMeters),
       siparisMetre: new Prisma.Decimal(w.orderedMeters),
       cariKartIdleri: w.customers.map((c) => c.id),
-      aktifIstasyonId: currentWorkOrderStep(w.steps)?.stationId ?? null,
+      aktifIstasyonId: current?.stationId ?? null,
+      acik: open,
+      kapanisTarihi: closeDates.get(w.id) ?? null,
+      musteriAdi: w.customers[0]?.name ?? null,
+      musteriAdlari: w.customers.map((c) => c.name),
+      siparisIdleri: [...orders.keys()],
+      siparisNolari: [...orders.values()],
+      urunAdi: items.get(r.targetItemId as string) ?? null,
+      renkAdi: colors.get(r.targetColorId as string) ?? null,
+      asama: open ? workOrderStage(current?.station) : null,
+      asamaTop,
+      topSayisi: asamaTop.reduce((n, a) => n + a.top, 0),
+      metre: metreNumber(asamaTop.reduce((m, a) => m.plus(a.metre), D0())),
+      ...(fason.get(w.id) ?? NO_FASON),
     });
   }
   return out;
@@ -191,5 +221,6 @@ export const DERIVER_ROW_FIELDS: Readonly<Record<string, readonly string[]>> = {
   "siparis-kalemi": ["quantity", "shippedQty", "unit", "cancelledAt", "itemId", "colorId"],
   sevkiyat: ["customerId"],
   iade: ["reasonId"],
+  "is-emri": ["status", "cancelledAt", "targetItemId", "targetColorId"],
 };
 

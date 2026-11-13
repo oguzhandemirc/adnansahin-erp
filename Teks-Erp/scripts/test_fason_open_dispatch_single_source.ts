@@ -332,6 +332,10 @@ const REMAINDER_HAM_SQL_MUAF = new Set([
   "scripts/olcum_scorecard_kismi_dogrudan_sevk.ts",
   // Patron anlığının BAĞIMSIZ karşılaştırma SQL'i — helper'ı çağırsa kendi kendini ölçerdi.
   "scripts/lib/anlik-bagimsiz.ts",
+  // Patron bulutu değişiklik tespiti: fason firma adı değişince açık kalemli İE'leri bulan ham SQL (`change-scan` SQL koşar).
+  "src/cloud-sync/catalog-facts.ts",
+  // Patron İE satırının fason/müşteri kırılımını kurucudan BAĞIMSIZ ölçen SQL.
+  "scripts/test_patron_bulut_is_emri.ts",
 ]);
 
 function remainderHamSqlTara(): { muaflarda: string[]; kacaklar: string[] } {

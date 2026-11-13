@@ -123,7 +123,16 @@ export function subRowClasses(p: RecordProjection): Array<Exclude<DataClass, "IS
  * Türetilmiş alanın okuduğu ama değişiklik kaynağı OLMAYAN tablolar — kapsama gerekçesiyle.
  * Buradaki her satır ölçülmüş bir yan yoldur; gerekçesiz satır eklenmez (§4.3d bekçisi).
  */
-export const READ_COVERAGE: Readonly<Record<string, string>> = {};
+export const READ_COVERAGE: Readonly<Record<string, string>> = {
+  work_order_events: "is-emri kapanisTarihi: durum geçişi olayı aynı tx'te work_orders.status yazar → kök `self` kaynağı yakalar",
+  work_order_close_snapshots: "is-emri kapanisTarihi: künye COMPLETED geçişiyle aynı tx'te doğar → kök `self` kaynağı yakalar",
+  batches: "is-emri asamaTop: topun parti üyeliği değişimi rolls.updatedAt yazar → `rolls` kaynağı (WO_OF_ROLLS parti yolu)",
+  subcontractor_dispatches: "is-emri fason: sevk/iptal/doğrudan sevk aynı tx'te topun durumunu yazar → `rolls` kaynağı",
+  subcontractor_dispatch_items: "is-emri fason: kalem doğuşu ve kalan kapatma aynı tx'te topu günceller → `rolls` kaynağı (updatedAt yok)",
+  subcontractor_receipts: "is-emri fason: kabul ve kabul iptali aynı tx'te topun durumunu yazar → `rolls` kaynağı",
+  subcontractor_receipt_items: "is-emri fason: aynı (kabul kalemi) → `rolls` kaynağı",
+  subcontractor_category_links: "is-emri fasonKategoriler: firma kategori bağı pivot replace'idir (filigransız); en geç firmanın sonraki top hareketinde yenilenir",
+};
 
 /**
  * Projeksiyon DEĞİL, değişiklik tespitinin kendisi için okunan tablolar (§4.4–4.5).

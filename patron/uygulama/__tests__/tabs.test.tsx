@@ -1,5 +1,5 @@
 // Sekme bekçisi: 5 sekme yolu sabit (bildirim rotaları, safeRoute ve bildirim-sw.js bunlara bağlı); izinsiz sekme
-// çizilmez (href:null); "Diğer" her hesapta; native-tabs (beta) kullanılmaz; "Diğer" yalnız izinli bölümleri listeler.
+// çizilmez (href:null); ☰ menü (`/diger`) sekme değil, yığın ekranı; native-tabs (beta) kullanılmaz; menü yalnız izinli bölümleri listeler.
 import { render, screen } from "@testing-library/react-native";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -20,7 +20,7 @@ jest.mock("expo-router", () => {
 
 const { TABS, NAV_GROUPS, visibleTabs } = require("../src/ui/tabs") as typeof import("../src/ui/tabs");
 const TabsLayout = (require("../app/(app)/(tabs)/_layout") as typeof import("../app/(app)/(tabs)/_layout")).default;
-const More = (require("../app/(app)/(tabs)/diger") as typeof import("../app/(app)/(tabs)/diger")).default;
+const More = (require("../app/(app)/diger") as typeof import("../app/(app)/diger")).default;
 
 const ROOT = join(__dirname, "..");
 
@@ -32,22 +32,22 @@ function renderTabs(perms: string[]) {
 }
 
 describe("sekme yolları sabit", () => {
-  it("5 sekme, sıra ve yol (şartname §5: Pano · Siparişler · Stok · Cariler · Diğer)", () => {
-    expect(TABS.map((t) => t.route)).toEqual(["/pano", "/siparisler", "/stok", "/cariler", "/diger"]);
-    expect(TABS.map((t) => t.title)).toEqual(["Pano", "Siparişler", "Stok", "Cariler", "Diğer"]);
+  it("5 sekme, sıra ve yol (soru-cevap §2.1: Pano · Siparişler · Üretim · Stok · Cariler)", () => {
+    expect(TABS.map((t) => t.route)).toEqual(["/pano", "/siparisler", "/uretim", "/stok", "/cariler"]);
+    expect(TABS.map((t) => t.title)).toEqual(["Pano", "Siparişler", "Üretim", "Stok", "Cariler"]);
   });
-  it("Diğer grupları: Operasyon (Üretim, Sevkiyat) · İş (Raporlar, Finans…) · Hesap", () => {
+  it("☰ menü grupları: Operasyon (Sevkiyat) · İş (Raporlar, Finans…) · Hesap", () => {
     expect(NAV_GROUPS.map((g) => g.title)).toEqual(["Operasyon", "İş", "Hesap"]);
-    expect(NAV_GROUPS[0]!.modules).toEqual(["uretim", "sevkiyat"]);
+    expect(NAV_GROUPS[0]!.modules).toEqual(["sevkiyat"]);
     expect(NAV_GROUPS[1]!.modules.slice(0, 2)).toEqual(["raporlar", "finans"]);
     const hepsi = [...TABS.flatMap((t) => (t.module ? [t.module] : [])), ...NAV_GROUPS.flatMap((g) => g.modules)];
     expect(new Set(hepsi).size).toBe(hepsi.length);
   });
   it("her sekmenin dosyası (tabs) grubunda; eski yerinde kopya yok (URL tek)", () => {
     const tabs = join(ROOT, "app/(app)/(tabs)");
-    for (const f of ["pano.tsx", "stok.tsx", "diger.tsx", "siparisler/index.tsx", "siparisler/yeni.tsx", "cariler/index.tsx", "cariler/yeni.tsx", "cariler/[id].tsx"]) expect(existsSync(join(tabs, f))).toBe(true);
-    for (const f of ["pano.tsx", "stok.tsx", "diger.tsx", "siparisler", "cariler"]) expect(existsSync(join(ROOT, "app/(app)", f))).toBe(false);
-    for (const f of ["uretim.tsx", "finans.tsx"]) {
+    for (const f of ["pano.tsx", "uretim.tsx", "stok.tsx", "siparisler/index.tsx", "siparisler/yeni.tsx", "cariler/index.tsx", "cariler/yeni.tsx", "cariler/[id].tsx"]) expect(existsSync(join(tabs, f))).toBe(true);
+    for (const f of ["pano.tsx", "uretim.tsx", "stok.tsx", "siparisler", "cariler"]) expect(existsSync(join(ROOT, "app/(app)", f))).toBe(false);
+    for (const f of ["diger.tsx", "finans.tsx"]) {
       expect(existsSync(join(ROOT, "app/(app)", f))).toBe(true);
       expect(existsSync(join(tabs, f))).toBe(false);
     }
@@ -72,15 +72,16 @@ describe("sekme yolları sabit", () => {
 });
 
 describe("izinli sekmeler", () => {
-  it("yalnız oturum izni: Pano + Diğer; ötekiler href:null", () => {
+  it("yalnız oturum izni: yalnız Pano; ötekiler href:null", () => {
     const o = renderTabs(["bulut:oturum"]);
-    expect(Object.keys(o)).toEqual(["pano", "siparisler", "stok", "cariler", "diger"]);
+    expect(Object.keys(o)).toEqual(["pano", "siparisler", "uretim", "stok", "cariler"]);
     expect(o.pano!.href).toBeUndefined();
-    expect(o.diger!.href).toBeUndefined();
+    expect(o.uretim!.href).toBeNull();
     expect(o.stok!.href).toBeNull();
     expect(o.siparisler!.href).toBeNull();
     expect(o.cariler!.href).toBeNull();
-    expect(visibleTabs(["bulut:oturum"]).map((t) => t.name)).toEqual(["pano", "diger"]);
+    expect(visibleTabs(["bulut:oturum"]).map((t) => t.name)).toEqual(["pano"]);
+    expect(visibleTabs(["bulut:oturum", "bulut:uretim:oku"]).map((t) => t.name)).toEqual(["pano", "uretim"]);
   });
   it("sipariş + cari izni: Siparişler ve Cariler açılır, Stok kapalı kalır", () => {
     const o = renderTabs(["bulut:siparis:oku", "bulut:cari:oku"]);
@@ -99,7 +100,7 @@ describe("izinli sekmeler", () => {
   });
 });
 
-describe("Diğer listesi", () => {
+describe("☰ menü listesi", () => {
   it("izinsiz bölüm çizilmez; profil ve bildirimler her hesapta", () => {
     mockSession.permissions = ["bulut:oturum", "bulut:sevkiyat:oku"];
     render(<More />);

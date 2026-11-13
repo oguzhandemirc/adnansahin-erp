@@ -1,5 +1,5 @@
 // E1 (Pano · Üretim · Sevkiyat): izinsiz kart çizilmez · Dikkat şeridi `saglik` başarısızsa kritik madde ·
-// çalışan hesabında "Görebildiğin alanlar" · Üretim dönemi yeniden çekmeden değişir · kayıt rozeti tonu = anlam.
+// çalışan hesabında "Görebildiğin alanlar" · Üretim sade (anlık, dönemsiz) · kayıt rozeti tonu = anlam.
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import type React from "react";
 import { createCache } from "../src/state/cache";
@@ -19,7 +19,18 @@ const FIXTURES: Record<string, unknown> = {
   "ozet.siparis": { acikKalem: 12, karsilanmaYuzde: 64, gecikenKalem: 0 },
   "ozet.uretim": { bugunTamamlananToplam: 142, kolonlar: [] },
   "ozet.fason": { bugun: { acikMiktar: 1500, acikKalem: 2 }, buAy: { acikMiktar: 23120, acikKalem: 19 } },
-  "uretim-akisi": { kolonlar: [], istasyonlar: [] },
+  "uretim-akisi": {
+    kolonlar: [
+      { anahtar: "hamStok", etiket: "Ham Stok", adet: 342 }, { anahtar: "yariMamul", etiket: "Yarı Mamul", adet: 0 },
+      { anahtar: "fason", etiket: "Fason'da", adet: 294 }, { anahtar: "kursun", etiket: "Kurşun Bekleyen", adet: 110 },
+      { anahtar: "tambur", etiket: "Tambur Bekleyen", adet: 20 }, { anahtar: "depo", etiket: "Depo", adet: 2359 },
+      { anahtar: "sevk", etiket: "Sevk", adet: 4 },
+    ],
+    istasyonlar: [
+      { id: "s1", kod: "KK1", ad: "KK1", tur: "RAW_QC", kuyruk: 0, aktif: 0, bugunTamamlanan: 80, bugunSevk: 0 },
+      { id: "s2", kod: "KRS", ad: "Kurşun", tur: "PROCESS_QC", kuyruk: 110, aktif: 0, bugunTamamlanan: 60, bugunSevk: 0 },
+    ],
+  },
   saglik: { yedek: { hukum: "ok", yasSaat: 3 } },
 };
 
@@ -56,7 +67,7 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 
 // mock'lar kurulduktan SONRA yüklenir.
 const Dashboard = (require("../app/(app)/(tabs)/pano") as { default: () => React.ReactElement }).default;
-const Production = (require("../app/(app)/uretim") as { default: () => React.ReactElement }).default;
+const Production = (require("../app/(app)/(tabs)/uretim") as { default: () => React.ReactElement }).default;
 const { attentionItems, areaSummary, dueRows } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
 const L = require("../src/lib/labels/uretim") as typeof import("../src/lib/labels/uretim");
 
@@ -101,48 +112,30 @@ describe("Pano", () => {
 });
 
 describe("Üretim", () => {
-  it("§4 dönem segmenti yeniden çekmeden farklı bölümü gösterir", async () => {
+  it("§4 üç soru, hepsi anlık: dönem şeridi, fason fire, makine kartı ve eski iş emri listesi yok", async () => {
     mockSession.permissions = ["bulut:oturum", "bulut:ozet:oku", "bulut:uretim:oku"];
-    mockApi.list.mockResolvedValueOnce({
-      kayitlar: [
-        { id: "w1", kayit: { isEmriNo: "TIE-1", durum: "IN_PROGRESS" }, surum: "1" },
-        { id: "w2", kayit: { isEmriNo: "TIE-2", durum: "CANCELLED" }, surum: "1" },
-      ],
-      sonraki: null,
-    });
     render(<Production />);
-    const tile = await screen.findByTestId("kpi-fasonda");
-    expect(within(tile).getByText("23.120")).toBeTruthy();
-    await waitFor(() => expect(screen.getByTestId("durum-w1")).toBeTruthy());
-    const calls = mockApi.snapshot.mock.calls.length;
-    fireEvent.press(screen.getByTestId("donem-bugun"));
-    expect(within(screen.getByTestId("kpi-fasonda")).getByText("1.500")).toBeTruthy();
-    expect(mockApi.snapshot.mock.calls.length).toBe(calls);
-    // Rozet: Üretimde normal akıştır (uyarı değil), İptal sönüktür (kritik değil).
-    expect(screen.getByTestId("durum-w1").props.accessibilityLabel).toBe("Durum: Üretimde");
-    expect(screen.getByTestId("durum-w2").props.accessibilityLabel).toBe("Durum: İptal");
+    expect(within(await screen.findByTestId("kpi-bugun-tamamlanan")).getByText("142")).toBeTruthy();
+    expect(within(screen.getByTestId("kpi-ham-giris")).getByText("80")).toBeTruthy();
+    for (const id of ["donem-bugun", "kpi-fasonda", "kpi-fason-fire", "bolum-akis", "bolum-istasyonlar", "is-emirleri"]) expect(screen.queryByTestId(id)).toBeNull();
+    expect(mockApi.snapshot).not.toHaveBeenCalledWith("ozet.fason");
+    expect(mockApi.snapshot).not.toHaveBeenCalledWith("fason-acik");
   });
 
-  // D4-J5: `sevkeHazir` fabrikadan gelir; uygulama yalnız etiketler. Eski fabrika alanı göndermez → rozet yok, hata yok.
-  it("§5 iş emri satırında 'Sevke hazır / Kısmen hazır' rozeti; eski fabrika (alan yok) hatasız, rozetsiz", async () => {
+  it("§5 'Mal şu an nerede?' dikey liste: birim kolonun ölçtüğü şey; sıfır yarı mamul ve sevk kolonu çizilmez", async () => {
     mockSession.permissions = ["bulut:oturum", "bulut:uretim:oku"];
-    mockApi.list.mockResolvedValueOnce({
-      kayitlar: [
-        { id: "h1", kayit: { isEmriNo: "TIE-H", durum: "IN_PROGRESS", sevkeHazir: { durum: "HAZIR", hazirTop: 12, hazirMetre: "1234.500" } }, surum: "1" },
-        { id: "k1", kayit: { isEmriNo: "TIE-K", durum: "IN_PROGRESS", sevkeHazir: { durum: "KISMEN", hazirTop: 3, hazirMetre: 300 } }, surum: "1" },
-        { id: "e1", kayit: { isEmriNo: "TIE-E", durum: "IN_PROGRESS" }, surum: "1" },
-        { id: "n1", kayit: { isEmriNo: "TIE-N", durum: "IN_PROGRESS", sevkeHazir: null }, surum: "1" },
-        { id: "y1", kayit: { isEmriNo: "TIE-Y", durum: "IN_PROGRESS", sevkeHazir: { durum: "YOK", hazirTop: 0, hazirMetre: "0" } }, surum: "1" },
-      ],
-      sonraki: null,
-    });
     render(<Production />);
-    await waitFor(() => expect(screen.getByTestId("durum-e1")).toBeTruthy());
-    expect(screen.getByTestId("sevke-hazir-h1")).toBeTruthy();
-    expect(within(screen.getByTestId("kayit-h1")).getByText("Sevke hazır: 12 top · 1.235 m")).toBeTruthy();
-    expect(screen.getByTestId("sevke-hazir-k1")).toBeTruthy();
-    expect(within(screen.getByTestId("kayit-k1")).getByText("Kısmen hazır: 3 top · 300 m")).toBeTruthy();
-    for (const id of ["e1", "n1", "y1"]) expect(screen.queryByTestId(`sevke-hazir-${id}`)).toBeNull();
+    await screen.findByTestId("nerede-hamStok");
+    expect(within(screen.getByTestId("nerede-hamStok")).getByText("342 top")).toBeTruthy();
+    expect(within(screen.getByTestId("nerede-fason")).getByText("294 top")).toBeTruthy();
+    expect(within(screen.getByTestId("nerede-kursun")).getByText("110 iş emri")).toBeTruthy();
+    expect(within(screen.getByTestId("nerede-depo")).getByText("2.359 top")).toBeTruthy();
+    expect(screen.queryByTestId("nerede-yariMamul")).toBeNull();
+    expect(screen.queryByTestId("nerede-sevk")).toBeNull();
+    // Özet izni yoksa "Bugün ne bitti?" özet anlığı istenmez.
+    expect(mockApi.snapshot).not.toHaveBeenCalledWith("ozet.uretim");
+    fireEvent.press(screen.getByTestId("nerede-fason"));
+    expect(mockRouter.push).toHaveBeenCalledWith("/fason");
   });
 
   it("§6 görünüm sınıflamaz: bilinmeyen kod ve bozuk alan rozet çizmez", () => {
@@ -152,6 +145,15 @@ describe("Üretim", () => {
     expect(shipReadinessView({ sevkeHazir: { durum: "YENI", hazirTop: 5 } })).toBeNull();
     // Görünüm sayılardan durum çıkarmaz: fabrika KISMEN dediyse metre ne olursa olsun KISMEN kalır.
     expect(shipReadinessView({ sevkeHazir: { durum: "KISMEN", hazirTop: 99, hazirMetre: 99999 } })?.label).toBe("Kısmen hazır");
+  });
+});
+
+describe("☰ menü (Diğer sekme değil)", () => {
+  it("pano başlığında menü düğmesi /diger'i açar", async () => {
+    mockSession.permissions = ["bulut:oturum", "bulut:ozet:oku", "bulut:uretim:oku"];
+    render(<Dashboard />);
+    fireEvent.press(await screen.findByTestId("pano-menu"));
+    expect(mockRouter.push).toHaveBeenCalledWith("/diger");
   });
 });
 

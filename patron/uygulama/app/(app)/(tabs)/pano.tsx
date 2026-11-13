@@ -9,6 +9,7 @@ import { Text, View } from "react-native";
 import { can, visibleCards, visibleModules, type ModuleKey } from "../../../src/lib/access";
 import { PERIODS, type PeriodKey } from "../../../src/lib/labels/uretim";
 import { TERIM } from "../../../src/lib/terim";
+import { rozetMetni, useOkunmamisRet } from "../../../src/state/okunmamis-ret";
 import { useSession } from "../../../src/state/session";
 import { useOpenRefresh } from "../../../src/state/useOpenRefresh";
 import { FacilityName, Screen, useWide } from "../../../src/ui/Frame";
@@ -67,6 +68,8 @@ export default function Dashboard() {
     "ozet.fason": useSnapshot("ozet.fason", acik("ozet.fason", "anlik")),
     "ozet-finans": useSnapshot("ozet-finans", acik("ozet-finans", "anlik")),
     "uretim-akisi": useSnapshot("uretim-akisi", acik("uretim-akisi", "anlik")),
+    // `fasonTop` kutusunun kaynağı; haritada yokken kutu hep "henüz gelmedi" diyordu.
+    "fason-acik": useSnapshot("fason-acik", acik("fason-acik", "anlik")),
     "stok-karnesi": useSnapshot("stok-karnesi", acik("stok-karnesi", "anlik")),
   };
   const liste = {
@@ -86,19 +89,40 @@ export default function Dashboard() {
   const donemli = duzen.kutular.some((a) => kutu(a).donemli);
 
   const header = !wide ? <FacilityName /> : null;
+  // ☰ menü (Sevkiyat · Raporlar · Gönderdiklerim · Profil): yalnız telefonda; geniş ekranda aynı gruplar raydadır.
+  // Okunmamış ret (fabrikanın kabul etmediği gönderim) rozeti burada; kayıt açılınca söner.
+  const okunmamis = useOkunmamisRet();
+  const retRozeti = rozetMetni(okunmamis);
   const duzenleDugmesi = ozetVar && !duzenle ? (
     <Basilabilir onPress={() => setDuzenle(true)} style={s.duzenle} accessibilityRole="button" accessibilityLabel="Panoyu düzenle" testID="pano-duzenle">
       <Ionicons name="create-outline" size={18} color={t.color.link} />
       <Text style={[s.duzenleYazi, { color: t.color.link }]}>Düzenle</Text>
     </Basilabilir>
   ) : null;
+  const menuDugmesi = !wide && !duzenle ? (
+    <Basilabilir
+      onPress={() => router.push("/diger" as never)}
+      style={s.menu}
+      accessibilityRole="button"
+      accessibilityLabel={retRozeti ? `Menü, ${okunmamis} okunmamış hata` : "Menü"}
+      testID="pano-menu"
+    >
+      <Ionicons name="menu" size={24} color={t.color.link} />
+      {retRozeti ? (
+        <View style={[s.menuRozet, { backgroundColor: t.color.danger.solid }]} testID="pano-menu-rozet">
+          <Text style={[s.menuRozetYazi, { color: t.color.onPrimary }]}>{retRozeti}</Text>
+        </View>
+      ) : null}
+    </Basilabilir>
+  ) : null;
+  const basliktaEylem = duzenleDugmesi || menuDugmesi ? <View style={s.eylemler}>{duzenleDugmesi}{menuDugmesi}</View> : null;
 
   return (
     <Screen
       title="Pano"
       back={false}
       subtitle={header}
-      headerRight={duzenleDugmesi}
+      headerRight={basliktaEylem}
       onRefresh={duzenle ? undefined : reloadAll}
       refreshing={hepsi.some((r) => r.refreshing)}
       footer={duzenle ? <DuzenCubugu onEkle={() => setEkleAcik(true)} onBitti={() => setDuzenle(false)} /> : null}
@@ -169,6 +193,10 @@ function Reachable({ permissions, onOpen }: { readonly permissions: readonly str
 const useStyles = makeStyles((t) => ({
   duzenle: { minHeight: TOUCH, paddingHorizontal: space.s, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
   duzenleYazi: { fontSize: 16, lineHeight: 21, fontWeight: "600" as const },
+  eylemler: { flexDirection: "row" as const, alignItems: "center" as const },
+  menu: { minHeight: TOUCH, minWidth: TOUCH, alignItems: "center" as const, justifyContent: "center" as const },
+  menuRozet: { position: "absolute" as const, top: 4, right: 2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center" as const, justifyContent: "center" as const },
+  menuRozetYazi: { fontSize: 11, lineHeight: 14, fontWeight: "700" as const },
   kutular: { gap: space.m },
   ikili: { flexDirection: "row" as const, gap: space.m },
   yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },

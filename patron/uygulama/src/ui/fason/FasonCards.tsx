@@ -2,7 +2,7 @@
 // çizer. Rakamlar fabrikanın; görünüm `lib/fason-summary`. Anlık yoksa (eski fabrika, kapalı modül) 404 → boş durum.
 import { useState } from "react";
 import { Text, View } from "react-native";
-import { consignedView, scorecardConsignedLines, serviceRevenueView, subcontractOpenView } from "../../lib/fason-summary";
+import { consignedView, scorecardConsignedLines, serviceRevenueView } from "../../lib/fason-summary";
 import { PERIODS, type PeriodKey } from "../../lib/labels/uretim";
 import { AltSekmeler, BlokBasligi, BosDurum, ListeBlogu, ListeSatiri, SectionCard } from "../ortak";
 import { FactoryStamp, SnapshotGate } from "../pano/SnapshotGate";
@@ -51,43 +51,6 @@ export function ConsignedSection({ scorecardOzet }: { readonly scorecardOzet: un
         )
       ) : null}
       {view ? <FactoryStamp snap={remote.data} offline={remote.offline} note="saatlik güncellenir" /> : null}
-    </View>
-  );
-}
-
-/** Üretim › Fasondaki işler: açık sevk, geciken dönüş, firma başına kalan. */
-export function SubcontractOpenSection() {
-  const s = useStyles();
-  const remote = useSnapshot("fason-acik");
-  return (
-    <View style={s.bolum}>
-      <BlokBasligi baslik="Fasondaki işler" testID="bolum-fason-acik" />
-      <SnapshotGate remote={remote} variant="list" rows={2} empty="Fabrikadan fason bilgisi henüz gelmedi" testID="fason-acik">
-        {(veri, snap) => {
-          const v = subcontractOpenView(veri);
-          if (!v) return <BosDurum baslik="Fabrikadan fason bilgisi henüz gelmedi" icon={EMPTY_ICON.bekliyor} testID="fason-acik-bos" />;
-          return (
-            <>
-              <SectionCard baslik={v.openText} testID="fason-acik-ozet">
-                <View>
-                  <Text style={s.line} testID="fason-acik-geciken">{v.lateText}</Text>
-                  {v.soonText ? <Text style={s.line} testID="fason-acik-yaklasan">{v.soonText}</Text> : null}
-                  <Text style={s.line} testID="fason-acik-kalan">{v.remainingText}</Text>
-                  {v.clipped ? <Text style={s.note}>Çok sayıda açık sevk var; firma listesi ilk sevklerden hazırlandı.</Text> : null}
-                </View>
-              </SectionCard>
-              {v.firms.length > 0 ? (
-                <ListeBlogu baslik="Firma başına" sayi={v.firms.length} testID="fason-acik-firmalar">
-                  {v.firms.map((f, i) => (
-                    <ListeSatiri key={f.key} birincil={f.title} ikincil={f.lines.join(" · ")} deger={f.value} icon="business-outline" ton={f.late ? "warning" : "orange"} ayrac={i > 0} testID={`fason-firma-${f.key}`} />
-                  ))}
-                </ListeBlogu>
-              ) : null}
-              <FactoryStamp snap={snap} offline={remote.offline} note="saatlik güncellenir" />
-            </>
-          );
-        }}
-      </SnapshotGate>
     </View>
   );
 }

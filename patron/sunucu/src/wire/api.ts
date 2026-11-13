@@ -243,6 +243,31 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
       ],
     },
   },
+  // Veri tablosu (İş emirleri): `acik` ve `asama`yı fabrika türetir (kapanan İE'de asama null); bulut yalnız eşitler.
+  "is-emri": {
+    alanlar: ["isEmriNo", "musteriAdi", "siparisNolari"],
+    suzgec: {
+      etiket: "Durum",
+      varsayilan: "ACIK",
+      secenekler: [
+        { deger: "ACIK", etiket: "Açık", alan: "acik", esit: true },
+        { deger: "KAPANAN", etiket: "Kapanan", alan: "acik", esit: false },
+      ],
+    },
+    ekSuzgecler: [
+      {
+        anahtar: "asama",
+        etiket: "Aşama",
+        secenekler: [
+          { deger: "FASON", etiket: "Fasonda", alan: "asama", esit: "fason" },
+          { deger: "KURSUN", etiket: "Kurşun", alan: "asama", esit: "kursun" },
+          { deger: "TAMBUR", etiket: "Tambur", alan: "asama", esit: "tambur" },
+          { deger: "KK1", etiket: "Giriş kalite", alan: "asama", esit: "kk1" },
+          { deger: "DIGER", etiket: "Diğer", alan: "asama", esit: "diger" },
+        ],
+      },
+    ],
+  },
 };
 
 // ---------------------------------------------------------------- liste sıralaması (veri tablosu)
@@ -260,11 +285,12 @@ export const LIST_SORT: Readonly<Record<string, Readonly<Record<string, ListSort
   siparis: { siparisNo: "metin", musteriAdi: "metin", siparisTarihi: "tarih", acikMiktar: "sayi", sevkMiktari: "sayi", kalemSayisi: "sayi" },
   "cari-kart": { ad: "metin", kod: "metin", il: "metin", ilce: "metin", ulke: "metin" },
   sevkiyat: { sevkNo: "metin", musteriAdi: "metin", cikisTarihi: "tarih", toplamMetre: "sayi", topSayisi: "sayi", cuvalSayisi: "sayi", toplamKg: "sayi" },
+  "is-emri": { isEmriNo: "metin", musteriAdi: "metin", urunAdi: "metin", topSayisi: "sayi", metre: "sayi", olusturulma: "tarih", kapanisTarihi: "tarih" },
 };
 
 // ---------------------------------------------------------------- görünüm tercihleri (veri tablosu)
 /** `GET|POST /oturum/tercihler/:anahtar` — hesabın KENDİ görünüm tercihi; beyaz listeli anahtar, değer boyut sınırlı JSON. */
-export const VIEW_PREF_KEYS = ["tablo.siparis", "tablo.cari-kart", "tablo.sevkiyat", "tablo.stok", "tablo.stok-kalem", "tablo.stok-top", "stok.gorunum"] as const;
+export const VIEW_PREF_KEYS = ["tablo.siparis", "tablo.cari-kart", "tablo.sevkiyat", "tablo.stok", "tablo.stok-kalem", "tablo.stok-top", "stok.gorunum", "tablo.is-emri"] as const;
 export type ViewPrefKey = (typeof VIEW_PREF_KEYS)[number];
 /** Değerin JSON metni en çok bu kadar bayt (UTF-8). */
 export const VIEW_PREF_MAX_BYTES = 4096;
@@ -292,6 +318,20 @@ export const LIST_ID_FILTERS: Readonly<Record<ListIdFilterKey, readonly string[]
   urunId: ["siparis-kalemi", "is-emri", "fatura-kalemi", "fiyat", "teklif-kalemi", "standart-maliyet", "iade"],
 };
 
+// ---------------------------------------------------------------- liste üyelik süzgeçleri
+export const LIST_MEMBER_FILTER_KEYS = ["cariKartId", "siparisId", "fasonFirmaId"] as const;
+export type ListMemberFilterKey = (typeof LIST_MEMBER_FILTER_KEYS)[number];
+
+/**
+ * `GET /veri/:projeksiyon?<anahtar>=<uuid>` ⇒ kayıttaki, FABRİKANIN türettiği kimlik DİZİSİ bu kimliği içeriyor mu
+ * (projeksiyon → dizi alanı). Eşitlik beyanı `LIST_ID_FILTERS`ten ayrıdır: aynı projeksiyonda ikisi birden olmaz.
+ */
+export const LIST_MEMBER_FILTERS: Readonly<Record<ListMemberFilterKey, Readonly<Record<string, string>>>> = {
+  cariKartId: { "is-emri": "cariKartIdleri" },
+  siparisId: { "is-emri": "siparisIdleri" },
+  fasonFirmaId: { "is-emri": "fasonFirmaIdleri" },
+};
+
 // ---------------------------------------------------------------- liste anahtar süzgeçleri (D4-KUC3c)
 export const LIST_KEY_FILTER_KEYS = ["kategoriAnahtari"] as const;
 export type ListKeyFilterKey = (typeof LIST_KEY_FILTER_KEYS)[number];
@@ -316,6 +356,8 @@ export interface ListCapabilities {
    * tercihi ucunun beyanıdır. Eski sunucu göndermez ⇒ istemci sıralamayı kapatır, tek süzgeç gönderir, tercihi yerelde tutar.
    */
   readonly siralama?: Readonly<Record<string, readonly string[]>>;
+  /** Üyelik süzgeçleri (`LIST_MEMBER_FILTERS`, anahtar → projeksiyonlar); eski sunucu göndermez ⇒ istemci süzgeci gizler. */
+  readonly uyelikSuzgecleri?: Readonly<Partial<Record<ListMemberFilterKey, readonly string[]>>>;
 }
 
 // ---------------------------------------------------------------- cari kilidi (D4-I6)
