@@ -8,7 +8,7 @@ Patronun buluttaki OKUMA KOPYASI ve TEK yazma kanalı. **Bulut hesap yapmaz, fab
 
 ## Katmanlar
 
-- **Protokol** `src/lisans-protokol/`: Teks-Erp protokolünün BAYT-EŞİT aynası; burada düzenlenmez (bekçi `test_lisans_protokol_aynasi.ts` + `test_patron_kapilari` §7).
+- **Protokol** `src/lisans-protokol/`: yalnız istek imzasının 6 dosyası (`ortak jws belgeler belge-turleri parmak-izi istek`) — `Teks-Erp/src/lib/cloud-signing/` ile BAYT-EŞİT; burada düzenlenmez (bekçi `test_patron_kapilari` §7). Lisans/güncelleme kısımları Adnan'da yok.
 - **Tel şeması** `src/wire/esitleme.ts`: istek KATI, yanıt GEVŞEK.
 - **Katalog** `src/catalog/`: izin (süper yetki YOK) · projeksiyon → izin · rapor → izin; eşlenmeyen ad RED.
 - **Kiracı** `src/lib/tenant.ts`: `app.*` ayarlarının TEK yazarı; her tx'in İLK ifadesi tek SELECT'te ayar + (varsa) advisory kilit.

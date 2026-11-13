@@ -1,23 +1,8 @@
-// Lisans protokolü — tek giriş. Sözleşme: docs/design/LISANS-PROTOKOLU.md.
+// İmza protokolü — tek giriş. Adnan kopyasında yalnız istek imzasının 6 dosyası vardır; altısı fabrikanın
+// `Teks-Erp/src/lib/cloud-signing/` dosyalarıyla BAYT-EŞİTTİR (bekçi `test_patron_kapilari` §7). Lisans, güncelleme,
+// modül anahtarı ve geçici kod kısımları Adnan'da yoktur (ayıklama 2026-11-13).
 export * from "./ortak";
 export * from "./jws";
 export * from "./belgeler";
-export * from "./kok-anahtarlar";
-export * from "./anahtar-zinciri";
-export * from "./yanit-bagi";
-export * from "./indirme";
 export * from "./parmak-izi";
 export * from "./istek";
-export * from "./uclar";
-export * from "./donanim";
-export * from "./muafiyet";
-export * from "./hata-raporu";
-export * from "./modul-anahtari";
-export * from "./kabul";
-export * from "./kabul-katalogu";
-export * from "./guncelleme-ortak";
-export * from "./guncelleme-pg";
-export * from "./guncelleme";
-export * from "./guncelleme-karar";
-export * from "./paket-zinciri";
-export * from "./gecici-kod";
