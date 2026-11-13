@@ -31,7 +31,7 @@ Kim neyi görür ve yazar: izin kataloğu ve rol şablonları, süperadmin (sist
 - Panelde yetkiyi `useRoleAccess` + `<PermissionGate>` ile sor; `isAdmin` yalnız görünürlüktür, yetki kısayolu değildir. [bekçi: auth.test.ts]
 - READ ile açılan ekranda yazma eylemi çizilmez (gri buton değil). [inceleme]
 - Tablette `usePermissions().has()` üç jokeri tanır: `*`, `mobile:*`, `admin:*`. [bekçi: usePermission.test.ts]
-- `mode:"all"` "her şey" kuralının tek istisnası `ALL_MODE_EXCLUDED`tir (`patron:giris`): parola özetini buluta taşıyan izin şablonla örtük gelmez. [bekçi: test_role_template_catalog]
+- `patron:giris` (modül ADMIN, kategori web; panel ekranı yok) patron telefonuna giriş iznidir ve yalnız BİREBİR atamayla geçer: `*`/`patron:*` jokeri vermez, `mode:"all"` kuralının tek istisnası olarak (`ALL_MODE_EXCLUDED`) "Admin (Tam Yetki)" şablonu da taşımaz — parola özetini buluta götürdüğü için panelin Kullanıcılar ekranından kişi kişi atanır. [bekçi: test_role_template_catalog, test_patron_bulut_kullanicilar]
 
 ### Süperadmin ve ayar şifresi
 
