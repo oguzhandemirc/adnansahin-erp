@@ -8,7 +8,8 @@
 #   db_kok_parolasi · goc_parolasi (göç rolü patron_goc — süper kullanıcı DEĞİL, db-init/10-goc-rolu.sh kurar) ·
 #   uygulama_parolasi · esitleme_parolasi · tesis_rol_anahtari (giriş dizini = kimlik e-posta özeti HMAC anahtarı,
 #   32 bayt base64url; ad eski düzenden kalır) · isteğe bağlı guvenlik_telegram_bot_token / guvenlik_telegram_chat_id.
-# TOTP sarma anahtarı `anahtarlar/patron-totp.key` (10001 0600); birim salt okunur bağlanır.
+# TOTP sarma anahtarı `anahtarlar/patron-totp.key` (10001 0600, 32 bayt base64url); birim salt okunur bağlanır — sunucu
+# onu ÜRETEMEZ, ilk açılıştan önce elle konur (README § İlk kurulum 1; yoksa api EROFS ile açılmaz).
 #
 # PORT YAYINI YOK: Docker yayınlanan portta ufw'yi atlar. Dışa yalnız Caddy (../proxy projesi, 80/443) açıktır;
 # Caddy `adnan-ag` ağından `patron-api:4620`ye konuşur. DB yalnız `ic` (internal) ağda.

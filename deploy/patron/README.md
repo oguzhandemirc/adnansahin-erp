@@ -31,6 +31,9 @@ anahtarı `anahtarlar/patron-totp.key` (10001 0600). `.env` (0600, PAROLA TAŞIM
 
 1. İmaj: `deploy/patron/imaj-derle.sh --kaydet=/tmp/adnan-patron.tar.gz` → `gunzip -c /tmp/adnan-patron.tar.gz | ssh <vds> docker load`
    (kayıt deposu YOK). `.env`te `PATRON_IMAJ=adnan-patron:<sha>`.
+   TOTP sarma anahtarı (birim salt okunur; sunucu üretemez, yoksa api `EROFS` ile açılmaz):
+   `openssl rand 32 | basenc --base64url | tr -d '=\n' | sudo tee /opt/adnan/patron/anahtarlar/patron-totp.key >/dev/null`
+   → `sudo chown 10001:10001 …/patron-totp.key && sudo chmod 0600 …/patron-totp.key`. Kaybı = TOTP sırları çözülmez; `yedekle.sh` almaz, kasaya ayrıca kopyala.
 2. `cd /opt/adnan/proxy && docker compose up -d` (ağ `adnan-ag` + Caddy; sertifika ilk istekte alınır).
 3. `cd /opt/adnan/patron && docker compose --profile goc run --rm goc` (db ilk kez açılır → `patron_goc` kurulur →
    `migrate deploy` → `db-rolleri`).
