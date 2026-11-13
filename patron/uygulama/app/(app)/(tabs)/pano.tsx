@@ -20,6 +20,7 @@ import { DuzenCubugu, DuzenListesi, KutuEkleSayfasi } from "../../../src/ui/pano
 import { useDuzen } from "../../../src/ui/pano/duzen";
 import { KUTU_CIZICI, type KutuBaglami } from "../../../src/ui/pano/KutuCizici";
 import { istenenKaynaklar, izinliKutular, kutu, satirlar } from "../../../src/ui/pano/kutular";
+import { SimdiGuncelle } from "../../../src/ui/pano/SimdiGuncelle";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { SectionHeader } from "../../../src/ui/SectionHeader";
 import { SegmentedControl } from "../../../src/ui/SegmentedControl";
@@ -114,7 +115,7 @@ export default function Dashboard() {
     <Screen
       title="Pano"
       back={false}
-      subtitle={header}
+      subtitle={<SimdiGuncelle sol={header} />}
       headerRight={basliktaEylem}
       onRefresh={duzenle ? undefined : reloadAll}
       refreshing={hepsi.some((r) => r.refreshing)}
