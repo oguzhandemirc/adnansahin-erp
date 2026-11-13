@@ -13209,6 +13209,8 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 
 ## 2026-11-12 — Patron girişi: doğrulama kodu (TOTP) isteğe bağlı [ÇEKİRDEK + PROFİL]
 
+> ⚠️ **GEÇERSİZ/KISMEN (2026-11-13)** — TOTP isteğe bağlılığı ve CLI kurtarması sürer; davet, `identities`, parola değişimi/hesap silme ve "yeni uygulama eski bulutta kodsuz giremez" kurulum sırası "Patron üyeliği tamamlandı" (2026-11-13) notuyla kalktı. Güncel kural `docs/kurallar/patron-bulutu.md` § Patron girişi.
+
 **Karar (kullanıcı, 2026-11-12).** "Doğrulama kodunu tamamen kaldıralım, profilde isteğe bağlı çalıştırırız." [ÇEKİRDEK] Girişte kod zorunlu değil; hesap Profil › Güvenlik › İki adımlı doğrulama'dan açar (parola → karekod/anahtar → ilk kod), kapatır (parola + kod). Açık hesapta giriş, parola değişimi, hesap silme, cihaz bağlama kod ister. Davet kabulü hesabı parolayla hemen AKTİF eder. [PROFİL] Adnan Şahin ilk yöneticisi kod uygulaması kurmayacak; hesabın doğrulaması CLI ile kapatıldı.
 
 **Nasıl.** Bulut göçü `20261112120000_dogrulama_istege_bagli` (`identities.totp_enabled_at`; kurulu sırrı ve son adımı olan kimlik AÇIK kalır; CHECK'ler AKTİF ⇒ parola, açık ⇒ sır). Kod gerekli yanıtı (`DOGRULAMA_KODU_GEREKLI`) yalnız doğru paroladan sonra döner — durum yanlış parolada sızmaz. Kurtarma yalnız satıcı CLI'si `tesis.ts dogrulama-kapat` (talep + gerekçe zorunlu, denetim `DOGRULAMA_KAPATILDI`). Yaygın parola listesi eklendi (asgari 12 aynı). Kurulum sırası önce bulut: yeni uygulama eski bulutta kodsuz giremez; eski uygulamanın TOTP adımlı daveti yeni bulutta hesabı yine AKTİF eder.
@@ -13258,3 +13260,18 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Yayın.** Backend 2.12.1 ile panel 1.3.17 AYNI bakım penceresinde (ya da panel önce): eski panel kısıtlı token'ı "yetkin yok" diye reddeder ve giriş ekranında kalır (fail-closed, kalıcı kilit yok). Mobil değişmez.
 
 **Kaynak.** Plan: `PLAN-sifre-sikilastirma.md` (repo dışı plan klasörü) (D1 `7fb2f37d` · D2 `ee086a4e` · D3 `bbd4ebe9` · D6 `aba60bb7` `6d5de827` `9d611137` `9f6f5018` `b8e4420e` · D4 + PIN + D5 bu dal). Kural satırları `docs/kurallar/yetki-izin.md` § Parola ve giriş yöntemi, eski panel tuzağı `docs/kurallar/genel.md`.
+
+
+## 2026-11-13 — Patron üyeliği tamamlandı: tek tesis, Electron şifresi, bulutta panel/web yok [ÇEKİRDEK + PROFİL]
+
+**Karar (kullanıcı, 2026-11-13).** [PROFİL] Adnan bulutu TEK tesislidir; patron telefonuna panelin (Electron) kullanıcı adı + şifresiyle girer. Bulutta davet, e-posta kimliği, çok tesis geçişi, hesap yaratma, parola değişimi ve hesap silme YOK; parolayı fabrikadaki yönetici değiştirir, giriş izni panelden kişi kişi `patron:giris` ile verilir. VDS'te yönetim paneli ya da web uygulaması YOK — web "şimdilik yok, telefon canlıya çıktıktan sonra bakılır". Kullanıcı kararları: bcryptjs bulut paketine eklenir · 7 gün bayatlık tavanı · TOTP isteğe bağlı, kurtarma CLI · kaba kuvvet 24 sa'te 50 başarısız → 1 sa kilit (artan gecikme önerisi elendi).
+
+**Değişmezler.** [ÇEKİRDEK] Hesabın fabrika kolonlarını yalnız eşitleme rolü yazar, ikinci etken (`account_factors`) uygulamanındır. Bilinmeyen/PASİF/kilitli/yanlış parola/yanlış kod aynı 401 + sahte karşılaştırma + ≥ 500 ms taban. Bulutta `PAROLA_ZAYIF` yok (doğru parola kâhini olurdu, Y8): fabrika yalnız `passwordPolicyVersion` güncel kullanıcıyı gönderir. Parola sıfırlama/kapanış `kimlik_surumu`nu artırır ve oturumu düşürür. Acil araçlar yalnız VDS'teki `scripts/tesis.ts` (`kullanici-kilitle/ac`, `dogrulama-kapat`, `kullanici-yeniden-iste`); çıktıya ve denetime kullanıcı adı yazılmaz.
+
+**Kilitte bekleyen mesaj.** Bulut kilidi, hesabın fabrikanın henüz almadığı BEKLIYOR gelen kutusu mesajlarını aynı tx'te makbuzlu RET `YAZAR_YETKISIZ` ile kapatır; yeni yazım yazarın etken satırını kilitleyerek okur, kilitliyse 403. Elenen yol: fabrikanın `al` claim'inde kilitli yazarı süzmek — eşitleme rolü `account_factors`ı okuyamaz ve bu ayrımı bozmak istenmedi (`test_kullanici_esitleme` §1g korur). Kalıcı kapatma fabrikada kullanıcıyı pasifleştirmektir (F3 yazar denetimi).
+
+**Uygulama (A1).** Giriş = kullanıcı adı + parola, kod adımı yalnız `DOGRULAMA_KODU_GEREKLI` sonrası; hata cümleleri tek kaynak `patron/uygulama/src/lib/giris-hata.ts` (her 401 tek cümle, 503 `FABRIKA_BAGLANTISI_YOK` açıklaması). Davet, hesaplar, hesap silme ve tesis geçişi ekranları silindi; dışa aktarım `/disa-aktar` (yalnız `bulut:hesap:yonet`). Profilde parola satırı "Fabrikadaki yöneticin değiştirir" der, TOTP aç/kapat kalır.
+
+**Geçiş.** Giriş sözleşmesi kırıcıdır, geçiş serttir: VDS sıfırdan → backend paketi (eşitleme kapalı) → panelden `patron:giris` → eşitleme açık → uygulama. Eski "yeni uygulama eski bulutta kodsuz giremez" sırası ve 2026-11-12 TOTP notundaki davet/satıcı CLI anlatımı bu notla geçersizdir.
+
+**Kaynak.** Plan `PLAN-uyelik-electron-sifresi.md` (repo dışı plan klasörü). Fabrika: W `15d314cf` · F1 `38cc36a0` · F2 `4a36e2a8` · F3 `c73a5a04` · Y8 `9d611137`. Bulut: C1 `a6dec281` · C2 `2472499f` · C3 `f9ecea62` · C4 `e3db9fb7` + `941438a0` (e-posta özeti anahtarı ve `tesis_rol_anahtari` sırrı söküldü) · kilit-ret makbuzu `84aaa87e`. Uygulama: A1 `23b58720`. Kural satırları `docs/kurallar/patron-bulutu.md` § Patron girişi, `docs/kurallar/yetki-izin.md` (`patron:giris`); anlatım `patron/sunucu/MIMARI.md`.

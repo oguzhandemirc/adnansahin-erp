@@ -56,6 +56,7 @@ export const FACTS: readonly RecordProjection[] = [
       col("olusturulma", "createdAt")],
     derived: [
       derived("acikMiktar", "helpers/order-line-scope.helper isActiveLine + isMeasuredLine: Σ(quantity − shippedQty)", ["order_lines"]),
+      derived("toplamMiktar", "helpers/order-line-scope.helper isActiveLine + isMeasuredLine: Σ quantity (acikMiktar ile aynı satır kapsamı)", ["order_lines"]),
       derived("kalemSayisi", "helpers/order-line-scope.helper isActiveLine", ["order_lines"]),
       derived("gecikmis", "helpers/order-deadline.helper daysPastDeadline ≠ null ∧ açık durum (PENDING · APPROVED · PARTIAL_SHIPPED)", ["orders"], { timeBound: true }),
       // M2a: telefonun "açık siparişler" süzgeci — açık durum kümesi tek kaynaktan (bulut durum listesi bilmez).
@@ -64,8 +65,8 @@ export const FACTS: readonly RecordProjection[] = [
     ],
     sources: [self("orders"), via("order_lines", "orderId"), lookup("customers", "id", ORDERS_OF_CUSTOMERS, "cari adı değişince siparişleri yeniden gider")],
     crossings: [{ name: "termin", sql: 'SELECT o."id" AS root_id FROM "orders" o WHERE o."deadline" >= $1 AND o."deadline" < $2' }],
-    // 2 (M2a): `acik` eklendi — TAM gönderim eski satırları doldurur.
-    deletion: "YOK", permission: "bulut:siparis:oku", retention: { wireFields: ["siparisTarihi"], sql: 't."orderDate"' }, catalogVersion: 2,
+    // 2 (M2a): `acik` eklendi — TAM gönderim eski satırları doldurur. 3: `toplamMiktar` eklendi (aynı yol).
+    deletion: "YOK", permission: "bulut:siparis:oku", retention: { wireFields: ["siparisTarihi"], sql: 't."orderDate"' }, catalogVersion: 3,
   },
   {
     name: "siparis-kalemi", kind: "KAYIT", role: "OLGU", root: { table: "order_lines", model: "OrderLine" },

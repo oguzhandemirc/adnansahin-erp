@@ -61,18 +61,25 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Tel sözleşmesi yalnız EKLEYEREK genişler: var olan uç, alan, projeksiyon adı değişmez; yeni alan katalog sürümünü artırır. [inceleme]
 - Sözleşme genişletmesinde kurulum sırası önce bulut, sonra fabrikadır; eski bulut bilinmeyen projeksiyonu yalnız o girdide reddeder (tur KISMI, düşmez) ama reddedilen kayıt her turda baştan, anlık her aralıkta yeniden gönderilir. [inceleme]
 
-### Patron girişi · doğrulama kodu (bulut `patron/sunucu`)
+### Patron girişi (üyelik = Electron şifresi; bulut `patron/sunucu`, uygulama `patron/uygulama`)
 
-- Doğrulama kodu (TOTP) isteğe bağlıdır ve hesap başına Profil › Güvenlik'ten fabrika parolasıyla açılır; açık hesapta giriş kodsuz geçmez. [bekçi: patron/sunucu test_giris_fabrika_parolasi]
-- Yanlış parolada doğrulama durumu sızmaz: `DOGRULAMA_KODU_GEREKLI` yalnız doğru paroladan sonra döner, yanlış parola her hesapta aynı 401'dir. [bekçi: patron/sunucu test_giris_fabrika_parolasi]
-- Kodunu kaybeden hesabın doğrulaması yalnız satıcı CLI'siyle kapatılır (`tesis.ts dogrulama-kapat --kullanici= --gerekce= [--talep=]`, denetim `DOGRULAMA_KAPATILDI`); uygulamada kurtarma yolu yoktur. [bekçi: patron/sunucu test_hesap_acil_cli]
-- Bulutta hesap yaratma, davet, parola değişimi ve hesap silme YOKTUR (hesap fabrikanın malı); acil araçlar yalnız satıcı CLI'sidir — `kullanici-kilitle/ac` (bulut kilidi; açık oturum kapanır, açılınca dirilmez) ve `kullanici-yeniden-iste` (damga sıfır → sonraki gönderime dek yeni giriş 503); gerekçe denetime yazılır, kullanıcı adı çıktıya ve denetime yazılmaz. [bekçi: patron/sunucu test_hesap_acil_cli]
-- Giriş sözleşmesi değişince kurulum sırası önce bulut, sonra uygulamadır: yeni uygulama eski bulutta kodsuz giremez. [inceleme]
-
-### Kullanıcı listesi (üyelik = Electron şifresi)
-
-- Buluta yalnız parolası GÜNCEL kural sürümüyle belirlenmiş kullanıcının özeti gider (Y8): `User.passwordPolicyVersion >= PASSWORD_POLICY_VERSION` hem sorguda hem satır yükleminde; sürümü yalnız `newPasswordFields` (yarat · yönetici sıfırla · kendi değiştir · süperadmin kur) günceller, eski parolalı kullanıcı yeniden belirleyene kadar ne girer ne yazar; bulut tarafında `PAROLA_ZAYIF` yanıtı yoktur (kâhin olurdu). [bekçi: test_password_policy_version]
+- Bulut TEK tesislidir ve hesap fabrikanın malıdır: patron, panelin (Electron) kullanıcı adı + parolasıyla girer; bulutta ve uygulamada hesap yaratma, davet, e-posta kimliği, parola değişimi, hesap silme ve tesis geçişi YOKTUR — parolayı fabrikadaki yönetici değiştirir. [bekçi: patron/sunucu test_hesap_acil_cli]
 - Telefona yalnız `patron:giris` iznini BİREBİR taşıyan fabrika kullanıcısı girer; `*`/`patron:*` jokeri ve "Admin (Tam Yetki)" şablonu bu izni vermez, panelden kişi kişi atanır. [bekçi: test_patron_bulut_kullanicilar]
+- Buluta yalnız parolası GÜNCEL kural sürümüyle belirlenmiş kullanıcının özeti gider (Y8): `User.passwordPolicyVersion >= PASSWORD_POLICY_VERSION` hem sorguda hem satır yükleminde; sürümü yalnız `newPasswordFields` (yarat · yönetici sıfırla · kendi değiştir · süperadmin kur) günceller, eski parolalı kullanıcı yeniden belirleyene kadar ne girer ne yazar; bulut tarafında `PAROLA_ZAYIF` yanıtı yoktur (kâhin olurdu). [bekçi: test_password_policy_version]
+- Giriş gövdesi `POST /api/oturum/ac {kullaniciAdi, parola, totp?, istemci?}` katıdır (`eposta`/`tesisId` 400); mühürlü bcrypt özeti açılıp karşılaştırılır; bilinmeyen/PASİF/kilitli hesap, yanlış parola ve yanlış kod AYNI 401'dir — uygun olmayan dalda sahte karşılaştırma koşar, yanıt ≥ 500 ms tabandadır. [bekçi: patron/sunucu test_giris_fabrika_parolasi]
+- Kaba kuvvet tavanı hesap başınadır: sabit 24 sa pencerede 50 başarısız (`GIRIS_HESAP_TAVANI`) → 60 dk yeni giriş kilidi (`GIRIS_HESAP_KILIT_DK`); başarılı giriş sayacı sıfırlamaz, kilit açık oturumu düşürmez. [bekçi: patron/sunucu test_giris_fabrika_parolasi]
+- Oturum hesabın `kimlik_surumu`nu taşır: fabrikada parola sıfırlanınca ya da hesap kapanınca sürüm +1 olur ve eski oturum sonraki istekte 401 alır. [bekçi: patron/sunucu test_giris_fabrika_parolasi]
+- Kullanıcı kümesi 7 günden bayatsa (`facilities.kullanici_son_esitleme`, `FABRIKA_BAYATLIK_GUN`) yeni giriş parola sorulmadan 503 `FABRIKA_BAGLANTISI_YOK` alır; açık oturum sürer. [bekçi: patron/sunucu test_giris_fabrika_parolasi]
+- Doğrulama kodu (TOTP) isteğe bağlıdır ve hesap başına Profil › Güvenlik'ten fabrika parolasıyla açılır; açık hesapta giriş kodsuz geçmez; `DOGRULAMA_KODU_GEREKLI` yalnız doğru paroladan sonra döner. [bekçi: patron/sunucu test_giris_fabrika_parolasi]
+- Kodunu kaybeden hesabın doğrulaması yalnız VDS'teki tesis CLI'siyle kapatılır (`tesis.ts dogrulama-kapat --kullanici= --gerekce= [--talep=]`, denetim `DOGRULAMA_KAPATILDI`); uygulamada kurtarma yolu yoktur. [bekçi: patron/sunucu test_hesap_acil_cli]
+- Acil araçlar yalnız tesis CLI'sidir: `kullanici-kilitle/ac` (bulut kilidi; açık oturum kapanır, açılınca dirilmez; açma kaba kuvvet kilidini de sıfırlar) ve `kullanici-yeniden-iste` (damga sıfır → sonraki gönderime dek yeni giriş 503); gerekçe denetime yazılır, kullanıcı adı çıktıya ve denetime yazılmaz; kalıcı kapatma fabrikada kullanıcıyı pasifleştirmektir. [bekçi: patron/sunucu test_hesap_acil_cli]
+- Bulut kilidi, hesabın fabrikanın henüz almadığı (`claim_count = 0`) BEKLIYOR gelen kutusu mesajlarını aynı tx'te makbuzlu RET `YAZAR_YETKISIZ` ile kapatır; kilitle yarışan yeni yazım yazarın etken satırını kilitleyerek okur, kilitliyse 403 alır. [bekçi: patron/sunucu test_hesap_acil_cli]
+- Uygulamanın giriş hata cümleleri tek kaynaktandır (`patron/uygulama/src/lib/giris-hata.ts`): her 401 adım başına tek cümledir (hesabın varlığı sızmaz), 503 `FABRIKA_BAGLANTISI_YOK` fabrikaya ulaşılamadığını söyler. [bekçi: patron/uygulama __tests__/iki-adimli-dogrulama.test.tsx]
+- Uygulamanın uç tablosu sunucunun rota tablosuyla birebirdir; sökülen uçlar için geçici liste taşınmaz. [bekçi: patron/uygulama __tests__/mirror.test.ts]
+- Giriş sözleşmesi kırıcı değişti, geçiş serttir: sıra VDS sıfırdan (bulut) → backend paketi (eşitleme kapalı) → panelden `patron:giris` ataması → eşitleme açık → uygulama; eski uygulama yeni bulutta giremez. [inceleme]
+
+### Kullanıcı listesi (fabrika → bulut)
+
 - Telefon izni bulutta atanmaz, fabrika izinlerinden türetilir; tablonun tek kaynağı `cloud-sync/user-permission-map.ts`tir ve finans izni türetmez. [bekçi: test_patron_bulut_kullanicilar]
 - Süperadmin, sistem ve teknik kullanıcı buluta ASLA gitmez; pasif, silinmiş ve izin penceresi dışındaki kullanıcı kümeden düşer (süzgeç sorguda ve satır yükleminde iki kat). [bekçi: test_patron_bulut_kullanicilar]
 - Kullanıcı kaydı açık select'le okunur (`CLOUD_USER_SELECT`); PIN, kart, TOTP sırrı ve oturum sayacı ne okunur ne gider; parola bcrypt özeti olduğu gibi gider. [bekçi: test_patron_bulut_kullanicilar]
@@ -81,7 +88,6 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Liste her gönderimde TAM kümedir: 30 sn'de bir kurulur, özet değiştiyse ya da 10 dk geçtiyse gönderilir; kümede olmayan hesabı bulut kapatır. [bekçi: test_patron_bulut_kullanicilar]
 - Bulut hesabı fabrikanın malıdır: hesabın fabrika kolonlarını (kullanıcı adı, ad, izin, durum, mühürlü parola özeti, kimlik sürümü, kapanış) yalnız eşitleme rolü yazar, uygulama rolü yalnız son giriş anını yazar; ikinci etken (`account_factors`) uygulamanındır ve eşitleme rolü ona erişemez. [bekçi: patron/sunucu test_kullanici_esitleme]
 - Bulut `POST /v1/kullanicilar` kümesini tek tx'te (ilk ifade 9205 kilidi) uygular: kümede yok → PASİF + parola özeti NULL + oturumlar kapanır; parola özeti değişince (kapanış/yeniden açılış dahil) `kimlik_surumu` +1; özet gövdeyle tutmazsa ya da izin bulut kataloğunda yoksa 400; denetime ve log'a parola özeti ve mühür yazılmaz, log yalnız sayıdır. [bekçi: patron/sunucu test_kullanici_esitleme]
-- Telefon girişi fabrika kullanıcı adı + fabrika parolasıyladır (bcrypt, mühür açılır; TOTP isteğe bağlı, `account_factors`ta): bilinmeyen/PASİF/kilitli/yanlış parola AYNI 401 + sahte karşılaştırma + ≥ 500 ms taban; hesap başına 24 sa'te 50 başarısız → 1 sa yeni giriş kilidi (açık oturum sürer); oturum `kimlik_surumu` hesabınkinden farklıysa 401; kullanıcı kümesi 7 günden bayatsa yeni giriş 503 `FABRIKA_BAGLANTISI_YOK`; bulutta `PAROLA_ZAYIF` yanıtı YOKTUR (Y8). [bekçi: patron/sunucu test_giris_fabrika_parolasi]
 - Eski bulut (`/v1/kullanicilar` 404) hata değildir: tek satır log + 60 dk geri çekilme; kurulum sırası önce bulut, sonra fabrikadır. [bekçi: test_patron_bulut_kullanicilar]
 
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
@@ -103,6 +109,8 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_patron_cloud_switch_superadmin` · `test_password_policy_version` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
 Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_giris_fabrika_parolasi` (giriş · TOTP · kaba kuvvet · bayatlık) · `test_hesap_acil_cli` (acil CLI · üyelik sökümü) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
+
+Uygulama (`patron/uygulama`, `npx jest`): `__tests__/iki-adimli-dogrulama.test.tsx` (giriş adımları · hata cümleleri) · `__tests__/mirror.test.ts` (uç tablosu ↔ sunucu rotaları).
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 
