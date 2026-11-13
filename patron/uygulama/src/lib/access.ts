@@ -11,7 +11,7 @@ export type ModuleKey =
   | "uretim"
   | "stok"
   | "gelen-kutusu"
-  | "hesaplar"
+  | "disa-aktar"
   | "bildirimler"
   | "profil";
 
@@ -39,9 +39,9 @@ export const MODULES: readonly ModuleDef[] = [
   { key: "stok", title: "Stok", hint: "Ham ve bitmiş stok", route: "/stok", anyOf: ["bulut:stok:oku"] },
   { key: "raporlar", title: "Raporlar", hint: "Fabrikadan rapor isteyin", route: "/raporlar", anyOf: ["bulut:rapor:oku"] },
   { key: "gelen-kutusu", title: "Gönderdiklerim", hint: "Telefondan fabrikaya gönderdiğiniz kayıtlar", route: "/gelen-kutusu", anyOf: ["bulut:siparis:yaz", "bulut:cari:yaz"] },
-  { key: "hesaplar", title: "Hesaplar", hint: "Kim neyi görür, davetler", route: "/hesaplar", anyOf: ["bulut:hesap:yonet"] },
+  { key: "disa-aktar", title: "Verileri dışa aktar", navTitle: "Dışa aktar", hint: "JSON ya da CSV döküm", route: "/disa-aktar", anyOf: ["bulut:hesap:yonet"] },
   { key: "bildirimler", title: TERIM_AD.bildirimAyarlari, hint: "Bu cihazda izin, türler, sessiz saatler", route: "/bildirimler", anyOf: [] },
-  { key: "profil", title: "Profil", hint: "Görünüm, parola ve çıkış", route: "/profil", anyOf: [] },
+  { key: "profil", title: "Profil", hint: "Görünüm, doğrulama kodu ve çıkış", route: "/profil", anyOf: [] },
 ];
 
 export function moduleDef(key: ModuleKey): ModuleDef {

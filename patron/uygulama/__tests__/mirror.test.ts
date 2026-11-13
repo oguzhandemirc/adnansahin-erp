@@ -25,17 +25,6 @@ function outsideImports(file: string, src: string): string[] {
   return specs.filter((s) => relative(ROOT, resolve(dirname(file), s)).startsWith(".."));
 }
 
-/**
- * GEÇİCİ (C4 → A1): sunucudan sökülen üyelik uçları (davet · hesap yönetimi · parola · hesap silme · tesis geçişi). Uç
- * tablosunda yalnız A1'de silinecek ekranlar derlensin diye duruyor; liste YALNIZ KÜÇÜLÜR — burada olup tabloda olmayan
- * anahtar da kırmızıdır (A1 ucu silince listeden de siler; sonunda boş dizi + bu sabit kalkar).
- */
-const SOKULEN_UCLAR: readonly string[] = [
-  "post /davet/incele", "post /davet/kabul", "post /davet/onay", "post /davet/bagla",
-  "get /oturum/tesisler", "post /oturum/gecis", "post /oturum/parola", "post /oturum/hesap-sil",
-  "get /izinler", "get /hesaplar", "post /hesaplar", "patch /hesaplar/:id", "post /hesaplar/:id/durum", "post /hesaplar/:id/sifirla",
-];
-
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
     const p = join(dir, n);
@@ -58,11 +47,8 @@ describe("ayna: patron/sunucu ↔ patron/uygulama", () => {
     const resolve = (p: string) => p.replace(/\$\{([A-Z_]+)\}/g, (_x, k: string) => consts.get(k) ?? `?${k}`);
     const server = new Set([...text.matchAll(/method:\s*"(get|post|patch|delete)",\s*path:\s*["`]([^"`]+)["`]/g)].map((m) => `${m[1]} ${resolve(m[2]!)}`));
     expect(server.size).toBeGreaterThan(20); // desen körleşirse boş küme sahte yeşil verir
-    const table = Object.values(ENDPOINTS).map(([m, p]) => `${m} ${p}`);
-    const missing = table.filter((k) => !server.has(k) && !SOKULEN_UCLAR.includes(k));
+    const missing = Object.values(ENDPOINTS).map(([m, p]) => `${m} ${p}`).filter((k) => !server.has(k));
     expect(missing).toEqual([]);
-    // Geçici liste bayatlamaz: her girdisi hâlâ tabloda ve sunucuda GERÇEKTEN yok.
-    expect(SOKULEN_UCLAR.filter((k) => !table.includes(k) || server.has(k))).toEqual([]);
   });
 
   it("uygulamadaki her 'bulut:' izin literali bulut kataloğunda var", () => {

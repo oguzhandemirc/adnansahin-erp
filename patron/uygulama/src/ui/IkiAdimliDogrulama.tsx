@@ -71,7 +71,7 @@ export function TwoFactorSheet({ visible, open, onClose, onDone }: {
         <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
           {open ? (
             <View>
-              <Text style={s.note}>Kapatınca girişte yalnız e-posta ve parola istenir. Onaylamak için parolanızı ve kod uygulamasındaki güncel kodu girin.</Text>
+              <Text style={s.note}>Kapatınca girişte yalnız kullanıcı adı ve parola istenir. Onaylamak için parolanızı ve kod uygulamasındaki güncel kodu girin.</Text>
               <Field label="Parola" value={parola} onChangeText={setParola} secureTextEntry autoComplete="current-password" testID="dogrulama-parola" />
               <Field label="Doğrulama kodu" value={kod} onChangeText={(v) => setKod(digits(v))} keyboardType="number-pad" autoComplete="one-time-code" testID="dogrulama-kod" />
               {disable.error ? <Banner tone="error" text={disable.error} /> : null}

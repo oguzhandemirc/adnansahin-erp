@@ -7,14 +7,15 @@ describe("izin görünürlüğü (istemci yalnız gizler)", () => {
   it("izinsiz hesap yalnız pano + bildirimler + profil görür", () => {
     expect(keys(["bulut:oturum"])).toEqual(["pano", "bildirimler", "profil"]);
   });
-  it("satış şablonu: hesaplar YOK, gelen kutusu VAR", () => {
+  it("satış şablonu: dışa aktarım YOK, gelen kutusu VAR", () => {
     const k = keys(["bulut:oturum", "bulut:ozet:oku", "bulut:siparis:oku", "bulut:sevkiyat:oku", "bulut:uretim:oku", "bulut:stok:oku", "bulut:rapor:oku", "bulut:cari:oku", "bulut:siparis:yaz", "bulut:cari:yaz"]);
     expect(k).toContain("gelen-kutusu");
-    expect(k).not.toContain("hesaplar");
+    expect(k).not.toContain("disa-aktar");
   });
-  it("hesaplar yalnız tesis yöneticisine", () => {
-    expect(moduleVisible(["bulut:hesap:yonet"], "hesaplar")).toBe(true);
-    expect(moduleVisible(["bulut:siparis:oku"], "hesaplar")).toBe(false);
+  it("dışa aktarım yalnız yöneticiye; hesap yönetimi ekranı YOK (hesap fabrikanın malı)", () => {
+    expect(moduleVisible(["bulut:hesap:yonet"], "disa-aktar")).toBe(true);
+    expect(moduleVisible(["bulut:siparis:oku"], "disa-aktar")).toBe(false);
+    expect(keys(["bulut:oturum", "bulut:hesap:yonet"])).toEqual(["pano", "disa-aktar", "bildirimler", "profil"]);
   });
   it("pano kartı gereken izinlerin HEPSİNİ ister", () => {
     expect(visibleCards(["bulut:siparis:oku"]).map((c) => c.projection)).toEqual([]);

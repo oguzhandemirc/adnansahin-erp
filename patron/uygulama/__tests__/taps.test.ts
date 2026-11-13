@@ -8,44 +8,38 @@ jest.mock("expo-router", () => ({ useRouter: () => ({ push: jest.fn() }) }));
 
 const { openNotification } = require("../src/push/taps") as typeof import("../src/push/taps");
 
-function deps(facilityId: string | null, switchOk = true) {
+function deps(facilityId: string | null) {
   const order: string[] = [];
   return {
     order,
     d: {
       facilityId,
-      switchFacility: jest.fn(async (id: string) => { order.push(`gecis:${id}`); return switchOk; }),
       push: jest.fn((r: string) => void order.push(`rota:${r}`)),
     },
   };
 }
 
-describe("bildirim dokunuşu (çok tesis)", () => {
-  it("farklı tesisId → önce geçiş, sonra rota", async () => {
+describe("bildirim dokunuşu (tek tesis; geçiş yok)", () => {
+  it("farklı tesisId → rota AÇILMAZ (tesis geçişi yok)", async () => {
     const { order, d } = deps("t1");
-    await expect(openNotification({ rota: "/siparisler", tesisId: "t2" }, d)).resolves.toBe(true);
-    expect(order).toEqual(["gecis:t2", "rota:/siparisler"]);
+    await expect(openNotification({ rota: "/siparisler", tesisId: "t2" }, d)).resolves.toBe(false);
+    expect(order).toEqual([]);
   });
-  it("aynı tesis ya da tesisId yok (eski yük) → geçiş yok, rota açılır", async () => {
+  it("aynı tesis ya da tesisId yok (eski yük) → rota açılır", async () => {
     for (const data of [{ rota: "/stok", tesisId: "t1" }, { rota: "/stok" }]) {
       const { order, d } = deps("t1");
       await openNotification(data, d);
       expect(order).toEqual(["rota:/stok"]);
     }
   });
-  it("geçiş reddedilirse rota AÇILMAZ", async () => {
-    const { order, d } = deps("t1", false);
-    await expect(openNotification({ rota: "/stok", tesisId: "t9" }, d)).resolves.toBe(false);
-    expect(order).toEqual(["gecis:t9"]);
-  });
-  it("güvensiz rota → ne geçiş ne rota", async () => {
+  it("güvensiz rota → rota yok", async () => {
     const { order, d } = deps("t1");
     await expect(openNotification({ rota: "https://kotu.ornek", tesisId: "t2" }, d)).resolves.toBe(false);
     expect(order).toEqual([]);
   });
 });
 
-describe("web bildirimi: service worker → adres → tesis geçişi", () => {
+describe("web bildirimi: service worker → adres → tesis denetimi", () => {
   const { webTapFromUrl } = require("../src/push/taps") as typeof import("../src/push/taps");
   const T2 = "11111111-2222-3333-4444-555555555555";
 
@@ -69,14 +63,17 @@ describe("web bildirimi: service worker → adres → tesis geçişi", () => {
     return acilan;
   }
 
-  it("yük tesisId taşıyorsa adres `?tesis=` taşır; uygulama farklı tesise önce geçer", async () => {
+  it("yük tesisId taşıyorsa adres `?tesis=` taşır; aynı tesiste rota açılır, başka tesiste açılmaz", async () => {
     const url = await swAc({ baslik: "x", rota: "/siparisler", tesisId: T2 });
     expect(url).toBe(`https://patron.ornek/siparisler?tesis=${T2}`);
     const tap = webTapFromUrl(url);
     expect(tap).toEqual({ rota: "/siparisler", tesisId: T2 });
-    const { order, d } = deps("t1");
-    await expect(openNotification(tap, d)).resolves.toBe(true);
-    expect(order).toEqual([`gecis:${T2}`, "rota:/siparisler"]);
+    const ayni = deps(T2);
+    await expect(openNotification(tap, ayni.d)).resolves.toBe(true);
+    expect(ayni.order).toEqual(["rota:/siparisler"]);
+    const baska = deps("t1");
+    await expect(openNotification(tap, baska.d)).resolves.toBe(false);
+    expect(baska.order).toEqual([]);
   });
   it("tesisId yok (eski yük) ya da biçimsiz → adres tesis taşımaz, geçiş yok", async () => {
     for (const yuk of [{ rota: "/stok" }, { rota: "/stok", tesisId: "../kotu" }]) {

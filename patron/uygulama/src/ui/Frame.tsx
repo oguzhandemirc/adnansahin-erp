@@ -1,7 +1,5 @@
 // Çerçeve: telefonda büyük başlık + alt sekmeler; tablet/web'de (≥ 768) solda kalıcı ray + içerik.
 // Menü yalnız izinli bölümleri gösterir (karar yine sunucuda; izinsiz uç 403 döner).
-import { BASMA } from "./hareket/sabitler";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native";
@@ -10,7 +8,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MODULES, moduleNavTitle, moduleTitle, moduleVisible, type ModuleKey } from "../lib/access";
 import { useSession } from "../state/session";
 import { StatusBands } from "./data";
-import { FacilitySwitchModal } from "./FacilitySwitcher";
 import { IconTile } from "./ortak";
 import { DOMAIN_TONE } from "./tokens";
 import { MODULE_ICON } from "./icons";
@@ -27,24 +24,11 @@ export function useWide(): boolean {
   return useWindowDimensions().width >= WIDE_MIN;
 }
 
+/** Tesis adı (Adnan bulutu tek tesislidir; tesis geçişi yok). Firma adı KODDA yok: hesabın tesisinden gelir; yoksa nötr ad. */
 export function FacilityName() {
-  const { facility, facilities } = useSession();
-  const t = useTokens();
+  const { facility } = useSession();
   const s = useStyles();
-  const [open, setOpen] = useState(false);
-  // Firma adı KODDA yok: hesabın tesisinden gelir; yoksa nötr ad.
-  const name = <Text style={s.facility} numberOfLines={1}>{facility?.tesis.ad ?? UYGULAMA_ADI}</Text>;
-  if (facilities.length < 2) return name;
-  return (
-    <>
-      <Pressable accessibilityRole="button" accessibilityLabel="Fabrika değiştir" testID="tesis-secici" onPress={() => setOpen(true)} style={({ pressed }) => [s.facilityPress, pressed && { opacity: BASMA.opaklik }]}>
-        {name}
-        <Ionicons name="swap-horizontal" size={16} color={t.tint} />
-        <Text style={s.facilitySwitch}>değiştir</Text>
-      </Pressable>
-      <FacilitySwitchModal visible={open} onClose={() => setOpen(false)} />
-    </>
-  );
+  return <Text style={s.facility} numberOfLines={1}>{facility?.tesis.ad ?? UYGULAMA_ADI}</Text>;
 }
 
 /** Geniş ekran rayı: tesis adı + rol rozeti; sekmelerle aynı sırada ana bölümler, sonra "İş" ve "Hesap" grupları. */
@@ -145,7 +129,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const wide = useWide();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { permissions, switchError, factoryStamp, offline } = useSession();
+  const { permissions, factoryStamp, offline } = useSession();
   const { scrollY, onScroll } = useHeaderScroll(onEndReached);
   const allowed = module === undefined || moduleVisible(permissions, module);
   const path = usePathname();
@@ -187,7 +171,6 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
             </View>
           ) : null}
           <StatusBands />
-          {switchError ? <Banner tone="error" text={switchError} testID="bant-tesis-gecisi" /> : null}
         </View>
         {sticky && allowed ? <View style={[s.sticky, { marginHorizontal: -pad, paddingHorizontal: pad }]}>{sticky}</View> : null}
         <View>{allowed ? children : <Banner tone="error" icon="lock-closed-outline" text="Bu bölümü görme yetkiniz yok" />}</View>
@@ -204,8 +187,6 @@ const useStyles = makeStyles((t) => ({
   subtitleEmpty: { height: 0, overflow: "hidden" as const },
   content: { maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },
-  facilityPress: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
-  facilitySwitch: { ...typography.footnote, color: t.tint },
   rail: { width: RAIL_WIDTH, borderRightWidth: 1, borderColor: t.separator, backgroundColor: t.surface, paddingTop: space.l, paddingHorizontal: space.s },
   railHead: { paddingHorizontal: space.s, marginBottom: space.m, gap: space.xs },
   railSection: { ...typography.caption, color: t.textMuted, paddingHorizontal: space.s, marginTop: space.m, marginBottom: space.xs },

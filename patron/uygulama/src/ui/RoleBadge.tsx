@@ -1,5 +1,5 @@
-// Rol rozeti (tasarım dili §1.4): ölçüt `bulut:hesap:yonet` → Yönetici, diğerleri Çalışan. Yalnız gösterir; karar
-// sunucudadır. Rol adı TEK kaynak `ROLE_LABEL` (profil kartı, hesap satırı da buradan okur).
+// Rol rozeti (tasarım dili §1.4): ölçüt `bulut:hesap:yonet` (fabrikada `admin:users`ten türer) → Yönetici, diğerleri
+// Çalışan. Yalnız gösterir; karar sunucudadır. Rol adı TEK kaynak `ROLE_LABEL` (profil kartı da buradan okur).
 import { Text, View } from "react-native";
 import { can } from "../lib/access";
 import { makeStyles, useTokens } from "./theme-context";

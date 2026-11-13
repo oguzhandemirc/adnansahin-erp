@@ -1,7 +1,9 @@
-// YEREL API DUMANI — uygulamanın KENDİ API istemcisiyle (src/api) zincir: davet → parola → (profilden) TOTP aç →
-// giriş → oturum/pano → gelen kutusuna sipariş → durum oku → iptal (tekrarı aynı sonuç) → çıkış.
-// Yalnız yerel _test sunucusuna karşı koşulur (127.0.0.1/localhost dışı adres RED).
-//   ../sunucu/node_modules/.bin/tsx scripts/duman.ts --api=http://127.0.0.1:4631 --davet=<belirteç>
+// YEREL API DUMANI — uygulamanın KENDİ API istemcisiyle (src/api) zincir: fabrika kullanıcı adı + parola ile giriş
+// (yanlış parola 401) → (profilden) TOTP aç → kodsuz giriş 401 kod gerekli → kodlu giriş → oturum/pano → gelen kutusuna
+// sipariş → durum oku → iptal (tekrarı aynı sonuç) → TOTP kapat (hesap eski hâline döner) → çıkış.
+// Hesap fabrikanın malıdır: yerel _test bulutunda fabrika gönderimiyle (ya da bekçi ortamının `hesapKur`uyla) doğar;
+// davet yoktur. Parola komut satırına yazılmaz: ortam değişkeni `DUMAN_PAROLA`. Yalnız yerel sunucuya koşulur.
+//   DUMAN_PAROLA=… ../sunucu/node_modules/.bin/tsx scripts/duman.ts --api=http://127.0.0.1:4631 --kullanici=<ad>
 import { createHmac, randomUUID } from "node:crypto";
 import { ApiError, createClient } from "../src/api/client";
 import { createApi } from "../src/api/endpoints";
@@ -9,9 +11,11 @@ import type { OrderMessageBody } from "../src/api/wire";
 
 const arg = (k: string) => process.argv.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3);
 const API = arg("api") ?? "http://127.0.0.1:4631";
-const INVITE = arg("davet");
+const USERNAME = arg("kullanici");
+const PASSWORD = process.env.DUMAN_PAROLA;
 if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(API)) throw new Error("duman yalnız yerel sunucuya koşulur");
-if (!INVITE) throw new Error("--davet=<belirteç> zorunlu (scripts/tesis.ts yonetici-davet çıktısı)");
+if (!USERNAME) throw new Error("--kullanici=<fabrika kullanıcı adı> zorunlu");
+if (!PASSWORD) throw new Error("DUMAN_PAROLA ortam değişkeni zorunlu (fabrika parolası)");
 
 function base32(s: string): Buffer {
   const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -41,22 +45,17 @@ function expect(cond: unknown, m: string): asserts cond {
 }
 
 async function main(): Promise<void> {
-  const info = await api.inviteInspect(INVITE!);
-  ok(`davet incelendi (${info.eposta}, tesis: ${info.tesisAd ?? "—"})`);
-  const parola = `Duman-${randomUUID()}`;
-  const acc = await api.inviteAccept(INVITE!, parola);
-  expect(acc.durum === "AKTIF", "kabul hesabı etkinleştirmedi");
-  ok("parola belirlendi → hesap AKTİF (doğrulama kodu kapalı)");
-
+  const kullaniciAdi = USERNAME!;
+  const parola = PASSWORD!;
   try {
-    await api.login({ eposta: info.eposta, parola: `${parola}-yanlis`, istemci: "mobil" });
+    await api.login({ kullaniciAdi, parola: `${parola}-yanlis`, istemci: "mobil" });
     throw new Error("KIRMIZI: yanlış parola ile giriş açıldı");
   } catch (e) {
     expect(e instanceof ApiError && e.status === 401 && e.code === "GIRIS_BASARISIZ", `yanlış parola 401 GIRIS_BASARISIZ değil: ${String(e)}`);
   }
   ok("yanlış parola → 401 GIRIS_BASARISIZ (details.code)");
 
-  const ilk = await api.login({ eposta: info.eposta, parola, istemci: "mobil" });
+  const ilk = await api.login({ kullaniciAdi, parola, istemci: "mobil" });
   token = ilk.belirtec;
   const kurulum = await api.twoFactorBegin(parola);
   expect(kurulum.otpauth.startsWith("otpauth://"), "kurulum sırrı yok");
@@ -64,7 +63,7 @@ async function main(): Promise<void> {
   ok("iki adımlı doğrulama profilden açıldı");
   token = null;
   try {
-    await api.login({ eposta: info.eposta, parola, istemci: "mobil" });
+    await api.login({ kullaniciAdi, parola, istemci: "mobil" });
     throw new Error("KIRMIZI: açık hesap kodsuz girdi");
   } catch (e) {
     expect(e instanceof ApiError && e.code === "DOGRULAMA_KODU_GEREKLI", `kodsuz giriş DOGRULAMA_KODU_GEREKLI değil: ${String(e)}`);
@@ -72,7 +71,7 @@ async function main(): Promise<void> {
   ok("kodsuz giriş → 401 DOGRULAMA_KODU_GEREKLI");
 
   await nextStep();
-  const login = await api.login({ eposta: info.eposta, parola, totp: totp(kurulum.totpSirri), istemci: "mobil" });
+  const login = await api.login({ kullaniciAdi, parola, totp: totp(kurulum.totpSirri), istemci: "mobil" });
   token = login.belirtec;
   ok(`giriş (izin: ${login.hesap.izinler.length})`);
 
@@ -106,6 +105,10 @@ async function main(): Promise<void> {
   const c2 = await api.inboxCancel(mesajId);
   expect(c2.durum === "IPTAL" && c2.iptal === c.iptal, "ikinci iptal aynı sonucu vermedi");
   ok("ikinci iptal → aynı sonuç (idempotent; damga değişmedi)");
+  await nextStep();
+  const kapali = await api.twoFactorDisable({ parola, totp: totp(kurulum.totpSirri) });
+  expect(!kapali.acik, "doğrulama kapanmadı");
+  ok("iki adımlı doğrulama kapatıldı (hesap eski hâlinde)");
   await api.logout();
   token = login.belirtec;
   try {

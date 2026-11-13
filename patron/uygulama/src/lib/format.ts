@@ -92,9 +92,7 @@ export const STATUS_LABEL: Readonly<Record<string, string>> = {
   HESAPLANIYOR: "Hesaplanıyor",
   HAZIR: "Hazır",
   HATA: "Hata",
-  DAVETLI: "Davetli",
   AKTIF: "Aktif",
-  KILITLI: "Kilitli",
   PASIF: "Arşiv",
 };
 

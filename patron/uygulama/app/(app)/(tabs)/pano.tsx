@@ -36,9 +36,9 @@ const MODULE_HINT: Readonly<Partial<Record<ModuleKey, string>>> = {
   stok: "Ham, yarı mamul ve bitmiş stok",
   raporlar: "Hazır raporlar ve istekler",
   "gelen-kutusu": "Fabrikaya gönderdiğin talepler",
-  hesaplar: "Kullanıcılar ve yetkiler",
+  "disa-aktar": "Verilerin JSON ya da CSV dökümü",
   bildirimler: "Uyarı ve bildirim ayarları",
-  profil: "Hesabın, parola ve oturum",
+  profil: "Hesabın, doğrulama kodu ve oturum",
 };
 
 export default function Dashboard() {
