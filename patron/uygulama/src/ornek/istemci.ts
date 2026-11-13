@@ -1,7 +1,7 @@
 // Örnek veri istemcisi: `ApiClient`in yerine oturur (endpoints/kancalar aynen çalışır), ağa hiç çıkmaz.
 // Okumalar `veri.ts`ten gelir; yazmalar reddedilir. Kısa gecikme iskelet ve yenileme durumlarını gösterir.
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
-import { LIST_SEARCH, LIST_SORT } from "../api/wire";
+import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT } from "../api/wire";
 import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_HESAPLAR, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
 
 const GECIKME_MS = 350;
@@ -22,8 +22,18 @@ const BOS_SAYFA = { kayitlar: [], sonraki: null };
 
 function listele(projeksiyon: string, q: Query | undefined) {
   const hepsi = ORNEK_LISTE()[projeksiyon] ?? [];
-  const suz = (alan: string) => (q?.[alan] ? hepsi.filter((r) => (r.kayit as Record<string, unknown>)[alan] === q[alan]) : null);
-  let kayitlar = suz("cariKartId") ?? suz("siparisId") ?? hepsi;
+  // Üyelik süzgeci sunucudaki gibi (fabrikanın kimlik dizisi değeri içeriyor mu); yoksa aynı adlı alanın eşitliği.
+  const uyelik = (k: string): string | undefined => (LIST_MEMBER_FILTERS as Readonly<Record<string, Readonly<Record<string, string>>>>)[k]?.[projeksiyon];
+  const suz = (k: string) => {
+    const v = q?.[k];
+    if (!v) return null;
+    const dizi = uyelik(k);
+    return hepsi.filter((r) => {
+      const d = (r.kayit as Record<string, unknown>)[dizi ?? k];
+      return dizi ? Array.isArray(d) && d.includes(v) : d === v;
+    });
+  };
+  let kayitlar = suz("cariKartId") ?? suz("siparisId") ?? suz("fasonFirmaId") ?? hepsi;
   const ara = typeof q?.ara === "string" ? q.ara.toLocaleLowerCase("tr") : "";
   // Süzgeç sunucudaki gibi `LIST_SEARCH` beyanından (virgüllü değerler, alan = değer); ekran süzmez, sahte sunucu süzer.
   const spec = LIST_SEARCH[projeksiyon];

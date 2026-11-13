@@ -10,7 +10,7 @@ import { ASSIGNABLE_PERMISSIONS, ROLE_TEMPLATES } from "../catalog/permissions";
 import { CloudError, badRequest } from "../lib/errors";
 import { createAccount, listAccountAudit, listAccounts, resetAccount, setAccountStatus, updateAccount } from "../services/account.service";
 import type { CloudContext } from "../services/context";
-import { ANAHTAR_SUZGEC_AZAMI, LIST_ID_FILTER_KEYS, LIST_KEY_FILTER_KEYS, LIST_SORT_DIRS, type ListSortDir, type LoginResponse, type PermissionCatalog } from "../wire/api";
+import { ANAHTAR_SUZGEC_AZAMI, LIST_ID_FILTER_KEYS, LIST_MEMBER_FILTER_KEYS, LIST_KEY_FILTER_KEYS, LIST_SORT_DIRS, type ListSortDir, type LoginResponse, type PermissionCatalog } from "../wire/api";
 import { facilityStatus, getCustomerSummary, getProjectionRecord, getSnapshot, listProjection } from "../services/data.service";
 import { deactivateDevice, listDevices, registerDevice } from "../services/device.service";
 import { requestSnapshotRefresh } from "../services/doorbell";
@@ -128,7 +128,7 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
     kimlik: "OKUMA",
     handler: async (c) => {
       const { cursor, limit } = page(c);
-      return { data: await listProjection(c.ctx, s(c), String(c.req.params[PROJECTION]), { cursor, limit, durum: text(c, "durum", 40), kimlik: Object.fromEntries(LIST_ID_FILTER_KEYS.map((k) => [k, text(c, k, 40)])), anahtar: Object.fromEntries(LIST_KEY_FILTER_KEYS.map((k) => [k, text(c, k, ANAHTAR_SUZGEC_AZAMI + 1)])), ara: text(c, "ara", 200), suzgec: text(c, "suzgec", 120), sirala: text(c, "sirala", 40), yon: sortDir(text(c, "yon", 10)) }) };
+      return { data: await listProjection(c.ctx, s(c), String(c.req.params[PROJECTION]), { cursor, limit, durum: text(c, "durum", 40), kimlik: Object.fromEntries([...new Set([...LIST_ID_FILTER_KEYS, ...LIST_MEMBER_FILTER_KEYS])].map((k) => [k, text(c, k, 40)])), anahtar: Object.fromEntries(LIST_KEY_FILTER_KEYS.map((k) => [k, text(c, k, ANAHTAR_SUZGEC_AZAMI + 1)])), ara: text(c, "ara", 200), suzgec: text(c, "suzgec", 120), sirala: text(c, "sirala", 40), yon: sortDir(text(c, "yon", 10)) }) };
     },
   },
   { method: "get", path: `/veri/:${PROJECTION}/:id`, auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await getProjectionRecord(c.ctx, s(c), String(c.req.params[PROJECTION]), String(c.req.params.id)) }) },

@@ -125,7 +125,7 @@ async function imlecler(o: Ortam, h: TestHesabi, f: Fikstur): Promise<void> {
 async function kapilar(o: Ortam, h: TestHesabi): Promise<void> {
   console.log("\n§3 kapılar");
   kontrol("§3a beyansız alan 400", (await liste(o, h, "siparis", { sirala: "durum" })).status === 400);
-  kontrol("§3b sıralanmayan liste 400", (await liste(o, h, "is-emri", { sirala: "olusturulma" })).status === 400);
+  kontrol("§3b sıralanmayan liste 400", (await liste(o, h, "siparis-kalemi", { sirala: "olusturulma" })).status === 400);
   kontrol("§3c tek başına yon 400", (await liste(o, h, "siparis", { yon: "artan" })).status === 400);
   kontrol("§3d bilinmeyen yon 400", (await liste(o, h, "siparis", { sirala: "siparisNo", yon: "yukari" })).status === 400);
   kontrol("§3e prototip adı alan değildir", (await liste(o, h, "siparis", { sirala: "constructor" })).status === 400);

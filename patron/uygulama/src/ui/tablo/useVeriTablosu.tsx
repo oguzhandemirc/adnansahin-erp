@@ -10,7 +10,8 @@ import { useListCapability } from "../siparis/capabilities";
 import { ListStates } from "../siparis/parts";
 import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
 import { useSession } from "../../state/session";
-import { azamiSutun, etkinSuzgecSayisi, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecSec, tercihiTemizle, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
+import type { ListQuery } from "../siparis/useRemoteList";
+import { azamiSutun, etkinSuzgecSayisi, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecSec, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
 import { SutunSecici, SuzgecSecici } from "./Seciciler";
 import { useTabloTercihi } from "./useTabloTercihi";
 import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri } from "./VeriTablosu";
@@ -41,7 +42,17 @@ export interface VeriTablosu {
   degistir(f: (t: TabloTercihi) => TabloTercihi): void;
 }
 
-export function useVeriTablosu(ayar: VeriTablosuAyari): VeriTablosu {
+/**
+ * Ekranın tercihten bağımsız koşulu: `suzgec` sabit değer(ler) tercihin önüne eklenir (ör. açık/kapanan sekmesi),
+ * `siralama` verilirse tercihin sıralamasını ezer, `kimlik` kimlik/üyelik süzgeçleridir (beyanlıysa gönderilir).
+ */
+export interface TabloEki {
+  readonly suzgec?: string;
+  readonly siralama?: Siralama;
+  readonly kimlik?: Pick<ListQuery, "cariKartId" | "siparisId" | "fasonFirmaId">;
+}
+
+export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriTablosu {
   const { facility } = useSession();
   const { width } = useWindowDimensions();
   const azami = azamiSutun(width);
@@ -55,12 +66,22 @@ export function useVeriTablosu(ayar: VeriTablosuAyari): VeriTablosu {
   const pref = useTabloTercihi(ayar.anahtar, temizle);
   const [terim, setTerim] = useState("");
   const ara = useDebounced(terim.trim(), 300);
-  const sorgu = sunucuSorgusu(pref.tercih, spec ? ara : "", gs, siralanabilir);
+  // Ekranın sabit değeri bir grubu doldurduysa tercihin o gruptaki değeri gönderilmez (sunucu grup başına tek değer alır).
+  const ekDegerler = ek.suzgec ? ek.suzgec.split(",") : [];
+  const dolu = gs.filter((g) => g.secenekler.some((o) => ekDegerler.includes(o.deger))).map((g) => g.anahtar);
+  const etkin: TabloTercihi = {
+    ...pref.tercih,
+    suzgec: Object.fromEntries(Object.entries(pref.tercih.suzgec).filter(([g]) => !dolu.includes(g))),
+    ...(ek.siralama ? { siralama: ek.siralama } : {}),
+  };
+  const temel = sunucuSorgusu(etkin, spec ? ara : "", gs, siralanabilir);
+  const suzgec = [ek.suzgec, temel.suzgec].filter(Boolean).join(",") || undefined;
+  const sorgu: ListQuery = { ...temel, suzgec, ...ek.kimlik };
   const list = useRemoteList(ayar.projeksiyon, sorgu, { enabled: pref.hazir });
   const gorunur = pref.tercih.sutunlar.flatMap((k) => ayar.sutunlar.filter((c) => c.key === k));
   return {
     ayar, tercih: pref.tercih, gorunur, gruplar: gs, siralanabilir, aramaVar: !!spec, terim, setTerim, azami, list,
-    suzuldu: !!sorgu.ara || !!sorgu.suzgec,
+    suzuldu: !!sorgu.ara || !!temel.suzgec || Object.values(ek.kimlik ?? {}).some(Boolean),
     degistir: pref.degistir,
   };
 }
@@ -98,16 +119,28 @@ export function TabloUstu({ tablo }: { readonly tablo: VeriTablosu }) {
 }
 
 /** Satırlar + ortak durumlar (iskelet · hata · boş · daha fazla). */
-export function TabloListesi({ tablo, onPress, bos, bosSuzgecli, icon }: { readonly tablo: VeriTablosu; readonly onPress: (r: ProjectionRecord) => void; readonly bos: string; readonly bosSuzgecli: string; readonly icon?: IconName }) {
+export function TabloListesi({ tablo, onPress, bos, bosSuzgecli, icon, goster }: {
+  readonly tablo: VeriTablosu;
+  readonly onPress: (r: ProjectionRecord) => void;
+  readonly bos: string;
+  readonly bosSuzgecli: string;
+  readonly icon?: IconName;
+  /** Görünüm penceresi (ör. "son 30 gün"): sunucunun sırasıyla gelen satırlardan yalnız bunlar çizilir. */
+  readonly goster?: (r: ProjectionRecord) => boolean;
+}) {
   const { list } = tablo;
+  const satirlar = goster ? list.items.filter(goster) : list.items;
+  // Sıra pencereyle aynı yöndeyse ilk dışarıdaki satır pencerenin bittiğini söyler: "Daha fazla" gösterilmez.
+  const son = list.items[list.items.length - 1];
+  const durum: RemoteList = goster ? { ...list, items: satirlar, hasMore: list.hasMore && !(son && !goster(son)) } : list;
   return (
     <View>
-      {list.items.length > 0 ? (
+      {satirlar.length > 0 ? (
         <TabloGovdesi testID={`${tablo.ayar.testID}-govde`}>
-          {list.items.map((r, i) => <TabloSatiri key={r.id} sutunlar={tablo.gorunur} kayit={r} ayrac={i > 0} onPress={() => onPress(r)} testID={`${tablo.ayar.testID}-satir-${r.id}`} />)}
+          {satirlar.map((r, i) => <TabloSatiri key={r.id} sutunlar={tablo.gorunur} kayit={r} ayrac={i > 0} onPress={() => onPress(r)} testID={`${tablo.ayar.testID}-satir-${r.id}`} />)}
         </TabloGovdesi>
       ) : null}
-      <ListStates list={list} empty={tablo.suzuldu ? bosSuzgecli : bos} icon={icon} testID={tablo.ayar.testID} />
+      <ListStates list={durum} empty={tablo.suzuldu ? bosSuzgecli : bos} icon={icon} testID={tablo.ayar.testID} />
     </View>
   );
 }

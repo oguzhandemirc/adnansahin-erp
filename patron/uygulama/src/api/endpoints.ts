@@ -110,6 +110,8 @@ export interface ListParams {
   readonly cariHesapId?: string;
   readonly siparisId?: string;
   readonly teklifId?: string;
+  /** Üyelik süzgeci (`LIST_MEMBER_FILTERS`); yalnız sunucu `liste.uyelikSuzgecleri`nde beyanlıysa gönderilir. */
+  readonly fasonFirmaId?: string;
   /** Sunucu araması (`LIST_SEARCH`); istemci süzmez. */
   readonly ara?: string;
   readonly suzgec?: string;
@@ -121,7 +123,7 @@ export interface ListParams {
 }
 
 export function createApi(c: ApiClient) {
-  const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, cariHesapId: p.cariHesapId, siparisId: p.siparisId, teklifId: p.teklifId, ara: p.ara, suzgec: p.suzgec, kategoriAnahtari: p.kategoriAnahtari, sirala: p.sirala, yon: p.yon });
+  const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, cariHesapId: p.cariHesapId, siparisId: p.siparisId, teklifId: p.teklifId, fasonFirmaId: p.fasonFirmaId, ara: p.ara, suzgec: p.suzgec, kategoriAnahtari: p.kategoriAnahtari, sirala: p.sirala, yon: p.yon });
   return {
     login: (b: { eposta: string; parola: string; totp?: string; istemci?: "mobil" | "web"; tesisId?: string }) => c.post<LoginResponse>(pathOf("login"), b),
     inviteInspect: (davet: string) => c.post<InviteInfo>(pathOf("inviteInspect"), { davet }),

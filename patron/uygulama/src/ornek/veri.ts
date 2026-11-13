@@ -32,7 +32,12 @@ export function ornekOturum(): FacilityStatus {
     projeksiyonlar: Object.keys(ORNEK_ANLIK()),
     esitleme: { sonEsitleme: once(0, 0.05), ufuk: once(0, 0.05), ufukTakildi: false, sozlesmeUyarisi: null, fabrikaSurumu: "örnek" },
     hizmet: { asama: "ACIK", bitis: null, saltOkunurBitis: null },
-    liste: { kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "cari-hesap", "iade"], siparisId: ["siparis-kalemi"] }, aranabilir: ["cari-kart", "siparis", "sevkiyat"], siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])) },
+    liste: {
+      kimlikSuzgecleri: { cariKartId: ["siparis", "sevkiyat", "cari-hesap", "iade"], siparisId: ["siparis-kalemi"] },
+      aranabilir: ["cari-kart", "siparis", "sevkiyat", "is-emri"],
+      siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])),
+      uyelikSuzgecleri: { cariKartId: ["is-emri"], siparisId: ["is-emri"], fasonFirmaId: ["is-emri"] },
+    },
   };
 }
 
@@ -231,16 +236,45 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
       olusturulma: once(i, 3),
     }),
   );
-  const isEmri = Array.from({ length: 5 }, (_, i) =>
-    kayit(`w${i + 1}`, {
+  // İş emri: fabrikanın türettiği hâliyle (açık/aşama/aşama sayıları/kimlik dizileri); biri siparişsiz, biri kapanmış.
+  const FIRMA = { f1: "Örnek Boyahane", f2: "Deneme Zımpara" } as const;
+  const FIRMA_ID = { f1: "00000000-0000-4000-8000-0000000000f1", f2: "00000000-0000-4000-8000-0000000000f2" } as const;
+  const IE = [
+    { c: 0, s: [0], u: "Örnek Saten 280 cm", r: "Krem", asama: "fason", f: "f1", gun: 6, top: [["fason", 14, 1690], ["kursun", 0, 0], ["tambur", 0, 0], ["depo", 4, 470]] },
+    { c: 1, s: [1], u: "Deneme Keten 150 cm", r: "Antrasit", asama: "kursun", top: [["kursun", 9, 1085], ["tambur", 3, 360], ["depo", 6, 720]] },
+    { c: 2, s: [2], u: "Numune Tül 320 cm", r: "Ekru", asama: "fason", f: "f2", gun: 2, top: [["fason", 8, 940], ["depo", 2, 230]] },
+    { c: 3, s: [3, 6], u: "Taslak Kadife 140 cm", r: "Lacivert", asama: "tambur", top: [["tambur", 5, 610], ["depo", 11, 1340], ["sevkEdildi", 4, 480]] },
+    { c: -1, s: [], u: "Örnek Saten 280 cm", r: "Beyaz", asama: "kk1", top: [["diger", 12, 1450]] },
+    { c: 0, s: [5], u: "Deneme Keten 150 cm", r: "Bej", asama: "fason", f: "f1", gun: 11, top: [["fason", 10, 1210], ["kursun", 2, 240]] },
+    { c: 1, s: [4], u: "Numune Tül 320 cm", r: "Gri", asama: null, kapandi: 5, top: [["sevkEdildi", 16, 1920]] },
+  ] as const;
+  const isEmri = IE.map((x, i) => {
+    const c = x.c >= 0 ? CARILER[x.c]! : null;
+    const sip = x.s.map((j) => ({ id: `s${j + 1}`, no: `SIP-2026-${String(451 - j).padStart(4, "0")}` }));
+    const asamaTop = x.top.map(([anahtar, top, metre]) => ({ anahtar, top, metre }));
+    const f = "f" in x ? x.f : null;
+    return kayit(`w${i + 1}`, {
       isEmriNo: `IE-2026-${String(318 - i).padStart(4, "0")}`,
-      durum: i < 3 ? "IN_PROGRESS" : "PLANNED",
-      tur: i % 2 === 0 ? "ORDER_PRODUCTION" : "STOCK_PRODUCTION",
-      hedefMiktar: 4000 + i * 500,
-      uretilenMetre: i < 3 ? 1500 + i * 700 : 0,
-      planBitis: sonra(3 + i * 2),
-    }),
-  );
+      durum: x.asama === null ? "COMPLETED" : "IN_PROGRESS",
+      tur: sip.length > 0 ? "ORDER_PRODUCTION" : "STOCK_PRODUCTION",
+      acik: x.asama !== null,
+      asama: x.asama,
+      kapanisTarihi: "kapandi" in x ? once(x.kapandi) : null,
+      musteriAdi: c?.ad ?? null,
+      cariKartIdleri: c ? [c.id] : [],
+      siparisIdleri: sip.map((y) => y.id),
+      siparisNolari: sip.map((y) => y.no),
+      urunAdi: x.u,
+      renkAdi: x.r,
+      topSayisi: asamaTop.reduce((n, a) => n + a.top, 0),
+      metre: asamaTop.reduce((n, a) => n + a.metre, 0),
+      asamaTop,
+      fasonFirmaIdleri: f ? [FIRMA_ID[f]] : [],
+      fasonFirmaAdi: f ? FIRMA[f] : null,
+      fasonGonderim: "gun" in x ? once(x.gun) : null,
+      olusturulma: once(i * 4 + 8),
+    });
+  });
   // İade: yalnız "Örnek Tekstil"de; biri iptal (storno) — sayıma girmez, listede "İptal" rozetiyle.
   const iade = [
     { no: "IA-2026-0042", urun: "Örnek Saten 280 cm", renk: "Krem", metre: "62.50", sebep: "Renk farkı", gun: 4 },

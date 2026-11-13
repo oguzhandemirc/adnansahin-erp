@@ -2,22 +2,29 @@
 // `ozet.uretim` bugün biten + KK1 istasyonlarının bugünkü girişi · "Mal şu an nerede?" — `uretim-akisi` kolonları
 // dikey liste (satır → ilgili ekran) · "Açık iş emirleri" — ilk satırlar + Tümü. Fason ayrıntısı Fason ekranında.
 import { useRouter } from "expo-router";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { can } from "../../../src/lib/access";
 import { UNIT } from "../../../src/lib/labels/uretim";
 import { useSession } from "../../../src/state/session";
 import { Screen } from "../../../src/ui/Frame";
-import { KademeliGiris } from "../../../src/ui/hareket";
+import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
+import { asamaMetni, kumasMetni, musteriMetni, topMetni, type Kayit } from "../../../src/ui/is-emri/gorunum";
+import { openRecord } from "../../../src/ui/nav";
 import { BlokBasligi, ListeBlogu, ListeSatiri, StatCard } from "../../../src/ui/ortak";
 import { arr, num, obj, qty, str } from "../../../src/ui/pano/read";
 import { SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { combine, useSnapshot } from "../../../src/ui/pano/useSnapshot";
+import { useListCapability } from "../../../src/ui/siparis/capabilities";
+import { ListStates } from "../../../src/ui/siparis/parts";
+import { useRemoteList } from "../../../src/ui/siparis/useRemoteList";
 import { neredeSatirlari } from "../../../src/ui/uretim/nerede";
-import { makeStyles } from "../../../src/ui/theme-context";
-import { space } from "../../../src/ui/tokens";
+import { makeStyles, useTokens } from "../../../src/ui/theme-context";
+import { space, typography } from "../../../src/ui/tokens";
 
 /** KK1 (ham mal girişi) istasyon türü — fabrikanın `StationKind` kodu. */
 const HAM_GIRIS_TURU = "RAW_QC";
+/** Üretimde ilk bu kadar açık iş emri; gerisi "Tümü" (İş emirleri ekranı). */
+const ILK_IS_EMRI = 10;
 
 export default function Production() {
   const { permissions } = useSession();
@@ -27,6 +34,11 @@ export default function Production() {
   const summary = read && can(permissions, "bulut:ozet:oku");
   const today = useSnapshot("ozet.uretim", summary);
   const flow = useSnapshot("uretim-akisi", read);
+  // Açık süzgeci yalnız sunucu is-emri aramasını beyan ettiyse: eski sunucu süzgeci yok sayar, kapananları da döndürürdü.
+  const ieArama = useListCapability().search("is-emri");
+  const ieAcik = read && ieArama !== null;
+  const isEmirleri = useRemoteList("is-emri", { suzgec: "ACIK" }, { limit: ILK_IS_EMRI, enabled: ieAcik });
+  const t = useTokens();
   const all = combine([today, flow]);
 
   const bugunBiten = today.data ? num(obj(today.data.veri).bugunTamamlananToplam) : null;
@@ -34,7 +46,7 @@ export default function Production() {
   const hamGiris = kk1.length > 0 ? kk1.reduce((n, x) => n + (num(x.bugunTamamlanan) ?? 0), 0) : null;
 
   return (
-    <Screen module="uretim" onRefresh={all.reload} refreshing={all.refreshing}>
+    <Screen module="uretim" onRefresh={() => { all.reload(); if (ieAcik) isEmirleri.reload(); }} refreshing={all.refreshing || isEmirleri.refreshing}>
       {bugunBiten !== null || hamGiris !== null ? (
         <KademeliGiris sira={0}>
           <BlokBasligi baslik="Bugün ne bitti?" testID="bolum-bugun" />
@@ -73,6 +85,36 @@ export default function Production() {
           )}
         </SnapshotGate>
       </KademeliGiris>
+
+      {ieAcik && !isEmirleri.forbidden ? (
+        <KademeliGiris sira={2}>
+          <ListeBlogu
+            baslik="Açık iş emirleri"
+            testID="bolum-is-emirleri"
+            sag={
+              <Basilabilir onPress={() => router.push("/is-emirleri" as never)} accessibilityRole="link" testID="is-emirleri-tumu">
+                <Text style={[typography.footnote, s.tumu, { color: t.color.link }]}>Tümü</Text>
+              </Basilabilir>
+            }
+          >
+            {isEmirleri.items.slice(0, ILK_IS_EMRI).map((r, i) => {
+              const k = (r.kayit ?? {}) as Kayit;
+              return (
+                <ListeSatiri
+                  key={r.id}
+                  birincil={musteriMetni(k)}
+                  ikincil={`${topMetni(k)} top · ${kumasMetni(k)}`}
+                  deger={asamaMetni(k)}
+                  ayrac={i > 0}
+                  onPress={() => openRecord(router, "is-emri", r.id)}
+                  testID={`ie-${r.id}`}
+                />
+              );
+            })}
+            <ListStates list={{ ...isEmirleri, hasMore: false }} empty="Açık iş emri yok" iskeletSatir={3} testID="is-emirleri" />
+          </ListeBlogu>
+        </KademeliGiris>
+      ) : null}
     </Screen>
   );
 }
@@ -80,4 +122,5 @@ export default function Production() {
 const useStyles = makeStyles(() => ({
   ikili: { flexDirection: "row" as const, gap: space.m },
   yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
+  tumu: { fontWeight: "600" as const },
 }));

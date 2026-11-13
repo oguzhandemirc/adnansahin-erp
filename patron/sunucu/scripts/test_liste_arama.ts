@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { ROLE_TEMPLATES } from "../src/catalog/permissions";
 import { FOLD_FROM, FOLD_TO, foldTerm, likePattern } from "../src/lib/search";
-import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_KEY_FILTERS, LIST_SEARCH, type FacilityStatus } from "../src/wire/api";
+import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_KEY_FILTERS, LIST_MEMBER_FILTERS, LIST_SEARCH, type FacilityStatus } from "../src/wire/api";
 import { api, girdi, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
 import { KATALOG_DISI_FINANS, fabrikaDosyasi, katalogDisiDenetimi } from "./lib/fabrika-karsiligi";
 
@@ -136,8 +136,8 @@ async function imlec(o: Ortam, h: TestHesabi, ids: Ids): Promise<void> {
 
 async function kapilar(o: Ortam, h: TestHesabi, yabanci: Ids): Promise<void> {
   console.log("\n§5 kapılar");
-  const sev = await ara(o, h, "is-emri", { ara: "x" });
-  kontrol("§5a aranmayan liste (is-emri) → 400", sev.status === 400, `${sev.status}`);
+  const sev = await ara(o, h, "siparis-kalemi", { ara: "x" });
+  kontrol("§5a aranmayan liste (siparis-kalemi) → 400", sev.status === 400, `${sev.status}`);
   const uzun = await ara(o, h, "cari-kart", { ara: "a".repeat(ARAMA_AZAMI + 1) });
   kontrol("§5b azamiden uzun terim → 400", uzun.status === 400, `${uzun.status}`);
   const sinir = await ara(o, h, "cari-kart", { ara: "a".repeat(ARAMA_AZAMI) });
@@ -230,6 +230,59 @@ async function kimlikSuzgecleri(o: Ortam, h: TestHesabi, id: SiparisIds): Promis
   kontrol("§7i imleç süzgeçle devam eder (2 sayfa, kesişmez)", !!kalemSayfa2 && kalemSayfa2.ids.size === 1 && ![...kalemSayfa2.ids].some((x) => kalemSayfa.ids.has(x)) && ayni(new Set([...kalemSayfa.ids, ...kalemSayfa2.ids]), [id.kalem.a1, id.kalem.a2]), `${kalemSayfa2?.ids.size}`);
 }
 
+interface IsEmriIds {
+  readonly fason: string;
+  readonly kursun: string;
+  readonly kapali: string;
+  readonly cari: string;
+  readonly siparis: string;
+  readonly firma: string;
+}
+
+/** İş emri satırları: kimlik DİZİLERİNİ fabrika türetir; bulut yalnız üyeliğe bakar. */
+async function isEmriFikstur(o: Ortam, k: TestKurulumu): Promise<IsEmriIds> {
+  const w = { t: new Date(o.saat.simdi() - 60_000).toISOString(), k: "000000000003" };
+  const t = new Date(o.saat.simdi() - 120_000).toISOString();
+  const id: IsEmriIds = { fason: randomUUID(), kursun: randomUUID(), kapali: randomUUID(), cari: randomUUID(), siparis: randomUUID(), firma: randomUUID() };
+  const ie = (iid: string, no: string, acik: boolean, asama: string | null, ek: Record<string, unknown>) =>
+    ({ id: iid, isEmriNo: no, acik, asama, olusturulma: t, cariKartIdleri: [], siparisIdleri: [], siparisNolari: [], fasonFirmaIdleri: [], ...ek });
+  const yaz = [
+    ie(id.fason, "IE-2026-0201", true, "fason", { musteriAdi: "MAVİ ÖRME TEKSTİL", cariKartIdleri: [id.cari], siparisIdleri: [id.siparis], siparisNolari: ["SP-2026-0777"], fasonFirmaIdleri: [id.firma], topSayisi: 12 }),
+    ie(id.kursun, "IE-2026-0202", true, "kursun", { topSayisi: 3 }),
+    ie(id.kapali, "IE-2026-0203", false, null, { cariKartIdleri: [id.cari], kapanisTarihi: t, topSayisi: 7 }),
+  ];
+  const r = await imzali(o, k, "/v1/esitle", { govde: paket(k, { ufuk: new Date(o.saat.simdi() - 60_000), kayitlar: [girdi("is-emri", { yaz, yeni: w })] }) });
+  if (r.status !== 200 || (r.json as unknown as { ret: unknown[] }).ret.length > 0) throw new Error(`iş emri fikstürü: ${r.status} ${JSON.stringify(r.json)}`);
+  return id;
+}
+
+async function isEmriListesi(o: Ortam, h: TestHesabi, id: IsEmriIds): Promise<void> {
+  console.log("\n§9 iş emri listesi: durum/aşama süzgeci · arama · üyelik süzgeci");
+  const varsayilan = await ara(o, h, "is-emri", { suzgec: "ACIK" });
+  kontrol("§9a ⭐ \"Açık\" çipi fabrikanın `acik` alanı (kapanan gizli)", varsayilan.status === 200 && ayni(varsayilan.ids, [id.fason, id.kursun]), `${varsayilan.status} ${varsayilan.ids.size}`);
+  const kapanan = await ara(o, h, "is-emri", { suzgec: "KAPANAN" });
+  kontrol("§9b \"Kapanan\" çipi", ayni(kapanan.ids, [id.kapali]), `${kapanan.ids.size}`);
+  const fason = await ara(o, h, "is-emri", { suzgec: "ACIK,FASON" });
+  kontrol("§9c ⭐ aşama çipi (asama=fason) durumla birlikte", ayni(fason.ids, [id.fason]), `${fason.ids.size}`);
+  const sipNo = await ara(o, h, "is-emri", { ara: "0777" });
+  kontrol("§9d sipariş no dizisinde arama", ayni(sipNo.ids, [id.fason]), `${sipNo.ids.size}`);
+  const musteri = await ara(o, h, "is-emri", { cariKartId: id.cari });
+  kontrol("§9e ⭐ cariKartId → `cariKartIdleri` üyeliği (açık + kapanan)", musteri.status === 200 && ayni(musteri.ids, [id.fason, id.kapali]), `${musteri.status} ${musteri.ids.size}`);
+  const firma = await ara(o, h, "is-emri", { fasonFirmaId: id.firma.toUpperCase() });
+  kontrol("§9f ⭐ fasonFirmaId → `fasonFirmaIdleri` üyeliği (büyük harf de)", firma.status === 200 && ayni(firma.ids, [id.fason]), `${firma.status} ${firma.ids.size}`);
+  const siparis = await ara(o, h, "is-emri", { siparisId: id.siparis });
+  kontrol("§9g siparisId → `siparisIdleri` üyeliği", ayni(siparis.ids, [id.fason]), `${siparis.ids.size}`);
+  const beyansiz = await ara(o, h, "siparis", { fasonFirmaId: id.firma });
+  kontrol("§9h ⭐ üyelik beyanı olmayan projeksiyonda fasonFirmaId → 400", beyansiz.status === 400 && beyansiz.kod !== undefined, `${beyansiz.status}`);
+  const bicim = await ara(o, h, "is-emri", { cariKartId: "x' OR 1=1" });
+  kontrol("§9i biçimsiz üyelik değeri → 400", bicim.status === 400, `${bicim.status}`);
+  const sira = await ara(o, h, "is-emri", { suzgec: "ACIK", sirala: "topSayisi", yon: "azalan" });
+  kontrol("§9j topSayisi azalan sıralama", sira.status === 200 && JSON.stringify([...sira.ids]) === JSON.stringify([id.fason, id.kursun]), `${sira.status}`);
+  const ortak = Object.keys(LIST_MEMBER_FILTERS).flatMap((k) => Object.keys(LIST_MEMBER_FILTERS[k as keyof typeof LIST_MEMBER_FILTERS])
+    .filter((p) => (LIST_ID_FILTERS as Partial<Record<string, readonly string[]>>)[k]?.includes(p)).map((p) => `${k}:${p}`));
+  kontrol("§9k eşitlik ve üyelik beyanı aynı projeksiyonda çakışmaz", ortak.length === 0, ortak.join(","));
+}
+
 /** İki tesis AYNI sipariş kimliğini taşır, kalemleri ayrı: her hesap yalnız kendi tesisinin kalemlerini görür. */
 async function kimlikRls(o: Ortam, h: TestHesabi, h2: TestHesabi, id: SiparisIds, id2: SiparisIds): Promise<void> {
   const bir = await ara(o, h, "siparis-kalemi", { siparisId: id.siparis.yeni });
@@ -295,6 +348,7 @@ async function main(): Promise<void> {
     await kimlikSuzgecleri(o, h, sid);
     await kimlikRls(o, h, await hesapKur(o, k2.tesisId, ROLE_TEMPLATES.PATRON), sid, sid2);
     await beyanKatalog(o, h);
+    await isEmriListesi(o, h, await isEmriFikstur(o, k));
   } finally {
     await temizleTesis(o, k.tesisId);
     await temizleTesis(o, k2.tesisId);

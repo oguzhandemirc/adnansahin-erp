@@ -28,8 +28,8 @@ export const NEREDE_KOLONLARI: Readonly<Record<string, KolonTanimi>> = {
   hamStok: { etiket: "Ham stok", birim: "top", icon: "layers-outline", ton: "teal", git: "/stok" },
   yariMamul: { etiket: "Yarı mamul", birim: "top", icon: "sync-outline", ton: "blue", git: "/stok", sifirdaGizle: true },
   fason: { etiket: "Fasonda", birim: "top", icon: "color-fill-outline", ton: "orange", git: "/fason" },
-  kursun: { etiket: "Kurşun + KK2", birim: "iş emri", icon: "scan-outline", ton: "violet", git: null },
-  tambur: { etiket: "Tambur", birim: "iş emri", icon: "disc-outline", ton: "rose", git: null },
+  kursun: { etiket: "Kurşun + KK2", birim: "iş emri", icon: "scan-outline", ton: "violet", git: "/is-emirleri?asama=KURSUN" },
+  tambur: { etiket: "Tambur", birim: "iş emri", icon: "disc-outline", ton: "rose", git: "/is-emirleri?asama=TAMBUR" },
   depo: { etiket: "Depo", birim: "top", icon: "cube-outline", ton: "green", git: "/stok" },
 };
 
