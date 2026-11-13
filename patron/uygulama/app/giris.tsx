@@ -56,13 +56,13 @@ export default function Login() {
           <Field label="Parola" value={parola} onChangeText={setParola} secureTextEntry autoComplete="password" textContentType="password"
             returnKeyType="go" onSubmitEditing={() => { if (canSubmit && !busy) void submit(false); }} testID="parola" />
           <View style={{ height: space.xs }} />
-          <Button label="Giriş yap" icon="log-in-outline" busy={busy} disabled={!canSubmit} onPress={() => void submit(false)} testID="devam" />
+          <Button label="Giriş yap" tone="marka" icon="log-in-outline" busy={busy} disabled={!canSubmit} onPress={() => void submit(false)} testID="devam" />
         </View>
       ) : (
         <View>
           <Field label="Doğrulama kodu" value={totp} onChangeText={(t) => setTotp(t.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" autoComplete="one-time-code"
             textContentType="oneTimeCode" testID="totp" style={{ fontSize: 24, letterSpacing: 6, textAlign: "center" }} maxLength={6} placeholder="000000" autoFocus />
-          <Button label="Giriş yap" icon="log-in-outline" busy={busy} disabled={totp.length !== 6} onPress={() => void submit(true)} testID="giris" />
+          <Button label="Giriş yap" tone="marka" icon="log-in-outline" busy={busy} disabled={totp.length !== 6} onPress={() => void submit(true)} testID="giris" />
           <Button label="Geri" tone="plain" onPress={() => { setStep(1); setTotp(""); setError(null); }} testID="geri" />
         </View>
       )}

@@ -28,8 +28,10 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
   const { height } = useWindowDimensions();
   // Parola ↔ doğrulama adımı: zemin ve marka sabit kalır, yalnız kart (başlığa anahtarlı) hafif aşağıdan solar.
   const anim = (sira: number) => (azalt || Platform.OS === "web" ? undefined : girisAnimasyonu(sira, false));
+  // Android'de de "padding": Expo 54 kenardan kenara çizer, pencere klavyeyle küçülmez → alan klavyenin altında kalıyordu
+  // (sahada görüldü 2026-11-13).
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[s.flex, { backgroundColor: BRAND_NAVY }]}>
+    <KeyboardAvoidingView behavior="padding" style={[s.flex, { backgroundColor: BRAND_NAVY }]}>
       {/* Zemin her temada TeksERP laciverti: durum çubuğu içeriği açık (son takılan StatusBar geçerlidir). */}
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={[s.scroll, { paddingTop: Math.max(space.xxl, Math.round(height * 0.09)) }]} keyboardShouldPersistTaps="handled">

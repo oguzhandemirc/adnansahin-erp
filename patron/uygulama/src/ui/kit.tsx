@@ -10,7 +10,7 @@ import { SegmentedControl } from "./SegmentedControl";
 import { statusEntry } from "../lib/labels";
 import { Rozet, STATUS_ROZET_TONU } from "./ortak";
 import { makeStyles, useTokens } from "./theme-context";
-import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
+import { BRAND_NAVY, FONT_SCALE, ON_NAVY, TOUCH, space, tabularNums, typography, type Domain, type StatusKind } from "./tokens";
 
 /** Opak içerik kartı; solda 4 px alan şeridi (alan verilmezse nötr). */
 export function Card({ children, onPress, testID, domain, style, accessibilityLabel }: {
@@ -58,14 +58,15 @@ export function Body({ children }: { children: ReactNode }) {
   return <Text style={s.body}>{children}</Text>;
 }
 
-type Tone = "primary" | "secondary" | "plain" | "danger";
+/** `marka`: TeksERP laciverti — giriş gibi marka yüzeylerindeki ana eylem (temadan bağımsız). */
+type Tone = "primary" | "secondary" | "plain" | "danger" | "marka";
 
 export function Button(p: { label: string; onPress: () => void; tone?: Tone; disabled?: boolean; busy?: boolean; testID?: string; icon?: IconName; accessibilityLabel?: string }) {
   const t = useTokens();
   const s = useStyles();
   const tone = p.tone ?? "primary";
   const off = p.disabled || p.busy;
-  const fg = tone === "primary" ? t.onTint : tone === "danger" ? t.color.danger.fg : tone === "secondary" ? t.tint : t.text;
+  const fg = tone === "marka" ? ON_NAVY.text : tone === "primary" ? t.onTint : tone === "danger" ? t.color.danger.fg : tone === "secondary" ? t.tint : t.text;
   return (
     <Pressable
       accessibilityRole="button"
@@ -209,6 +210,7 @@ const useStyles = makeStyles((t) => ({
     marginVertical: space.xs,
   },
   btn_primary: { backgroundColor: t.tint },
+  btn_marka: { backgroundColor: BRAND_NAVY },
   btn_secondary: { backgroundColor: t.tintContainer },
   btn_plain: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.separator },
   // Tehlike metni kart zemininde AA (≥ 4.5:1) olan `danger.fg`; dolgu tonu (`solid`) koyu kipte kartta okunmaz.
