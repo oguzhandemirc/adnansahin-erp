@@ -3,12 +3,15 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { girisAnimasyonu, useHareketAzalt } from "../hareket";
 import { UYGULAMA_ADI } from "../../lib/kimlik";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, space, typography } from "../tokens";
+
+/** Giriş ekranındaki marka işareti = uygulama simgesi (tek görsel kaynağı `assets/icon.png`). */
+const UYGULAMA_LOGOSU = require("../../../assets/icon.png") as number;
 
 export function AuthShell({ title, subtitle, step, children, footer }: {
   readonly title: string;
@@ -32,7 +35,7 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
       <ScrollView contentContainerStyle={[s.scroll, { paddingTop: Math.max(space.xxl, Math.round(height * 0.09)) }]} keyboardShouldPersistTaps="handled">
         <View style={s.brand}>
           <View style={s.mark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <Ionicons name="stats-chart" size={34} color={t.color.onPrimary} />
+            <Image source={UYGULAMA_LOGOSU} style={s.logo} resizeMode="cover" />
           </View>
           <Text style={s.brandName} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{UYGULAMA_ADI}</Text>
           <Text style={s.brandTag}>Fabrikanızın özeti, her an yanınızda</Text>
@@ -51,10 +54,6 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
           <View style={s.body}>{children}</View>
         </Animated.View>
         {footer ? <Animated.View key={`alt-${title}`} entering={anim(1)} style={s.footer}>{typeof footer === "string" ? <Text style={s.footerText}>{footer}</Text> : footer}</Animated.View> : null}
-        <View style={s.secure}>
-          <Ionicons name="lock-closed" size={13} color={t.color.onPrimary} />
-          <Text style={s.secureText}>Parola ile korunur · doğrulama kodu isteğe bağlı</Text>
-        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -64,7 +63,9 @@ const useStyles = makeStyles((t) => ({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: "flex-start" as const, padding: space.l, paddingVertical: space.xxl, width: "100%" as const, maxWidth: 480, alignSelf: "center" as const },
   brand: { alignItems: "center" as const, marginBottom: space.xl },
-  mark: { width: 72, height: 72, borderRadius: t.radius.card, backgroundColor: t.color.primary2, alignItems: "center" as const, justifyContent: "center" as const, marginBottom: space.l, borderWidth: 1, borderColor: t.color.primary2 },
+  // Uygulama simgesinin kendisi (mağaza/ana ekran simgesiyle aynı görsel); kenarı zeminden ince açık çizgiyle ayrılır.
+  mark: { width: 84, height: 84, borderRadius: 20, overflow: "hidden" as const, marginBottom: space.l, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)" },
+  logo: { width: "100%" as const, height: "100%" as const },
   brandName: { ...typography.largeTitle, fontSize: 30, lineHeight: 36, color: t.color.onPrimary, textAlign: "center" as const },
   brandTag: { ...typography.subhead, color: t.color.onPrimary, marginTop: space.xs, textAlign: "center" as const },
   card: { borderRadius: t.radius.sheet, padding: space.xl, borderWidth: 1, borderColor: t.scheme === "dark" ? t.separator : t.surface, ...t.floatShadow },
@@ -77,6 +78,4 @@ const useStyles = makeStyles((t) => ({
   body: { marginTop: space.l },
   footer: { marginTop: space.l },
   footerText: { ...typography.footnote, color: t.color.onPrimary, textAlign: "center" as const, paddingHorizontal: space.m },
-  secure: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "center" as const, gap: space.xs, marginTop: space.xl },
-  secureText: { ...typography.footnote, color: t.color.onPrimary },
 }));

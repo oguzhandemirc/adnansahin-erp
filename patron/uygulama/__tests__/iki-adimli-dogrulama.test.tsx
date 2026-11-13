@@ -90,7 +90,7 @@ describe("giriş", () => {
     render(<Login />);
     expect(screen.queryByTestId("davet-git")).toBeNull();
     expect(screen.queryByText(/davet/i)).toBeNull();
-    expect(screen.getByText(LOGIN_HELP)).toBeTruthy();
+    expect(screen.queryByText(LOGIN_HELP)).toBeNull(); // giriş ekranında alt yardım yazısı yok (kullanıcı kararı 2026-11-13)
   });
 
   it("hata eşlemesi: aynı 401 her kodda aynı cümle; hız sınırı, ağ, bilinmeyen sunucu iletisi", () => {

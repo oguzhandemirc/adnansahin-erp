@@ -7,7 +7,7 @@ import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { ApiError } from "../src/api/client";
-import { LOGIN_HELP, loginErrorMessage } from "../src/lib/giris-hata";
+import { loginErrorMessage } from "../src/lib/giris-hata";
 import { useSession } from "../src/state/session";
 import { AuthShell } from "../src/ui/diger/AuthShell";
 import { Banner, Button, Field } from "../src/ui/kit";
@@ -44,9 +44,8 @@ export default function Login() {
   return (
     <AuthShell
       title={step === 1 ? "Giriş yap" : "Doğrulama kodu"}
-      subtitle={step === 1 ? "Fabrika programındaki kullanıcı adınız ve parolanızla" : "Doğrulama uygulamanızdaki 6 haneli kodu girin"}
+      {...(step === 2 ? { subtitle: "Doğrulama uygulamanızdaki 6 haneli kodu girin" } : {})}
       {...(step === 2 ? { step: { at: 2, of: 2 } } : {})}
-      footer={step === 1 ? LOGIN_HELP : null}
     >
       {!configured ? <Banner tone="error" text="Uygulama bulut adresi olmadan derlenmiş; giriş yapılamaz" /> : null}
       {error ? <Banner tone="error" text={error} testID="giris-hata" /> : null}
