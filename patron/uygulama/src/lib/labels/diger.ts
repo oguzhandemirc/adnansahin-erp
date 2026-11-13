@@ -101,5 +101,4 @@ export const EXPORT_DATASET_LABEL: Readonly<Record<string, string>> = {
   "gelen-kutusu": "Gelen kutusu (sipariş/cari talepleri)",
   hesaplar: "Bulut hesapları",
   "hesap-denetimi": "Hesap güvenlik kaydı",
-  "destek-erisimi": "Destek erişim kaydı",
 };

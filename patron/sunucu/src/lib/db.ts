@@ -1,7 +1,7 @@
 // Prisma istemcileri (Prisma 7 + pg sürücü bağdaştırıcısı). Sunucu İKİ rolle bağlanır — uygulama
 // (hesap API'si) ve eşitleme (fabrika kanalı + bakım) — ikisi de NOSUPERUSER NOBYPASSRLS; göç rolü
-// (tablo sahibi) yalnız migration ve satıcı CLI'sidir. İstemciler yönlendiricinin (`lib/tesis-db.ts`) içindedir:
-// merkez + tesis başına küçük havuz. Her sorgu `lib/tenant.ts` kapsamından geçer (kapsamsız sorgu RLS'te HATA).
+// (tablo sahibi) yalnız migration ve satıcı CLI'sidir. İstemci rol başına tektir (`lib/tesis-db.ts`; tek
+// veritabanı). Her sorgu `lib/tenant.ts` kapsamından geçer (kapsamsız sorgu RLS'te HATA).
 import { PrismaClient, Prisma } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";

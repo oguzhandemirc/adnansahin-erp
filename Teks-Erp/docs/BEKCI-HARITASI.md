@@ -2324,6 +2324,8 @@ Kalan atlamalar üç biçimde ve strict hiçbirini görmez:
 > Alan 2026-11-12'de doğdu (D1: imza + bulut istemcisi + kapatma düğmesi). Kural dosyası `docs/kurallar/patron-bulutu.md`.
 >
 > Bulut tarafı bekçileri `patron/sunucu/scripts/test_*.ts` (koşum `cd patron/sunucu && npx tsx scripts/run-all-tests.ts`) ve uygulama `patron/uygulama/__tests__/` (jest) burada satır satır listelenmez. Ayıklama D3 (2026-11-13): finans/teklif/maliyet/dokuma yüzeyiyle birlikte iki bulut bekçisi (kasa kategori süzgeci, bildirim cari kilidi) ve uygulamanın altı jest dosyası (finans, kasa kategori, kârlılık, masraf, teklifler, makine duruşu kartı) SİLİNDİ.
+>
+> Ayıklama D4 (2026-11-13, tek DB + destek rolü kalktı): altı bulut bekçisi (tesis DB hazırlığı, tesis göçü, tesis rol hizası, tesis DB yalıtımı, çok tesis, destek rolü) ile hizmet sonu bekçisinin imha bölümü, kendi hesabını silme bekçisinin çok tesisli kimlik bölümü ve özet yenileme bekçisinin çok üyelik kurgusu (tek DB'de bir e-posta tek AKTİF hesap) SİLİNDİ; çok üyelikli kimlik davranışı bekçisiz, kimlik dilimi yeniden yazacak. YENİ bulut bekçisi "tek veritabanı": eski çok-DB/destek nesneleri yok, üç rol aynı DB, uygulama rolü projeksiyona / eşitleme rolü hesaba ve kimliğe erişemez, tesis açma ikinci tesisi 409 — kalıcı negatif sonda (geçici GRANT → kırmızı) + dosya dışı sonda (tek-tesis kapısı gevşetildi → §4a/§4c kırmızı).
 
 | Dosya | Ne ölçüyor | DB | Negatif sonda | |
 |---|---|---|---|---|

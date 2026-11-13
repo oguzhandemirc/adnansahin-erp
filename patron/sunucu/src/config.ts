@@ -32,7 +32,7 @@ const EnvSchema = z
     BIND: z.string().min(1).default("127.0.0.1"),
     /** TOTP sırlarının sarma anahtarı burada (`patron-totp.key`, 0600) — DB'de DEĞİL. */
     ANAHTAR_DIZINI: z.string().min(1).default("anahtarlar"),
-    /** Tesis DB rol parolalarının + giriş dizini özetinin anahtarı (üretim sırrı, salt okunur); yoksa `ANAHTAR_DIZINI/patron-tesis-db.key`. */
+    /** Giriş dizini e-posta özetinin anahtarı (üretim sırrı, salt okunur); yoksa `ANAHTAR_DIZINI/patron-tesis-db.key`. */
     TESIS_ROL_ANAHTARI_DOSYASI: z.preprocess((v) => (v === "" ? undefined : v), z.string().min(1).optional()),
     /** İstemci adresini taşıyan vekil başlığı; YALNIZ güvenilen kenar ağından gelen bağlantıda okunur. */
     VEKIL_IP_BASLIGI: z.string().min(1).optional(),

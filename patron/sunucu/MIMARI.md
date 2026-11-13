@@ -6,9 +6,9 @@
 
 - **Servis** (`src/services/` · `src/auth/`): İş kuralı + tx.
 
-## Çok kiracılı tek DB — üç rol (+ destek rolü)
+## Tek DB, tek tesis — üç rol
 
-- **Destek rolü:** Aç/kapa runbook'u ana ürün `ops/PATRON-BULUTU-DESTEK-ERISIMI.md` (docs, TeksERP@19aa48a9; bu repoda yok); bekçi `test_destek_rolu`.
+- Adnan bulutu TEK veritabanı ve TEK tesislidir (ayıklama D4, 2026-11-13): tesis başına DB, merkez yönlendirme kataloğu, hazırlayıcı, imha ve destek rolü YOKTUR. `tesis-ac` kayıtlı başka tesis varken 409 `DURUM_CAKISMASI` verir. Bekçi `test_tek_veritabani`.
 
 ## Komutlar
 
@@ -20,7 +20,7 @@ npx tsx scripts/tesis.ts kurulum-kaydet --tesis=<uuid> --kurulum=<uuid> --acik-a
 npx tsx scripts/tesis.ts yonetici-davet --tesis=<uuid> --eposta=<e-posta> --ad="Ad Soyad"   # davet belirteci BİR KEZ basılır
 npx tsx scripts/tesis.ts yonetici-yeniden-davet --tesis=<uuid> --eposta=<e-posta> [--zorla --talep=<no> --gerekce="…"]   # aktif yönetici varken yalnız zorlamayla
 npx tsx scripts/tesis.ts dogrulama-kapat --eposta=<e-posta> --talep=<no> --gerekce="…"   # doğrulama kodunu (TOTP) kapatır; TEK kurtarma yolu, e-posta basılmaz
-npx tsx scripts/tesis.ts imha --tesis=<uuid> --isleyen="Ad Soyad" [--erken-talep=<no>] [--uygula]   # kuru koşum varsayılan
+npx tsx scripts/tesis.ts ozet-yenile [--apply]   # giriş dizini anahtarı değişince kimlik e-posta özetleri; kuru koşum varsayılan
 npm run typecheck:scripts && npm run lint        # commit kapısı altıncı proje olarak aynısını ölçer (tip + eslint + lint-baseline.json tavanı)
 node ../../scripts/agir-is.mjs -- npx tsx scripts/run-all-tests.ts [ad-parçası]   # yalnız *_test DB
 ```
@@ -29,7 +29,7 @@ node ../../scripts/agir-is.mjs -- npx tsx scripts/run-all-tests.ts [ad-parçası
 
 ## CLAUDE.md'den taşınan ayrıntı (2026-10-12 kısaltma turu)
 
-> `CLAUDE.md` yalnız kısaltılmış kural cümlesini taşır; aşağıdaki katman tablosu, merkez/tesis DB rolleri ve budama beyanı o dosyanın 2026-10-12 öncesi metninin kelimesi kelimesine aynısıdır.
+> `CLAUDE.md` yalnız kısaltılmış kural cümlesini taşır; aşağıdaki katman tablosu ve budama beyanı o dosyanın 2026-10-12 öncesi metninin kelimesi kelimesine aynısıdır; roller bölümü D4'te (2026-11-13) tek DB'ye göre yeniden yazıldı.
 
 ### Katman tablosu (tam)
 
@@ -43,19 +43,18 @@ node ../../scripts/agir-is.mjs -- npx tsx scripts/run-all-tests.ts [ad-parçası
 | HTTP | `src/http/` | Tek dinleyici: `/v1/*` fabrika kanalı (kurulum imzalı, HAM gövde ≤ 4 MB, gzip açılır ≤ 32 MB; eşitleme rolü) + `/api/*` hesap API'si (Bearer oturum, yazma yalnız JSON; uygulama rolü; rota TABLOSU veridir) |
 | Şema | `prisma/` | Model/kolon İngilizce snake_case, kod değerleri Türkçe; her tabloda `tesis_id` + RLS ENABLE + FORCE (migration SQL); CHECK'ler çift yüklemi DB'de de sedder (AKTİF hesap parolasız, doğrulaması açık hesap sırsız doğamaz; doğrulama kodu isteğe bağlı) |
 
-### Merkez DB + tesis başına DB — roller (tam metin)
+### Tek DB — roller (tam metin)
 
-- **Merkez DB** (`DATABASE_URL`ın veritabanı): yalnız yönlendirme ve yaşam döngüsü tabloları — `facility_databases` (durum `ISTENDI|HAZIR|IMHA_SURUYOR|IMHA_EDILDI`) · `installation_routes` (kurulum → tesis) · `login_routes` (e-posta özeti → tesis) · `facility_destructions` · `support_access` (`db-grants.ts` `MERKEZ_TABLES`). **Tesis DB'si** `<merkez>_t<tesis kimliğinin ilk 16 onaltılık hanesi>` (`lib/tesis-db-ad.ts`; ad kimlikten TÜRETİLİR, satırdan okunmaz) kiracı verisini taşır. Tek şema, tek göç zinciri her DB'de; tablonun nerede yaşadığını yetkiler belirler (merkezde tesis tablosu, tesiste merkez tablosu boş ve yetkisiz — bekçi ölçer). Yönlendirici `lib/tesis-db.ts`; satır yoksa 404, `ISTENDI` ya da şeması geride tesis 503 `TEKRAR_DENEYIN`.
-- **Göç rolü** (`GOC_DATABASE_URL`, tablo sahibi): merkezde `prisma migrate deploy` + `scripts/db-rolleri.ts`, tesislerde `scripts/tesis-db.ts goc` (Prisma CLI'siz koşucu `lib/tesis-goc.ts`, bir tesisin hatası ötekini durdurmaz), hazırlayıcı ve satıcı CLI'si. Sunucu bu rolle BAĞLANMAZ.
-- **Tesis rolleri** `<tesis DB>_uyg` (uygulama) ve `<tesis DB>_esit` (eşitleme): LOGIN NOSUPERUSER NOBYPASSRLS, tablo sahibi değil; yetkileri tek kaynak `src/lib/db-grants.ts` (tablo + `*_COLUMN_GRANTS` kolon düzeyi) — uygulama rolü projeksiyona YAZAMAZ, eşitleme rolü hesap/oturum tablosunu OKUYAMAZ (tek istisna: gelen kutusu claim'inin `accounts` kolon düzeyi SELECT'i). Parola DİSKTE tutulmaz, `tesis_rol_anahtari` sırrından (`ANAHTAR_DIZINI/patron-tesis-db.key`; üretimde `TESIS_ROL_ANAHTARI_DOSYASI`) HMAC ile türetilir; anahtar kaybı = her tesis rolünün parolası kaybı, yedeği emanettedir. Sunucu açılışta rolleri ölçer: RLS'i atlayabilen rolle KALKMAZ.
-- **Hazırlık:** `patron-hazirla` servisi (`scripts/tesis-db.ts izle`, göç rolüyle, yalnız iç ağ) `ISTENDI` satırlarını yoklar: claim → rol → DB (`CONNECT` yalnız tesis rollerine) → göç → yetkiler → `HAZIR`. `tesis-db.ts hazirla --tesis=<uuid>` tek tesisi eşzamanlı kurar; `patron-goc` zinciri `migrate deploy && db-rolleri && tesis-db goc`. Sunucu hazırlayıcıyı import ETMEZ. Her DB'ye hazırlayıcı `app.veritabani_tesisi` yazar (merkezde `merkez`); tx'in ilk ifadesi bu işareti ölçer.
-- Tesis DB'sinde de `app.tesis_id` ayarsız/sıfırlanmış bağlantıda sorgu HATA verir (fail-closed) ve RLS + `app.projeksiyonlar` RESTRICTIVE politikası aynen geçerlidir ("sipariş görür, tutar görmez"); `*` projeksiyon YASAK. Yeni tablonun yetkisi `db-grants.ts`e AYNI dilimde girer — girmezse roller erişemez.
-- **Destek rolü** `<tesis DB>_destek` (merkezde `patron_destek`; Ek-6/B §3.2): sunucu bu rolle BAĞLANMAZ — Lisans Veren çalışanının doğrudan destek sorgusu içindir. Göç NOLOGIN kurar, `db-rolleri.ts` ve hazırlayıcı yetkisini `SUPPORT_GRANTS`ten verir (yalnız SELECT, sır kolonları hariç); çalıştırabildiği fonksiyonlar `SUPPORT_FUNCTIONS` beyanıdır. Kapı GUC DEĞİLDİR: okunabilir her tabloda RESTRICTIVE `destek_kapisi`; izin yalnız `destek_ac(...)` (SECURITY DEFINER, ≤ 480 dk) ile açılır ve silinemeyen `support_access` kaydına yazılır; `destek_kapat()` kapatır.
-- **İmha:** `HAZIR → IMHA_SURUYOR` claim → tesis rollerinin bağlantısı kesilir → sayım planı merkeze → `DROP DATABASE` + roller → tutanak; yedek tesis başına alınır. Ayrıntı: ana ürün `ops/PATRON-TESIS-DB-GECIS.md` (docs, TeksERP@19aa48a9; bu repoda yok), ana ürün `design/PATRON-TESIS-DB.md` (docs, TeksERP@19aa48a9; bu repoda yok).
+- **Tek veritabanı** (`DATABASE_URL`ın veritabanı): kiracı tabloları (`tesis_id` + RLS ENABLE + FORCE + `tesis_yalitimi`) ile yönlendirme/kimlik tabloları (`installation_routes` · `login_routes` · `identities`; `db-grants.ts` `ROUTING_TABLES`) AYNI DB'dedir. Tek şema, tek göç zinciri (temel göç `20261113200000_temel`; VDS sıfırdan kurulduğu için eski çok-DB zinciri squash edildi). Bağlantı nesnesi `lib/tesis-db.ts` (`TesisDbRouter` adı çağrı yerleri değişmesin diye korunur; içi tek `Database`).
+- **Göç rolü** (`GOC_DATABASE_URL`, tablo sahibi): `prisma migrate deploy` + `scripts/db-rolleri.ts` + satıcı CLI'si. Sunucu bu rolle BAĞLANMAZ.
+- **Uygulama** (`DATABASE_URL`) ve **eşitleme** (`ESITLEME_DATABASE_URL`) rolleri: LOGIN NOSUPERUSER NOBYPASSRLS, tablo sahibi değil; ad + parola URL'den okunur, `db-rolleri.ts` kurar/hizalar (parola çıktıya yazılmaz). Yetkileri tek kaynak `src/lib/db-grants.ts` (tablo + `*_COLUMN_GRANTS` kolon düzeyi) — uygulama rolü projeksiyona YAZAMAZ, eşitleme rolü hesap/oturum tablosunu OKUYAMAZ (tek istisna: gelen kutusu claim'inin `accounts` kolon düzeyi SELECT'i), hesaba YAZAMAZ ve `identities`e ERİŞEMEZ. Sunucu açılışta rolleri ölçer: RLS'i atlayabilen rolle KALKMAZ.
+- `app.tesis_id` ayarsız/sıfırlanmış bağlantıda sorgu HATA verir (fail-closed) ve RLS + `app.projeksiyonlar` RESTRICTIVE politikası geçerlidir ("sipariş görür, tutar görmez"); `*` projeksiyon YASAK. Yeni tablonun yetkisi `db-grants.ts`e AYNI dilimde girer — girmezse roller erişemez.
+- **Giriş dizini anahtarı** (`ANAHTAR_DIZINI/patron-tesis-db.key`; üretimde `TESIS_ROL_ANAHTARI_DOSYASI`): yalnız kimlik e-posta özetinin HMAC anahtarıdır (ad eski düzenden kalır; rol parolası türetmez). Değişirse `tesis.ts ozet-yenile`.
+- `tesis_id` kolonu ve `tesis_yalitimi` RLS'i ile `login_routes`/`installation_routes` şimdilik KALIR; kimlik dilimi söker.
 
 ### Budama beyanı — tam metin
 
-Yaşa göre silinen tablolar YALNIZ `src/services/maintenance.ts` `PRUNED_TABLES` (bekçi `test_patron_kapilari` §4 iki yönlü ölçer; tesis imhasının silmeleri ayrı beyanlı dosyada, § Hizmet aşaması): `projection_rows` (tesisin saklama süresi — 3 · 13 · 25 ay · tümü, varsayılan 13 — kökü düşen kaydın alt satırı ve kalemiyle; 7 günden eski mezar taşı) · `request_nonces` · `package_receipts` · `full_sync_runs` · `report_results` · `report_requests` · `inbox_messages` (sonuçlanmış; asıl kayıt fabrikada) · `sessions` · `operation_receipts` · `account_audit` (ayak izi: başarısız giriş 90 gün, diğerleri 730 gün) · `notifications` (sonuçlanmış bildirim, `BILDIRIM_SAKLAMA_GUN` = 90) · `push_devices` + `sessions` (kimliği silinen hesabınki). Hiçbiri fabrikanın defteri değildir; iş kararı bunlardan okunmaz. Başka her silme yasak; hesap soft (durum; PASIF terminal) ve cihaz soft (`active`).
+Yaşa göre silinen tablolar YALNIZ `src/services/maintenance.ts` `PRUNED_TABLES` (bekçi `test_patron_kapilari` §4 iki yönlü ölçer): `projection_rows` (tesisin saklama süresi — 3 · 13 · 25 ay · tümü, varsayılan 13 — kökü düşen kaydın alt satırı ve kalemiyle; 7 günden eski mezar taşı) · `request_nonces` · `package_receipts` · `full_sync_runs` · `report_results` · `report_requests` · `inbox_messages` (sonuçlanmış; asıl kayıt fabrikada) · `sessions` · `operation_receipts` · `account_audit` (ayak izi: başarısız giriş 90 gün, diğerleri 730 gün) · `notifications` (sonuçlanmış bildirim, `BILDIRIM_SAKLAMA_GUN` = 90) · `push_devices` + `sessions` (kimliği silinen hesabınki). Hiçbiri fabrikanın defteri değildir; iş kararı bunlardan okunmaz. Başka her silme yasak; hesap soft (durum; PASIF terminal) ve cihaz soft (`active`).
 
 **Yaşa göre silinen ALAN** (satır kalır) YALNIZ `maintenance.ts` `AGED_FIELDS` (bekçi `test_patron_kapilari` §8 iki yönlü): giriş olaylarının istemci adresi `account_audit.summary.ip` → 30 gün (`IP_RETENTION_DAYS`, koddadır; Ek-6/A §2.4 erişim/IP kaydı). Uygulama IP'yi başka hiçbir yerde saklamaz: erişim günlüğü satırı `[patron] <yöntem> <yol> <durum> <ms>`dir (IP ve sorgu dizgisi yok), hız sınırı adresi bellekte 60 sn tutar, giriş kilidi hesap + kaynak çiftini yalnız süreç anahtarlı özetle `KILIT_DK` boyunca bellekte tutar; istemci adresi yalnız HTTP katmanında (`http/rate-limit.ts` `clientAddress`) okunur. Uygulama rolünün `account_audit` UPDATE yetkisi tablo düzeyinde YOKTUR: yalnız `summary` kolonunda (kolon düzeyi, `APP_COLUMN_GRANTS`) ve yalnız bu alan silmesi içindir — olay, aktör, zaman yazılamaz (bekçi `test_rls_sizinti` §5d · `test_patron_kapilari` §8g).
 

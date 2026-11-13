@@ -1,5 +1,5 @@
 // Servislerin ortak bağlamı. İki DB istemcisi iki ROLDÜR: `app` (hesap API'si; projeksiyona yazamaz)
-// ve `sync` (fabrika kanalı + bakım budaması). Saat enjekte edilebilir (bekçiler `now`u kaydırır).
+// ve `sync` (fabrika kanalı + bakım budaması), ikisi de aynı (tek) veritabanına. Saat enjekte edilebilir (bekçiler `now`u kaydırır).
 import type { SecretBox } from "../auth/secret-box";
 import type { CloudConfig } from "../config";
 import type { Doorbell } from "./doorbell";

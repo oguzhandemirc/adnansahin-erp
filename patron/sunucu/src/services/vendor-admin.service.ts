@@ -13,7 +13,7 @@ import { publicKeyFromX } from "../lisans-protokol";
 import { recordAudit } from "../lib/audit";
 import { CloudError, notFound, stateConflict } from "../lib/errors";
 import { uniqueViolationOn } from "../lib/prisma-errors";
-import { withCentral, withTesis } from "../lib/tenant";
+import { listReadyFacilities, withCentral, withTesis } from "../lib/tenant";
 import type { Tx } from "../lib/db";
 import { ADMIN_PERMISSION, assertEmailFreeInFacility, emailInUseHere } from "./account.service";
 import { bindInstallationRoute, safeKeyId } from "./installation-directory";
@@ -21,6 +21,16 @@ import type { TesisDbRouter } from "../lib/tesis-db";
 
 export const VENDOR_ACTOR = "satici-cli";
 export const RETENTION_CHOICES: readonly (number | null)[] = [3, 13, 25, null];
+
+/**
+ * Adnan bulutu TEK TESİSLİDİR (tek veritabanı): kayıtlı tesis varsa yalnız AYNI kimlikle yeniden açılır (ad/saklama
+ * güncellemesi); başka kimlik 409 `DURUM_CAKISMASI`. Kapı satıcı CLI'sindedir (`tesis.ts tesis-ac`); bekçiler aynı DB'de
+ * rastgele tesisleri servis yolundan (`openFacility`) açar.
+ */
+export async function assertSingleFacility(db: TesisDbRouter, tesisId: string): Promise<void> {
+  const others = (await listReadyFacilities(db)).filter((t) => t !== tesisId.toLowerCase());
+  if (others.length > 0) throw new CloudError(409, "DURUM_CAKISMASI", `Bu bulut tek tesislidir; kayıtlı tesis ${others[0]} — ikinci tesis açılamaz`);
+}
 
 export async function openFacility(db: TesisDbRouter, g: { tesisId: string; name: string; retentionMonths?: number | null }) {
   if (g.retentionMonths !== undefined && !RETENTION_CHOICES.includes(g.retentionMonths)) throw new CloudError(400, "GOVDE_GECERSIZ", "Saklama 3, 13, 25 ay ya da 'tumu' olmalı");
@@ -99,8 +109,8 @@ export function overrideFromArgs(a: Readonly<Record<string, string | undefined>>
 }
 
 /**
- * Tesiste AKTİF hesap yöneticisi varsa satıcı yönetici açamaz/yükseltemez (yönetim tesisindedir; destek erişimi
- * ayrı, kayıtlı yoldur). Zorlama yalnız açık talep + gerekçeyle; dönen sayı denetim özetine girer.
+ * Tesiste AKTİF hesap yöneticisi varsa satıcı yönetici açamaz/yükseltemez (yönetim tesisindedir).
+ * Zorlama yalnız açık talep + gerekçeyle; dönen sayı denetim özetine girer.
  */
 async function assertNoActiveAdmin(tx: Tx, tesisId: string, override: VendorOverride | undefined): Promise<number> {
   const active = await tx.account.count({ where: { tesisId, status: "AKTIF", permissions: { has: ADMIN_PERMISSION } } });

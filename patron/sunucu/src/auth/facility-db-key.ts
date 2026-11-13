@@ -1,6 +1,7 @@
-// TESİS DB ANAHTARI — tesis rol parolalarının ve giriş dizini e-posta özetinin TEK anahtarı (32 bayt, 0600;
-// üretimde salt okunur, önceden üretilir). Parola SAKLANMAZ, türetilir: sunucu ve hazırlayıcı aynı anahtardan
-// aynı parolayı bulur; DB'de, günlükte, ortamda parola yoktur. İki kullanım alan ayrımlı HMAC'tir.
+// GİRİŞ DİZİNİ ANAHTARI — kimlik e-posta özetinin anahtarı (32 bayt, 0600; üretimde salt okunur, önceden üretilir):
+// `identities` düz e-posta taşımaz, yalnız bu anahtarla HMAC özeti. Ad ve dosya adı (`patron-tesis-db.key`) eski
+// tesis başına DB düzeninden kalır (o düzende rol parolaları da buradan türerdi; tek DB'de roller `.env`'dedir) —
+// anahtar değişirse özetler `scripts/tesis.ts ozet-yenile` ile yenilenir.
 import crypto from "node:crypto";
 import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -21,7 +22,7 @@ export class FacilityDbKey {
   /** `create`: dosya yoksa üretir (üstüne YAZMAZ). Açık sır yolu verildiyse çağıran `create:false` geçer. */
   static load(file: string, g: { create: boolean }): FacilityDbKey {
     if (!existsSync(file)) {
-      if (!g.create) throw new Error(`Tesis DB anahtarı yok: ${file}`);
+      if (!g.create) throw new Error(`Giriş dizini anahtarı yok: ${file}`);
       try {
         writeFileSync(file, `${crypto.randomBytes(32).toString("base64url")}\n`, { mode: 0o600, flag: "wx" });
         chmodSync(file, 0o600);
@@ -31,7 +32,7 @@ export class FacilityDbKey {
     }
     assertSecretFileMode(file);
     const key = Buffer.from(readFileSync(file, "utf8").trim(), "base64url");
-    if (key.length !== 32) throw new Error(`Tesis DB anahtarı biçimsiz (32 bayt değil): ${file}`);
+    if (key.length !== 32) throw new Error(`Giriş dizini anahtarı biçimsiz (32 bayt değil): ${file}`);
     return new FacilityDbKey(key);
   }
 
@@ -39,12 +40,7 @@ export class FacilityDbKey {
     return crypto.createHmac("sha256", this.key).update(`${domain}\0${value}`, "utf8").digest("hex");
   }
 
-  /** Tesis çalışma rolünün parolası (64 onaltılık). */
-  rolePassword(role: string): string {
-    return this.mac("tesis-rol-parolasi", role);
-  }
-
-  /** Giriş dizini anahtarı: normalleşmiş e-postanın anahtarlı özeti (merkez düz e-posta taşımaz). */
+  /** Giriş dizini anahtarı: normalleşmiş e-postanın anahtarlı özeti (kimlik tablosu düz e-posta taşımaz). */
   emailDigest(normalizedEmail: string): string {
     return this.mac("giris-dizini", normalizedEmail);
   }

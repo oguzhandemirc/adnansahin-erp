@@ -7,10 +7,8 @@
 //   §3 kapsamsız sorgu yok: istemci (`ctx.app` · `ctx.sync` · `this.db` · `db`) üzerinden doğrudan model
 //      ya da ham sorgu çağrısı YOK — hepsi `withTesis/withLookup/withMaintenanceList` tx'inde
 //   §4 silme beyanı: `src`teki HER silme (`<herhangi alıcı>.<model>.deleteMany|delete(` — `tx`/`central`/… · `DELETE FROM`)
-//      üç beyanlı dosyadan birinde: `maintenance.ts` (yaşa göre; hedef `PRUNED_TABLES`ta, ölü beyan da KIRMIZI) ·
-//      `facility-destruction.ts` (tesis imhası: tesis DB'si bütünüyle düşer, satır silmesi YALNIZ merkezin yönlendirme
-//      satırları; tutanak sayım listesi = TESIS_TABLES − RETAINED_TABLES İKİ YÖNLÜ — yeni tablo tutanaktan kaçamaz) ·
-//      `auth/membership.ts` (üyelik devri; YALNIZ `login_routes`)
+//      iki beyanlı dosyadan birinde: `maintenance.ts` (yaşa göre; hedef `PRUNED_TABLES`ta, ölü beyan da KIRMIZI) ·
+//      `auth/membership.ts` (üyelik devri; YALNIZ `login_routes`). Tesis imhası YOKTUR (Adnan, tek tesis).
 //   §5 rota tablosu: yöntem+yol tekil · her yazma rotası işlem kimliği ya da GEREKÇELİ muafiyet beyan
 //      eder, her okuma rotası OKUMA · muafiyet gerekçesi boş olamaz
 //   §6 katalog: izin kodları tekil · her okuma izni en az bir projeksiyon/rapor açar · yazma ve
@@ -31,9 +29,8 @@ import { PROJECTION_CATALOG } from "../src/catalog/projections";
 import { REPORT_KEY_PERMISSION } from "../src/catalog/reports";
 import { API_ROUTES, type ApiRouteDef } from "../src/http/api-routes";
 import { CLOUD_ERROR_CODES } from "../src/lib/errors";
-import { APP_COLUMN_GRANTS, APP_GRANTS, MERKEZ_TABLES, ROUTING_TABLES, TESIS_TABLES } from "../src/lib/db-grants";
+import { APP_COLUMN_GRANTS, APP_GRANTS } from "../src/lib/db-grants";
 import { LOCK_NAMESPACES } from "../src/lib/locks";
-import { DESTRUCTION_STEPS, RETAINED_TABLES } from "../src/services/facility-destruction";
 import { AGED_FIELDS, PRUNED_TABLES } from "../src/services/maintenance";
 import { REPO_KOKU } from "./lib/fabrika-karsiligi";
 
@@ -86,8 +83,7 @@ function tekYazar(): void {
     [/pg_(try_)?advisory/, "pg_advisory"],
     [/\$transaction\s*\(/, "$transaction"],
   ] as const) {
-    // Tek beyanlı istisna: göç koşucusu Prisma şema motorunun OTURUM kilidini alır (uygulama kilit uzayı değil).
-    const muaf = (f: string): boolean => f.endsWith(path.join("lib", "tenant.ts")) || (ad === "pg_advisory" && f.endsWith(path.join("lib", "tesis-goc.ts")));
+    const muaf = (f: string): boolean => f.endsWith(path.join("lib", "tenant.ts"));
     const disarida = kaynaklar.filter((f) => !muaf(f) && desen.test(kod(readFileSync(f, "utf8")))).map(goreli);
     kontrol(`§2 ${ad} yalnız src/lib/tenant.ts`, disarida.length === 0, disarida.join(", ") || "temiz");
   }
@@ -135,14 +131,13 @@ export function silmeHedefleri(metin: string, modeller: ReadonlyMap<string, stri
 }
 
 function budama(): void {
-  console.log("\n§4 silme beyanı (budama + imha)");
+  console.log("\n§4 silme beyanı (budama + üyelik devri)");
   const modeller = modelTablolari();
   const beyan = new Set(Object.keys(PRUNED_TABLES));
   const bakim = path.join(SRC, "services", "maintenance.ts");
-  const imha = path.join(SRC, "services", "facility-destruction.ts");
   const uyelik = path.join(SRC, "auth", "membership.ts");
-  const baskaYer = kaynaklar.filter((f) => f !== bakim && f !== imha && f !== uyelik && silmeHedefleri(readFileSync(f, "utf8"), modeller).tablolar.size > 0).map(goreli);
-  kontrol("§4a silme YALNIZ services/maintenance.ts, services/facility-destruction.ts ve auth/membership.ts'te", baskaYer.length === 0, baskaYer.join(", ") || "temiz");
+  const baskaYer = kaynaklar.filter((f) => f !== bakim && f !== uyelik && silmeHedefleri(readFileSync(f, "utf8"), modeller).tablolar.size > 0).map(goreli);
+  kontrol("§4a silme YALNIZ services/maintenance.ts ve auth/membership.ts'te", baskaYer.length === 0, baskaYer.join(", ") || "temiz");
   const uyelikHedef = silmeHedefleri(readFileSync(uyelik, "utf8"), modeller);
   kontrol("§4i auth/membership.ts YALNIZ üyelik satırı (`login_routes`) siler", [...uyelikHedef.tablolar].join(",") === "login_routes" && uyelikHedef.bilinmeyen.length === 0, [...uyelikHedef.tablolar].join(",") || "yok");
   const merkezSonda = silmeHedefleri("await central.loginRoute.deleteMany({}); this.entries.delete(k);", modeller);
@@ -154,20 +149,6 @@ function budama(): void {
   kontrol("§4c beyanda olup silme yeri olmayan tablo YOK (ölü beyan)", olu.length === 0, olu.join(",") || "temiz");
   const sonda = silmeHedefleri("await tx.account.deleteMany({})", modeller);
   kontrol("§4d ✓K sonda: hesap silmesi `accounts` olarak ısırır (beyan dışı)", sonda.tablolar.has("accounts") && !beyan.has("accounts"));
-  const imhaMetni = readFileSync(imha, "utf8");
-  const imhaHedef = silmeHedefleri(imhaMetni, modeller);
-  const kalan = new Set(Object.keys(RETAINED_TABLES));
-  const beklenen = TESIS_TABLES.filter((t) => !kalan.has(t)).sort();
-  const sayilan = DESTRUCTION_STEPS.map((st) => st.table).sort();
-  kontrol("§4e imha sayım listesi = TESIS_TABLES − RETAINED_TABLES (iki yönlü; yeni tablo tutanaktan kaçamaz)", JSON.stringify(sayilan) === JSON.stringify(beklenen) && new Set(sayilan).size === sayilan.length, `${sayilan.length}/${beklenen.length}`);
-  // Kimlik (`identities`) tesise ait değildir: tesis imhasında KALIR (yalnız o tesisin üyelik satırı düşer).
-  const yonlendirme = ROUTING_TABLES.filter((t) => t !== "facility_databases" && t !== "identities").sort();
-  const bulunan = [...imhaHedef.tablolar].sort();
-  kontrol("§4f imha satır silmesi YALNIZ merkezin yönlendirme satırları (tesis verisi DB'yle düşer; facility_databases durum geçişi)", JSON.stringify(bulunan) === JSON.stringify(yonlendirme) && imhaHedef.bilinmeyen.length === 0 && /DROP DATABASE IF EXISTS/.test(kod(imhaMetni)), bulunan.concat(imhaHedef.bilinmeyen).join(",") || "boş");
-  kontrol("§4g kalan tablo MERKEZDE ve tutanak sayımında değil", [...kalan].every((t) => MERKEZ_TABLES.includes(t) && !sayilan.includes(t)));
-  const eksikSonda = beklenen.filter((t) => t !== "sessions");
-  const satirSonda = silmeHedefleri("await tx.account.deleteMany({})", modeller);
-  kontrol("§4h ✓K sonda: sayımdan bir tablo düşerse eşitlik bozulur · imhada tesis tablosu silmesi yönlendirme kümesinden taşar", JSON.stringify(eksikSonda) !== JSON.stringify(beklenen) && [...satirSonda.tablolar].some((t) => !yonlendirme.includes(t)));
 }
 
 export function rotaIhlalleri(rotalar: readonly Pick<ApiRouteDef, "method" | "path" | "kimlik">[]): string[] {

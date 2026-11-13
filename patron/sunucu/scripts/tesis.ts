@@ -1,7 +1,7 @@
 // =============================================================================
 // SATICI CLI'si — patron bulutunda tesis · kurulum kaydı · ilk tesis yöneticisi (göç rolüyle).
 //   npx tsx scripts/tesis.ts tesis-ac --tesis=<uuid> --ad="Fabrika A.Ş." [--saklama=3|13|25|tumu]
-//        (önce tesisin AYRI veritabanını hazırlar — `tesis-db.ts hazirla` ile aynı; yarım kalan tamamlanır)
+//        (bulut TEK TESİSLİ: kayıtlı başka tesis varsa REDDEDİLİR; aynı kimlikle yeniden koşum adı/saklamayı günceller)
 //   npx tsx scripts/tesis.ts tesis-durum --tesis=<uuid> --durum=AKTIF|PASIF
 //   npx tsx scripts/tesis.ts kurulum-kaydet --tesis=<uuid> --kurulum=<uuid> --acik-anahtar=<x> \
 //        --sinif=URETIM --moduller=patron-bulut,production.enabled --bitis=<ISO|yok> [--pasif]
@@ -16,25 +16,30 @@
 //   npx tsx scripts/tesis.ts dogrulama-kapat --eposta=<e-posta> --talep=<talep no> --gerekce="…"
 //        (kimliğin doğrulama kodunu (TOTP) kapatır — telefon kaybında TEK kurtarma yolu; parola ve oturumlar kalır;
 //        her üyelik tesisinin denetimine talep + gerekçeyle yazılır; e-posta çıktıya basılmaz)
-//   npx tsx scripts/tesis.ts imha --tesis=<uuid> --isleyen="Ad Soyad" [--erken-talep=<talep no>] [--uygula]
-//        (Ek-6/A §4.3: KURU KOŞUM varsayılan — tablo başına silinecek satır; `--uygula` tesisin veritabanını düşürür,
-//        destek erişim kayıtlarını merkeze kopyalar ve imha kaydını merkeze yazar; yarıda kalan aynı komutla tamamlanır.
-//        Hizmet açıkken ASLA; salt okuma süresi dolmadan yalnız yazılı erken talep numarasıyla.)
+//   npx tsx scripts/tesis.ts ozet-yenile [--apply]
+//        (giriş dizini anahtarı değişince: bağlı kimliklerin e-posta özetini geçerli anahtarla yeniden hesaplar; kuru
+//        koşum varsayılan, yalnız kimlik kimliği + sayı basar; çakışmada HİÇ yazmaz; anahtar dosyası YOKSA üretmez, durur)
 // Tesis/kurulum kimlikleri SATICIDAN gelir (HAK'taki `tesis.id` · `kurulumId`), burada uydurulmaz.
 // Davet belirteci YALNIZ bu komutun çıktısında, BİR KEZ basılır; repoya/loga/denetime yazılmaz.
-// Satıcı iç API'si kurulunca (`KURULUM_KAYNAGI=satici`) kurulum kaydı oradan dolar; bu CLI yine
-// ilk yöneticiyi açar.
 // =============================================================================
 import type { LicenseClass } from "@prisma/client";
 import { z } from "zod";
+import { FacilityDbKey, facilityDbKeyPath } from "../src/auth/facility-db-key";
 import { loadEnvFile } from "../src/lib/env";
 import { TesisDbRouter } from "../src/lib/tesis-db";
-import { prepareFacilityDb } from "../src/lib/tesis-db-hazirlik";
-import { expectedSchemaVersion } from "../src/lib/tesis-goc";
-import { cliDeps } from "./tesis-db";
-import { destroyFacility } from "../src/services/facility-destruction";
+import { applyDigestRekey, describePlan, planDigestRekey } from "../src/services/identity-rekey";
 import { parseCloudUntilArg } from "../src/services/service-lifecycle";
-import { disableIdentityTwoFactor, inviteFacilityAdmin, openFacility, overrideFromArgs, registerInstallation, reinviteAdmin, resetIdentity, setFacilityStatus } from "../src/services/vendor-admin.service";
+import {
+  assertSingleFacility,
+  disableIdentityTwoFactor,
+  inviteFacilityAdmin,
+  openFacility,
+  overrideFromArgs,
+  registerInstallation,
+  reinviteAdmin,
+  resetIdentity,
+  setFacilityStatus,
+} from "../src/services/vendor-admin.service";
 
 function args(argv: readonly string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -61,18 +66,55 @@ function retention(v: string | undefined): number | null | undefined {
   return n;
 }
 
-async function main(): Promise<void> {
+function gocUrl(env: NodeJS.ProcessEnv): string {
+  const url = env.GOC_DATABASE_URL;
+  if (!url) throw new Error("GOC_DATABASE_URL tanımlı değil");
+  return url;
+}
+
+/** Özet yenileme: önce plan (kuru), `--apply` ile ve planda çakışma yoksa yazar. Çıkış 0 temiz · 1 çakışma/okunamayan/durdu. */
+export async function rekeyDigests(env: NodeJS.ProcessEnv, cwd: string, apply: boolean, log: (line: string) => void = console.log): Promise<number> {
+  const k = facilityDbKeyPath(env, cwd);
+  // Yeni anahtar burada ÜRETİLMEZ: yanlış yoldan doğan anahtar bütün özetleri ona yazardı.
+  const key = FacilityDbKey.load(k.file, { create: false });
+  const db = new TesisDbRouter({ role: "goc", url: gocUrl(env), key, poolMax: 2 });
+  try {
+    const plan = await planDigestRekey(db, key);
+    for (const line of describePlan(plan)) log(line);
+    let code = plan.counts.cakisma > 0 || plan.counts.okunamadi > 0 ? 1 : 0;
+    if (!apply) {
+      log(`PATRON_OZET_YENILE kip=kuru yenilenecek=${plan.counts.yenilenecek} cakisma=${plan.counts.cakisma} — yazmak için --apply`);
+      return code;
+    }
+    const r = await applyDigestRekey(db, key, plan);
+    if (r.kind === "reddedildi") {
+      log(`⛔ ${r.conflicts} kimlikte çakışma — HİÇBİR özet yazılmadı; çakışan kimlikler incelenmeli (runbook)`);
+      log(`PATRON_OZET_YENILE kip=uygula degisen=0 cakisma=${r.conflicts}`);
+      return 1;
+    }
+    if (r.kind === "durdu") {
+      log(`⛔ ${r.stop.identityId} kimliğinde durdu (${r.stop.reason}) — ${r.changed} kimlik yazıldı; komutu yeniden koşun`);
+      code = 1;
+    }
+    log(`PATRON_OZET_YENILE kip=uygula degisen=${r.changed} cakisma=${plan.counts.cakisma}`);
+    return code;
+  } finally {
+    await db.close();
+  }
+}
+
+async function main(): Promise<number> {
   loadEnvFile();
   const [komut, ...rest] = process.argv.slice(2);
   const a = args(rest);
-  const deps = cliDeps();
-  const db = new TesisDbRouter({ role: "goc", centralUrl: deps.gocUrl, key: deps.key, schemaVersion: expectedSchemaVersion(), centralPoolMax: 2, facilityPoolMax: 2 });
+  if (komut === "ozet-yenile") return rekeyDigests(process.env, process.cwd(), a.apply === "true");
+  const k = facilityDbKeyPath(process.env, process.cwd());
+  const db = new TesisDbRouter({ role: "goc", url: gocUrl(process.env), key: FacilityDbKey.load(k.file, { create: !k.explicit }), poolMax: 2 });
   try {
     switch (komut) {
       case "tesis-ac": {
         const tesisId = uuidArg(a, "tesis");
-        const h = await prepareFacilityDb(deps, tesisId);
-        if (h.kind !== "hazir" && h.kind !== "zaten-hazir") throw new Error(`tesis DB'si hazır değil (${h.kind}${h.kind === "hata" ? `: ${h.message}` : ""}); \`tesis-db.ts hazirla\` ile yeniden deneyin`);
+        await assertSingleFacility(db, tesisId);
         const r = await openFacility(db, { tesisId, name: need(a, "ad"), retentionMonths: retention(a.saklama) });
         console.log(`✅ tesis ${r.tesisId} — ${r.name} (saklama: ${r.retentionMonths ?? "tümü"})`);
         break;
@@ -118,30 +160,20 @@ async function main(): Promise<void> {
         console.log(r.changed ? `✅ doğrulama kodu kapatıldı — ${r.facilities} tesis denetimine yazıldı; giriş: e-posta + parola` : "ℹ️  doğrulama kodu zaten kapalı — değişiklik yok");
         break;
       }
-      case "imha": {
-        const tesisId = uuidArg(a, "tesis");
-        const erken = a["erken-talep"];
-        const r = await destroyFacility(db, { tesisId, operator: z.string().trim().min(3).max(120).parse(need(a, "isleyen")), apply: a.uygula === "true", ...(erken ? { earlyRequestRef: z.string().trim().min(3).max(60).parse(erken) } : {}) });
-        if (!r.applied) {
-          console.log(`🔎 KURU KOŞUM — tesis ${r.tesisId} (${r.facilityName}) · aşama ${r.phase} · neden ${r.reason}; silinecek satırlar:`);
-          console.log(JSON.stringify(r.counts, null, 2));
-          console.log("   Uygulamak için aynı komutu --uygula ile yeniden koşun.");
-          break;
-        }
-        console.log(`✅ imha tamam — tesis ${r.tesisId}; veritabanı düşürüldü; kayıt ${r.recordId}`);
-        console.log("   İmha tutanağı verisi (Ek-6/A §4.5; satıcı kayıtlarında saklanır, yedekten geri yüklemede yeniden koşulur):");
-        console.log(JSON.stringify({ tesisId: r.tesisId, tesis: r.facilityName, neden: r.reason, hizmetBitisi: r.serviceEndedAt, saltOkunurBitis: r.readOnlyUntil, silinen: r.counts, yedektenDusme: r.backupClearBy, kayitId: r.recordId }, null, 2));
-        break;
-      }
       default:
-        throw new Error("Komut: tesis-ac | tesis-durum | kurulum-kaydet | yonetici-davet | yonetici-yeniden-davet | kimlik-sifirla | dogrulama-kapat | imha");
+        throw new Error("Komut: tesis-ac | tesis-durum | kurulum-kaydet | yonetici-davet | yonetici-yeniden-davet | kimlik-sifirla | dogrulama-kapat | ozet-yenile");
     }
   } finally {
     await db.close();
   }
+  return 0;
 }
 
-main().catch((err: Error) => {
-  console.error(`⛔ ${err.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main()
+    .then((code) => process.exit(code))
+    .catch((err: Error) => {
+      console.error(`⛔ ${err.message}`);
+      process.exit(1);
+    });
+}

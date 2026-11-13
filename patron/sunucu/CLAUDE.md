@@ -17,12 +17,11 @@ Patronun buluttaki OKUMA KOPYASI ve TEK yazma kanalı. **Bulut hesap yapmaz, fab
 - **Şema**: her tabloda `tesis_id` + RLS ENABLE + FORCE; çift yüklem DB CHECK ile de seddelenir.
 - **Değişim akışı** `services/change-feed.ts` + `GET /api/degisim?since=&bekle=` (`http/change-routes.ts`): `sync_state.change_counter` YALNIZ paket tx'inde (9201 altında), veri kabul edildiyse +1; hub süreç içidir (halka 64, `notify` COMMIT'ten sonra), yanıt içerik taşımaz, ≤ 25 sn, adlar oturumun okuyabildiği projeksiyonlarla süzülür (bekçi `test_degisim_sayaci`).
 
-## Merkez DB + tesis başına DB — roller
+## Tek DB, tek tesis — roller
 
-- Merkez DB yalnız yönlendirme ve yaşam döngüsü tablolarını, tesis DB'si (`lib/tesis-db-ad.ts`, ad kimlikten türetilir) kiracı verisini taşır; tek şema, tek göç zinciri; yönlendirici `lib/tesis-db.ts`.
-- Göç rolü tablo sahibidir; sunucu bu rolle BAĞLANMAZ. Tesis rolleri (`_uyg`, `_esit`) NOBYPASSRLS; yetkiler tek kaynak `src/lib/db-grants.ts` — yeni tablonun yetkisi AYNI dilimde girer. Rol parolası diskte tutulmaz, anahtardan türetilir. Sunucu RLS'i atlayabilen rolle KALKMAZ.
-- `app.tesis_id` ayarsız bağlantıda sorgu HATA verir (fail-closed); `*` projeksiyon YASAK. Sunucu hazırlayıcıyı import ETMEZ.
-- Destek rolüyle sunucu bağlanmaz; kapı `destek_ac(...)` ile açılır ve `support_access`e yazılır. İmha claim'li ve tutanaklıdır. Ayrıntı ana ürün `ops/PATRON-TESIS-DB-GECIS.md` (docs, TeksERP@19aa48a9; bu repoda yok), ana ürün `design/PATRON-TESIS-DB.md` (docs, TeksERP@19aa48a9; bu repoda yok).
+- TEK veritabanı, TEK tesis: kiracı ve kimlik/yönlendirme tabloları aynı DB'de; tesis başına DB, merkez kataloğu, hazırlayıcı, imha ve destek rolü YOK. `tesis-ac` ikinci tesisi 409 ile reddeder (bekçi `test_tek_veritabani`). Bağlantı nesnesi `lib/tesis-db.ts`.
+- Göç rolü tablo sahibidir; sunucu bu rolle BAĞLANMAZ. Uygulama ve eşitleme rolleri NOBYPASSRLS (ad + parola `.env` URL'lerinde); yetkiler tek kaynak `src/lib/db-grants.ts` — yeni tablonun yetkisi AYNI dilimde girer. Sunucu RLS'i atlayabilen rolle KALKMAZ.
+- `app.tesis_id` ayarsız bağlantıda sorgu HATA verir (fail-closed); `*` projeksiyon YASAK.
 
 ## Advisory kilit envanteri (patron DB'si — backend 80xx ve satıcı 91xx'ten bağımsız)
 
@@ -33,7 +32,7 @@ Kilit tx'in İLK ifadesidir ve kiracı ayarıyla AYNI SELECT'te alınır (`lib/t
 | 9201 | `PACKAGE` | tesis başına eşitleme paketi — `try`: doluysa 409 `PAKET_ISLENIYOR` |
 | 9202 | `ACCOUNT_ADMIN` | tesis başına hesap yönetimi (son yönetici kuralı) |
 | 9203 | `CLIENT_TOKEN` | (tesis, işlem kimliği) başına tekrarlar sıraya girer |
-| 9204 | `LOGIN_ROUTE` | MERKEZ DB'sinde kimlik e-posta özeti başına (davet kabul/onay/bağla, satıcı kimlik sıfırlaması, merkez kimlik kapanışı/silmesi, kendi hesabını silme, özet yenileme (ozet-yenile)); hesap kilidinden ÖNCE |
+| 9204 | `LOGIN_ROUTE` | kimlik e-posta özeti başına (davet kabul/onay/bağla, satıcı kimlik sıfırlaması, kimlik kapanışı/silmesi, kendi hesabını silme, özet yenileme (ozet-yenile)); hesap kilidinden ÖNCE |
 
 ## Alt-alan kuralları — dokunmadan önce oku
 

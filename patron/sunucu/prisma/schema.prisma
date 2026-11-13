@@ -4,10 +4,9 @@
 // Sözleşme: docs/design/PATRON-BULUTU-ESITLEME.md §9 (bulut veri modeli ve RLS).
 // Çekirdek kurallar burada da geçerli (kök CLAUDE.md):
 //   - PK: UUID; her DateTime timestamptz; UUID kolon @db.Uuid.
-//   - TESİS BAŞINA AYRI DB (docs/design/PATRON-TESIS-DB.md): merkez DB yönlendirme kataloğudur, her
-//     tesisin verisi kendi DB'sindedir; ŞEMA TEKTİR, tablonun nerede yaşadığını yetkiler belirler
-//     (`src/lib/db-grants.ts` MERKEZ_TABLES). Tesis DB'sinde her satır yine `tesis_id` taşır ve RLS ile
-//     yalıtılır (ikinci savunma; `app.tesis_id` her tx'in İLK ifadesinde — tek yazar `src/lib/tenant.ts`).
+//   - TEK TESİS, TEK VERİTABANI (Adnan Şahin; 2026-11-13 ayıklaması): her satır yine `tesis_id` taşır ve RLS
+//     ile yalıtılır (`app.tesis_id` her tx'in İLK ifadesinde — tek yazar `src/lib/tenant.ts`); kimlik tabloları
+//     (`identities`, `login_routes`, `installation_routes`) RLS taşımaz, yalnız rol yetkisiyle korunur.
 //   - Bulut HESAP YAPMAZ: projeksiyon satırı fabrikanın hesapladığı veridir (jsonb), bulut saklar,
 //     süzer, gösterir. İş kaydı fabrikada doğar; buluttaki tek yazma kanalı gelen kutusudur.
 //   - Soft delete: hesap `status`, cihaz `active`, kurulum `active`. Hard delete yalnız
@@ -111,43 +110,9 @@ enum NotificationStatus {
   ATLANDI
 }
 
-/// Tesis veritabanının yaşam döngüsü (merkez): ISTENDI → HAZIR → IMHA_SURUYOR → IMHA_EDILDI (hepsi atomik claim).
-enum FacilityDbStatus {
-  ISTENDI
-  HAZIR
-  IMHA_SURUYOR
-  IMHA_EDILDI
-}
-
 // -----------------------------------------------------------------------------
-// MERKEZ — yönlendirme kataloğu (yalnız merkez DB'sinde dolu; tesis DB'lerinde boş ve yetkisiz)
+// KİMLİK VE YÖNLENDİRME — kiracı verisi değil (RLS yok; yetki `src/lib/db-grants.ts`)
 // -----------------------------------------------------------------------------
-
-/// Tesis → veritabanı. Ad `<merkez>_t<tesis kimliğinin ilk 16 onaltılık hanesi>` (belirlenimli; yönlendirici
-/// adı satırdan değil kimlikten türetir, satır yalnız durum ve şema sürümü verir). Yazan: hazırlayıcı + göç
-/// koşucusu + imha (göç rolü); eşitleme rolü yalnız `tesis_id` ile hazırlık isteği açar.
-model FacilityDatabase {
-  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tesisId         String           @unique @map("tesis_id") @db.Uuid
-  databaseName    String?          @unique @map("database_name") @db.VarChar(63)
-  status          FacilityDbStatus @default(ISTENDI) @map("status")
-  schemaVersion   String?          @map("schema_version") @db.VarChar(255)
-  claimOwner      String?          @map("claim_owner") @db.VarChar(80)
-  claimUntil      DateTime?        @map("claim_until") @db.Timestamptz
-  attempts        Int              @default(0) @map("attempts")
-  nextAttemptAt   DateTime?        @map("next_attempt_at") @db.Timestamptz
-  lastError       String?          @map("last_error") @db.VarChar(500)
-  migratedAt      DateTime?        @map("migrated_at") @db.Timestamptz
-  migrationError  String?          @map("migration_error") @db.VarChar(500)
-  destructionPlan Json?            @map("destruction_plan")
-  readyAt         DateTime?        @map("ready_at") @db.Timestamptz
-  destroyedAt     DateTime?        @map("destroyed_at") @db.Timestamptz
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-
-  @@index([status, nextAttemptAt])
-  @@map("facility_databases")
-}
 
 /// Kurulum → tesis (değişmez). İmzalı isteğin tesisi buradan çözülür; satır yoksa kurulum bilinmiyor (401).
 model InstallationRoute {
@@ -161,8 +126,8 @@ model InstallationRoute {
   @@map("installation_routes")
 }
 
-/// Bulut KİMLİĞİ (merkez): tek e-posta (yalnız ANAHTARLI özet, HMAC-SHA256 `patron-tesis-db.key`) + tek parola + tek
-/// TOTP (İSTEĞE BAĞLI); birden çok tesise üyelikle (`login_routes`) erişir. Merkez düz e-posta TAŞIMAZ. TOTP sırrı kimlik
+/// Bulut KİMLİĞİ: tek e-posta (yalnız ANAHTARLI özet, HMAC-SHA256 `patron-tesis-db.key`) + tek parola + tek
+/// TOTP (İSTEĞE BAĞLI); birden çok tesise üyelikle (`login_routes`) erişir. Kimlik tablosu düz e-posta TAŞIMAZ. TOTP sırrı kimlik
 /// id'siyle mühürlü. CHECK: AKTIF ⇒ parola; açık TOTP ⇒ sır + son adım; PASIF ⇔ kapanış anı; silinmişte sır yok.
 model Identity {
   id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -253,16 +218,16 @@ model Installation {
 
 /// Bulut hesabı (tesis tarafı). E-posta küçük harfe normalleşir; bulut genelinde KİMLİK tekildir (`identities`). PASIF terminaldir;
 /// kapanıştan 30 gün sonra kimliği silinir (`src/services/maintenance.ts` `purgeClosedIdentities`), satır iş kayıtlarının izi için kalır.
-/// Tesis hesabı (üyeliğin tesis tarafı): ad, e-posta, izin, durum. Parola/TOTP merkez kimliktedir (`identities`).
+/// Tesis hesabı (üyeliğin tesis tarafı): ad, e-posta, izin, durum. Parola/TOTP kimliktedir (`identities`).
 /// İzinler kod kataloğundan (`src/catalog/permissions.ts`); süper yetki yoktur.
 model Account {
   id               String        @id @default(uuid()) @db.Uuid
   tesisId          String        @map("tesis_id") @db.Uuid
-  /// Tekillik kısmi indekslerle (migration `20261001120000`): tesis DB'si içinde AKTIF · KILITLI hesapta (bulut geneli tekillik `identities.email_digest`);
+  /// Tekillik kısmi indekslerle (temel göç): AKTIF · KILITLI hesapta (bulut geneli tekillik `identities.email_digest`);
   /// tesis içinde PASİF olmayan hesapta. Davet ve arşiv e-postayı tutmaz.
   email            String        @map("email") @db.VarChar(254)
   name             String        @map("name") @db.VarChar(120)
-  /// Merkez kimliği (`identities.id`; DB'ler arası, FK yok). CHECK: AKTIF · KILITLI ⇒ dolu. Parola/TOTP kimliktedir.
+  /// Kimlik (`identities.id`; FK yok). CHECK: AKTIF · KILITLI ⇒ dolu. Parola/TOTP kimliktedir.
   identityId       String?       @map("identity_id") @db.Uuid
   permissions      String[]      @map("permissions")
   status           AccountStatus @default(DAVETLI) @map("status")
@@ -589,49 +554,6 @@ model FullSyncRun {
 
   @@unique([tesisId, projection, startedAt])
   @@map("full_sync_runs")
-}
-
-/// İmha kaydı (Ek-6/A §4.5 tutanak verisi) — tesisin verisi silindikten SONRA da kalır; değiştirilemez ve
-/// silinemez (DB tetikleyicisi). Silinen verinin içeriğini taşımaz: tablo başına sayı, neden, işlemi yapan.
-/// Yazan yalnız satıcı CLI'si (`scripts/tesis.ts imha`, göç rolü); çalışma rollerine yetki yok.
-model FacilityDestruction {
-  id             String    @id @default(uuid()) @db.Uuid
-  tesisId        String    @map("tesis_id") @db.Uuid
-  facilityName   String    @map("facility_name") @db.VarChar(200)
-  reason         String    @map("reason") @db.VarChar(20)
-  requestRef     String?   @map("request_ref") @db.VarChar(60)
-  operator       String    @map("operator") @db.VarChar(120)
-  serviceEndedAt DateTime? @map("service_ended_at") @db.Timestamptz
-  deletedCounts  Json      @map("deleted_counts")
-  backupClearBy  DateTime  @map("backup_clear_by") @db.Timestamptz
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-
-  @@index([tesisId, createdAt])
-  @@map("facility_destructions")
-}
-
-/// Destek erişim kaydı (Ek-6/B §3.2) — destek rolünün (`<db>_destek`) her içerik erişimi: kim (DB oturum kullanıcısı),
-/// ne zaman, hangi tesis, hangi veri kümesi (kapsam), gerekçe + talep no, bitiş. Aynı zamanda erişim İZNİDİR: destek
-/// rolünün okuyabildiği her tablo RESTRICTIVE `destek_kapisi` politikasıyla bu kaydın açık + süresi dolmamış satırına
-/// (oturumun pid + başlangıç anı) bağlıdır. Yazan yalnız `destek_ac`/`destek_kapat` (SECURITY DEFINER, göç SQL'i);
-/// SİLİNEMEZ (tetikleyici; yalnız açık kaydın kapanışı yazılır), tesis imhasında da KALIR. Uygulama rolü okur (döküm).
-model SupportAccess {
-  id           String    @id @db.Uuid
-  tesisId      String    @map("tesis_id") @db.Uuid
-  dbUser       String    @map("db_user") @db.VarChar(63)
-  pid          Int       @map("pid")
-  backendStart DateTime  @map("backend_start") @db.Timestamptz
-  ticket       String    @map("ticket") @db.VarChar(60)
-  reason       String    @map("reason") @db.VarChar(500)
-  scope        String    @map("scope") @db.VarChar(200)
-  expiresAt    DateTime  @map("expires_at") @db.Timestamptz
-  closedAt     DateTime? @map("closed_at") @db.Timestamptz
-  closeReason  String?   @map("close_reason") @db.VarChar(20)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-
-  @@index([tesisId, createdAt])
-  @@index([pid, backendStart])
-  @@map("support_access")
 }
 
 /// İmzalı istek nonce defteri — TELEMETRİ (tekrar oynatma engeli; saklama = istek zamanı + 10 dk).
