@@ -13275,3 +13275,17 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Geçiş.** Giriş sözleşmesi kırıcıdır, geçiş serttir: VDS sıfırdan → backend paketi (eşitleme kapalı) → panelden `patron:giris` → eşitleme açık → uygulama. Eski "yeni uygulama eski bulutta kodsuz giremez" sırası ve 2026-11-12 TOTP notundaki davet/satıcı CLI anlatımı bu notla geçersizdir.
 
 **Kaynak.** Plan `PLAN-uyelik-electron-sifresi.md` (repo dışı plan klasörü). Fabrika: W `15d314cf` · F1 `38cc36a0` · F2 `4a36e2a8` · F3 `c73a5a04` · Y8 `9d611137`. Bulut: C1 `a6dec281` · C2 `2472499f` · C3 `f9ecea62` · C4 `e3db9fb7` + `941438a0` (e-posta özeti anahtarı ve `tesis_rol_anahtari` sırrı söküldü) · kilit-ret makbuzu `84aaa87e`. Uygulama: A1 `23b58720`. Kural satırları `docs/kurallar/patron-bulutu.md` § Patron girişi, `docs/kurallar/yetki-izin.md` (`patron:giris`); anlatım `patron/sunucu/MIMARI.md`.
+
+## 2026-11-13 — Cihaz kimliği: yeniden kurulan uygulama eski kaydına bağlanır (varsayılan KAPALI) [ÇEKİRDEK]
+
+**Sorun (canlı, salt okuma).** Adnan'da 22 tablet kaydı / gerçekte 3–4 cihaz, 15 masaüstü / ~5 PC. Kimlik yalnız uygulamanın yerel UUID'siydi; eşleştirme kapalı olduğu için her kaldır-kur yeni APPROVED satır açtı.
+
+**Karar (kullanıcı 2026-11-13).** Ana üründeki düzeltme taşındı ama Adnan'a **PASİF** gelir: `device.autoReattachKnownHardware` varsayılan KAPALI; kapalıyken `announce` bugünkü davranışla birebir aynıdır (`hw` okunmaz/yazılmaz). Açıkken bilinen donanım yeni kurulum anahtarıyla gelirse yalnız **aktif + APPROVED** eski satır yeni anahtara geçer (atomik claim); pasif ya da onayı geri alınmış satır asla dirilmez — o durumda bugünkü doğuş. İstemci `hw = HMAC-SHA256(installationId, "tekserp/cihaz-donanim/v1\n<kaynak>\n<ham>")` gönderir; ham kimlik cihazdan çıkmaz.
+
+**Kaynak (ana ürün, elle taşındı).** Backend `058fd1bc9` (PR #116, D1) + `0dd4b6832` (PR #673); mobil `6b648ad8d` (PR #163, D2), saf HMAC `aa72ab54b` (`device-proof.ts`) + `62e026517` (`qr-parca.ts`). Masaüstü kaynağı `8f24dd745` (PR #134, D3) — bu turda taşınmadı (bkz. açık kalan).
+
+**Ana üründen farklar.** Bağlama defteri (`device_binding_events`), yeniden bağlama talepleri + panel/yerinde onay ekranı, `mergedIntoId`, cihaz kanıtı ve barındırılan sınıf soğuma süresi ALINMADI (Adnan şemasında yok; uygun olmayan hedefte bugünkü doğuşa düşülür, iz audit'te `DEVICE_REBOUND_AUTO` / `DEVICE_HW_LEARNED`). Özet düz UNIQUE (NULL'lar ayrık) → şema-dışı nesne yok. Ana üründe varsayılan AÇIK, burada KAPALI.
+
+**Eski istemci.** Tablet 1.0.14 `hw` göndermez → bugünkü yol (bayrak açık olsa da). Eski backend 2.11.7 yeni tabletin `hw`sini Zod strip ile atar. `minVersion` değişmedi.
+
+**Temizlik.** Tek seferlik `Teks-Erp/scripts/cihaz_kopya_temizle.ts`: varsayılan teşhis, `--apply --onay=<N> --hedef=<db>` ile N gün (vars. 30) görülmeyen aktif cihazları SİLMEDEN pasifler (audit `DEVICE_STALE_DEACTIVATED`). Yerel prova kopyasında (`tekserp_deneme_saha`, değiştirilmeden) teşhis: 40 aktif cihazdan 26'sı (TABLET 17 · PHONE 1 · DESKTOP 8).

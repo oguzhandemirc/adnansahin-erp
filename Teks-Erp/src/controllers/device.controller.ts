@@ -5,16 +5,28 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { DeviceService } from "../services/device.service";
+import { HW_DIGEST_RE, HW_SOURCES } from "../services/helpers/device-identity.helper";
 import { readDevicePairingRequired } from "../services/system-setting.service";
 import { assertValidUuid } from "../middlewares/uuid-param.middleware";
 import "../types/express-augment";
 
 const deviceKindSchema = z.enum(["TABLET", "PHONE", "DESKTOP"]).optional();
 
+/**
+ * Donanım özeti (cihaz kimliği, 2026-11-13). Biçimsiz `hw` 400 DEĞİL, yok sayılır
+ * (`.catch(undefined)`): tanıma bir kolaylıktır, cihazın açılışını kilitleyemez.
+ * `model` yalnız bilgi amaçlı — bugün saklanmaz (eski backend ikisini de strip eder).
+ */
+const hwClaimSchema = z
+  .object({ v: z.literal(1), kaynak: z.enum(HW_SOURCES), ozet: z.string().regex(HW_DIGEST_RE) })
+  .optional()
+  .catch(undefined);
+
 const announceSchema = z.object({
   deviceId: z.string().min(8, "Geçersiz cihaz kimliği").max(80),
   name: z.string().max(80).optional(),
   kind: deviceKindSchema,
+  hw: hwClaimSchema,
 });
 
 const approveSchema = z.object({

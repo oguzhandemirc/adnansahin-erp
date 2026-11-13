@@ -347,6 +347,8 @@ export const updateSchema = z.strictObject({
   fasonNoteMobileEntry: z.boolean().optional(),
   // Mobil cihaz eşleştirmesi zorunlu mu (true=aktif) yoksa pasif mi (false=default).
   devicePairingRequired: z.boolean().optional(),
+  // device.autoReattachKnownHardware — bilinen donanımı yeniden tanı (false=default, bugünkü davranış).
+  deviceAutoReattachKnownHardware: z.boolean().optional(),
   // shipping.confirmationEnabled — sevk onay adımı (UI rehberi).
   shipmentConfirmationEnabled: z.boolean().optional(),
   // shipping.manualSackCountEnabled — "araca yüklenen gerçek çuval adedi" alanı

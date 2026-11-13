@@ -1075,6 +1075,15 @@ model Device {
   status     DeviceStatus @default(PENDING)
   /// Cihaz türü: TABLET / PHONE / DESKTOP (yönetici PC'si). Sadece görsel/etiket.
   kind       DeviceKind   @default(TABLET)
+  /// Kalıcı donanım özeti (cihaz kimliği, 2026-11-13; ana ürün PR #116 D1 taşıması):
+  /// `HMAC-SHA256(installationId, "tekserp/cihaz-donanim/v1\n<kaynak>\n<ham>")` küçük hex.
+  /// Ham donanım kimliği (ANDROID_ID / MachineGuid …) cihazdan ÇIKMAZ. Yalnız
+  /// `device.autoReattachKnownHardware` AÇIKKEN yazılır/okunur (kapalıyken hiç dokunulmaz).
+  /// Düz UNIQUE: PG'de NULL'lar ayrık, en çok bir satır aynı donanımı taşır.
+  /// ⚠️ Admin liste cevabında GİZLİ (`omit`): özeti bilen kimliksiz `announce` satırı devralabilir.
+  hwDigest   String?      @unique @db.VarChar(64)
+  /// Özetin kaynağı: ANDROID_ID / WIN_MACHINE_GUID / MAC_PLATFORM_UUID / LINUX_MACHINE_ID.
+  hwSource   String?      @db.VarChar(24)
 
   // Relations
   machine       Machine?           @relation(fields: [machineId], references: [id])
