@@ -67,6 +67,14 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Parola asgari 12 karakterdir ve yaygın parola listesindeki parola reddedilir. [bekçi: patron/sunucu test_dogrulama_kodu]
 - Giriş sözleşmesi değişince kurulum sırası önce bulut, sonra uygulamadır: yeni uygulama eski bulutta kodsuz giremez. [inceleme]
 
+### Kullanıcı listesi (üyelik = Electron şifresi)
+
+- Telefona yalnız `patron:giris` iznini BİREBİR taşıyan fabrika kullanıcısı girer; `*`/`patron:*` jokeri ve "Admin (Tam Yetki)" şablonu bu izni vermez, panelden kişi kişi atanır. [bekçi: test_patron_bulut_kullanicilar]
+- Telefon izni bulutta atanmaz, fabrika izinlerinden türetilir; tablonun tek kaynağı `cloud-sync/user-permission-map.ts`tir ve finans izni türetmez. [bekçi: test_patron_bulut_kullanicilar]
+- Süperadmin, sistem ve teknik kullanıcı buluta ASLA gitmez; pasif, silinmiş ve izin penceresi dışındaki kullanıcı kümeden düşer (süzgeç sorguda ve satır yükleminde iki kat). [bekçi: test_patron_bulut_kullanicilar]
+- Kullanıcı kaydı açık select'le okunur (`CLOUD_USER_SELECT`); PIN, kart, TOTP sırrı ve oturum sayacı ne okunur ne gider; parola bcrypt özeti olduğu gibi gider. [bekçi: test_patron_bulut_kullanicilar]
+- Kullanıcı listesi işi ve `--kuru` aracı log'a, audit'e ve hata özetine yalnız SAYI yazar; parola özeti ve küme özeti basılmaz. [bekçi: test_patron_bulut_kullanicilar]
+
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 
 1. `.env`: `PATRON_CLOUD_URL=https://<bulut kökeni>` ve `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (dosya veri dizininde, repoda değil).
@@ -83,7 +91,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ## Bekçiler
 
-Backend: `test_patron_bulut_imza` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
+Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
 Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_dogrulama_kodu` (doğrulama kodu isteğe bağlı · açıkken zorunlu · sızıntı yok · CLI kapatma) · `test_cari_ozeti` · `test_hizmet_sonu` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
 

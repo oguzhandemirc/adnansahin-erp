@@ -37,6 +37,7 @@ import {
   LEGACY_TEMPLATE_NAME_TO_CODE,
   ROLE_COVERAGE_EXEMPT,
   resolveRoleTemplateCodes,
+  ALL_MODE_EXCLUDED,
 } from "../src/constants/role-template-catalog";
 import { reconcileRoleTemplates } from "../src/jobs/role-template-catalog.job";
 import { foldNameForCompare } from "../src/services/helpers/name-normalize.helper";
@@ -98,6 +99,10 @@ async function main(): Promise<void> {
   const bosRol = ROLE_TEMPLATE_CATALOG.filter((e) => resolveRoleTemplateCodes(e).length === 0);
   check("Hiçbir rol boş değil", bosRol.length === 0, bosRol.map((e) => e.code).join(", "));
 
+  // 2026-11-13: `mode:"all"` istisnası — `patron:giris` şablonla örtük gelmez (parola özeti buluta gider).
+  const allKodlari = new Set(resolveRoleTemplateCodes(ROLE_TEMPLATE_CATALOG.find((e) => e.mode === "all")!));
+  check('patron:giris "Admin (Tam Yetki)" çözümünde YOK (ALL_MODE_EXCLUDED)', !allKodlari.has("patron:giris") && izinKodlari.has("patron:giris"));
+  check("ALL_MODE_EXCLUDED'in her kodu katalogda (ölü istisna yok)", [...ALL_MODE_EXCLUDED].every((c) => izinKodlari.has(c)));
   const allModu = ROLE_TEMPLATE_CATALOG.filter((e) => e.mode === "all");
   check('Tam olarak bir tane mode:"all" rolü var', allModu.length === 1, allModu.map((e) => e.code).join(", "));
 
@@ -238,9 +243,9 @@ async function main(): Promise<void> {
   const adminRol = dbByCode.get("ADMIN_FULL");
   if (adminRol) {
     const sablonIzinleri = new Set(adminRol.permissions.map((p) => p.permission.code));
-    const eksik = [...izinKodlari].filter((c) => !sablonIzinleri.has(c)).sort();
+    const eksik = [...izinKodlari].filter((c) => !ALL_MODE_EXCLUDED.has(c) && !sablonIzinleri.has(c)).sort();
     check(
-      '"Admin (Tam Yetki)" izin kataloğunun TAMAMINI içeriyor',
+      '"Admin (Tam Yetki)" izin kataloğunun TAMAMINI içeriyor (ALL_MODE_EXCLUDED hariç)',
       eksik.length === 0,
       eksik.length ? `eksik ${eksik.length}: ${eksik.join(", ")}` : `${sablonIzinleri.size} izin`,
     );
