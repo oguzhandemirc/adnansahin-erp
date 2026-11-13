@@ -54,12 +54,30 @@ export function asamaMetni(k: Kayit): string {
   return a ? (ASAMA_ETIKET[a] ?? "Diğer") : "—";
 }
 
+/** İptal edilmiş ya da devredilmiş (tüm topları başka iş emrine geçmiş) iş emri: siparişin iş emri listesinde çizilmez. */
+export const iptalMi = (k: Kayit): boolean => k.durum === "CANCELLED" || k.durum === "SUPERSEDED";
+
+/** "Şu an nerede": açıkta kaba aşama (fasondaysa "Fasonda – <firma>"), kapalıda tamamlandıysa "Tamamlandı". */
+export function yerMetni(k: Kayit): string {
+  if (!acik(k)) return k.durum === "COMPLETED" ? "Tamamlandı" : "Kapandı";
+  const firma = metin(k.fasonFirmaAdi);
+  if (k.asama === "fason" && firma) return `Fasonda – ${firma}`;
+  return asamaMetni(k);
+}
+
 export const topSayisi = (k: Kayit): number | null => sayi(k.topSayisi);
 export const metre = (k: Kayit): number | null => sayi(k.metre);
 export const topMetni = (k: Kayit): string => {
   const t = topSayisi(k);
   return t === null ? "—" : formatNumber(t, 0);
 };
+
+/** "18 top · 2.160 m"; alan gelmediyse o parça yok, ikisi de yoksa "—". */
+export function topMetreMetni(k: Kayit): string {
+  const t = topSayisi(k);
+  const m = metre(k);
+  return [t === null ? null : `${formatNumber(t, 0)} top`, m === null ? null : `${formatNumber(m, 0)} m`].filter(Boolean).join(" · ") || "—";
+}
 
 export interface AsamaSayisi {
   readonly anahtar: string;

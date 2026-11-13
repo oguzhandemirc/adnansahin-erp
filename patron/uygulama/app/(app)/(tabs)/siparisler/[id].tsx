@@ -2,7 +2,8 @@
 // → bilgiler → kalemler (sevk ve açık miktar kalem satırında). Termin düz bilgi satırı (vurgu/rozet YOK). Finans buluta
 // gitmez; tutar gösterilmez. Her değer fabrikadan;
 // durum/yön sözlükten. Kalem satırları sunucunun `siparisId` süzgeciyle; sunucu süzgeci beyan etmiyorsa (eski bulut,
-// parametreyi yok sayar) fabrikanın kalem özeti kalır — istemci süzmez.
+// parametreyi yok sayar) fabrikanın kalem özeti kalır — istemci süzmez. "İş emirleri" bölümü aynı ilkeyle: `is-emri`
+// üyelik süzgeci (`siparisId`) beyan edilmediyse ya da hesap üretimi okuyamıyorsa bölüm yok.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
@@ -16,9 +17,10 @@ import { useRemote } from "../../../../src/state/useRemote";
 import { Screen } from "../../../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../../../src/ui/hareket";
 import { HataDurumu, IconTile, Iskelet, ListeBlogu, ListeSatiri, Rozet, StatCard } from "../../../../src/ui/ortak";
-import { ROZET_TONU, asObj, present, str } from "../../../../src/ui/siparis/OrderRow";
+import { ROZET_TONU, asObj, present, str, uretimMetni } from "../../../../src/ui/siparis/OrderRow";
 import { useListCapability } from "../../../../src/ui/siparis/capabilities";
 import { OrderLines, useOrderLines } from "../../../../src/ui/siparis/OrderLines";
+import { OrderWorkOrders, useOrderWorkOrders } from "../../../../src/ui/siparis/OrderWorkOrders";
 import { StaleNote } from "../../../../src/ui/siparis/parts";
 import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
 import { FONT_SCALE, TOUCH, space, typography } from "../../../../src/ui/tokens";
@@ -33,6 +35,7 @@ export default function OrderDetail() {
   const [tick, setTick] = useState(0);
   const r = useRemote(id ? `kayit:siparis:${id}` : null, () => api.record("siparis", String(id)));
   const kalemler = useOrderLines(lines && id ? String(id) : null);
+  const isEmirleri = useOrderWorkOrders(id ? String(id) : null);
   const k = asObj(r.data?.kayit);
   const no = str(k.siparisNo);
   const status = orderStatus(k.durum);
@@ -44,6 +47,8 @@ export default function OrderDetail() {
     { key: "tarih", etiket: "Sipariş tarihi", deger: formatDate(k.siparisTarihi) },
     str(k.termin) ? { key: "termin", etiket: "Termin", deger: formatDate(k.termin) } : null,
     { key: "yon", etiket: "Sevk yönü", deger: destinationLabel(k.yon) },
+    // Fabrikanın üretim cümlesi; eski fabrika alanı göndermez → satır yok.
+    k.uretim ? { key: "uretim", etiket: "Üretim", deger: uretimMetni(k) } : null,
     doviz ? { key: "doviz", etiket: "Para birimi", deger: doviz } : null,
     str(k.tamamlanma) ? { key: "tamam", etiket: "Tamamlanma", deger: formatDate(k.tamamlanma) } : null,
     str(k.iptalTarihi) ? { key: "iptal", etiket: "İptal tarihi", deger: formatDate(k.iptalTarihi) } : null,
@@ -89,7 +94,12 @@ export default function OrderDetail() {
           ) : null}
           <KademeliGiris sira={2}>
             <ListeBlogu baslik="Bilgiler" testID="siparis-bilgiler">
-              {bilgiler.map((b, i) => <ListeSatiri key={b.key} birincil={b.etiket} deger={b.deger} ayrac={i > 0} testID={`bilgi-${b.key}`} />)}
+              {bilgiler.map((b, i) =>
+                // Üretim cümlesi uzun olabilir ("Fasonda – <firma> · +1 yerde daha"): değer sütunu kırpılmadığından
+                // etiketi ezmesin diye ikincil metinde (sığmazsa "…"; tamamı erişilebilirlik etiketinde).
+                b.key === "uretim"
+                  ? <ListeSatiri key={b.key} birincil={b.etiket} ikincil={b.deger} ayrac={i > 0} testID={`bilgi-${b.key}`} />
+                  : <ListeSatiri key={b.key} birincil={b.etiket} deger={b.deger} ayrac={i > 0} testID={`bilgi-${b.key}`} />)}
             </ListeBlogu>
           </KademeliGiris>
           <KademeliGiris sira={3}>
@@ -100,6 +110,9 @@ export default function OrderDetail() {
                 <ListeSatiri birincil="Etkin kalem" deger={present(k.kalemSayisi) ? `${formatNumber(k.kalemSayisi, 0)} kalem` : "—"} ayrac={false} />
               </ListeBlogu>
             )}
+          </KademeliGiris>
+          <KademeliGiris sira={4}>
+            <OrderWorkOrders list={isEmirleri} tick={tick} />
           </KademeliGiris>
           <Text style={s.foot} testID="fabrika-veri-ani">{`Fabrika verisi ${fmtFactoryDateTime(r.data.surum)}`}</Text>
         </>

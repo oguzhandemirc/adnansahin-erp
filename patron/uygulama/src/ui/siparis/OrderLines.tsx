@@ -11,7 +11,7 @@ import { ListStates } from "./parts";
 import { useRemoteList, type RemoteList } from "./useRemoteList";
 
 /** Ekranın aşağı çekip tazelemesi (`tick` artar) listeyi de yeniden okur; ilk değer okumaz (ilk yükleme kendiliğinden). */
-function useReloadOn(tick: number, list: RemoteList): void {
+export function useReloadOn(tick: number, list: RemoteList): void {
   const seen = useRef(tick);
   useEffect(() => {
     if (seen.current === tick) return;

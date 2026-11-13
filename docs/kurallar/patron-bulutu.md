@@ -111,7 +111,7 @@ Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_p
 
 Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_giris_fabrika_parolasi` (giriş · TOTP · kaba kuvvet · bayatlık) · `test_hesap_acil_cli` (acil CLI · üyelik sökümü) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` ve dizindeki diğer `test_*.ts`.
 
-Uygulama (`patron/uygulama`, `npx jest`): `__tests__/iki-adimli-dogrulama.test.tsx` (giriş adımları · hata cümleleri) · `__tests__/mirror.test.ts` (uç tablosu ↔ sunucu rotaları).
+Uygulama (`patron/uygulama`, `npx jest`): `__tests__/iki-adimli-dogrulama.test.tsx` (giriş adımları · hata cümleleri) · `__tests__/mirror.test.ts` (uç tablosu ↔ sunucu rotaları) · `__tests__/siparis-uretim.test.tsx` (sipariş Üretim sütunu · ayrıntıda iş emirleri yalnız `is-emri` üyelik süzgeci beyanlıysa).
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 

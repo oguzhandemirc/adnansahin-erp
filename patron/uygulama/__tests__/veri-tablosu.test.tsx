@@ -184,14 +184,14 @@ describe("§2 ekran: sıralama ve süzgeç SUNUCUDA", () => {
     render(<Orders />);
     await settle();
     fireEvent.press(screen.getByTestId("siparis-sutunlar"));
-    const gizli = ["tarih", "kalem", "yon"]; // varsayılan 4 sütunun dışındakiler, tanım sırasıyla
+    const gizli = ["tarih", "kalem", "yon"]; // varsayılan 5 sütunun dışındakiler, tanım sırasıyla
     for (const k of gizli) fireEvent.press(screen.getByTestId(`siparis-sutun-secici-${k}`));
     const gorunen = gizli.filter((k) => screen.queryByTestId(`siparis-sutun-${k}`) !== null);
-    expect(gorunen).toEqual(gizli.slice(0, Math.max(0, azami - 4))); // azamiye ulaşınca yenisi eklenmez
-    for (const k of ["no", "musteri", "sevkToplam", "durum", ...gorunen.slice(1)]) fireEvent.press(screen.getByTestId(`siparis-sutun-secici-${k}`));
+    expect(gorunen).toEqual(gizli.slice(0, Math.max(0, azami - 5))); // azamiye ulaşınca yenisi eklenmez
+    for (const k of ["no", "musteri", "sevkToplam", "uretim", "durum", ...gorunen.slice(1)]) fireEvent.press(screen.getByTestId(`siparis-sutun-secici-${k}`));
     const kalan = gorunen[0] ?? "durum";
     expect(screen.getByTestId(`siparis-sutun-${kalan}`)).toBeTruthy(); // son sütun gizlenemez
-    expect(screen.getAllByTestId(/^siparis-sutun-(no|musteri|sevkToplam|durum|tarih|kalem|yon)$/)).toHaveLength(1);
+    expect(screen.getAllByTestId(/^siparis-sutun-(no|musteri|sevkToplam|uretim|durum|tarih|kalem|yon)$/)).toHaveLength(1);
   });
 });
 

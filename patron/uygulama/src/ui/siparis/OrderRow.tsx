@@ -12,6 +12,14 @@ export const asObj = (v: unknown): Obj => (typeof v === "object" && v !== null &
 export const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
 export const present = (v: unknown): boolean => (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && v.trim() !== "");
 
+/**
+ * Siparişin "Üretim" cümlesi (fabrika `uretim.metin`: kaba aşama · "Fasonda – <firma>" · "Tamamlandı" · "İş emri yok"
+ * …). Fabrika türetir, uygulama yalnız basar; alan hiç gelmediyse (eski fabrika) "—".
+ */
+export function uretimMetni(k: Obj): string {
+  return str(asObj(k.uretim).metin) ?? "—";
+}
+
 /** Fabrika durum tonu → rozet tonu (tek yer). */
 export const ROZET_TONU: Readonly<Record<StatusKind, RozetTonu>> = { iyi: "success", uyari: "warning", kritik: "danger", bilgi: "info" };
 

@@ -13,7 +13,7 @@ import { Screen } from "../../../../src/ui/Frame";
 import { MODULE_ICON } from "../../../../src/ui/icons";
 import { openRecord } from "../../../../src/ui/nav";
 import { OzetSeridi, rozetRenk } from "../../../../src/ui/ortak";
-import { ROZET_TONU, asObj, present, str } from "../../../../src/ui/siparis/OrderRow";
+import { ROZET_TONU, asObj, present, str, uretimMetni } from "../../../../src/ui/siparis/OrderRow";
 import { CapsuleButton, StaleNote } from "../../../../src/ui/siparis/parts";
 import type { SutunTanimi } from "../../../../src/ui/tablo/model";
 import { TabloListesi, TabloUstu, useVeriTablosu } from "../../../../src/ui/tablo/useVeriTablosu";
@@ -41,6 +41,8 @@ const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
     key: "sevkToplam", baslik: "Sevk / Toplam", ad: "Sevk / Toplam (m)", agirlik: 1.5, sayi: true, sirala: "sevkMiktari",
     hucre: (r) => (present(k(r).toplamMiktar) ? `${sayi(k(r).sevkMiktari)} / ${sayi(k(r).toplamMiktar)}` : "—"),
   },
+  // Üretimde nerede (fabrika cümlesi; "Fasonda – <firma> · +1 yerde daha" uzun olabilir → 2 satır). Eski fabrika "—".
+  { key: "uretim", baslik: "Üretim", ad: "Üretim durumu", agirlik: 1.6, satir: 2, hucre: (r) => uretimMetni(k(r)) },
   { key: "kalem", baslik: "Kalem", ad: "Kalem sayısı", agirlik: 0.7, sayi: true, sirala: "kalemSayisi", hucre: (r) => sayi(k(r).kalemSayisi) },
   { key: "yon", baslik: "Yön", agirlik: 0.9, hucre: (r) => YON[str(k(r).yon) ?? ""] ?? "—" },
   {
@@ -53,7 +55,7 @@ const AYAR = {
   projeksiyon: "siparis",
   anahtar: "tablo.siparis",
   sutunlar: SIPARIS_SUTUNLARI,
-  varsayilan: ["no", "musteri", "sevkToplam", "durum"],
+  varsayilan: ["no", "musteri", "sevkToplam", "uretim", "durum"],
   aramaIpucu: "Sipariş no ya da müşteri",
   haricAlanlar: ["gecikmis"],
   testID: "siparis",

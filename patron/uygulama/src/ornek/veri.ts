@@ -232,6 +232,21 @@ const CARILER = [
 
 const DURUMLAR = ["APPROVED", "PARTIAL_SHIPPED", "PENDING", "APPROVED", "COMPLETED", "PARTIAL_SHIPPED", "APPROVED", "CANCELLED"];
 
+/**
+ * Siparişin fabrika "Üretim" cümlesi (`uretim`), aşağıdaki örnek iş emirleriyle (IE) tutarlı: en kalabalık yer +
+ * "+N yerde daha" (depo = "Sevke hazır", sevk edilen top yer sayılmaz); bütün İE'ler bittiyse "Tamamlandı".
+ */
+const URETIM: readonly { readonly tur: string; readonly metin: string }[] = [
+  { tur: "FASON", metin: "Fasonda – Örnek Boyahane · +1 yerde daha" }, // s1 ← w1: fason 14 · depo 4
+  { tur: "ASAMA", metin: "Kurşun · +2 yerde daha" }, // s2 ← w2: kurşun 9 · tambur 3 · depo 6
+  { tur: "FASON", metin: "Fasonda – Deneme Zımpara · +1 yerde daha" }, // s3 ← w3: fason 8 · depo 2
+  { tur: "HAZIR", metin: "Sevke hazır · +1 yerde daha" }, // s4 ← w4: depo 11 · tambur 5
+  { tur: "TAMAMLANDI", metin: "Tamamlandı" }, // s5 ← w7 (tamamlandı)
+  { tur: "FASON", metin: "Fasonda – Örnek Boyahane · +1 yerde daha" }, // s6 ← w6: fason 10 · kurşun 2
+  { tur: "HAZIR", metin: "Sevke hazır · +1 yerde daha" }, // s7 ← w4
+  { tur: "IS_EMRI_YOK", metin: "İş emri yok" }, // s8 (iptal sipariş)
+];
+
 export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
   const siparis = DURUMLAR.map((durum, i) => {
     const c = CARILER[i % 4]!;
@@ -256,6 +271,7 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         toplamMiktar,
         kalemSayisi: 1 + (i % 3),
         tamamlanma: durum === "COMPLETED" ? 100 : durum === "PARTIAL_SHIPPED" ? 45 : 0,
+        uretim: URETIM[i]!,
       },
     );
   });
