@@ -3,6 +3,11 @@
 --     edilen isteğin anı (60 sn penceresi). Uygulama rolü işaret AÇAR, eşitleme rolü `/v1/rapor/al` yanıtında
 --     TÜKETİR (atomik claim: `pending_at IS NOT NULL` ⇒ NULL). İçerik/veri taşımaz; budanmaz (tesis başına tek satır).
 
+-- `facilities` FORCE RLS taşır ve göç rolü süper kullanıcı değildir: yabancı anahtar doğrulaması (`sync_requests` →
+-- `facilities`) politikadan geçer ve kiracı ayarı ister; tesisi olan DB'de ayar yoksa göç düşer (yerel demoda ölçüldü
+-- 2026-11-13, 42704). Kiracısız değer (sıfır UUID) yeter — yeni tablo boştur (kalıp: 20261113220000_uyelik_fabrika_hesabi).
+SELECT set_config('app.tesis_id', '00000000-0000-0000-0000-000000000000', false);
+
 CREATE TABLE "sync_requests" (
     "id" UUID NOT NULL,
     "tesis_id" UUID NOT NULL,
