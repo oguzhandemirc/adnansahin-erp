@@ -117,6 +117,16 @@ function loadJwtSecret(): string {
 }
 const JWT_SECRET: string = loadJwtSecret();
 
+
+/** Tanınmayan PIN / geçersiz kart cevabı — Y5 reddi de AYNI metni kullanır (kâhin yok). */
+export const PIN_UNKNOWN_MESSAGE = "PIN tanınmadı — yöneticinizden hızlı PIN isteyin";
+export const CARD_UNKNOWN_MESSAGE = "Kart geçersiz veya iptal edilmiş — yöneticiden yeni kart isteyin";
+
+/** Y5: PIN/kartla girişi yasak izin kümesi — süperadmin (`*`) ya da herhangi bir `admin:` izni. */
+export function isPrivilegedForFieldLogin(permissions: readonly string[]): boolean {
+  return permissions.some((p) => p === "*" || p.startsWith("admin:"));
+}
+
 export class AuthService {
   /**
    * Authenticate user and return JWT token.
@@ -257,8 +267,10 @@ export class AuthService {
       where: { id: m[1], cardToken: m[2].toLowerCase(), isActive: true },
       select: { id: true, username: true, tokenVersion: true },
     });
-    if (!user) {
-      throw AppError.unauthorized("Kart geçersiz veya iptal edilmiş — yöneticiden yeni kart isteyin");
+    // Y5: yönetici hesabı kartla açılmaz — cevap bilinmeyen kartla BİREBİR aynı
+    // (401, aynı metin, aynı kilit sayımı): kartın yönetici hesabına ait olduğu sızmaz.
+    if (!user || (await this.isFieldLoginForbidden(user.id))) {
+      throw AppError.unauthorized(CARD_UNKNOWN_MESSAGE);
     }
     return this.issueToken(user, ctx);
   }
@@ -288,7 +300,12 @@ export class AuthService {
       where: { quickPin: normalized, isActive: true },
       select: { id: true, username: true, tokenVersion: true },
     });
-    if (!user) throw AppError.unauthorized("PIN tanınmadı — yöneticinizden hızlı PIN isteyin");
+    // Y5: süperadmin ve yönetici (`*`, `admin:*`) hesabı PIN'le açılmaz — cevap
+    // tanınmayan PIN'le BİREBİR aynı (401, aynı metin, kilide sayılır): PIN'in
+    // yönetici hesabına ait olduğu sızmaz.
+    if (!user || (await this.isFieldLoginForbidden(user.id))) {
+      throw AppError.unauthorized(PIN_UNKNOWN_MESSAGE);
+    }
     return this.issueToken(user, ctx);
   }
 
@@ -476,6 +493,19 @@ export class AuthService {
    * Tablet 1.0.8+ her istekte `x-device-id` gönderir ve açılışta announce eder
    * (eşleştirme kapalıyken APPROVED doğar) — mevcut saha cihazları geçer.
    */
+  /**
+   * Y5 (güvenlik denetimi 2026-11-13): PIN ve kart tek faktördür; 6 haneli PIN
+   * uzayında her deneme HERHANGİ bir PIN'li hesabı açabilir. Süperadmin (`*`) ve
+   * yönetim izni taşıyan hesap (`admin:*`, `admin:settings`, `admin:users` —
+   * kullanıcı yönetimi kendine `admin:settings` verebildiği için aynı sınıf) bu
+   * yollarla giremez; kullanıcı adı + parola (+ uzakta TOTP) kullanır. Kapı
+   * D3 saha cihazı kapısına EKTİR; izinler `getEffectivePermissions`ten (tek kaynak).
+   */
+  private static async isFieldLoginForbidden(userId: string): Promise<boolean> {
+    const permissions = await this.getEffectivePermissions(userId);
+    return isPrivilegedForFieldLogin(permissions);
+  }
+
   private static assertFieldDevice(ctx: LoginContext | undefined, method: "pin" | "card"): void {
     const kind = ctx?.fieldDevice?.kind;
     if (!isDesktopClient(ctx?.clientType) && kind && kind !== "DESKTOP") return;
