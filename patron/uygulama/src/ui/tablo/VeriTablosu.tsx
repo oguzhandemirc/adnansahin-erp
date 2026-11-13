@@ -3,7 +3,7 @@
 // Sayılar sağa yaslı, tabular rakamlı. Başlığa dokunmak sıralamayı döndürür (artan → azalan → kapalı); sıralanamayan
 // sütunun başlığı düğme değildir. Süzme/sıralama SUNUCUDA (`useVeriTablosu`); burada yalnız çizim.
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, useRef, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Basilabilir } from "../hareket";
 import { BASMA } from "../hareket/sabitler";
@@ -36,11 +36,15 @@ export function useYatayEksen(): YatayEksen {
   return useMemo(() => ({ baslik, govde, x }), []);
 }
 
-function esle(e: YatayEksen, kaynak: "baslik" | "govde", ev: NativeSyntheticEvent<NativeScrollEvent>) {
+/**
+ * TEK YÖNLÜ eşleme: kaydırmayı yalnız gövde sürer, başlık onu izler. İki yönlü eşlemede iki ScrollView birbirinin
+ * gecikmeli olayını geri yansıtıp sağa-sola salınıyordu (sahada görüldü 2026-11-13); başlık bu yüzden elle kaydırılmaz.
+ */
+function esle(e: YatayEksen, ev: NativeSyntheticEvent<NativeScrollEvent>) {
   const yeni = ev.nativeEvent.contentOffset.x;
   if (Math.abs(yeni - e.x.current) < 0.5) return;
   e.x.current = yeni;
-  (kaynak === "baslik" ? e.govde : e.baslik).current?.scrollTo({ x: yeni, animated: false });
+  e.baslik.current?.scrollTo({ x: yeni, animated: false });
 }
 
 /** Yatay kipte satırın toplam genişliği (iki yan kenar dahil). */
@@ -49,14 +53,26 @@ export function toplamGenislik<R>(sutunlar: readonly SutunTanimi<R>[]): number {
 }
 
 function YatayKaydirici(p: { readonly eksen: YatayEksen; readonly kaynak: "baslik" | "govde"; readonly children: React.ReactNode; readonly testID: string }) {
+  const govde = p.kaynak === "govde";
+  const { eksen } = p;
+  // Gövde yeniden doğarsa 0'dan başlar: başlık da 0'a döner (yoksa eski konumda kalıp kayık görünür).
+  useEffect(() => {
+    if (!govde) return;
+    eksen.x.current = 0;
+    eksen.baslik.current?.scrollTo({ x: 0, animated: false });
+  }, [govde, eksen]);
   return (
     <ScrollView
-      ref={p.kaynak === "baslik" ? p.eksen.baslik : p.eksen.govde}
+      ref={govde ? eksen.govde : eksen.baslik}
       horizontal
       bounces={false}
-      showsHorizontalScrollIndicator={p.kaynak === "govde"}
+      overScrollMode="never"
+      scrollEnabled={govde}
+      showsHorizontalScrollIndicator={govde}
       scrollEventThrottle={16}
-      onScroll={(ev) => esle(p.eksen, p.kaynak, ev)}
+      onScroll={govde ? (ev) => esle(eksen, ev) : undefined}
+      // Başlık (yeniden) çizilince gövdenin bulunduğu yere oturur.
+      onContentSizeChange={govde ? undefined : () => eksen.baslik.current?.scrollTo({ x: eksen.x.current, animated: false })}
       testID={p.testID}
     >
       {p.children}
