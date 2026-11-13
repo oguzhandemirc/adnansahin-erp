@@ -5,7 +5,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { AccessibilityInfo, StyleSheet, Text } from "react-native";
 import { AcilisPerdesi, Basilabilir, BASMA, KADEME, KademeliGiris, SURE, SayiGecisi, TOPLAM_UST, gezinmeAyarlari, kademe, sure } from "../src/ui/hareket";
-import { BRAND_PRIMARY } from "../src/ui/tokens";
+import { BRAND_NAVY } from "../src/ui/tokens";
 
 const ROOT = join(__dirname, "..");
 function walk(dir: string): string[] {
@@ -52,8 +52,8 @@ describe("§1 sabitler tek kaynak ve sınırda", () => {
   });
   it("açılış perdesi rengi = yerel açılış ekranı rengi (app.json)", () => {
     const app = JSON.parse(readFileSync(join(ROOT, "app.json"), "utf8")) as { expo: { splash: { backgroundColor: string }; android: { splash: { backgroundColor: string } } } };
-    expect(app.expo.splash.backgroundColor.toUpperCase()).toBe(BRAND_PRIMARY);
-    expect(app.expo.android.splash.backgroundColor.toUpperCase()).toBe(BRAND_PRIMARY);
+    expect(app.expo.splash.backgroundColor.toUpperCase()).toBe(BRAND_NAVY);
+    expect(app.expo.android.splash.backgroundColor.toUpperCase()).toBe(BRAND_NAVY);
   });
 });
 
@@ -104,7 +104,7 @@ describe("§3 açılış perdesi", () => {
     jest.useFakeTimers();
     try {
       const r = await draw(<AcilisPerdesi hazir={false} />);
-      expect(StyleSheet.flatten(screen.getByTestId("acilis-perdesi").props.style).backgroundColor).toBe(BRAND_PRIMARY);
+      expect(StyleSheet.flatten(screen.getByTestId("acilis-perdesi").props.style).backgroundColor).toBe(BRAND_NAVY);
       act(() => jest.advanceTimersByTime(2_000));
       expect(screen.getByTestId("acilis-perdesi")).toBeTruthy();
       r.rerender(<AcilisPerdesi hazir />);

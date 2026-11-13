@@ -132,3 +132,18 @@ describe("§3 okunurluk — her bileşim", () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe("§4 TeksERP markası (varsayılan)", () => {
+  it("varsayılan tema TeksERP çivit + nötr zemin; açılış/giriş zemini TeksERP laciverti", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { BRAND_NAVY, BRAND_PRIMARY, ON_NAVY } = require("../src/ui/tokens") as typeof import("../src/ui/tokens");
+    expect(DEFAULT_APPEARANCE).toMatchObject({ preset: "tekserp", surface: "neutral", customColor: BRAND_PRIMARY });
+    expect(light.color.primary).toBe(BRAND_PRIMARY);
+    expect(BRAND_NAVY).toBe("#161C2B");
+    for (const fg of [ON_NAVY.text, ON_NAVY.textSecondary]) expect(contrast(fg, BRAND_NAVY)).toBeGreaterThanOrEqual(4.5);
+    const kimlik = JSON.parse(readFileSync(join(ROOT, "kimlik.json"), "utf8")) as { markaRengi: string };
+    expect(kimlik.markaRengi).toBe(BRAND_PRIMARY);
+    const app = JSON.parse(readFileSync(join(ROOT, "app.json"), "utf8")) as { expo: { android: { adaptiveIcon: { backgroundColor: string } } } };
+    expect(app.expo.android.adaptiveIcon.backgroundColor.toUpperCase()).toBe(BRAND_NAVY);
+  });
+});

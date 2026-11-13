@@ -54,7 +54,7 @@ describe("Görünüm ekranı", () => {
     fireEvent.press(screen.getByTestId("kareler-mono"));
     expect(seen!.tile.rose).toEqual(seen!.tile.primary);
     const final = seen!;
-    expect(JSON.parse(store.raw.get("patron.gorunum")!)).toEqual({ mode: "koyu", preset: "teal", customColor: "#6047E1", surface: "white", radius: "small", tiles: "mono" });
+    expect(JSON.parse(store.raw.get("patron.gorunum")!)).toEqual({ mode: "koyu", preset: "teal", customColor: "#4F46E5", surface: "white", radius: "small", tiles: "mono" });
     first.unmount();
 
     seen = null;

@@ -50,7 +50,7 @@ describe("profil: görünüm", () => {
     render(<ThemeProvider store={store}><Profile /><Probe /></ThemeProvider>);
     await act(async () => undefined);
     expect(screen.getByTestId("sema").props.children).toBe("dark");
-    expect(screen.getByText("Koyu · Turkuaz · Lavanta")).toBeTruthy();
+    expect(screen.getByText("Koyu · Turkuaz · Nötr")).toBeTruthy();
     fireEvent.press(screen.getByTestId("gorunum-git"));
     expect(mockRouter.push).toHaveBeenCalledWith("/gorunum");
   });

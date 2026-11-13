@@ -2,8 +2,9 @@
 // Tasarım belirteçleri — patron uygulamasının TEK renk/ölçü kaynağı.
 //
 // Ham hex YALNIZ bu dosyada yazılır; ekran ve bileşenler `useTokens()` ile okur (bekçi: `__tests__/tokens.test.ts`).
-// Değerler panelin bitmiş belirteçlerinin (Electron `index.css`) hex karşılığıdır; tema `buildTheme(scheme, görünüm)`
-// ile kurulur ve anahtarına göre önbelleklenir. Şartname: belgeler/MOBIL-TASARIM-SARTNAMESI.md §1–§2.
+// Değerler panelin bitmiş belirteçlerinin (Electron `index.css`) hex karşılığıdır; TeksERP marka renkleri (lacivert
+// zemin, çivit tema rengi, arduvaz griler) ana ürün patron uygulamasının paletinden elle taşındı. Tema
+// `buildTheme(scheme, görünüm)` ile kurulur ve anahtarına göre önbelleklenir. Şartname: belgeler/MOBIL-TASARIM-SARTNAMESI.md §1–§2.
 // Eski alan adları (`bg`, `surface`, `tint`, `domain`, `status`…) bir sürüm boyunca türetilmiş takma ad olarak kalır.
 // =============================================================================
 import type { TextStyle, ViewStyle } from "react-native";
@@ -21,14 +22,18 @@ export interface Appearance {
   readonly tiles: TileStyle;
 }
 
-/** Marka moru (varsayılan tema rengi; kimlik.json `markaRengi` ile aynı). */
-export const BRAND_PRIMARY = "#6047E1";
+/** TeksERP çivit mavisi (varsayılan tema rengi; kimlik.json `markaRengi` ile aynı; panel `--primary`). */
+export const BRAND_PRIMARY = "#4F46E5";
+/** TeksERP laciverti: giriş zemini, açılış ekranı ve uygulama simgesi zemini (app.json `splash.backgroundColor`). */
+export const BRAND_NAVY = "#161C2B";
+/** Lacivert zemin üstü metin tonları (zemin her temada koyu → değerler sabit; ≥ 11:1). */
+export const ON_NAVY = { text: "#F1F5F9", textSecondary: "#CBD5E1", border: "#2E3440" } as const;
 
 export const DEFAULT_APPEARANCE: Appearance = {
   mode: "sistem",
-  preset: "violet",
+  preset: "tekserp",
   customColor: BRAND_PRIMARY,
-  surface: "lavender",
+  surface: "neutral",
   radius: "large",
   tiles: "color",
 };
@@ -156,7 +161,7 @@ export type Tokens = Theme;
 // ----------------------------------------------------------------------------- ham değerler (§1.1–§1.3)
 
 const WHITE = "#FFFFFF";
-const INK = "#191929";
+const INK = "#0F172A";
 
 interface Base {
   readonly border: string;
@@ -176,13 +181,13 @@ interface Base {
 
 const BASE: Readonly<Record<Scheme, Base>> = {
   light: {
-    border: "#E3E2EE",
-    input: "#D5D4E2",
+    border: "#E2E8F0",
+    input: "#CBD5E1",
     text: INK,
-    textMuted: "#606076",
-    muted: "#F2F2F8",
-    secondary: "#EFEEF6",
-    pressed: "#F0EFFB",
+    textMuted: "#5B6576",
+    muted: "#F1F5F9",
+    secondary: "#F1F5F9",
+    pressed: "#EEF2FF",
     scrim: INK,
     success: { solid: "#157F4A", bg: "#E2F8EB", fg: "#0F673B" },
     warning: { solid: "#DB8D06", bg: "#FFF3D1", fg: "#834107" },
@@ -191,13 +196,13 @@ const BASE: Readonly<Record<Scheme, Base>> = {
     chart: ["#6047E1", "#1099C6", "#F59F0A", "#29A366", "#EA3E69", "#2B75EE"],
   },
   dark: {
-    border: "#2A2B3C",
-    input: "#3A3C50",
-    text: "#F0F0F5",
-    textMuted: "#A4A4B7",
-    muted: "#212330",
-    secondary: "#262736",
-    pressed: "#282640",
+    border: "#2E3440",
+    input: "#3A4150",
+    text: "#F1F5F9",
+    textMuted: "#94A3B8",
+    muted: "#252933",
+    secondary: "#252933",
+    pressed: "#2A2F3A",
     scrim: "#030307",
     success: { solid: "#2EB873", bg: "#183929", fg: "#8DE2B0" },
     warning: { solid: "#F6AF23", bg: "#3D2E14", fg: "#FBD06A" },
@@ -224,8 +229,8 @@ const SURFACES: Readonly<Record<SurfaceTone, Readonly<Record<Scheme, SurfaceSet>
     dark: { background: "#10111E", cardBorder: "#262736", chromeBorder: "#282939", band: "#151623", chrome: "#181928", tabstrip: "#0C0C16", card: "#181925" },
   },
   neutral: {
-    light: { background: "#EFF0F3", cardBorder: "#E0E2E6", chromeBorder: "#D5D7DD", band: "#F8F8FA", chrome: WHITE, tabstrip: "#E4E6EA", card: WHITE },
-    dark: { background: "#161618", cardBorder: "#2A2C32", chromeBorder: "#2D2F34", band: "#1A1B1E", chrome: "#1D1E21", tabstrip: "#101012", card: "#1E1F23" },
+    light: { background: "#F2F4F7", cardBorder: "#E2E8F0", chromeBorder: "#D5DBE3", band: "#F8FAFC", chrome: WHITE, tabstrip: "#E4E8EE", card: WHITE },
+    dark: { background: "#0B0D12", cardBorder: "#2E3440", chromeBorder: "#2E3440", band: "#14171D", chrome: "#1C1F26", tabstrip: "#07080C", card: "#1C1F26" },
   },
   white: {
     light: { background: WHITE, cardBorder: "#DEDDE9", chromeBorder: "#D5D4E2", band: "#F8F8FC", chrome: WHITE, tabstrip: "#EEEDF5", card: WHITE },
@@ -242,8 +247,12 @@ interface PresetSet {
 
 /** Hazır tema renkleri (§1.2): açık `primary · primary2 · soft · onSoft`; koyu `primary · soft · onSoft`. */
 const PRESETS: Readonly<Record<PresetKey, Readonly<Record<Scheme, PresetSet>>>> = {
+  tekserp: {
+    light: { primary: BRAND_PRIMARY, primary2: "#6366F1", primarySoft: "#E0E7FF", onPrimarySoft: BRAND_PRIMARY },
+    dark: { primary: "#818CF8", primary2: "#6366F1", primarySoft: "#2A2A5C", onPrimarySoft: "#A5B4FC" },
+  },
   violet: {
-    light: { primary: BRAND_PRIMARY, primary2: "#8A54E8", primarySoft: "#EFECFE", onPrimarySoft: "#3D29A3" },
+    light: { primary: "#6047E1", primary2: "#8A54E8", primarySoft: "#EFECFE", onPrimarySoft: "#3D29A3" },
     dark: { primary: "#6E52E0", primary2: "#8756DC", primarySoft: "#29224F", onPrimarySoft: "#BCAFFD" },
   },
   blue: {
@@ -279,7 +288,7 @@ export const PRESET_SWATCH: Readonly<Record<PresetKey, string>> = Object.fromEnt
 
 /** "Özel" renk modalında önerilen 12 renk. */
 export const CUSTOM_SUGGESTIONS: readonly string[] = [
-  "#6047E1", "#7C3AED", "#9333EA", "#C026D3", "#DB2777", "#E11D48",
+  "#4F46E5", "#7C3AED", "#9333EA", "#C026D3", "#DB2777", "#E11D48",
   "#DC2626", "#EA580C", "#CA8A04", "#16A34A", "#0D9488", "#0284C7",
 ];
 

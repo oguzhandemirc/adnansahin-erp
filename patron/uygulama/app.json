@@ -7,11 +7,11 @@
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
-    "backgroundColor": "#6047E1",
+    "backgroundColor": "#161C2B",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#6047E1"
+      "backgroundColor": "#161C2B"
     },
     "ios": {
       "bundleIdentifier": "com.etkiliyazilim.adnansahin.yonetim",
@@ -25,12 +25,12 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "monochromeImage": "./assets/adaptive-icon-monochrome.png",
-        "backgroundColor": "#6047E1"
+        "backgroundColor": "#161C2B"
       },
       "splash": {
         "image": "./assets/splash-icon.png",
         "resizeMode": "contain",
-        "backgroundColor": "#6047E1"
+        "backgroundColor": "#161C2B"
       },
       "permissions": [],
       "blockedPermissions": [

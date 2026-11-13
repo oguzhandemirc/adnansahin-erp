@@ -1,10 +1,10 @@
 // Açılış perdesi (expo-splash-screen KURULU DEĞİL): yerel açılış ekranı kapanınca JS ilk kareyi çizerken beyaz/zemin
-// parlaması olmasın diye aynı renkte (`BRAND_PRIMARY` = app.json `splash.backgroundColor`) ve aynı görselle perde
+// parlaması olmasın diye aynı renkte (`BRAND_NAVY` = app.json `splash.backgroundColor`, TeksERP laciverti) ve aynı görselle perde
 // durur; tema tercihi + oturum okununca perde solar, ilk içerik altından yumuşakça belirir. Azaltılmışta anında kalkar.
 import { useEffect, useState } from "react";
 import { Image, StyleSheet } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { BRAND_PRIMARY } from "../tokens";
+import { BRAND_NAVY } from "../tokens";
 import { useHareketAzalt } from "./azalt";
 import { EGRI, SURE } from "./sabitler";
 
@@ -37,7 +37,7 @@ export function AcilisPerdesi({ hazir }: { readonly hazir: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  perde: { backgroundColor: BRAND_PRIMARY, alignItems: "center", justifyContent: "center" },
+  perde: { backgroundColor: BRAND_NAVY, alignItems: "center", justifyContent: "center" },
   // Yerel açılış ekranı görseli tüm ekrana "aspect fit" serer; perde de aynısını yapar (logo boyu sıçramasın).
   gorsel: { width: "100%", height: "100%" },
 });

@@ -1,5 +1,5 @@
-// Giriş kabuğu: her temada lacivert zemin + uygulama adı (`kimlik.json`) + opak
-// form kartı. Lacivert zemindeki metin `onNavy` token'larındandır (zemin her temada koyu).
+// Giriş kabuğu: her temada TeksERP laciverti zemin (`BRAND_NAVY`) + TeksERP logosu + uygulama adı (`kimlik.json`) +
+// opak form kartı. Lacivert zemindeki metin `ON_NAVY` token'larındandır (zemin her temada koyu).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
@@ -8,9 +8,9 @@ import Animated from "react-native-reanimated";
 import { girisAnimasyonu, useHareketAzalt } from "../hareket";
 import { UYGULAMA_ADI } from "../../lib/kimlik";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, space, typography } from "../tokens";
+import { BRAND_NAVY, FONT_SCALE, ON_NAVY, space, typography } from "../tokens";
 
-/** Giriş ekranındaki marka işareti = uygulama simgesi (tek görsel kaynağı `assets/icon.png`). */
+/** Giriş ekranındaki marka işareti = TeksERP logosu, uygulama simgesiyle aynı görsel (tek kaynak `assets/icon.png`). */
 const UYGULAMA_LOGOSU = require("../../../assets/icon.png") as number;
 
 export function AuthShell({ title, subtitle, step, children, footer }: {
@@ -29,8 +29,8 @@ export function AuthShell({ title, subtitle, step, children, footer }: {
   // Parola ↔ doğrulama adımı: zemin ve marka sabit kalır, yalnız kart (başlığa anahtarlı) hafif aşağıdan solar.
   const anim = (sira: number) => (azalt || Platform.OS === "web" ? undefined : girisAnimasyonu(sira, false));
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[s.flex, { backgroundColor: t.color.primary }]}>
-      {/* Zemin her temada koyu mor: durum çubuğu içeriği açık (son takılan StatusBar geçerlidir). */}
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[s.flex, { backgroundColor: BRAND_NAVY }]}>
+      {/* Zemin her temada TeksERP laciverti: durum çubuğu içeriği açık (son takılan StatusBar geçerlidir). */}
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={[s.scroll, { paddingTop: Math.max(space.xxl, Math.round(height * 0.09)) }]} keyboardShouldPersistTaps="handled">
         <View style={s.brand}>
@@ -64,10 +64,10 @@ const useStyles = makeStyles((t) => ({
   scroll: { flexGrow: 1, justifyContent: "flex-start" as const, padding: space.l, paddingVertical: space.xxl, width: "100%" as const, maxWidth: 480, alignSelf: "center" as const },
   brand: { alignItems: "center" as const, marginBottom: space.xl },
   // Uygulama simgesinin kendisi (mağaza/ana ekran simgesiyle aynı görsel); kenarı zeminden ince açık çizgiyle ayrılır.
-  mark: { width: 84, height: 84, borderRadius: 20, overflow: "hidden" as const, marginBottom: space.l, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)" },
+  mark: { width: 84, height: 84, borderRadius: 20, overflow: "hidden" as const, marginBottom: space.l, borderWidth: 1, borderColor: ON_NAVY.border },
   logo: { width: "100%" as const, height: "100%" as const },
-  brandName: { ...typography.largeTitle, fontSize: 30, lineHeight: 36, color: t.color.onPrimary, textAlign: "center" as const },
-  brandTag: { ...typography.subhead, color: t.color.onPrimary, marginTop: space.xs, textAlign: "center" as const },
+  brandName: { ...typography.largeTitle, fontSize: 30, lineHeight: 36, color: ON_NAVY.text, textAlign: "center" as const },
+  brandTag: { ...typography.subhead, color: ON_NAVY.textSecondary, marginTop: space.xs, textAlign: "center" as const },
   card: { borderRadius: t.radius.sheet, padding: space.xl, borderWidth: 1, borderColor: t.scheme === "dark" ? t.separator : t.surface, ...t.floatShadow },
   steps: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6, marginBottom: space.m },
   dot: { width: 8, height: 8, borderRadius: 4 },
@@ -77,5 +77,5 @@ const useStyles = makeStyles((t) => ({
   subtitle: { ...typography.subhead, color: t.textSecondary, marginTop: space.xs },
   body: { marginTop: space.l },
   footer: { marginTop: space.l },
-  footerText: { ...typography.footnote, color: t.color.onPrimary, textAlign: "center" as const, paddingHorizontal: space.m },
+  footerText: { ...typography.footnote, color: ON_NAVY.textSecondary, textAlign: "center" as const, paddingHorizontal: space.m },
 }));

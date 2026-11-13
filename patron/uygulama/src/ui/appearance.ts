@@ -5,7 +5,7 @@ import { DEFAULT_APPEARANCE } from "./tokens";
 
 export { DEFAULT_APPEARANCE };
 
-export const PRESET_KEYS = ["violet", "blue", "teal", "green", "orange", "rose", "graphite"] as const;
+export const PRESET_KEYS = ["tekserp", "violet", "blue", "teal", "green", "orange", "rose", "graphite"] as const;
 export type PresetKey = (typeof PRESET_KEYS)[number];
 export type ThemePreset = PresetKey | "custom";
 export const MODE_PREFS = ["sistem", "acik", "koyu"] as const;
@@ -25,6 +25,7 @@ export const APPEARANCE_KEY = "patron.gorunum";
 export const LEGACY_THEME_KEY = "patron.tema";
 
 export const PRESET_LABEL: Readonly<Record<ThemePreset, string>> = {
+  tekserp: "TeksERP",
   violet: "Mor",
   blue: "Mavi",
   teal: "Turkuaz",

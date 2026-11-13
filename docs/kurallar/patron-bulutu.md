@@ -77,6 +77,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Bulut kilidi, hesabın fabrikanın henüz almadığı (`claim_count = 0`) BEKLIYOR gelen kutusu mesajlarını aynı tx'te makbuzlu RET `YAZAR_YETKISIZ` ile kapatır; kilitle yarışan yeni yazım yazarın etken satırını kilitleyerek okur, kilitliyse 403 alır. [bekçi: patron/sunucu test_hesap_acil_cli]
 - Uygulamanın giriş hata cümleleri tek kaynaktandır (`patron/uygulama/src/lib/giris-hata.ts`): her 401 adım başına tek cümledir (hesabın varlığı sızmaz), 503 `FABRIKA_BAGLANTISI_YOK` fabrikaya ulaşılamadığını söyler. [bekçi: patron/uygulama __tests__/iki-adimli-dogrulama.test.tsx]
 - Uygulamanın uç tablosu sunucunun rota tablosuyla birebirdir; sökülen uçlar için geçici liste taşınmaz. [bekçi: patron/uygulama __tests__/mirror.test.ts]
+- Uygulamanın simgesi, açılış ve giriş ekranı TeksERP logosu + laciverti (`BRAND_NAVY` #161C2B), varsayılan tema TeksERP çivit (`BRAND_PRIMARY` #4F46E5) + nötr zemin; görseller ana ürün patron uygulamasından elle kopyalanır, ad Adnan'a özeldir (kullanıcı kararı 2026-11-13). [bekçi: patron/uygulama __tests__/tokens.test.ts §4 · hareket.test.tsx]
 - Giriş sözleşmesi kırıcı değişti, geçiş serttir: sıra VDS sıfırdan (bulut) → backend paketi (eşitleme kapalı) → panelden `patron:giris` ataması → eşitleme açık → uygulama; eski uygulama yeni bulutta giremez. [inceleme]
 
 ### Kullanıcı listesi (fabrika → bulut)
