@@ -82,34 +82,6 @@ export const STATION_TYPE: Readonly<Record<string, string>> = {
   EXTERNAL: "Fason",
 };
 
-/** Çek/senet yönü (`ChequeKind`). */
-export const CHEQUE_KIND: Readonly<Record<string, string>> = {
-  RECEIVED: "Alınan çek/senet",
-  ISSUED: "Verilen çek/senet",
-};
-
-export const CHEQUE_KIND_SHORT: Readonly<Record<string, string>> = {
-  RECEIVED: "Alınan",
-  ISSUED: "Verilen",
-};
-
-/** Çek vade kovası (`CHEQUE_DUE_BUCKETS`); SOON = 7 gün içinde. */
-export const CHEQUE_BUCKET: Readonly<Record<string, StatusEntry>> = {
-  OVERDUE: { label: "Vadesi geçmiş", tone: "kritik" },
-  SOON: { label: "7 gün içinde", tone: "uyari" },
-  MONTH: { label: "Bu ay", tone: "bilgi" },
-  LATER: { label: "Daha sonra", tone: "bilgi" },
-  NO_DUE: { label: "Vadesiz", tone: "bilgi" },
-};
-
-/** Gece yedeği hükmü (`saglik.yedek.hukum`). */
-export const BACKUP_VERDICT: Readonly<Record<string, StatusEntry>> = {
-  ok: { label: "Gece yedeği alındı", tone: "iyi" },
-  uyari: { label: "Gece yedeği gecikti", tone: "uyari" },
-  kritik: { label: "Gece yedeği alınamadı", tone: "kritik" },
-  yapilandirilmamis: { label: "Gece yedeği kurulmamış", tone: "bilgi" },
-};
-
 /** Stok yaş kovası (`stok-karnesi.yasKovalari[].anahtar`) → ton; etiket fabrikadan gelir. */
 export const STOCK_AGE_TONE: Readonly<Record<string, StatusEntry["tone"]>> = {
   "0-7": "iyi",

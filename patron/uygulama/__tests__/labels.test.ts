@@ -44,8 +44,8 @@ describe("§1 izin sözlüğü ↔ bulut kataloğu", () => {
     expect(Object.keys(ACCOUNT_TEMPLATE).sort()).toEqual([...keys].sort());
   });
   it("gruplama: grup sırası sabit, boş grup düşer, kod kaybolmaz", () => {
-    const g = groupPermissions(["bulut:hesap:yonet", "bulut:kasa:oku", "bulut:siparis:oku"]);
-    expect(g.map((x) => x.ad)).toEqual(["Sipariş", "Finans", "Hesap yönetimi"]);
+    const g = groupPermissions(["bulut:hesap:yonet", "bulut:rapor:oku", "bulut:siparis:oku"]);
+    expect(g.map((x) => x.ad)).toEqual(["Sipariş", "Rapor", "Hesap yönetimi"]);
     expect(groupPermissions(OZET.CLOUD_PERMISSIONS).flatMap((x) => x.codes).sort()).toEqual([...OZET.CLOUD_PERMISSIONS].sort());
   });
 });

@@ -12,7 +12,7 @@
 import { randomUUID } from "node:crypto";
 import { ROLE_TEMPLATES } from "../src/catalog/permissions";
 import { LIST_SEARCH, LIST_SORT, VIEW_PREF_MAX_BYTES, type FacilityStatus, type ViewPreference } from "../src/wire/api";
-import { KATALOG_DISI_FINANS, fabrikaDosyasi } from "./lib/fabrika-karsiligi";
+import { fabrikaDosyasi } from "./lib/fabrika-karsiligi";
 import { api, girdi, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
 
 type Liste = { status: number; ids: string[]; kayit: Record<string, unknown>[]; sonraki: string | null };
@@ -170,8 +170,7 @@ async function beyan(o: Ortam, h: TestHesabi): Promise<void> {
     kontrol("§5a tarayıcı körleşmedi (siparis.acikMiktar bulundu)", !!kat.get("siparis")?.has("acikMiktar"));
     const eksik = Object.entries(LIST_SORT).flatMap(([p, alanlar]) => Object.keys(alanlar).filter((a) => !kat.get(p)?.has(a)).map((a) => `${p}.${a}`));
     kontrol("§5b ⭐ her sıralama alanı fabrika kataloğunda", eksik.length === 0, eksik.join(", ") || "temiz");
-    // Finans projeksiyonları bu repoda katalog dışı (KATALOG_DISI_FINANS): beyanlı ama katalogda yok olmaları beklenir.
-    const suzEksik = Object.entries(LIST_SEARCH).filter(([p]) => !KATALOG_DISI_FINANS.has(p)).flatMap(([p, sp]) =>
+    const suzEksik = Object.entries(LIST_SEARCH).flatMap(([p, sp]) =>
       [...(sp.suzgec?.secenekler ?? []), ...(sp.ekSuzgecler ?? []).flatMap((g) => g.secenekler)].filter((x) => !kat.get(p)?.has(x.alan)).map((x) => `${p}.${x.alan}`));
     kontrol("§5c her süzgeç alanı fabrika kataloğunda", suzEksik.length === 0, suzEksik.join(", ") || "temiz");
   }

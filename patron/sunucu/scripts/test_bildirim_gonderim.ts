@@ -1,6 +1,6 @@
 // =============================================================================
 // BİLDİRİM GÖNDERİMİ BEKÇİSİ (B5) — negatif + pozitif:
-//   §1 katalog kuralı: finans türü finans izni ister · tür kaynağın iznini kapsar (sentetik ihlal kırmızı)
+//   §1 katalog kuralı: tür kaynağın iznini kapsar · kaynak projeksiyon katalogda olmalı (sentetik ihlal kırmızı)
 //   §2 kip: varsayılan `kapali` (bugünkü davranış, çalışma zamanı YOK) · `gercek` VAPID konusu olmadan açılmaz
 //   §3 VAPID sırrı: dosya 0600 · JSON/metin/inspect gizli anahtarı taşımaz · taşıyıcı hatası gizli anahtarı
 //      içerse de günlüğe, DB'ye, API yanıtına DÜŞMEZ · yeniden yüklemede üstüne yazılmaz
@@ -29,8 +29,8 @@ const FCM = (id: string) => JSON.stringify({ endpoint: `https://fcm.googleapis.c
 function katalogVeKip(): void {
   console.log("\n§1 katalog");
   kontrol("§1a gerçek katalog tutarlı", catalogProblems().length === 0, catalogProblems().join("; ") || "temiz");
-  const finansIzinsiz = catalogProblems({ ...KIND_RULES, "cek-vadesi": { ...KIND_RULES["cek-vadesi"], source: null, permissions: ["bulut:ozet:oku"] } });
-  kontrol("§1b ⭐ finans türü finans izni istemiyorsa KIRMIZI", finansIzinsiz.some((p) => p.includes("finans türü")), finansIzinsiz.join("; "));
+  const kaynaksiz = catalogProblems({ ...KIND_RULES, "stok-esigi": { ...KIND_RULES["stok-esigi"], source: "ozet-finans" } });
+  kontrol("§1b ⭐ kaynak projeksiyon katalogda yoksa KIRMIZI", kaynaksiz.some((p) => p.includes("kaynak projeksiyon yok")), kaynaksiz.join("; "));
   const kaynakKapsamaz = catalogProblems({ ...KIND_RULES, "stok-esigi": { ...KIND_RULES["stok-esigi"], permissions: ["bulut:ozet:oku"] } });
   kontrol("§1c ⭐ tür kaynağın iznini kapsamıyorsa KIRMIZI", kaynakKapsamaz.some((p) => p.includes("kapsanmıyor")), kaynakKapsamaz.join("; "));
 

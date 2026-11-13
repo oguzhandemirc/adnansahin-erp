@@ -2,7 +2,7 @@
 // dökümünü JSON ya da CSV alır. Hizmet açıkken ve bittikten sonraki 90 gün (SALT_OKUNUR) açıktır; KAPALI'da oturum
 // zaten açılmaz. Kurallar:
 //   · Projeksiyonlar hesabın OKUYABİLDİĞİ kadardır: tx `app.projeksiyonlar`ı oturumla aynı açar (RLS), izinsiz alt
-//     satır (`.finans`/`.kisisel`) dökümde de yoktur; yöneticiye ayrı bir kapı YOK.
+//     satır (`.kisisel`) dökümde de yoktur; yöneticiye ayrı bir kapı YOK.
 //   · Kolonlar saklı satırın kendi alanlarıdır (fabrika kataloğunun opt-in kolonları); bulut kolon EKLEMEZ.
 //   · Bulutta doğan veri sırsız görünümle: hesaplar (parola/TOTP/davet yok), gelen kutusu, hesap denetimi, destek
 //     erişim kaydı (Ek-6/B §3.3: Lisans Alan kendi tesisine ait erişim kayıtlarını görür).
@@ -69,17 +69,16 @@ async function jsonKeys(ctx: CloudContext, s: SessionContext, projection: string
 
 function recordDataset(ctx: CloudContext, s: SessionContext, def: ProjectionDef): Dataset {
   const sub = visibleSubRows(s, def);
-  let layout: { root: string[]; finans: string[]; kisisel: string[] } | null = null;
+  let layout: { root: string[]; kisisel: string[] } | null = null;
   return {
     name: def.name,
     kind: "KAYIT",
     async columns() {
       layout = {
         root: await jsonKeys(ctx, s, def.name),
-        finans: sub.finans ? await jsonKeys(ctx, s, `${def.name}.finans`) : [],
         kisisel: sub.kisisel ? await jsonKeys(ctx, s, `${def.name}.kisisel`) : [],
       };
-      return ["id", ...layout.root, ...layout.finans.map((k) => `finans.${k}`), ...layout.kisisel.map((k) => `kisisel.${k}`), "surum"];
+      return ["id", ...layout.root, ...layout.kisisel.map((k) => `kisisel.${k}`), "surum"];
     },
     async *pages() {
       let cursor: Prisma.Sql = Prisma.empty;
@@ -97,12 +96,11 @@ function recordDataset(ctx: CloudContext, s: SessionContext, def: ProjectionDef)
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
-function flatCells(r: Row, layout: { root: string[]; finans: string[]; kisisel: string[] } | null): Record<string, unknown> {
+function flatCells(r: Row, layout: { root: string[]; kisisel: string[] } | null): Record<string, unknown> {
   const out: Record<string, unknown> = { id: r.record_id, surum: r.version_at.toISOString() };
   if (!layout) return out;
   const data = obj(r.data);
   for (const k of layout.root) out[k] = data[k];
-  for (const k of layout.finans) out[`finans.${k}`] = obj(r.finans)[k];
   for (const k of layout.kisisel) out[`kisisel.${k}`] = obj(r.kisisel)[k];
   return out;
 }

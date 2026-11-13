@@ -127,7 +127,7 @@ export async function getReportRequest(ctx: CloudContext, s: SessionContext, id:
   const allowed = verdict.ok && hasAll(s, requiredReportPermissions(verdict.permission, (await catalogEntry(ctx, s.tesisId, out.r.reportKey))?.izin));
   return {
     ...requestView(out.r),
-    sonuc: allowed && verdict.ok && out.result ? { veri: stripMoneySideFigures(out.result.data, verdict.permission, s.permissions), hesaplandi: out.result.computedAt.toISOString(), kaynakUfuk: out.result.sourceHorizon?.toISOString() ?? null } : null,
+    sonuc: allowed && verdict.ok && out.result ? { veri: stripMoneySideFigures(out.result.data), hesaplandi: out.result.computedAt.toISOString(), kaynakUfuk: out.result.sourceHorizon?.toISOString() ?? null } : null,
   };
 }
 

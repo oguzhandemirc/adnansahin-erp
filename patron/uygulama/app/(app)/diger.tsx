@@ -1,6 +1,6 @@
 // ☰ menü (pano başlığından; sekme değil, yol `/diger` sabit): üstte hesap kartı (→ Profil), sonra sekmeye sığmayan bölümler gruplu, tam genişlik TEK satırlık
-// liste (simge karesi + ad + ok). İzinsiz bölüm/grup çizilmez (`moduleVisible`; ör. finans izni yoksa Finans satırı da
-// yok). Gönderdiklerim satırında bekleyen sayısı YOK (kayıt onay beklemez); yalnız okunmamış RET sayısı rozetle.
+// liste (simge karesi + ad + ok). İzinsiz bölüm/grup çizilmez (`moduleVisible`; ör. rapor izni yoksa Raporlar satırı
+// da yok). Gönderdiklerim satırında bekleyen sayısı YOK (kayıt onay beklemez); yalnız okunmamış RET sayısı rozetle.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { Text, View } from "react-native";

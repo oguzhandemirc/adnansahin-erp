@@ -1,15 +1,16 @@
 // =============================================================================
 // UZLAŞTIRMA KÜMESİ BEKÇİSİ (sözleşme §4.4, S44–S46) — bulut, fabrikayla AYNI kuralla sayar (tel sözleşmesi
 // `RECONCILE_PARENTS` başlığı); fabrika tarafı burada o kuralla elle hesaplanır, saat ENJEKTE:
-//   §1 ⭐ kalem ebeveyn kuralı: vadesi ufuktan eski çekin yeni hareketi · budanan faturanın kalemi — budama öncesi,
-//      gün 1 budaması sonrası ve gün 2 (eski çekte etkinlik + fatura yaşlanması) uzlaştırmalarında TAM YOK
-//   §2 ⭐ ebeveynli kalemin saklama ufku yanıtta (fatura-kalemi dahil — yoksa fabrika onu hiç süzemez)
+//   §1 ⭐ kalem ebeveyn kuralı: ufuktan eski siparişin yeni kalemi · yaşlanan siparişin kalemi — budama öncesi,
+//      gün 1 budaması sonrası ve gün 2 (eski siparişte yeni kalem + sipariş yaşlanması) uzlaştırmalarında TAM YOK
+//   §2 ⭐ ebeveynli kalemin (siparis-kalemi) saklama ufku yanıtta (yoksa fabrika onu hiç süzemez)
 //   §3 ⭐ bekleyen: fabrikanın bekleyen listesindeki satır bulut kümesinden dışlanır; listesiz aynı girdi TAM ister;
 //      paket toplam tavanı aşılırsa 400
 //   §4 ⭐ D4: `ISTEK_ZAMAN` yanıtı `details.sunucuSaati` taşır; o saate göre yeniden imzalanan istek geçer
 // NEGATİF SONDA (dosya dışı, cp + shasum ile geri): P1 uzlaştırmanın ebeveyn süzgeci düştü → §1 · P2 ufuk yalnız
 //   `retentionFields`li projeksiyona → §2 · P3 bekleyen dışlaması düştü → §3 · P4 `sunucuSaati` eki düştü → §4
-// Ölçüm (eski kod): gün 1 budamasından sonra cek-hareketi + fatura-kalemi TAM; TAM'dan sonra gün 2'de yine ikisi.
+// Ölçüm (eski kod, finans çiftleriyle): gün 1 budamasından sonra kalem projeksiyonları TAM; TAM'dan sonra gün 2'de yine.
+// Adnan'da ebeveynli tek çift `siparis-kalemi → siparis` (çek/fatura/teklif kesildi, D3).
 // Koşum: npx tsx scripts/test_uzlastirma_kumesi.ts
 // =============================================================================
 import { createHash, randomUUID } from "node:crypto";
@@ -50,42 +51,35 @@ async function ebeveynBolumu(o: Ortam, t: TestKurulumu): Promise<void> {
   console.log("\n§1–§2 kalem ebeveyn kuralı + saklama ufku");
   const f = new Fabrika(o, t);
   const s = o.saat.simdi();
-  const [C, C2, E1, E2, E3, F, F2, K, K2] = Array.from({ length: 9 }, (): string => randomUUID());
-  const cek = new Map<string, number>([[C!, s - 150 * GUN], [C2!, s + 30 * GUN]]);
-  const olaylar: Array<{ id: string; cek: string; tarih: number }> = [{ id: E1, cek: C, tarih: s - GUN }, { id: E3, cek: C2, tarih: s - GUN }];
-  const fatura = new Map<string, number>([[F!, s - 150 * GUN], [F2!, s - 91 * GUN]]);
-  const kalemler = [{ id: K, f: F }, { id: K2, f: F2 }];
+  const [S1, S2, S3, K1, K2, K3, K4] = Array.from({ length: 7 }, (): string => randomUUID());
+  const siparis = new Map<string, number>([[S1!, s - 150 * GUN], [S2!, s - 91 * GUN], [S3!, s - GUN]]);
+  const kalemler: Array<{ id: string; sip: string; tarih: number }> = [{ id: K1!, sip: S1!, tarih: s - GUN }, { id: K2!, sip: S2!, tarih: s - GUN }, { id: K3!, sip: S3!, tarih: s - GUN }];
   // Fabrikanın kuralı (sözleşme): kalem ∈ küme ⇔ kendi tarihi ∧ üst belgenin tarihi ufuk içinde.
-  const ic = (ms: number, p: string) => !f.ufuk[p] || ms >= Date.parse(f.ufuk[p]!);
-  const kume = () => [
-    ["cek-hareketi", olaylar.filter((e) => ic(e.tarih, "cek-hareketi") && ic(cek.get(e.cek)!, "cek-hareketi")).map((e) => e.id)],
-    ["fatura-kalemi", kalemler.filter((l) => ic(fatura.get(l.f)!, "fatura-kalemi")).map((l) => l.id)],
-  ] as Array<[string, string[]]>;
+  const ic = (ms: number) => !f.ufuk["siparis-kalemi"] || ms >= Date.parse(f.ufuk["siparis-kalemi"]!);
+  const kume = () => [["siparis-kalemi", kalemler.filter((l) => ic(l.tarih) && ic(siparis.get(l.sip)!)).map((l) => l.id)]] as Array<[string, string[]]>;
   const r0 = await f.gonder({
     kayitlar: [
-      ["cek-senet", [...cek].map(([id, vade]) => ({ id, vade: iso(vade), olusturulma: iso(s - 160 * GUN) }))],
-      ["cek-hareketi", olaylar.map((e) => ({ id: e.id, cekId: e.cek, tarih: iso(e.tarih) }))],
-      ["fatura", [...fatura].map(([id, tarih]) => ({ id, tarih: iso(tarih) }))],
-      ["fatura-kalemi", kalemler.map((l) => ({ id: l.id, faturaId: l.f }))],
+      ["siparis", [...siparis].map(([id, t]) => ({ id, siparisTarihi: iso(t) }))],
+      ["siparis-kalemi", kalemler.map((l) => ({ id: l.id, siparisId: l.sip, olusturulma: iso(l.tarih) }))],
     ],
   });
   const u = Object.keys(f.ufuk);
-  kontrol("§2a ⭐ ebeveynli kalemlerin saklama ufku yanıtta (fatura-kalemi · siparis-kalemi · cek-hareketi)", r0.status === 200 && ["fatura-kalemi", "siparis-kalemi", "cek-hareketi"].every((p) => u.includes(p)), u.filter((p) => p.includes("kalem") || p.includes("hareketi")).join(","));
+  kontrol("§2a ⭐ ebeveynli kalemin saklama ufku yanıtta (siparis-kalemi)", r0.status === 200 && u.includes("siparis-kalemi"), u.join(","));
   const turlar: string[][] = [];
-  const kalem0 = kume()[1]![1];
+  const kalem0 = kume()[0]![1];
   turlar.push((await f.gonder({ uzl: kume() })).tam);
   o.saat.ilerlet(GUN);
   await runDaily(o.ctx, o.saat.simdi());
   turlar.push((await f.gonder({ uzl: kume() })).tam);
   o.saat.ilerlet(GUN);
-  olaylar.push({ id: E2, cek: C, tarih: o.saat.simdi() - 60_000 });
-  await f.gonder({ kayitlar: [["cek-senet", [{ id: C, vade: iso(cek.get(C)!), olusturulma: iso(s - 160 * GUN) }]], ["cek-hareketi", [{ id: E2, cekId: C, tarih: iso(olaylar[2]!.tarih) }]]] });
+  kalemler.push({ id: K4!, sip: S1!, tarih: o.saat.simdi() - 60_000 });
+  await f.gonder({ kayitlar: [["siparis", [{ id: S1, siparisTarihi: iso(siparis.get(S1!)!) }]], ["siparis-kalemi", [{ id: K4, siparisId: S1, olusturulma: iso(kalemler[3]!.tarih) }]]] });
   await runDaily(o.ctx, o.saat.simdi());
   turlar.push((await f.gonder({ uzl: kume() })).tam);
   kontrol("§1a ⭐ budama öncesi uzlaştırma eşit", turlar[0]!.length === 0, turlar[0]!.join(",") || "eşit");
-  kontrol("§1b ⭐ gün 1 budamasından sonra TAM YOK (üst çek/fatura budandı, kalem iki uçta da dışarıda)", turlar[1]!.length === 0, turlar[1]!.join(",") || "eşit");
-  kontrol("§1c ⭐ gün 2: eski çekte yeni hareket + faturanın yaşlanması → yine TAM YOK", turlar[2]!.length === 0, turlar[2]!.join(",") || "eşit");
-  kontrol("§1d fikstür: güncel çekin hareketi kümede kaldı; fatura gün 2'de yaşlandı (K2 gün 0'da vardı, gün 2'de yok)", kume()[0]![1].includes(E3) && kalem0.includes(K2) && !kume()[1]![1].includes(K2));
+  kontrol("§1b ⭐ gün 1 budamasından sonra TAM YOK (eski sipariş budandı, kalemi iki uçta da dışarıda)", turlar[1]!.length === 0, turlar[1]!.join(",") || "eşit");
+  kontrol("§1c ⭐ gün 2: eski siparişte yeni kalem + siparişin yaşlanması → yine TAM YOK", turlar[2]!.length === 0, turlar[2]!.join(",") || "eşit");
+  kontrol("§1d fikstür: güncel siparişin kalemi kümede kaldı; S2 gün 2'de yaşlandı (K2 gün 0'da vardı, gün 2'de yok)", kume()[0]![1].includes(K3!) && kalem0.includes(K2!) && !kume()[0]![1].includes(K2!) && !kalem0.includes(K1!));
 }
 
 async function bekleyenBolumu(o: Ortam, t: TestKurulumu): Promise<void> {

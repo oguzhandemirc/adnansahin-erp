@@ -1,6 +1,5 @@
-// PB1 — fason · emanet anlıkları: §1 Stok › müşteri malı (karne emanet satırı + müşteri başına bakiye) · §2 Üretim ›
-// fasondaki işler (F10 kokpit özeti) · §3 Finans › Fatura üstünde hizmet geliri (dönem segmenti) · §4 eski fabrika
-// (anlık 404 / alan yok) boş durum, çökme yok · §5 görünüm hesap yapmaz (rakam fabrikanınki, yalnız biçim).
+// Fason anlığı: §1 Stok emanet bölümü çizmez (Adnan'da emanet modülü kapalı, anlık bulutta yok) · §2 Üretim ›
+// fasondaki işler (F10 kokpit özeti) · §4 pano stok satırı yalnız fabrikanın sayısı.
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import type React from "react";
 
@@ -26,24 +25,16 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 const Stock = (require("../app/(app)/(tabs)/stok") as { default: () => React.ReactElement }).default;
 const Subcontract = (require("../app/(app)/fason/index") as { default: () => React.ReactElement }).default;
 const Firm = (require("../app/(app)/fason/[firmaId]") as { default: () => React.ReactElement }).default;
-const Finance = (require("../app/(app)/finans") as { default: () => React.ReactElement }).default;
-const view = require("../src/lib/fason-summary") as typeof import("../src/lib/fason-summary");
 const { areaSummary } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
 const { ApiError } = require("../src/api/client") as typeof import("../src/api/client");
 
 const C1 = "11111111-1111-4111-8111-111111111111";
 const F1 = "22222222-2222-4222-8222-222222222222";
-const H1 = "33333333-3333-4333-8333-333333333333";
 const KARNE = {
   ozet: {
     bitmisMiktar: 5000, bitmisAdet: 50, hamMiktar: 2000, hamAdet: 20, yariMamulMiktar: 0, yariMamulAdet: 0, yasliMiktar: 0, oluMiktar: 0, oluStokGun: 90, yassizAdet: 0, yassizMiktar: 0,
-    emanet: { bitmisMiktar: 300, bitmisAdet: 3, hamMiktar: 1240.5, hamAdet: 12, yariMamulMiktar: 0, yariMamulAdet: 0 },
   },
   yasKovalari: [], urunler: [],
-};
-const EMANET = {
-  toplam: { topAdet: 15, topMiktar: 1540.5, iplikKg: "120.000", leventAdet: 2 },
-  cariler: [{ cariKartId: C1, etiket: "Akın Tekstil", topAdet: 15, topMiktar: 1540.5, iplikKg: "120.000", leventAdet: 2 }],
 };
 const FASON = {
   acikSevk: 7, kalanMiktar: "3456.000", acikTop: 30, boyahanedeTop: 22, isEmriSayisi: 4, musteriSayisi: 3,
@@ -55,9 +46,7 @@ const FASON = {
     urunler: [{ urunId: null, urunAdi: "Saten 280", renkId: null, renkAdi: "Krem", top: 22, metre: 2000 }],
   }],
 };
-const blok = (toplamTl: string) => ({ toplamTl, kalemler: toplamTl === "0.00" ? [] : [{ hizmetId: H1, etiket: "Kurşun 30 gr", miktar: "1500.000", birim: "m", tutarTl: toplamTl }] });
-const GELIR = { bugun: blok("0.00"), buAy: blok("45000.00"), gecenAy: blok("38000.50"), son30Gun: blok("52000.00") };
-const DATA: Record<string, unknown> = { "stok-karnesi": KARNE, "emanet-bakiye": EMANET, "fason-acik": FASON, "hizmet-geliri": GELIR };
+const DATA: Record<string, unknown> = { "stok-karnesi": KARNE, "fason-acik": FASON };
 
 async function flush() {
   await act(async () => undefined);
@@ -78,27 +67,14 @@ beforeEach(() => {
   mockSession.permissions = [];
 });
 
-describe("§1 Stok › müşteri malı", () => {
-  it("karnenin emanet satırı + müşteri başına bakiye aynen", async () => {
+describe("§1 Stok › emanet bölümü yok", () => {
+  it("emanet anlığı istenmez, bölüm çizilmez, çökme yok", async () => {
     mockSession.permissions = ["bulut:stok:oku"];
-    render(<Stock />);
-    await flush();
-    expect(screen.getByTestId("bolum-emanet")).toBeTruthy();
-    expect(screen.getByText("1.241 m · 12 top")).toBeTruthy();
-    expect(screen.getByText("Akın Tekstil")).toBeTruthy();
-    expect(screen.getByText("1.541 m")).toBeTruthy();
-    expect(screen.getByText("15 top · 120 kg iplik · 2 levent")).toBeTruthy();
-  });
-
-  it("emanet kullanmayan / eski fabrika: alan ve anlık yok → bölüm hiç çizilmez, çökme yok", async () => {
-    mockSession.permissions = ["bulut:stok:oku"];
-    DATA["stok-karnesi"] = { ...KARNE, ozet: { ...KARNE.ozet, emanet: undefined } };
-    serve(["emanet-bakiye"]);
     render(<Stock />);
     await flush();
     expect(screen.getByTestId("kpi-bitmis")).toBeTruthy();
     expect(screen.queryByTestId("emanet-bolumu")).toBeNull();
-    DATA["stok-karnesi"] = KARNE;
+    expect(mockApi.snapshot).not.toHaveBeenCalledWith("emanet-bakiye");
   });
 });
 
@@ -145,49 +121,10 @@ describe("§2 Fason ekranı › fasonda ne var, kimde", () => {
   });
 });
 
-describe("§3 Finans › Fatura › hizmet geliri", () => {
-  it("bu ay varsayılan; dönem değişince fabrikanın o dönem bloğu", async () => {
-    mockSession.permissions = ["bulut:fatura:oku"];
-    render(<Finance />);
-    await flush();
-    expect(screen.getByTestId("hizmet-geliri-tutar").props.children).toBe("45.000 ₺");
-    expect(screen.getByText("Kurşun 30 gr")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("gelir-donem-gecenAy"));
-    await flush();
-    expect(screen.getByTestId("hizmet-geliri-tutar").props.children).toBe("38.000,5 ₺");
-    fireEvent.press(screen.getByTestId("gelir-donem-bugun"));
-    await flush();
-    expect(screen.getByTestId("hizmet-geliri-yok")).toBeTruthy();
-  });
-
-  it("eski fabrika (404) → boş durum, fatura listesi yine çizilir", async () => {
-    mockSession.permissions = ["bulut:fatura:oku"];
-    serve(["hizmet-geliri"]);
-    render(<Finance />);
-    await flush();
-    expect(screen.getByTestId("hizmet-geliri-bos")).toBeTruthy();
-    expect(screen.getByText("Faturalar")).toBeTruthy();
-  });
-});
-
-describe("§4 bozuk / eksik şekil çökmez", () => {
-  it("görünümler tanınmayan veride null", () => {
-    expect(view.consignedView({ x: 1 })).toBeNull();
-    expect(view.serviceRevenueView({ buAy: {} }, "buAy")).toBeNull();
-    expect(view.scorecardConsignedLines({})).toBeNull();
-    expect(view.stockConsignedText({ bitmisMiktar: 1 })).toBeNull();
-  });
-  it("pano stok satırı: emanet varsa ek, yoksa eski metin aynen", () => {
+describe("§4 pano stok satırı", () => {
+  it("yalnız serbest ve ölü stok; emanet eki yazılmaz", () => {
     expect(areaSummary("ozet.stok", { bitmisMiktar: 100, oluMiktar: 0 })).toBe("Serbest stok 100 m · ölü 0 m");
-    expect(areaSummary("ozet.stok", { bitmisMiktar: 100, oluMiktar: 0, emanet: { adet: 3, miktar: 250 } })).toBe("Serbest stok 100 m · ölü 0 m · müşteri malı 250 m");
-  });
-});
-
-describe("§5 görünüm hesap yapmaz", () => {
-  it("kapalı modül (null) ve sıfır alan yazılmaz; toplam fabrikadan", () => {
-    const v = view.consignedView({ toplam: { topAdet: 2, topMiktar: 10, iplikKg: null, leventAdet: null }, cariler: [] })!;
-    expect(v.totalLine).toBe("2 top");
-    expect(v.totalValue).toBe("10 m");
+    expect(areaSummary("ozet.stok", { bitmisMiktar: 100, oluMiktar: 0, emanet: { adet: 3, miktar: 250 } })).toBe("Serbest stok 100 m · ölü 0 m");
   });
 });
 

@@ -6,7 +6,6 @@ import { Text, View } from "react-native";
 import { errorMessage } from "../api/client";
 import type { FacilityStatus, Page, ProjectionRecord } from "../api/wire";
 import { formatAgo, formatDateTime, formatMoney } from "../lib/format";
-import { FINANCE_FIELD, isMoneyField, moneyCurrencyOf } from "../lib/labels/finans";
 import { formatValue, humanize, isHiddenKey, nestedEntries, recordSubtitle, recordTitle, scalarEntries } from "../lib/present";
 import { useSession } from "../state/session";
 import { useRemote } from "../state/useRemote";
@@ -24,18 +23,6 @@ interface FieldRow {
   readonly value: string;
 }
 
-/** Para alt satırı (`.finans`): tutar alanları kaydın dövizi ile (`…Tl` alanı ₺), kur/oran düz sayı; döviz bilinmiyorsa ("") simge uydurulmaz. */
-function moneyEntries(obj: unknown, currency: string): FieldRow[] {
-  if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return [];
-  return Object.entries(obj as Record<string, unknown>)
-    .filter(([k, v]) => !isHiddenKey(k) && (v === null || typeof v !== "object"))
-    .map(([k, v]) => ({
-      key: k,
-      label: FINANCE_FIELD[k] ?? humanize(k),
-      value: currency !== "" && isMoneyField(k) && (typeof v === "string" || typeof v === "number") ? formatMoney(v, moneyCurrencyOf(k, currency)) : formatValue(k, v),
-    }));
-}
-
 /** Alan → (fabrika enum değeri → Türkçe ad); ekranda "SALES"/"CONFIRMED" gibi ham değer basılmaz. */
 export type FieldEnums = Readonly<Record<string, Readonly<Record<string, string>>>>;
 
@@ -45,13 +32,10 @@ function withEnumLabel(r: FieldRow, value: unknown, enums: FieldEnums): FieldRow
   return label ? { ...r, value: label } : r;
 }
 
-/**
- * Kaydın skaler alanları: gruplu satırlar (ad solda gri, değer sağda). `currency` verilirse alanlar PARA alt satırıdır:
- * her tutar o para birimiyle basılır (uygulama hesap yapmaz; değer fabrikanın).
- */
-export function Fields({ value, currency, enums }: { value: unknown; currency?: string; enums?: FieldEnums }) {
+/** Kaydın skaler alanları: gruplu satırlar (ad solda gri, değer sağda); değer fabrikanın, uygulama hesap yapmaz. */
+export function Fields({ value, enums }: { value: unknown; enums?: FieldEnums }) {
   const s = useFieldStyles();
-  const raw = currency !== undefined ? moneyEntries(value, currency) : scalarEntries(value);
+  const raw = scalarEntries(value);
   const rows = enums ? raw.map((r) => withEnumLabel(r, value, enums)) : raw;
   if (rows.length === 0) return <Muted>Gösterilecek alan yok</Muted>;
   return (
@@ -202,7 +186,6 @@ export interface ListFilter {
   readonly cariKartId?: string;
   readonly ara?: string;
   readonly suzgec?: string;
-  readonly kategoriAnahtari?: string;
 }
 
 /** Satırı `ListeSatiri` olarak çizen eşleme (dokunma ve testID listeden gelir). */
@@ -241,12 +224,12 @@ const NO_MORE: MorePages = { of: null, items: [], next: null, loading: false, er
  */
 export function ProjectionList(p: ProjectionListProps) {
   const { api, cache } = useSession();
-  const { durum, cariKartId, ara, suzgec, kategoriAnahtari } = p.filter ?? {};
+  const { durum, cariKartId, ara, suzgec } = p.filter ?? {};
   const search = typeof ara === "string" && ara !== "";
-  const key = `veri:${p.projection}:liste:${durum ?? ""}:${cariKartId ?? ""}:${suzgec ?? ""}${kategoriAnahtari === undefined ? "" : `:k=${kategoriAnahtari}`}`;
+  const key = `veri:${p.projection}:liste:${durum ?? ""}:${cariKartId ?? ""}:${suzgec ?? ""}`;
   const first = useRemote(
     search ? null : key,
-    () => api.list(p.projection, { imlec: undefined, limit: 50, durum, cariKartId, ara: undefined, suzgec, kategoriAnahtari }),
+    () => api.list(p.projection, { imlec: undefined, limit: 50, durum, cariKartId, ara: undefined, suzgec }),
     { tags: p.tags ?? [p.projection] },
   );
 
@@ -259,14 +242,14 @@ export function ProjectionList(p: ProjectionListProps) {
     const mine = ++seq.current;
     setFound({ page: null, loading: true, error: null });
     api
-      .list(p.projection, { imlec: undefined, limit: 50, durum, cariKartId, ara, suzgec, kategoriAnahtari })
+      .list(p.projection, { imlec: undefined, limit: 50, durum, cariKartId, ara, suzgec })
       .then((page) => {
         if (mine === seq.current) setFound({ page, loading: false, error: null });
       })
       .catch((err: unknown) => {
         if (mine === seq.current) setFound({ page: null, loading: false, error: errorMessage(err) });
       });
-  }, [search, cache, api, p.projection, durum, cariKartId, ara, suzgec, kategoriAnahtari, searchTick]);
+  }, [search, cache, api, p.projection, durum, cariKartId, ara, suzgec, searchTick]);
 
   const base: Page<ProjectionRecord> | null = search ? found.page : first.data;
   const baseNext = search ? (found.page?.sonraki ?? null) : first.offline ? null : (first.data?.sonraki ?? null);
@@ -281,12 +264,12 @@ export function ProjectionList(p: ProjectionListProps) {
     if (!of || !cursor) return;
     setMore((m) => ({ of, items: m.of === of ? m.items : [], next: cursor, loading: true, error: null }));
     try {
-      const page = await api.list(p.projection, { imlec: cursor, limit: 50, durum, cariKartId, ara: search ? ara : undefined, suzgec, kategoriAnahtari });
+      const page = await api.list(p.projection, { imlec: cursor, limit: 50, durum, cariKartId, ara: search ? ara : undefined, suzgec });
       setMore((m) => (m.of !== of ? m : { of, items: [...m.items, ...page.kayitlar], next: page.sonraki, loading: false, error: null }));
     } catch (err) {
       setMore((m) => (m.of !== of ? m : { ...m, loading: false, error: errorMessage(err) }));
     }
-  }, [api, base, next, p.projection, durum, cariKartId, ara, search, suzgec, kategoriAnahtari]);
+  }, [api, base, next, p.projection, durum, cariKartId, ara, search, suzgec]);
 
   const loading = search ? found.loading : first.loading && !first.data;
   const error = search ? found.error : first.data ? null : first.error;

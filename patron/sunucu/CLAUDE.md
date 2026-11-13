@@ -10,7 +10,7 @@ Patronun buluttaki OKUMA KOPYASI ve TEK yazma kanalı. **Bulut hesap yapmaz, fab
 
 - **Protokol** `src/lisans-protokol/`: yalnız istek imzasının 6 dosyası (`ortak jws belgeler belge-turleri parmak-izi istek`) — `Teks-Erp/src/lib/cloud-signing/` ile BAYT-EŞİT; burada düzenlenmez (bekçi `test_patron_kapilari` §7). Lisans/güncelleme kısımları Adnan'da yok.
 - **Tel şeması** `src/wire/esitleme.ts`: istek KATI, yanıt GEVŞEK.
-- **Katalog** `src/catalog/`: izin (süper yetki YOK) · projeksiyon → izin · rapor → izin; eşlenmeyen ad RED.
+- **Katalog** `src/catalog/`: izin (süper yetki YOK) · projeksiyon → izin · rapor → izin; eşlenmeyen ad RED. Finans, teklif, maliyet ve dokuma yüzeyi YOKTUR (projeksiyon, `.finans` alt satırı, izin, `MUHASEBE` şablonu, rapor anahtarı, çek/cari kilidi/yedek bildirimi): fabrika bunları göndermez; gelirse girdi `PROJEKSIYON_BILINMIYOR`/`ALAN_SINIFI_IHLALI` ile RED. Raporlar yalnız fabrikanın `REMOTE_REPORTS` 6 karnesi.
 - **Kiracı** `src/lib/tenant.ts`: `app.*` ayarlarının TEK yazarı; her tx'in İLK ifadesi tek SELECT'te ayar + (varsa) advisory kilit.
 - **Servis**: durum geçişi atomik claim; claim kuyruğu `FOR UPDATE SKIP LOCKED` CTE; işlem kimliği tek boğaz `lib/idempotency.ts`.
 - **HTTP**: tek dinleyici — `/v1/*` fabrika kanalı (kurulum imzalı, boyut tavanlı) + `/api/*` hesap API'si (Bearer, rota tablosu veridir).

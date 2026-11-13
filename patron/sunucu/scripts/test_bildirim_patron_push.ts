@@ -46,10 +46,10 @@ const TESIS = "00000000-0000-4000-8000-000000000001";
 const IS_VERISI = { musteri: "ACME Tekstil", tutar: "45.000,00", belge: "IRS-2026-000123" };
 const DOLU: PushMessage = {
   id: "11111111-1111-4111-8111-111111111111",
-  kind: "cek-vadesi",
+  kind: "stok-esigi",
   title: `${IS_VERISI.musteri} çeki ${IS_VERISI.tutar} TL`,
   body: `${IS_VERISI.musteri} — ${IS_VERISI.tutar} TL, irsaliye ${IS_VERISI.belge}`,
-  route: "/finans",
+  route: "/stok",
   tesisId: TESIS,
 };
 

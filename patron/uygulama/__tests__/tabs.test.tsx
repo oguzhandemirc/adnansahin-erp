@@ -36,10 +36,10 @@ describe("sekme yolları sabit", () => {
     expect(TABS.map((t) => t.route)).toEqual(["/pano", "/siparisler", "/uretim", "/stok", "/cariler"]);
     expect(TABS.map((t) => t.title)).toEqual(["Pano", "Siparişler", "Üretim", "Stok", "Cariler"]);
   });
-  it("☰ menü grupları: Operasyon (Sevkiyat) · İş (Raporlar, Finans…) · Hesap", () => {
+  it("☰ menü grupları: Operasyon (Sevkiyat) · İş (Raporlar) · Hesap", () => {
     expect(NAV_GROUPS.map((g) => g.title)).toEqual(["Operasyon", "İş", "Hesap"]);
     expect(NAV_GROUPS[0]!.modules).toEqual(["sevkiyat"]);
-    expect(NAV_GROUPS[1]!.modules.slice(0, 2)).toEqual(["raporlar", "finans"]);
+    expect(NAV_GROUPS[1]!.modules).toEqual(["raporlar"]);
     const hepsi = [...TABS.flatMap((t) => (t.module ? [t.module] : [])), ...NAV_GROUPS.flatMap((g) => g.modules)];
     expect(new Set(hepsi).size).toBe(hepsi.length);
   });
@@ -47,7 +47,7 @@ describe("sekme yolları sabit", () => {
     const tabs = join(ROOT, "app/(app)/(tabs)");
     for (const f of ["pano.tsx", "uretim.tsx", "stok.tsx", "siparisler/index.tsx", "siparisler/yeni.tsx", "cariler/index.tsx", "cariler/yeni.tsx", "cariler/[id].tsx"]) expect(existsSync(join(tabs, f))).toBe(true);
     for (const f of ["pano.tsx", "uretim.tsx", "stok.tsx", "siparisler", "cariler"]) expect(existsSync(join(ROOT, "app/(app)", f))).toBe(false);
-    for (const f of ["diger.tsx", "finans.tsx"]) {
+    for (const f of ["diger.tsx"]) {
       expect(existsSync(join(ROOT, "app/(app)", f))).toBe(true);
       expect(existsSync(join(tabs, f))).toBe(false);
     }

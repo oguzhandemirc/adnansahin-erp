@@ -42,7 +42,7 @@ export async function getSettingsView(ctx: CloudContext, s: SessionContext, webP
     kaynak: r.source,
     hesap: parseStored(own),
     tesis: parseStored(facility),
-    turler: NOTIFICATION_KINDS.map((k) => ({ tur: k, ad: KIND_RULES[k].label, aciklama: KIND_RULES[k].description, finans: KIND_RULES[k].finance, izinli: kindPermitted(k, s.permissions) })),
+    turler: NOTIFICATION_KINDS.map((k) => ({ tur: k, ad: KIND_RULES[k].label, aciklama: KIND_RULES[k].description, izinli: kindPermitted(k, s.permissions) })),
     gonderim: ctx.config.BILDIRIM_KIPI,
     webPushAnahtari: webPushKey,
   };

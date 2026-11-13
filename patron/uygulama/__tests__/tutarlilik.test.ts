@@ -1,5 +1,5 @@
 // UX-4 tutarlılık bekçisi: ekran adı · gezinme grubu · boş durum simgesi tek kaynaktan.
-// P1 "Bildirim Ayarları" · P2 dar ("Diğer") ve geniş (ray) aynı grup tablosu · P3 "Finans" sekmesi / "Ön Muhasebe" başlığı ·
+// P1 "Bildirim Ayarları" · P2 dar ("Diğer") ve geniş (ray) aynı grup tablosu · P3 kısa gezinme adı yoksa başlık ·
 // P4 başlık `access.ts`ten; boş durum simgesi `EMPTY_ICON`/alan simgesinden, metin nokta ile bitmez, "siz" dili.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -14,8 +14,7 @@ const SOURCES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "src"))].filter(
 describe("ekran adları (P1, P3, P4)", () => {
   it("sözlük adları", () => {
     expect(moduleTitle("bildirimler")).toBe("Bildirim Ayarları");
-    expect(moduleTitle("finans")).toBe("Ön Muhasebe");
-    expect(moduleNavTitle("finans")).toBe("Finans");
+    expect(moduleNavTitle("raporlar")).toBe(moduleTitle("raporlar"));
     expect(moduleTitle("gelen-kutusu")).toBe("Gönderdiklerim");
   });
   it("sekme adı modülün gezinme adından türer", () => {
@@ -24,7 +23,6 @@ describe("ekran adları (P1, P3, P4)", () => {
   it("modül kök ekranları başlık YAZMAZ; başlık `Screen module` üzerinden access.ts'ten gelir", () => {
     const roots: Readonly<Partial<Record<ModuleKey, string>>> = {
       uretim: "app/(app)/(tabs)/uretim.tsx",
-      finans: "app/(app)/finans.tsx",
       sevkiyat: "app/(app)/sevkiyat.tsx",
       stok: "app/(app)/(tabs)/stok.tsx",
       raporlar: "app/(app)/raporlar/index.tsx",
@@ -78,7 +76,7 @@ describe("boş durumlar", () => {
 
 describe("jenerik kayıt ayrıntısı: ham enum ekrana çıkmaz", () => {
   it("sipariş/sevkiyat/iş emri durum ve yön alanları sözlükten", () => {
-    const { RECORD_ENUMS } = require("../src/lib/labels/finans") as typeof import("../src/lib/labels/finans");
+    const { RECORD_ENUMS } = require("../src/lib/labels/rapor") as typeof import("../src/lib/labels/rapor");
     expect(RECORD_ENUMS.sevkiyat!.durum!.DISPATCHED).toBe("Sevk edildi");
     expect(RECORD_ENUMS.sevkiyat!.yon!.CIKIS).toBe("Çıkış");
     expect(RECORD_ENUMS.siparis!.durum!.PARTIAL_SHIPPED).toBeTruthy();

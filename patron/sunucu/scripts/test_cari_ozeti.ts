@@ -141,7 +141,7 @@ async function main(): Promise<void> {
     const { ids: yabanci } = await fikstur(o, k2, true);
     const { ids: anliksiz } = await fikstur(o, k3, false);
     const h = await hesapKur(o, k.tesisId, ROLE_TEMPLATES.PATRON);
-    const izinsiz = await hesapKur(o, k.tesisId, ROLE_TEMPLATES.MUHASEBE);
+    const izinsiz = await hesapKur(o, k.tesisId, ["bulut:ozet:oku", "bulut:rapor:oku", "bulut:cari:oku"]);
     await listeler(o, h, ids, yabanci);
     await ozet(o, h, izinsiz, ids, veri, yabanci);
     await anlikYok(o, await hesapKur(o, k3.tesisId, ROLE_TEMPLATES.PATRON), anliksiz);

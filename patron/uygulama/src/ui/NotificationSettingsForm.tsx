@@ -29,7 +29,7 @@ export function NotificationSettingsForm(p: {
         {kinds.map((k) => {
           const look = notificationKind(k.tur);
           return (
-            <ToggleRow key={k.tur} label={k.finans ? `${k.ad} (finans)` : k.ad} testID={`tur-${k.tur}`} icon={look.icon} domain={look.domain}
+            <ToggleRow key={k.tur} label={k.ad} testID={`tur-${k.tur}`} icon={look.icon} domain={look.domain}
               hint={k.izinli ? k.aciklama : "Yetkiniz bu bildirimi almaya yetmiyor"}
               value={f.turler[k.tur]} disabled={!f.acik || !k.izinli}
               onChange={(v) => set("turler", { ...f.turler, [k.tur]: v })} />

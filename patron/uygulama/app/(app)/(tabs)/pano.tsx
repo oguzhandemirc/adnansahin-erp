@@ -1,12 +1,12 @@
 // Pano (şartname §4.1): başlık (tesis + eşitleme + Düzenle) → dönem şeridi (yalnız dönemli kutu varken) → kutular
 // kullanıcı sırasıyla (ardışık göstergeler 2 sütun, diğerleri tam genişlik). Düzen cihazda kalıcı; YALNIZ ekli ve
-// izinli kutuların kaynakları istenir, düzenleme kipinde hiç istek yok. Yedek/eşitleme sorunu kutu değil bant.
+// izinli kutuların kaynakları istenir, düzenleme kipinde hiç istek yok.
 // Özet izni olmayan çalışan boş ekran yerine "Görebildiğin alanlar" listesini görür.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
-import { can, visibleCards, visibleModules, type ModuleKey } from "../../../src/lib/access";
+import { visibleCards, visibleModules, type ModuleKey } from "../../../src/lib/access";
 import { PERIODS, type PeriodKey } from "../../../src/lib/labels/uretim";
 import { TERIM } from "../../../src/lib/terim";
 import { rozetMetni, useOkunmamisRet } from "../../../src/state/okunmamis-ret";
@@ -15,13 +15,11 @@ import { useOpenRefresh } from "../../../src/state/useOpenRefresh";
 import { FacilityName, Screen, useWide } from "../../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../src/ui/icons";
-import { Banner } from "../../../src/ui/kit";
 import { BosDurum, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
 import { DuzenCubugu, DuzenListesi, KutuEkleSayfasi } from "../../../src/ui/pano/Duzenleyici";
 import { useDuzen } from "../../../src/ui/pano/duzen";
 import { KUTU_CIZICI, type KutuBaglami } from "../../../src/ui/pano/KutuCizici";
 import { istenenKaynaklar, izinliKutular, kutu, satirlar } from "../../../src/ui/pano/kutular";
-import { attentionItems } from "../../../src/ui/pano/read";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { SectionHeader } from "../../../src/ui/SectionHeader";
 import { SegmentedControl } from "../../../src/ui/SegmentedControl";
@@ -36,7 +34,6 @@ const MODULE_HINT: Readonly<Partial<Record<ModuleKey, string>>> = {
   sevkiyat: "Son sevkler",
   get uretim() { return `İstasyonlar ve ${TERIM.terbiyeIsEmri.cogulKucuk}`; },
   stok: "Ham, yarı mamul ve bitmiş stok",
-  finans: "Kasa, çek, fatura ve tahsilat",
   raporlar: "Hazır raporlar ve istekler",
   "gelen-kutusu": "Fabrikaya gönderdiğin talepler",
   hesaplar: "Kullanıcılar ve yetkiler",
@@ -66,7 +63,6 @@ export default function Dashboard() {
     "ozet.siparis": useSnapshot("ozet.siparis", acik("ozet.siparis", "anlik")),
     "ozet.stok": useSnapshot("ozet.stok", acik("ozet.stok", "anlik")),
     "ozet.fason": useSnapshot("ozet.fason", acik("ozet.fason", "anlik")),
-    "ozet-finans": useSnapshot("ozet-finans", acik("ozet-finans", "anlik")),
     "uretim-akisi": useSnapshot("uretim-akisi", acik("uretim-akisi", "anlik")),
     // `fasonTop` kutusunun kaynağı; haritada yokken kutu hep "henüz gelmedi" diyordu.
     "fason-acik": useSnapshot("fason-acik", acik("fason-acik", "anlik")),
@@ -76,15 +72,12 @@ export default function Dashboard() {
     sevkiyat: useRemoteList("sevkiyat", {}, { enabled: acik("sevkiyat", "liste"), limit: 5 }),
     siparis: useRemoteList("siparis", {}, { enabled: acik("siparis", "liste"), limit: 5 }),
   };
-  const health = useSnapshot("saglik", can(permissions, "bulut:ozet:oku"));
-  const hepsi = [...Object.values(anlik), ...Object.values(liste), health];
+  const hepsi = [...Object.values(anlik), ...Object.values(liste)];
   const reloadAll = () => {
     void refresh();
     hepsi.forEach((r) => r.reload());
   };
 
-  // Eşitleme tazeliği uyarı değil: başlıktaki göstergede süre olarak görünür (madde çıkmaz).
-  const bantlar = attentionItems({ health: health.data?.veri });
   const baglam: KutuBaglami = { anlik, liste, donem, router, permissions };
   const donemli = duzen.kutular.some((a) => kutu(a).donemli);
 
@@ -127,11 +120,6 @@ export default function Dashboard() {
       refreshing={hepsi.some((r) => r.refreshing)}
       footer={duzenle ? <DuzenCubugu onEkle={() => setEkleAcik(true)} onBitti={() => setDuzenle(false)} /> : null}
     >
-      {bantlar.map((b) => (
-        <View key={b.key} testID={`bant-${b.key}`}>
-          <Banner tone={b.tone === "kritik" ? "error" : "warn"} text={`${b.title} — ${b.detail}`} />
-        </View>
-      ))}
       {!ozetVar ? (
         <Reachable permissions={permissions} onOpen={(route) => router.push(route as never)} />
       ) : duzenle ? (

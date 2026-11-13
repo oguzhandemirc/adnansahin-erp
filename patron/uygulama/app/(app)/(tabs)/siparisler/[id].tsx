@@ -1,6 +1,6 @@
-// Sipariş ayrıntısı (şartname §4.3): başlıkta sipariş no; özet kartı (müşteri → cari kartı, durum rozeti, açık miktar ·
-// tutar) → bilgiler → kalemler (sevk ve açık miktar kalem satırında). Termin düz bilgi satırı (vurgu/rozet YOK). Parasal
-// alan (tutar, para birimi) yalnız değer geldiyse çizilir — bu fabrikada finans buluta gitmez. Her değer fabrikadan;
+// Sipariş ayrıntısı (şartname §4.3): başlıkta sipariş no; özet kartı (müşteri → cari kartı, durum rozeti, açık miktar)
+// → bilgiler → kalemler (sevk ve açık miktar kalem satırında). Termin düz bilgi satırı (vurgu/rozet YOK). Finans buluta
+// gitmez; tutar gösterilmez. Her değer fabrikadan;
 // durum/yön sözlükten. Kalem satırları sunucunun `siparisId` süzgeciyle; sunucu süzgeci beyan etmiyorsa (eski bulut,
 // parametreyi yok sayar) fabrikanın kalem özeti kalır — istemci süzmez.
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -9,7 +9,7 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 import { moduleVisible } from "../../../../src/lib/access";
 import { fmtFactoryDateTime } from "../../../../src/lib/factory-time";
-import { formatDate, formatMoney, formatNumber } from "../../../../src/lib/format";
+import { formatDate, formatNumber } from "../../../../src/lib/format";
 import { destinationLabel, isOpenOrder, orderStatus } from "../../../../src/lib/labels/siparis";
 import { useSession } from "../../../../src/state/session";
 import { useRemote } from "../../../../src/state/useRemote";
@@ -34,11 +34,9 @@ export default function OrderDetail() {
   const r = useRemote(id ? `kayit:siparis:${id}` : null, () => api.record("siparis", String(id)));
   const kalemler = useOrderLines(lines && id ? String(id) : null);
   const k = asObj(r.data?.kayit);
-  const f = asObj(r.data?.finans);
   const no = str(k.siparisNo);
   const status = orderStatus(k.durum);
   const doviz = str(k.doviz);
-  const tutar = present(f.tutar) ? formatMoney(f.tutar, doviz ?? "TRY") : null;
   const cariId = str(k.cariKartId);
   const cariAc = cariId && moduleVisible(permissions, "cariler") ? () => router.push({ pathname: "/cariler/[id]", params: { id: cariId } } as never) : undefined;
   const showOpen = isOpenOrder(k.durum) && present(k.acikMiktar);
@@ -82,18 +80,11 @@ export default function OrderDetail() {
               )}
             </View>
           </KademeliGiris>
-          {showOpen || tutar ? (
+          {showOpen ? (
             <KademeliGiris sira={1} style={s.ikili}>
-              {showOpen ? (
-                <View style={s.yarim}>
-                  <StatCard etiket="Açık miktar" icon="resize-outline" ton="blue" layout={tutar ? "stacked" : "row"} degerler={[{ deger: formatNumber(k.acikMiktar), birim: "m" }]} testID="siparis-acik" />
-                </View>
-              ) : null}
-              {tutar ? (
-                <View style={s.yarim}>
-                  <StatCard etiket="Tutar" icon="cash-outline" ton="green" degerler={[{ deger: tutar }]} testID="siparis-tutar" />
-                </View>
-              ) : null}
+              <View style={s.yarim}>
+                <StatCard etiket="Açık miktar" icon="resize-outline" ton="blue" layout="row" degerler={[{ deger: formatNumber(k.acikMiktar), birim: "m" }]} testID="siparis-acik" />
+              </View>
             </KademeliGiris>
           ) : null}
           <KademeliGiris sira={2}>

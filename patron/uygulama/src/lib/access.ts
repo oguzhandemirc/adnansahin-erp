@@ -6,13 +6,10 @@ export type ModuleKey =
   | "pano"
   | "raporlar"
   | "siparisler"
-  | "teklifler"
-  | "standart-maliyetler"
   | "cariler"
   | "sevkiyat"
   | "uretim"
   | "stok"
-  | "finans"
   | "gelen-kutusu"
   | "hesaplar"
   | "bildirimler"
@@ -29,22 +26,17 @@ export interface ModuleDef {
   readonly route: string;
   /** Bunlardan BİRİ yeter; boş = her hesap. */
   readonly anyOf: readonly string[];
-  /** Ayrıca bunların HEPSİ gerekir (ör. maliyet ekranı: kök satır izni + maliyet izni). */
+  /** Ayrıca bunların HEPSİ gerekir. */
   readonly allOf?: readonly string[];
 }
-
-export const FINANCE_READ = ["bulut:kasa:oku", "bulut:cek:oku", "bulut:fatura:oku", "bulut:tahsilat:oku"] as const;
 
 export const MODULES: readonly ModuleDef[] = [
   { key: "pano", title: "Pano", route: "/pano", anyOf: [] },
   { key: "siparisler", title: "Siparişler", route: "/siparisler", anyOf: ["bulut:siparis:oku"] },
-  { key: "cariler", title: "Cariler", hint: "Müşteri ve tedarikçiler", route: "/cariler", anyOf: ["bulut:cari:oku", "bulut:cari-bakiye:oku", "bulut:cari:yaz"] },
+  { key: "cariler", title: "Cariler", hint: "Müşteri ve tedarikçiler", route: "/cariler", anyOf: ["bulut:cari:oku", "bulut:cari:yaz"] },
   { key: "sevkiyat", title: "Sevkiyat", hint: "Sevk edilen ve bekleyen", route: "/sevkiyat", anyOf: ["bulut:sevkiyat:oku"] },
   { key: "uretim", title: "Üretim", hint: "İstasyonlar ve üretim kuyruğu", route: "/uretim", anyOf: ["bulut:uretim:oku"] },
   { key: "stok", title: "Stok", hint: "Ham ve bitmiş stok", route: "/stok", anyOf: ["bulut:stok:oku"] },
-  { key: "finans", title: TERIM_AD.onMuhasebe, navTitle: "Finans", hint: "Kasa, çek, fatura ve tahsilat", route: "/finans", anyOf: [...FINANCE_READ, "bulut:cari-bakiye:oku", "bulut:maliyet:oku"] },
-  { key: "teklifler", title: "Teklifler", hint: "Müşteriye gönderilen teklifler", route: "/teklifler", anyOf: ["bulut:teklif:oku"] },
-  { key: "standart-maliyetler", title: "Standart Maliyetler", hint: "Ürün başına metre maliyeti", route: "/standart-maliyetler", anyOf: ["bulut:teklif:oku"], allOf: ["bulut:maliyet:oku"] },
   { key: "raporlar", title: "Raporlar", hint: "Fabrikadan rapor isteyin", route: "/raporlar", anyOf: ["bulut:rapor:oku"] },
   { key: "gelen-kutusu", title: "Gönderdiklerim", hint: "Telefondan fabrikaya gönderdiğiniz kayıtlar", route: "/gelen-kutusu", anyOf: ["bulut:siparis:yaz", "bulut:cari:yaz"] },
   { key: "hesaplar", title: "Hesaplar", hint: "Kim neyi görür, davetler", route: "/hesaplar", anyOf: ["bulut:hesap:yonet"] },
@@ -97,7 +89,6 @@ export const DASHBOARD_CARDS: readonly { readonly projection: string; readonly t
   { projection: "ozet.uretim", title: "Üretim", allOf: ["bulut:ozet:oku", "bulut:uretim:oku"] },
   { projection: "ozet.stok", title: "Stok", allOf: ["bulut:ozet:oku", "bulut:stok:oku"] },
   { projection: "ozet.fason", title: "Fason", allOf: ["bulut:ozet:oku", "bulut:uretim:oku"] },
-  { projection: "ozet-finans", title: "Finans", allOf: ["bulut:cari-bakiye:oku"] },
 ];
 
 export function visibleCards(perms: readonly string[]) {

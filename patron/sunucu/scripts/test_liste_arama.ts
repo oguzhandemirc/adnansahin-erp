@@ -14,9 +14,9 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { ROLE_TEMPLATES } from "../src/catalog/permissions";
 import { FOLD_FROM, FOLD_TO, foldTerm, likePattern } from "../src/lib/search";
-import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_KEY_FILTERS, LIST_MEMBER_FILTERS, LIST_SEARCH, type FacilityStatus } from "../src/wire/api";
+import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_MEMBER_FILTERS, LIST_SEARCH, type FacilityStatus } from "../src/wire/api";
 import { api, girdi, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
-import { KATALOG_DISI_FINANS, fabrikaDosyasi, katalogDisiDenetimi } from "./lib/fabrika-karsiligi";
+import { fabrikaDosyasi } from "./lib/fabrika-karsiligi";
 
 type Liste = { kayitlar: { id: string; kayit: Record<string, unknown> }[]; sonraki: string | null };
 
@@ -151,26 +151,23 @@ async function kapilar(o: Ortam, h: TestHesabi, yabanci: Ids): Promise<void> {
 interface SiparisIds {
   readonly siparis: { readonly yeni: string; readonly eski: string; readonly gec: string };
   readonly kalem: { readonly a1: string; readonly a2: string; readonly b1: string };
-  readonly cariHesap: { readonly a: string; readonly b: string };
-  readonly hareket: { readonly a1: string; readonly a2: string; readonly b1: string };
+  readonly urun: string;
   readonly cariKart: string;
 }
 
-/** Sipariş + kalem + cari hesap/hareket fikstürü; `ortak` verilirse kimlikleri paylaşır (başka tesis aynı UUID'leri taşır). */
+/** Sipariş + kalem fikstürü; `ortak` verilirse kimlikleri paylaşır (başka tesis aynı UUID'leri taşır). */
 async function siparisFikstur(o: Ortam, k: TestKurulumu, ortak?: SiparisIds): Promise<SiparisIds> {
   const w = { t: new Date(o.saat.simdi() - 60_000).toISOString(), k: "000000000002" };
   const t = new Date(o.saat.simdi() - 120_000).toISOString();
   const id: SiparisIds = ortak ?? {
     siparis: { yeni: randomUUID(), eski: randomUUID(), gec: randomUUID() },
     kalem: { a1: randomUUID(), a2: randomUUID(), b1: randomUUID() },
-    cariHesap: { a: randomUUID(), b: randomUUID() },
-    hareket: { a1: randomUUID(), a2: randomUUID(), b1: randomUUID() },
+    urun: randomUUID(),
     cariKart: randomUUID(),
   };
   const sip = (sid: string, no: string, durum: string, gecikmis: boolean, musteriAdi?: string) =>
     ({ id: sid, siparisNo: no, durum, gecikmis, cariKartId: id.cariKart, siparisTarihi: t, ...(musteriAdi ? { musteriAdi } : {}) });
-  const kalem = (kid: string, siparisId: string) => ({ id: kid, siparisId, urunId: randomUUID(), miktar: "10", birim: "MT", olusturulma: t });
-  const hareket = (hid: string, cariHesapId: string) => ({ id: hid, cariHesapId, doviz: "TRY", tarih: t, kaynak: "INVOICE" });
+  const kalem = (kid: string, siparisId: string, urunId: string = randomUUID()) => ({ id: kid, siparisId, urunId, miktar: "10", birim: "MT", olusturulma: t });
   const kayitlar = [
     girdi("siparis", {
       yaz: [
@@ -180,9 +177,7 @@ async function siparisFikstur(o: Ortam, k: TestKurulumu, ortak?: SiparisIds): Pr
       ],
       yeni: w,
     }),
-    girdi("siparis-kalemi", { yaz: [kalem(id.kalem.a1, id.siparis.yeni), kalem(id.kalem.a2, id.siparis.yeni), kalem(id.kalem.b1, id.siparis.eski)], yeni: w }),
-    girdi("cari-hesap", { yaz: [{ id: id.cariHesap.a, tur: "CUSTOMER", cariKartId: id.cariKart, aktif: true }, { id: id.cariHesap.b, tur: "SUBCONTRACTOR", cariKartId: randomUUID(), aktif: true }], yeni: w }),
-    girdi("cari-hareket", { yaz: [hareket(id.hareket.a1, id.cariHesap.a), hareket(id.hareket.a2, id.cariHesap.a), hareket(id.hareket.b1, id.cariHesap.b)], yeni: w }),
+    girdi("siparis-kalemi", { yaz: [kalem(id.kalem.a1, id.siparis.yeni, id.urun), kalem(id.kalem.a2, id.siparis.yeni), kalem(id.kalem.b1, id.siparis.eski, id.urun)], yeni: w }),
   ];
   const r = await imzali(o, k, "/v1/esitle", { govde: paket(k, { ufuk: new Date(o.saat.simdi() - 60_000), kayitlar }) });
   if (r.status !== 200 || (r.json as unknown as { ret: unknown[] }).ret.length > 0) throw new Error(`sipariş fikstürü: ${r.status} ${JSON.stringify(r.json)}`);
@@ -217,14 +212,12 @@ async function kimlikSuzgecleri(o: Ortam, h: TestHesabi, id: SiparisIds): Promis
   kontrol("§7c ⭐ beyansız projeksiyonda siparisId → 400", beyansiz.status === 400 && beyansiz.kod !== undefined, `${beyansiz.status}`);
   const bicim = await ara(o, h, "siparis-kalemi", { siparisId: "x' OR 1=1" });
   kontrol("§7d biçimsiz siparisId → 400", bicim.status === 400, `${bicim.status}`);
-  const har = await ara(o, h, "cari-hareket", { cariHesapId: id.cariHesap.a });
-  kontrol("§7e cari-hareket?cariHesapId → yalnız o hesabın hareketleri", har.status === 200 && ayni(har.ids, [id.hareket.a1, id.hareket.a2]), `${har.status} ${har.ids.size}`);
-  const hesap = await ara(o, h, "cari-hesap", { cariKartId: id.cariKart });
-  kontrol("§7f cariKartId davranışı aynı (cari-hesap)", hesap.status === 200 && ayni(hesap.ids, [id.cariHesap.a]), `${hesap.status} ${hesap.ids.size}`);
+  const urn = await ara(o, h, "siparis-kalemi", { urunId: id.urun });
+  kontrol("§7e siparis-kalemi?urunId → yalnız o ürünün kalemleri (iki siparişten)", urn.status === 200 && ayni(urn.ids, [id.kalem.a1, id.kalem.b1]), `${urn.status} ${urn.ids.size}`);
   const sip = await ara(o, h, "siparis", { cariKartId: id.cariKart });
   kontrol("§7g cariKartId davranışı aynı (siparis)", sip.status === 200 && ayni(sip.ids, Object.values(id.siparis)), `${sip.status} ${sip.ids.size}`);
-  const hareketCari = await ara(o, h, "cari-hareket", { cariKartId: id.cariKart });
-  kontrol("§7h ⭐ cariKartId taşımayan projeksiyonda (cari-hareket) → 400", hareketCari.status === 400, `${hareketCari.status}`);
+  const kalemCari = await ara(o, h, "siparis-kalemi", { cariKartId: id.cariKart });
+  kontrol("§7h ⭐ cariKartId taşımayan projeksiyonda (siparis-kalemi) → 400", kalemCari.status === 400, `${kalemCari.status}`);
   const kalemSayfa = await ara(o, h, "siparis-kalemi", { siparisId: id.siparis.yeni, limit: "1" });
   const kalemSayfa2 = kalemSayfa.sonraki ? await ara(o, h, "siparis-kalemi", { siparisId: id.siparis.yeni, limit: "1", imlec: kalemSayfa.sonraki }) : null;
   kontrol("§7i imleç süzgeçle devam eder (2 sayfa, kesişmez)", !!kalemSayfa2 && kalemSayfa2.ids.size === 1 && ![...kalemSayfa2.ids].some((x) => kalemSayfa.ids.has(x)) && ayni(new Set([...kalemSayfa.ids, ...kalemSayfa2.ids]), [id.kalem.a1, id.kalem.a2]), `${kalemSayfa2?.ids.size}`);
@@ -313,16 +306,12 @@ async function beyanKatalog(o: Ortam, h: TestHesabi): Promise<void> {
   const tasiyan = katalogTasiyanlar();
   if (tasiyan) {
     kontrol("§8a tarayıcı körleşmedi (siparisId → siparis-kalemi bulundu)", tasiyan.get("siparisId")!.has("siparis-kalemi"));
-    // Finans projeksiyonları bu repoda kapsam dışı: beyanlı ama katalogda yok olmaları BEKLENİR (KATALOG_DISI_FINANS).
     const fark = LIST_ID_FILTER_KEYS.flatMap((k) => {
       const beyan = new Set(LIST_ID_FILTERS[k]);
       const kat = tasiyan.get(k)!;
-      return [...[...beyan].filter((p) => !kat.has(p) && !KATALOG_DISI_FINANS.has(p)).map((p) => `${k}:${p} beyanlı ama kolon yok`), ...[...kat].filter((p) => !beyan.has(p)).map((p) => `${k}:${p} kolon var ama beyansız`)];
+      return [...[...beyan].filter((p) => !kat.has(p)).map((p) => `${k}:${p} beyanlı ama kolon yok`), ...[...kat].filter((p) => !beyan.has(p)).map((p) => `${k}:${p} kolon var ama beyansız`)];
     });
-    kontrol("§8b ⭐ LIST_ID_FILTERS ↔ fabrika kolonları iki yönlü eşit (katalog dışı finans hariç)", fark.length === 0, fark.join(" | "));
-    const d = katalogDisiDenetimi(katalogMetni()!, [...Object.values(LIST_ID_FILTERS), ...Object.values(LIST_KEY_FILTERS)]);
-    kontrol("§8b2 ⭐ katalog dışı finans kümesi bayat değil (katalog taşımıyor · her üye beyanlı)", d.katalogda.length === 0 && d.beyansiz.length === 0,
-      [...d.katalogda.map((p) => `${p} katalogda — kümeden çıkar`), ...d.beyansiz.map((p) => `${p} beyansız — kümeden çıkar`)].join(" | ") || "temiz");
+    kontrol("§8b ⭐ LIST_ID_FILTERS ↔ fabrika kolonları iki yönlü eşit", fark.length === 0, fark.join(" | "));
   }
   const r = await api(o, "GET", "/api/oturum", { belirtec: h.belirtec });
   const liste = (r.json.data as FacilityStatus | undefined)?.liste;

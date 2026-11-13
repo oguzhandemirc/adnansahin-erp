@@ -25,7 +25,7 @@ import { setFacilityStatus } from "../src/services/vendor-admin.service";
 import { TEST_PAROLASI, api, girdi, girisYap, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, tesisUrl, totpKodu, type Ortam, type TestKurulumu } from "./lib/test-ortam";
 
 const GUN = 86_400_000;
-const TUM_OKUMA = ["bulut:siparis:oku", "bulut:fiyat:oku", "bulut:cari:oku", "bulut:ozet:oku", "bulut:hesap:yonet", "bulut:siparis:yaz", "bulut:cari:yaz", "bulut:rapor:oku"];
+const TUM_OKUMA = ["bulut:siparis:oku", "bulut:cari:oku", "bulut:ozet:oku", "bulut:hesap:yonet", "bulut:siparis:yaz", "bulut:cari:yaz", "bulut:rapor:oku"];
 
 function saf(): void {
   console.log("\n§1 saf aşama (tek kaynak)");
@@ -67,7 +67,6 @@ async function paketGonder(o: Ortam, k: TestKurulumu, ad: string): Promise<{ sip
   const cariId = randomUUID();
   const kayitlar = [
     girdi("siparis", { yaz: [{ id: siparisId, siparisNo: `S-${ad}`, durum: "ACIK", siparisTarihi: ufuk.toISOString() }], yeni: w }),
-    girdi("siparis.finans", { yaz: [{ id: siparisId, tutar: "1250.50" }], yeni: w }),
     girdi("cari-kart", { yaz: [{ id: cariId, ad: `=HYPERLINK("x") ${ad}`, kod: `C-${ad}` }], yeni: w }),
     girdi("cari-kart.kisisel", { yaz: [{ id: cariId, yetkili: "Ayşe Yılmaz", telefon: "0555 000 00 00" }], yeni: w }),
   ];
@@ -161,19 +160,20 @@ async function disaAktarma(o: Ortam, a: TestKurulumu, ids: { siparisId: string }
   kontrol("§5a manifest: siparis (1) · cari-kart · ozet.siparis yalnız JSON · bulut kümeleri", ad("siparis")?.adet === 1 && !!ad("cari-kart") && JSON.stringify(ad("ozet.siparis")?.bicimler) === '["json"]' && ["gelen-kutusu", "hesaplar", "hesap-denetimi"].every((x) => ad(x)?.tur === "BULUT"), kumeler.map((k) => `${k.ad}:${k.adet}`).join(" "));
   kontrol("§5b manifest alt satırı ayrı küme saymaz", !kumeler.some((k) => k.ad.includes(".finans") || k.ad.includes(".kisisel")));
   const json = await indir(o, yonetici.belirtec, "/api/disa-aktar/siparis?bicim=json");
-  const govde = JSON.parse(json.text) as { kume: string; tesisId: string; kayitlar: { id: string; kayit: { siparisNo: string }; finans?: { tutar: string } }[] };
-  kontrol("§5c JSON: tek kayıt + finans alt satırı (yetkili yönetici)", json.status === 200 && govde.kume === "siparis" && govde.kayitlar.length === 1 && govde.kayitlar[0]!.finans?.tutar === "1250.50" && govde.kayitlar[0]!.id === ids.siparisId);
+  const govde = JSON.parse(json.text) as { kume: string; tesisId: string; kayitlar: { id: string; kayit: { siparisNo: string } }[] };
+  kontrol("§5c JSON: tek kayıt, finans alt satırı YOK (Adnan'da kesildi)", json.status === 200 && govde.kume === "siparis" && govde.kayitlar.length === 1 && !("finans" in govde.kayitlar[0]!) && govde.kayitlar[0]!.id === ids.siparisId);
   kontrol("§5d dosya olarak iner (Content-Disposition ek + no-store)", /attachment; filename="patron-.*-siparis-.*\.json"/.test(json.headers.get("content-disposition") ?? "") && json.headers.get("cache-control") === "no-store");
   const csv = await indir(o, yonetici.belirtec, "/api/disa-aktar/siparis?bicim=csv");
   const satirlar = csv.text.split("\r\n");
-  kontrol("§5e CSV: BOM + başlık (id · alanlar · finans.* · surum) + 1 satır", csv.bom && satirlar[0] === "id,durum,siparisNo,siparisTarihi,finans.tutar,surum" && satirlar.filter((l) => l.length > 0).length === 2, satirlar[0]);
+  kontrol("§5e CSV: BOM + başlık (id · alanlar · surum) + 1 satır", csv.bom && satirlar[0] === "id,durum,siparisNo,siparisTarihi,surum" && satirlar.filter((l) => l.length > 0).length === 2, satirlar[0]);
   const cari = await indir(o, yonetici.belirtec, "/api/disa-aktar/cari-kart?bicim=csv");
   kontrol("§5f CSV formül enjeksiyonu önlendi (= ile başlayan metin ' önekli)", cari.text.includes(`"'=HYPERLINK(""x"") `), cari.text.split("\r\n")[1]);
-  const sinirliCsv = await indir(o, sinirli.belirtec, "/api/disa-aktar/siparis?bicim=csv");
-  const sinirliJson = await indir(o, sinirli.belirtec, "/api/disa-aktar/siparis?bicim=json");
-  kontrol("§5g fiyat izni olmayan yönetici: CSV'de finans.* YOK, JSON'da finans YOK (RLS)", sinirliCsv.status === 200 && !sinirliCsv.text.split("\r\n")[0]!.includes("finans.") && !sinirliJson.text.includes("1250.50"), sinirliCsv.text.split("\r\n")[0]);
+  const sinirliCsv = await indir(o, sinirli.belirtec, "/api/disa-aktar/cari-kart?bicim=csv");
+  const sinirliJson = await indir(o, sinirli.belirtec, "/api/disa-aktar/cari-kart?bicim=json");
+  kontrol("§5g0 yetkili yönetici: cari CSV'de kisisel.* başlığı ve değeri var", cari.text.split("\r\n")[0]!.includes("kisisel.yetkili") && cari.text.includes("Ayşe Yılmaz"), cari.text.split("\r\n")[0]);
+  kontrol("§5g cari izni olmayan yönetici: CSV'de kisisel.* YOK, JSON'da kişisel değer YOK (RLS)", sinirliCsv.status === 200 && !sinirliCsv.text.split("\r\n")[0]!.includes("kisisel.") && !sinirliJson.text.includes("Ayşe Yılmaz"), sinirliCsv.text.split("\r\n")[0]);
   kontrol("§5h başka tesisin verisi dökümde YOK", !json.text.includes(digerAd) && !csv.text.includes(digerAd) && !cari.text.includes(digerAd));
-  kontrol("§5i alt satır doğrudan istenemez (404)", (await indir(o, yonetici.belirtec, "/api/disa-aktar/siparis.finans")).status === 404);
+  kontrol("§5i alt satır doğrudan istenemez (404)", (await indir(o, yonetici.belirtec, "/api/disa-aktar/cari-kart.kisisel")).status === 404);
   kontrol("§5j bilinmeyen küme 404", (await indir(o, yonetici.belirtec, "/api/disa-aktar/yok-boyle")).status === 404);
   kontrol("§5k anlık özet CSV istenemez (400)", (await indir(o, yonetici.belirtec, "/api/disa-aktar/ozet.siparis?bicim=csv")).status === 400);
   const anlik = JSON.parse((await indir(o, yonetici.belirtec, "/api/disa-aktar/ozet.siparis")).text) as { veri: { acikSiparis: number } };

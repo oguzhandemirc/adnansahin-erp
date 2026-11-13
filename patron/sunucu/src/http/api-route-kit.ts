@@ -63,7 +63,7 @@ export async function sendFile(res: Response, file: ExportFile): Promise<void> {
 export const Uuid = z.uuid();
 export const Token = z.uuid();
 export const PermissionList = z.array(z.string().max(40)).max(40);
-export const Template = z.enum(["PATRON", "MUHASEBE", "SATIS"]);
+export const Template = z.enum(["PATRON", "SATIS"]);
 
 export function body<T>(c: ApiCall, schema: z.ZodType<T>): T {
   const r = schema.safeParse(c.req.body ?? {});

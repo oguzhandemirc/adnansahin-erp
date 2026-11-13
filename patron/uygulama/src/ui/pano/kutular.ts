@@ -12,7 +12,6 @@ export const KUTU_ANAHTARLARI = [
   "stok",
   "fason",
   "fasonTop",
-  "alacak",
   "hizliIslemler",
   "uretimIstasyon",
   "uretimAkisi",
@@ -20,14 +19,13 @@ export const KUTU_ANAHTARLARI = [
   "stokYas",
   "sonSevkler",
   "sonSiparisler",
-  "makineDurus",
 ] as const;
 export type KutuAnahtari = (typeof KUTU_ANAHTARLARI)[number];
 
 /** `kpi` yarım genişlik (2 sütun; tek kalırsa tam genişliğe uzar); `orta`/`genis` tam genişlik. */
 export type KutuBoyu = "kpi" | "orta" | "genis";
-export type KutuGrubu = "Üretim" | "Satış ve sevk" | "Stok" | "Finans" | "Genel";
-export const KUTU_GRUPLARI: readonly KutuGrubu[] = ["Üretim", "Satış ve sevk", "Stok", "Finans", "Genel"];
+export type KutuGrubu = "Üretim" | "Satış ve sevk" | "Stok" | "Genel";
+export const KUTU_GRUPLARI: readonly KutuGrubu[] = ["Üretim", "Satış ve sevk", "Stok", "Genel"];
 
 /** Kutunun veri kaynağı: anlık projeksiyonu ya da kayıt listesi (son 5). */
 export type KutuKaynagi = { readonly tur: "anlik"; readonly ad: string } | { readonly tur: "liste"; readonly ad: string };
@@ -40,9 +38,8 @@ export interface KutuTanimi {
   readonly grup: KutuGrubu;
   readonly icon: IconName;
   readonly ton: TileTone;
-  /** Kaynaksız kutu (hızlı işlemler) ağ isteği yapmaz; kendi isteğini atan kutu (makine duruşları) `null` + `kendiIster`. */
+  /** Kaynaksız kutu (hızlı işlemler) ağ isteği yapmaz. */
   readonly kaynak: KutuKaynagi | null;
-  readonly kendiIster?: boolean;
   /** Bunların HEPSİ gerekir (sunucu kataloğuyla aynı küme); boş = her hesap. */
   readonly izin: readonly string[];
   readonly varsayilan: boolean;
@@ -59,7 +56,6 @@ export const KUTULAR: readonly KutuTanimi[] = [
   { anahtar: "stok", baslik: "Serbest stok", aciklama: "Çuvala ve sevke girmemiş bitmiş metre, ölü stok", boy: "kpi", grup: "Stok", icon: "cube-outline", ton: "teal", kaynak: { tur: "anlik", ad: "ozet.stok" }, izin: [OZET, "bulut:stok:oku"], varsayilan: false },
   { anahtar: "fasonTop", baslik: "Fasondaki top", aciklama: "Şu an fasonda bekleyen top sayısı, boyahanedeki payı", boy: "kpi", grup: "Üretim", icon: "swap-horizontal-outline", ton: "orange", kaynak: { tur: "anlik", ad: "fason-acik" }, izin: ["bulut:uretim:oku"], varsayilan: true },
   { anahtar: "fason", baslik: "Fasonda", aciklama: "Seçili dönemde fasonda açık metre", boy: "kpi", grup: "Üretim", icon: "swap-horizontal-outline", ton: "orange", kaynak: { tur: "anlik", ad: "ozet.fason" }, izin: [OZET, "bulut:uretim:oku"], varsayilan: false, donemli: true },
-  { anahtar: "alacak", baslik: "Açık alacak", aciklama: "Para birimi başına açık alacak (toplanmaz)", boy: "kpi", grup: "Finans", icon: "wallet-outline", ton: "sky", kaynak: { tur: "anlik", ad: "ozet-finans" }, izin: ["bulut:cari-bakiye:oku"], varsayilan: false },
   { anahtar: "hizliIslemler", baslik: "Hızlı işlemler", aciklama: "Yeni sipariş, yeni müşteri, rapor iste, cari ara", boy: "orta", grup: "Genel", icon: "flash-outline", ton: "amber", kaynak: null, izin: [], varsayilan: true },
   { anahtar: "uretimIstasyon", baslik: "İstasyon bazında üretim", aciklama: "Bugün her istasyonda biten top", boy: "genis", grup: "Üretim", icon: "bar-chart-outline", ton: "violet", kaynak: { tur: "anlik", ad: "uretim-akisi" }, izin: ["bulut:uretim:oku"], varsayilan: true },
   { anahtar: "uretimAkisi", baslik: "Üretim akışı", aciklama: "Topların şu an hangi aşamada beklediği", boy: "genis", grup: "Üretim", icon: "git-network-outline", ton: "blue", kaynak: { tur: "anlik", ad: "uretim-akisi" }, izin: ["bulut:uretim:oku"], varsayilan: false },
@@ -67,7 +63,6 @@ export const KUTULAR: readonly KutuTanimi[] = [
   { anahtar: "stokYas", baslik: "Stok yaşı", aciklama: "Bitmiş stokun yaş kovaları", boy: "orta", grup: "Stok", icon: "hourglass-outline", ton: "amber", kaynak: { tur: "anlik", ad: "stok-karnesi" }, izin: ["bulut:stok:oku"], varsayilan: false },
   { anahtar: "sonSevkler", baslik: "Son sevkler", aciklama: "En son beş sevkiyat", boy: "genis", grup: "Satış ve sevk", icon: "car-outline", ton: "green", kaynak: { tur: "liste", ad: "sevkiyat" }, izin: ["bulut:sevkiyat:oku"], varsayilan: true },
   { anahtar: "sonSiparisler", baslik: "Son siparişler", aciklama: "En son beş sipariş", boy: "genis", grup: "Satış ve sevk", icon: "receipt-outline", ton: "blue", kaynak: { tur: "liste", ad: "siparis" }, izin: ["bulut:siparis:oku"], varsayilan: true },
-  { anahtar: "makineDurus", baslik: "Makine duruşları", aciklama: "Fabrikadan hazır rapor iste", boy: "orta", grup: "Üretim", icon: "pause-circle-outline", ton: "rose", kaynak: null, kendiIster: true, izin: ["bulut:rapor:oku"], varsayilan: false },
 ];
 
 export function kutu(anahtar: KutuAnahtari): KutuTanimi {

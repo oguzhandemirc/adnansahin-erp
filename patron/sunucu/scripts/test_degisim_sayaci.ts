@@ -4,7 +4,7 @@
 //   §2 yalnız-ret paket ve ufku eski anlık → sayaç ARTMAZ
 //   §3 `since = şimdiki` bekler, paket gelince < 1 sn döner · `bekle=0` hemen · süre dolunca boş döner · tesis
 //      yalıtımı · istemci koparsa bekleyen bırakılır · biçimsiz parametre 400 (TR) · oturumsuz 401
-//   §4 `degisenler` hesabın okuyabildiğiyle süzülür (fiyat/cari-bakiye izni yoksa finans adları düşer)
+//   §4 `degisenler` hesabın okuyabildiğiyle süzülür (cari/üretim izni yoksa `cari-kart.kisisel` ve `uretim-akisi` düşer)
 //   §5 halka dışı `since` → tüm okunabilir adlar · tek adımlık fark DB'deki son adlarla · `since` ileride → hepsi
 //   §6 eski istemci: `/api/oturum` ve `/v1/esitle` yanıt gövdelerinin alan kümesi DEĞİŞMEDİ
 // Koşum: npx tsx scripts/test_degisim_sayaci.ts
@@ -37,7 +37,7 @@ function kayitPaketi(o: Ortam, k: TestKurulumu, g: { siparis?: boolean; anlik?: 
   const w = { t: iso(ufuk), k: String(++tur).padStart(12, "0") };
   const id = randomUUID();
   const kayitlar = g.siparis
-    ? [girdi("siparis", { yaz: [{ id, siparisNo: "S-1", durum: "ACIK", siparisTarihi: iso(ufuk) }], yeni: w }), girdi("siparis.finans", { yaz: [{ id, tutar: "10.00" }], yeni: w })]
+    ? [girdi("siparis", { yaz: [{ id, siparisNo: "S-1", durum: "ACIK", siparisTarihi: iso(ufuk) }], yeni: w }), girdi("cari-kart.kisisel", { yaz: [{ id, yetkili: "Ayşe" }], yeni: w })]
     : [girdi("urun", { yaz: [{ id, kod: "U1", ad: "Kumaş" }], yeni: w })];
   const anliklar = g.anlik ? [{ projeksiyon: g.anlik, icerikOzeti: BOS_OZET, veri: { deger: id } }] : [];
   return paket(k, { ufuk: new Date(ufuk), kayitlar, anliklar });
@@ -113,11 +113,11 @@ async function izinSuzmesi(o: Ortam, k: TestKurulumu, patron: TestHesabi, satis:
   const c = (await durum(o, k.tesisId)).sayac;
   const ufuk = o.saat.simdi() - 10_000;
   const p = kayitPaketi(o, k, { siparis: true, ufukGeri: 10_000 });
-  const r = await gonder(o, k, { ...p, anliklar: [{ projeksiyon: "ozet-finans", icerikOzeti: BOS_OZET, veri: { kasa: String(ufuk) } }] });
+  const r = await gonder(o, k, { ...p, anliklar: [{ projeksiyon: "uretim-akisi", icerikOzeti: BOS_OZET, veri: { deger: String(ufuk) } }] });
   const sp = await yokla(o, patron, `since=${c}&bekle=0`);
   const ss = await yokla(o, satis, `since=${c}&bekle=0`);
-  kontrol("§4a izinli hesap: siparis + siparis.finans + ozet-finans", r.status === 200 && ["siparis", "siparis.finans", "ozet-finans"].every((n) => sp.feed.degisenler.includes(n)), JSON.stringify(sp.feed.degisenler));
-  kontrol("§4b fiyat/cari-bakiye izni yok: finans adları DÜŞER, siparis kalır", ss.feed.degisenler.includes("siparis") && !ss.feed.degisenler.includes("siparis.finans") && !ss.feed.degisenler.includes("ozet-finans"), JSON.stringify(ss.feed.degisenler));
+  kontrol("§4a izinli hesap: siparis + cari-kart.kisisel + uretim-akisi", r.status === 200 && ["siparis", "cari-kart.kisisel", "uretim-akisi"].every((n) => sp.feed.degisenler.includes(n)), JSON.stringify(sp.feed.degisenler));
+  kontrol("§4b cari/üretim izni yok: o adlar DÜŞER, siparis kalır", ss.feed.degisenler.includes("siparis") && !ss.feed.degisenler.includes("cari-kart.kisisel") && !ss.feed.degisenler.includes("uretim-akisi"), JSON.stringify(ss.feed.degisenler));
 }
 
 async function halka(o: Ortam, k: TestKurulumu, satis: TestHesabi): Promise<void> {
@@ -130,7 +130,7 @@ async function halka(o: Ortam, k: TestKurulumu, satis: TestHesabi): Promise<void
   await withTesis(o.goc, { tesisId: k.tesisId }, (tx) => tx.syncState.update({ where: { tesisId: k.tesisId }, data: { changeCounter: BigInt(c + 3), changedProjections: ["urun"] } }));
   const hepsi = await yokla(o, satis, `since=${c}&bekle=0`);
   const okunur = [...hepsi.feed.degisenler].sort().join(",");
-  kontrol("§5b halka dışı since → hesabın okuyabildiği TÜM adlar (finans yok)", hepsi.feed.sayac === c + 3 && hepsi.feed.degisenler.includes("ozet.siparis") && hepsi.feed.degisenler.includes("siparis") && !hepsi.feed.degisenler.includes("siparis.finans"), okunur);
+  kontrol("§5b halka dışı since → hesabın okuyabildiği TÜM adlar (kişisel yok)", hepsi.feed.sayac === c + 3 && hepsi.feed.degisenler.includes("ozet.siparis") && hepsi.feed.degisenler.includes("siparis") && !hepsi.feed.degisenler.includes("cari-kart.kisisel"), okunur);
   const tek = await yokla(o, satis, `since=${c + 2}&bekle=0`);
   kontrol("§5c tek adımlık fark (halka boş) → DB'deki son adlar", tek.feed.degisenler.join(",") === "urun", JSON.stringify(tek.feed.degisenler));
   const ileri = await yokla(o, satis, `since=${c + 50}&bekle=5`);
@@ -153,7 +153,7 @@ async function main(): Promise<void> {
   const a = await tesisKur(o);
   const b = await tesisKur(o);
   try {
-    const patron = await hesapKur(o, a.tesisId, ["bulut:siparis:oku", "bulut:fiyat:oku", "bulut:ozet:oku", "bulut:stok:oku", "bulut:cari-bakiye:oku"]);
+    const patron = await hesapKur(o, a.tesisId, ["bulut:siparis:oku", "bulut:cari:oku", "bulut:ozet:oku", "bulut:stok:oku", "bulut:uretim:oku"]);
     const satis = await hesapKur(o, a.tesisId, ["bulut:siparis:oku", "bulut:ozet:oku", "bulut:stok:oku"]);
     await sayacArtisi(o, a, patron);
     await retArtirmaz(o, a);

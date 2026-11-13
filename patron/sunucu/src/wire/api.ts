@@ -99,7 +99,6 @@ export interface ExportManifest {
 export interface ProjectionRecord {
   readonly id: string;
   readonly kayit: unknown;
-  readonly finans?: unknown;
   readonly kisisel?: unknown;
   readonly surum: string;
 }
@@ -227,22 +226,6 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
     },
     ekSuzgecler: [YON_SUZGECI],
   },
-  // Taslak teklif buluta gelmez. `suresiDoldu`yu fabrika türetir; geçerlilik günü dönünce satırı yeniden gönderir.
-  teklif: {
-    alanlar: ["no", "musteriAdi"],
-    suzgec: {
-      etiket: "Durum",
-      varsayilan: null,
-      secenekler: [
-        { deger: "GONDERILDI", etiket: "Gönderildi", alan: "durum", esit: "SENT" },
-        { deger: "SURESI_DOLDU", etiket: "Süresi doldu", alan: "suresiDoldu", esit: true },
-        { deger: "KABUL", etiket: "Kabul edildi", alan: "durum", esit: "ACCEPTED" },
-        { deger: "SIPARIS", etiket: "Siparişe döndü", alan: "durum", esit: "CONVERTED" },
-        { deger: "RED", etiket: "Reddedildi", alan: "durum", esit: "REJECTED" },
-        { deger: "IPTAL", etiket: "İptal", alan: "durum", esit: "CANCELLED" },
-      ],
-    },
-  },
   // Veri tablosu (İş emirleri): `acik` ve `asama`yı fabrika türetir (kapanan İE'de asama null); bulut yalnız eşitler.
   "is-emri": {
     alanlar: ["isEmriNo", "musteriAdi", "siparisNolari"],
@@ -303,7 +286,7 @@ export interface ViewPreference {
 }
 
 // ---------------------------------------------------------------- liste kimlik süzgeçleri
-export const LIST_ID_FILTER_KEYS = ["cariKartId", "cariHesapId", "siparisId", "teklifId", "urunId"] as const;
+export const LIST_ID_FILTER_KEYS = ["cariKartId", "siparisId", "urunId"] as const;
 export type ListIdFilterKey = (typeof LIST_ID_FILTER_KEYS)[number];
 
 /**
@@ -311,11 +294,9 @@ export type ListIdFilterKey = (typeof LIST_ID_FILTER_KEYS)[number];
  * TAŞIYAN projeksiyonlarda (fabrika kataloğu kolonları) kabul edilir, diğerinde 400.
  */
 export const LIST_ID_FILTERS: Readonly<Record<ListIdFilterKey, readonly string[]>> = {
-  cariKartId: ["sube", "fason-firma", "siparis", "sevkiyat", "dogrudan-sevk", "cuval", "cari-hesap", "fiyat", "teklif", "iade"],
-  cariHesapId: ["cari-hareket", "cek-senet", "fatura", "tahsilat-odeme"],
-  siparisId: ["siparis-kalemi", "teklif", "iade"],
-  teklifId: ["teklif-kalemi"],
-  urunId: ["siparis-kalemi", "is-emri", "fatura-kalemi", "fiyat", "teklif-kalemi", "standart-maliyet", "iade"],
+  cariKartId: ["sube", "fason-firma", "siparis", "sevkiyat", "dogrudan-sevk", "cuval", "iade"],
+  siparisId: ["siparis-kalemi", "iade"],
+  urunId: ["siparis-kalemi", "is-emri", "iade"],
 };
 
 // ---------------------------------------------------------------- liste üyelik süzgeçleri
@@ -332,25 +313,10 @@ export const LIST_MEMBER_FILTERS: Readonly<Record<ListMemberFilterKey, Readonly<
   fasonFirmaId: { "is-emri": "fasonFirmaIdleri" },
 };
 
-// ---------------------------------------------------------------- liste anahtar süzgeçleri (D4-KUC3c)
-export const LIST_KEY_FILTER_KEYS = ["kategoriAnahtari"] as const;
-export type ListKeyFilterKey = (typeof LIST_KEY_FILTER_KEYS)[number];
-export const ANAHTAR_SUZGEC_AZAMI = 200;
-
-/**
- * `GET /veri/:projeksiyon?<anahtar>=<metin>` ⇒ kayıttaki AYNI ADLI, FABRİKANIN ürettiği anahtarın birebir eşitliği
- * (bulut kırpmaz, katlamaz, hesaplamaz). Beyansız projeksiyonda ya da uzun değerde 400.
- */
-export const LIST_KEY_FILTERS: Readonly<Record<ListKeyFilterKey, readonly string[]>> = {
-  kategoriAnahtari: ["kasa-hareketi"],
-};
-
 /** `GET /oturum` `liste` — bu sunucunun liste yetenekleri; eski sunucu göndermez (istemci süzgeçli görünümü gizler). */
 export interface ListCapabilities {
   readonly kimlikSuzgecleri: Readonly<Partial<Record<ListIdFilterKey, readonly string[]>>>;
   readonly aranabilir: readonly string[];
-  /** D4-KUC3c; eski sunucu göndermez ⇒ istemci anahtar süzgecini (kasa kategori çipleri) gizler. */
-  readonly anahtarSuzgecleri?: Readonly<Partial<Record<ListKeyFilterKey, readonly string[]>>>;
   /**
    * Veri tablosu: projeksiyon → sıralanabilir alanlar (`LIST_SORT`); varlığı aynı zamanda çoklu `suzgec` ve görünüm
    * tercihi ucunun beyanıdır. Eski sunucu göndermez ⇒ istemci sıralamayı kapatır, tek süzgeç gönderir, tercihi yerelde tutar.
@@ -358,39 +324,6 @@ export interface ListCapabilities {
   readonly siralama?: Readonly<Record<string, readonly string[]>>;
   /** Üyelik süzgeçleri (`LIST_MEMBER_FILTERS`, anahtar → projeksiyonlar); eski sunucu göndermez ⇒ istemci süzgeci gizler. */
   readonly uyelikSuzgecleri?: Readonly<Partial<Record<ListMemberFilterKey, readonly string[]>>>;
-}
-
-// ---------------------------------------------------------------- cari kilidi (D4-I6)
-
-/**
- * `cari-hesap` kaydının `kilit` alanı (fabrika türetir): aktif kilit, yoksa en son açılan; hiç kilit yoksa `null`.
- * Eski fabrika alanı GÖNDERMEZ (`undefined`) → "fabrika güncellenince gelir". Serbest sebep metni ve kişi buluta gelmez.
- */
-export interface CariLock {
-  readonly durum: "AKTIF" | "ACILDI";
-  readonly kilitId: string;
-  readonly kapsam: readonly string[];
-  readonly sebepKodu: string;
-  readonly baslangic: string;
-  readonly acilis: string | null;
-}
-
-/** Kapsam kodu → görünen ad (bilinmeyen kod olduğu gibi gösterilir). */
-export const CARI_LOCK_SCOPE_LABELS: Readonly<Record<string, string>> = { KABUL: "yeni iş kabulü", SEVK: "sevk", FATURA: "fatura onayı" };
-/** Sebep kodu → görünen ad (fabrika `CARI_HOLD_REASON_LABELS` ile aynı). */
-export const CARI_LOCK_REASON_LABELS: Readonly<Record<string, string>> = { BORC: "Borç", RISK: "Risk", ANLASMAZLIK: "Anlaşmazlık", DIGER: "Diğer" };
-
-// ---------------------------------------------------------------- standart maliyet varyantı (SY-N3)
-
-/**
- * `standart-maliyet` kaydının varyant alanları (fabrika kolonu + türetir). Aynı ürünün desen geneli ve varyant sürümleri
- * ayrı zincirdir: anahtar `urunId` + `varyantId`; desen geneli sürümde üçü `null`. Eski fabrika alanları GÖNDERMEZ
- * (`undefined`) → desen geneli sayılır.
- */
-export interface StandardCostVariantFields {
-  readonly varyantId?: string | null;
-  readonly varyantAdi?: string | null;
-  readonly varyantKodu?: string | null;
 }
 
 // ---------------------------------------------------------------- iş emri sevke hazırlığı (D4-J5)
@@ -409,110 +342,7 @@ export interface WorkOrderShipReadiness {
 /** Durum kodu → rozet metni; `YOK` ve bilinmeyen kod rozet çizmez. */
 export const SHIP_READINESS_LABELS: Readonly<Record<string, string>> = { HAZIR: "Sevke hazır", KISMEN: "Kısmen hazır" };
 
-// ---------------------------------------------------------------- masraf özeti (D4-H2)
-
-/** `ozet-masraf` ay hücresi: fabrika ayı `YYYY-MM` + net TL (tel ondalığı). */
-export interface ExpenseMonthCell {
-  readonly ay: string;
-  readonly tutar: string;
-}
-
-/**
- * `ozet-masraf` kategori satırı (kategori METNİ fabrikadaki gibi; kişi adı yazılmaması panelde istenir). İlk 15 kategori
- * adıyla, kalanlar tek "Diğer" satırında (`digerMi`, `kategoriSayisi`). Toplam, fark ve pay FABRİKANINDIR — bulut ve
- * uygulama toplamaz, çıkarmaz; yalnız basar.
- */
-export interface ExpenseCategoryRow {
-  readonly etiket: string;
-  /** Kasa hareketi `kategoriAnahtari` ile aynı (fabrika üretir); "Diğer"de null; eski fabrika göndermez (D4-KUC3c). */
-  readonly kategoriAnahtari?: string | null;
-  readonly digerMi: boolean;
-  readonly kategoriSayisi: number;
-  readonly toplam: string;
-  readonly buAy: string;
-  readonly gecenAy: string;
-  readonly fark: string;
-  /** Bu ayki masraf içindeki pay, yüzde (0–100). */
-  readonly buAyPay: number;
-  readonly aylik: readonly ExpenseMonthCell[];
-}
-
-/** `GET /anlik/ozet-masraf` verisi (izin `bulut:kasa:oku`): son 12 fabrika ayı; eski fabrika anlığı GÖNDERMEZ (404). */
-export interface ExpenseSummarySnapshot {
-  readonly aylar: readonly string[];
-  readonly buAy: string;
-  readonly gecenAy: string;
-  readonly toplam: string;
-  readonly buAyToplam: string;
-  readonly gecenAyToplam: string;
-  readonly fark: string;
-  readonly aylikToplam: readonly ExpenseMonthCell[];
-  readonly kategoriler: readonly ExpenseCategoryRow[];
-}
-
-// ---------------------------------------------------------------- kârlılık özeti (D4-G4)
-
-/**
- * `karlilik-ozet` tutar kümesi (TL, tel ondalığı). Eksik girdili kalem 0 yazılmaz: `katki`/`net` `null` ve `rozet`
- * fabrikanın metni ("eksik: sarf normu, döviz kuru" · "tahmini" · ""). Bulut ve uygulama hesaplamaz, yalnız basar.
- */
-export interface ProfitMoney {
-  readonly gelir: string;
-  readonly katki: string | null;
-  readonly net: string | null;
-  readonly rozet: string;
-}
-
-/** `karlilik-ozet` ay satırı: fabrika ayı `YYYY-MM`. */
-export interface ProfitMonthRow extends ProfitMoney {
-  readonly ay: string;
-}
-
-/** `karlilik-ozet` adlı satır (bu ayın işlemi ya da müşteri); müşteri sıralaması FABRİKADA. */
-export interface ProfitNamedRow extends ProfitMoney {
-  readonly etiket: string;
-}
-
-/** `GET /anlik/karlilik-ozet` verisi (izin `bulut:maliyet:oku`): son 12 fabrika ayı; eski fabrika anlığı GÖNDERMEZ (404). */
-export interface ProfitSummarySnapshot {
-  readonly buAy: string;
-  /** Hesap ayarlarının okuma anındaki özeti (panel raporu başlığıyla aynı metin). */
-  readonly hesap: string;
-  readonly donem: ProfitMoney & { readonly sarf: string | null; readonly makine: string | null; readonly disFason: string | null };
-  readonly aylar: readonly ProfitMonthRow[];
-  readonly buAyIslemler: readonly (ProfitNamedRow & { readonly metre: string })[];
-  /** Katkısı en yüksek ilk 10 müşteri (katkı > 0, azalan). */
-  readonly enKarli: readonly ProfitNamedRow[];
-  /** Katkısı en düşük ilk 10 müşteri (katkı < 0, artan). */
-  readonly enZararli: readonly ProfitNamedRow[];
-  /** Katkısı eksik girdi yüzünden hesaplanamayan müşteri sayısı. */
-  readonly hesaplanamayanMusteri: number;
-}
-
-// ---------------------------------------------------------------- fason · emanet (genel fason PB1)
-
-/**
- * `ozet.stok.emanet` (isteğe bağlı): müşteri malı (emanet) — fabrikanın emanet modülü açıkken; o zaman `ozet.stok`un ham/
- * yarı mamul/bitmiş rakamları BİZİM stoktur ve emanet bu ayrı satırdadır. Eski fabrika ya da kapalı modül alanı GÖNDERMEZ.
- */
-export interface StockConsignedLine {
-  readonly adet: number;
-  readonly miktar: number;
-}
-
-/** Emanet bakiyesi: top (adet · metre) + iplik kg + levent. `null` = o modül fabrikada kapalı (ölçülmedi; 0 değil). */
-export interface ConsignedBalance {
-  readonly topAdet: number;
-  readonly topMiktar: number;
-  readonly iplikKg: string | null;
-  readonly leventAdet: number | null;
-}
-
-/** `GET /anlik/emanet-bakiye` (izin `bulut:stok:oku`): müşteri başına içerideki emanet; sıra fabrikada. Eski fabrika 404. */
-export interface ConsignedBalanceSnapshot {
-  readonly toplam: ConsignedBalance;
-  readonly cariler: readonly (ConsignedBalance & { readonly cariKartId: string; readonly etiket: string })[];
-}
+// ---------------------------------------------------------------- fason (genel fason PB1)
 
 /** `fason-acik` firma satırı (sıra fabrikada: geciken azalan, açık azalan, ad). */
 export interface SubcontractOpenFirm {
@@ -542,20 +372,6 @@ export interface SubcontractOpenSnapshot {
   readonly acikTop?: number;
   readonly boyahanedeTop?: number;
   readonly firmalar: readonly SubcontractOpenFirm[];
-}
-
-/** `hizmet-geliri` dönem bloğu: onaylı satış faturasının hizmet satırları, hizmet kartı (süreç) başına; TL fabrikada. */
-export interface ServiceRevenuePeriod {
-  readonly toplamTl: string;
-  readonly kalemler: readonly { readonly hizmetId: string; readonly etiket: string; readonly miktar: string; readonly birim: string; readonly tutarTl: string }[];
-}
-
-/** `GET /anlik/hizmet-geliri` (izin `bulut:fatura:oku`): fabrikanın dört standart dönemi. Eski fabrika 404. */
-export interface ServiceRevenueSnapshot {
-  readonly bugun: ServiceRevenuePeriod;
-  readonly buAy: ServiceRevenuePeriod;
-  readonly gecenAy: ServiceRevenuePeriod;
-  readonly son30Gun: ServiceRevenuePeriod;
 }
 
 /** `GET /anlik/:projeksiyon`. */
@@ -774,16 +590,13 @@ export interface Device {
 
 // ---------------------------------------------------------------- bildirimler (B5)
 
-/** Bildirim türleri — kurallar sunucu kataloğunda (`src/catalog/notifications.ts`: izin, finans sınıfı, kaynak). */
+/** Bildirim türleri — kurallar sunucu kataloğunda (`src/catalog/notifications.ts`: izin, kaynak). */
 export const NOTIFICATION_KINDS = [
   "gelen-kutusu-sonucu",
   "stok-esigi",
   "geciken-siparis",
   "gunluk-uretim",
   "esitleme-gecikti",
-  "yedek-basarisiz",
-  "cek-vadesi",
-  "cari-kilit",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -817,7 +630,6 @@ export interface NotificationKindInfo {
   readonly tur: NotificationKind;
   readonly ad: string;
   readonly aciklama: string;
-  readonly finans: boolean;
   /** Hesabın izni bu türü almaya yetiyor mu (yetmiyorsa ayar açık olsa da gitmez). */
   readonly izinli: boolean;
 }

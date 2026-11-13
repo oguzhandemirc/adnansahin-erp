@@ -7,7 +7,7 @@
 //   §2 `app.tesis_id` AYARSIZ bağlantı → HATA (sıfır satır) · SIFIRLANMIŞ (önceki tx SET LOCAL) → HATA.
 //   §3 tesis A kapsamında B'nin satırı görünmez (liste, kimlikle doğrudan, projeksiyon) · WITH CHECK:
 //      A kapsamında B'ye yazılamaz · ön-kiracı arama yalnız TEK anahtarlı satırı açar.
-//   §4 alan izni (RESTRICTIVE): izinsiz alt satır (`siparis.finans`) doğrudan SQL'le de 0 satır.
+//   §4 alan izni (RESTRICTIVE): izinsiz alt satır (`cari-kart.kisisel`) doğrudan SQL'le de 0 satır.
 //   §5 rol ayrımı: uygulama rolü projeksiyona YAZAMAZ; eşitleme rolü hesap tablosunu OKUYAMAZ — tek istisna gelen
 //      kutusu claim'inin yazar sorgusu (`accounts`ta yalnız kimlik · tesis · durum · izin; e-posta, ad ve sırlar RED);
 //      uygulama rolü denetim satırında yalnız `summary`yi (IP alanı silmesi) güncelleyebilir.
@@ -137,7 +137,7 @@ async function capraz(o: Ortam, a: { tesisId: string; hesap: string; eposta: str
   console.log("\n§3 tesis A'nın DB'sinde B görünmez · WITH CHECK · ön-kiracı arama (RLS ikinci katman)");
   const c = await istemci(tesisUrl(o, a.tesisId, "uygulama"));
   try {
-    const ayarA = { "app.tesis_id": a.tesisId, "app.projeksiyonlar": "siparis,siparis.finans" };
+    const ayarA = { "app.tesis_id": a.tesisId, "app.projeksiyonlar": "siparis,cari-kart,cari-kart.kisisel" };
     const hesaplar = await kapsamda(c, ayarA, () => c.query<{ tesis_id: string }>("SELECT tesis_id FROM accounts"));
     kontrol("§3a A kapsamında hesap listesi yalnız A", hesaplar.rows.length > 0 && hesaplar.rows.every((r) => r.tesis_id === a.tesisId), `${hesaplar.rows.length} satır`);
     const dogrudan = await kapsamda(c, ayarA, () => c.query("SELECT * FROM accounts WHERE id = $1", [b.hesap]));
@@ -167,9 +167,9 @@ async function alanIzni(o: Ortam, a: { tesisId: string }): Promise<void> {
   try {
     const n = async (liste: string, proj: string) =>
       (await kapsamda(c, { "app.tesis_id": a.tesisId, "app.projeksiyonlar": liste }, () => c.query<{ n: number }>("SELECT count(*)::int AS n FROM projection_rows WHERE projection = $1", [proj]))).rows[0]!.n;
-    kontrol("§4a izinli (siparis,siparis.finans) → finans satırı 1", (await n("siparis,siparis.finans", "siparis.finans")) === 1);
-    kontrol("§4b yalnız siparis izni → siparis.finans 0 satır", (await n("siparis", "siparis.finans")) === 0);
-    kontrol("§4c yalnız siparis izni → siparis 1 satır", (await n("siparis", "siparis")) === 1);
+    kontrol("§4a izinli (cari-kart,cari-kart.kisisel) → kişisel satır 1", (await n("cari-kart,cari-kart.kisisel", "cari-kart.kisisel")) === 1);
+    kontrol("§4b yalnız cari-kart izni → cari-kart.kisisel 0 satır", (await n("cari-kart", "cari-kart.kisisel")) === 0);
+    kontrol("§4c yalnız cari-kart izni → cari-kart 1 satır", (await n("cari-kart", "cari-kart")) === 1);
     const bos = await kapsamda(c, { "app.tesis_id": a.tesisId, "app.projeksiyonlar": "" }, () => c.query<{ n: number }>("SELECT count(*)::int AS n FROM projection_rows"));
     kontrol("§4d boş projeksiyon listesi → 0 satır", bos.rows[0]!.n === 0);
   } finally {
@@ -279,7 +279,8 @@ async function main(): Promise<void> {
         ufuk,
         kayitlar: [
           girdi("siparis", { yaz: [{ id, siparisNo: `S-${k.tesisId.slice(0, 4)}`, durum: "ACIK" }], yeni: { t: ufuk.toISOString(), k: "000000000001" } }),
-          girdi("siparis.finans", { yaz: [{ id, tutar: "100.00" }], yeni: { t: ufuk.toISOString(), k: "000000000001" } }),
+          girdi("cari-kart", { yaz: [{ id, ad: "Bekçi", kod: "C-1" }], yeni: { t: ufuk.toISOString(), k: "000000000001" } }),
+          girdi("cari-kart.kisisel", { yaz: [{ id, yetkili: "Ayşe" }], yeni: { t: ufuk.toISOString(), k: "000000000001" } }),
         ],
       });
       const r = await imzali(o, k, "/v1/esitle", { govde: p });

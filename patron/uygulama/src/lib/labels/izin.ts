@@ -3,7 +3,7 @@
 // burada olduğunu `__tests__/labels.test.ts` §1 ölçer (yeni izin eklenince sözlük eksikse kırmızı).
 import { TERIM } from "../terim";
 
-export type PermissionGroup = "siparis" | "cari" | "finans" | "rapor" | "hesap";
+export type PermissionGroup = "siparis" | "cari" | "rapor" | "hesap";
 
 export interface PermissionLabel {
   readonly ad: string;
@@ -14,7 +14,6 @@ export interface PermissionLabel {
 export const PERMISSION_GROUPS: readonly { readonly key: PermissionGroup; readonly ad: string }[] = [
   { key: "siparis", ad: "Sipariş" },
   { key: "cari", ad: "Cari" },
-  { key: "finans", ad: "Finans" },
   { key: "rapor", ad: "Rapor" },
   { key: "hesap", ad: "Hesap yönetimi" },
 ];
@@ -29,14 +28,6 @@ export const PERMISSION_LABEL: Readonly<Record<string, PermissionLabel>> = {
   "bulut:stok:oku": { ad: "Stoku görme", aciklama: "Ham ve bitmiş stok miktarlarını görür", grup: "siparis" },
   "bulut:cari:oku": { ad: "Carileri görme", aciklama: "Müşteri ve tedarikçi kartlarını görür", grup: "cari" },
   "bulut:cari:yaz": { ad: "Cari talebi gönderme", aciklama: "Fabrikaya yeni cari açma talebi gönderir (gelen kutusu)", grup: "cari" },
-  "bulut:cari-bakiye:oku": { ad: "Cari bakiyeleri", aciklama: "Carilerin alacak/borç bakiyesini ve yaşlandırmayı görür", grup: "cari" },
-  "bulut:kasa:oku": { ad: "Kasa", aciklama: "Kasa hareketlerini ve bakiyesini görür", grup: "finans" },
-  "bulut:cek:oku": { ad: "Çek ve senet", aciklama: "Çek/senet portföyünü ve vadeleri görür", grup: "finans" },
-  "bulut:fatura:oku": { ad: "Faturalar", aciklama: "Kesilen ve alınan faturaları görür", grup: "finans" },
-  "bulut:tahsilat:oku": { ad: "Tahsilat ve ödeme", aciklama: "Tahsilat ve ödeme kayıtlarını görür", grup: "finans" },
-  "bulut:fiyat:oku": { ad: "Fiyatlar", aciklama: "Birim fiyatları ve tutarları görür", grup: "finans" },
-  "bulut:teklif:oku": { ad: "Teklifleri görme", aciklama: "Müşteriye gönderilmiş teklifleri ve kalemlerini görür", grup: "siparis" },
-  "bulut:maliyet:oku": { ad: "Maliyet ve marj", aciklama: "Teklif tutarlarını, maliyeti, kârlılığı ve standart maliyetleri görür", grup: "finans" },
   "bulut:rapor:oku": { ad: "Raporlar", aciklama: "Fabrikadan rapor ister ve sonuçlarını görür", grup: "rapor" },
   "bulut:hesap:yonet": { ad: "Hesap yönetimi", aciklama: "Hesap davet eder, izin verir, kilitler; verileri dışa aktarır", grup: "hesap" },
 };

@@ -1,5 +1,6 @@
 // Rapor isteği: istenebilir liste fabrikanın `rapor-katalogu` anlık kaydından okunur; anahtar → izin
-// eşlemesi bulut kataloğunun aynasıdır (ayna bekçisi `patron/sunucu/src/catalog/reports.ts` ile ölçer).
+// eşlemesi bulut kataloğunun aynasıdır (ayna bekçisi `patron/sunucu/src/catalog/reports.ts` ile ölçer): fabrikanın
+// `REMOTE_REPORTS` listesindeki 6 karne; finans/maliyet/dokuma ve eski v2 anahtarları Adnan'da yok.
 // Parametreler fabrikanın kendi şemasıyla yeniden doğrulanır; uygulama yalnız tarih aralığı + ek alan toplar.
 import type { RaporSunumu } from "../api/wire";
 import { trDateToIso } from "./forms";
@@ -11,24 +12,6 @@ export const REPORT_KEY_PERMISSION: Readonly<Record<string, string>> = {
   "quality/scorecard": "bulut:uretim:oku",
   "subcontract/scorecard": "bulut:uretim:oku",
   "inventory/scorecard": "bulut:stok:oku",
-  "finance/aging": "bulut:cari-bakiye:oku",
-  "finance/cheque-due": "bulut:cek:oku",
-  // Raporlar v2 temel raporları (R1-BULUT)
-  "sales/siparis-talep": "bulut:siparis:oku",
-  "sales/sevkiyat": "bulut:sevkiyat:oku",
-  "sales/termin": "bulut:sevkiyat:oku",
-  "sales/acik-siparisler": "bulut:siparis:oku",
-  "sales/vazgecilen-is": "bulut:siparis:oku",
-  "quality/kalite": "bulut:uretim:oku",
-  "quality/kayip": "bulut:uretim:oku",
-  "inventory/depo": "bulut:stok:oku",
-  "subcontract/fasoncular": "bulut:uretim:oku",
-  "dokuma/tezgah-randimani": "bulut:uretim:oku",
-  "dokuma/duruslar": "bulut:uretim:oku",
-  "dokuma/levent-dengesi": "bulut:uretim:oku",
-  "production/makine-duruslari": "bulut:uretim:oku",
-  "finance/alacaklar": "bulut:cari-bakiye:oku",
-  "maliyet/karlilik": "bulut:maliyet:oku",
 };
 
 export const REPORTS_NOT_IN_CLOUD: readonly string[] = ["audit/*", "production/operator-performance", "production/uretim-akisi"];
@@ -37,23 +20,9 @@ export const REPORTS_NOT_IN_CLOUD: readonly string[] = ["audit/*", "production/o
  * Sonucu `RaporSunumu` olan (v2) anahtarlar — uygulama bunları `SunumGorunumu` ile basar. Uygulamanın TANIMADIĞI
  * anahtar listede çizilmez (`requestable` eşlemesi); eski uygulama yeni anahtarı görmez.
  */
-export const PRESENTATION_REPORT_KEYS: readonly string[] = [
-  "sales/siparis-talep",
-  "sales/sevkiyat",
-  "sales/termin",
-  "sales/acik-siparisler",
-  "sales/vazgecilen-is",
-  "quality/kalite",
-  "quality/kayip",
-  "inventory/depo",
-  "subcontract/fasoncular",
-  "dokuma/tezgah-randimani",
-  "dokuma/duruslar",
-  "dokuma/levent-dengesi",
-  "production/makine-duruslari",
-  "finance/alacaklar",
-  "maliyet/karlilik",
-];
+// Adnan'da fabrika yalnız 6 karneyi sunar (`REMOTE_REPORTS`); hiçbiri v2 sunum zarfı değil. Liste boştur; sunum
+// görünümü fabrika v2 rapor sunmaya başlarsa anahtar buraya eklenerek açılır.
+export const PRESENTATION_REPORT_KEYS: readonly string[] = [];
 
 export function isPresentationKey(key: string): boolean {
   return PRESENTATION_REPORT_KEYS.includes(key);

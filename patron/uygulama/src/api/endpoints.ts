@@ -107,23 +107,19 @@ export interface ListParams {
   readonly durum?: string;
   readonly cariKartId?: string;
   /** Kimlik süzgeçleri yalnız sunucu `liste.kimlikSuzgecleri`nde beyanlıysa gönderilir (eski sunucu yok sayar). */
-  readonly cariHesapId?: string;
   readonly siparisId?: string;
-  readonly teklifId?: string;
   /** Üyelik süzgeci (`LIST_MEMBER_FILTERS`); yalnız sunucu `liste.uyelikSuzgecleri`nde beyanlıysa gönderilir. */
   readonly fasonFirmaId?: string;
   /** Sunucu araması (`LIST_SEARCH`); istemci süzmez. */
   readonly ara?: string;
   readonly suzgec?: string;
-  /** Fabrika anahtarı süzgeci (`LIST_KEY_FILTERS`); yalnız sunucu `liste.anahtarSuzgecleri`nde beyanlıysa gönderilir. */
-  readonly kategoriAnahtari?: string;
   /** Sunucu sıralaması (`LIST_SORT`); yalnız sunucu `liste.siralama`da beyan ettiyse gönderilir. */
   readonly sirala?: string;
   readonly yon?: ListSortDir;
 }
 
 export function createApi(c: ApiClient) {
-  const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, cariHesapId: p.cariHesapId, siparisId: p.siparisId, teklifId: p.teklifId, fasonFirmaId: p.fasonFirmaId, ara: p.ara, suzgec: p.suzgec, kategoriAnahtari: p.kategoriAnahtari, sirala: p.sirala, yon: p.yon });
+  const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, siparisId: p.siparisId, fasonFirmaId: p.fasonFirmaId, ara: p.ara, suzgec: p.suzgec, sirala: p.sirala, yon: p.yon });
   return {
     login: (b: { eposta: string; parola: string; totp?: string; istemci?: "mobil" | "web"; tesisId?: string }) => c.post<LoginResponse>(pathOf("login"), b),
     inviteInspect: (davet: string) => c.post<InviteInfo>(pathOf("inviteInspect"), { davet }),

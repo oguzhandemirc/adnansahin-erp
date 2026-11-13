@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
 import { fmtFactoryDate } from "../../../src/lib/factory-time";
-import { REPORT_PARAM, reportDomain, reportTitle } from "../../../src/lib/labels/finans";
+import { REPORT_PARAM, reportDomain, reportTitle } from "../../../src/lib/labels/rapor";
 import { humanize } from "../../../src/lib/present";
 import { buildReportParams, catalogEntries, extraParamNames, isPresentationKey, rangeParamNames, requestable } from "../../../src/lib/reports";
 import { useSession } from "../../../src/state/session";

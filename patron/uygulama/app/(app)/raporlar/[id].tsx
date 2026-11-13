@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { errorMessage } from "../../../src/api/client";
 import { formatDateTime } from "../../../src/lib/format";
-import { REPORT_ERROR, reportDomain, reportPending, reportTitle } from "../../../src/lib/labels/finans";
+import { REPORT_ERROR, reportDomain, reportPending, reportTitle } from "../../../src/lib/labels/rapor";
 import { catalogEntries, isPresentation, isPresentationKey } from "../../../src/lib/reports";
 import { invalidate } from "../../../src/state/changes";
 import { useSession } from "../../../src/state/session";
