@@ -74,6 +74,9 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Süperadmin, sistem ve teknik kullanıcı buluta ASLA gitmez; pasif, silinmiş ve izin penceresi dışındaki kullanıcı kümeden düşer (süzgeç sorguda ve satır yükleminde iki kat). [bekçi: test_patron_bulut_kullanicilar]
 - Kullanıcı kaydı açık select'le okunur (`CLOUD_USER_SELECT`); PIN, kart, TOTP sırrı ve oturum sayacı ne okunur ne gider; parola bcrypt özeti olduğu gibi gider. [bekçi: test_patron_bulut_kullanicilar]
 - Kullanıcı listesi işi ve `--kuru` aracı log'a, audit'e ve hata özetine yalnız SAYI yazar; parola özeti ve küme özeti basılmaz. [bekçi: test_patron_bulut_kullanicilar]
+- Kullanıcı listesi işinin (`jobs/cloud-users.job.ts`) ayrı düğmesi yoktur: eşitleme ön koşulu açıkken başlar, kapanınca durur; her tur önce ön koşulu sorar ve kapalıyken ne DB okur ne istek atar. [bekçi: test_patron_bulut_kullanicilar]
+- Liste her gönderimde TAM kümedir: 30 sn'de bir kurulur, özet değiştiyse ya da 10 dk geçtiyse gönderilir; kümede olmayan hesabı bulut kapatır. [bekçi: test_patron_bulut_kullanicilar]
+- Eski bulut (`/v1/kullanicilar` 404) hata değildir: tek satır log + 60 dk geri çekilme; kurulum sırası önce bulut, sonra fabrikadır. [bekçi: test_patron_bulut_kullanicilar]
 
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 

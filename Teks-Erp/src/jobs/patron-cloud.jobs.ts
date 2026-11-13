@@ -16,6 +16,7 @@ import { startCloudSync, stopCloudSync } from "./cloud-sync.job";
 import { inboxEligibility, type InboxEligibility } from "../cloud-sync/eligibility";
 import { startCloudInbox, stopCloudInbox } from "./cloud-inbox.job";
 import { startCloudReports, stopCloudReports } from "./cloud-report.job";
+import { startCloudUsers, stopCloudUsers } from "./cloud-users.job";
 import { ensurePatronCloudUser, type EnsureResult } from "../services/patron-cloud-user.service";
 
 const SETTING_PREFIX = "patronCloud.";
@@ -99,6 +100,8 @@ export interface ReconcileDeps {
   readonly inbox?: InboxReconcileDeps;
   /** Rapor isteği ayağı (ayrı düğmesi yok: eşitlemeyle birlikte başlar/durur); verilmezse canlı iş. */
   readonly reports?: ReportJobDeps;
+  /** Kullanıcı listesi ayağı (ayrı düğmesi yok: eşitlemeyle birlikte başlar/durur); verilmezse canlı iş. */
+  readonly users?: ReportJobDeps;
 }
 
 export interface ReportJobDeps {
@@ -107,6 +110,7 @@ export interface ReportJobDeps {
 }
 
 export const LIVE_REPORT_JOB: ReportJobDeps = { start: startCloudReports, stop: stopCloudReports };
+export const LIVE_USERS_JOB: ReportJobDeps = { start: startCloudUsers, stop: stopCloudUsers };
 
 export const LIVE_INBOX_RECONCILE: InboxReconcileDeps = {
   eligibility: () => inboxEligibility(),
@@ -151,6 +155,7 @@ export type ReconcileResult = "BASLADI" | "DURDU" | "TETIKLEYICI_ACILAMADI" | "T
 export async function reconcilePatronCloud(reason: string, deps: ReconcileDeps = LIVE_RECONCILE): Promise<ReconcileResult> {
   const inbox = deps.inbox ?? LIVE_INBOX_RECONCILE;
   const reports = deps.reports ?? LIVE_REPORT_JOB;
+  const users = deps.users ?? LIVE_USERS_JOB;
   try {
     const elig = await deps.eligibility();
     if (elig.ok) {
@@ -159,18 +164,21 @@ export async function reconcilePatronCloud(reason: string, deps: ReconcileDeps =
         deps.stop();
         inbox.stop();
         reports.stop();
+        users.stop();
         uyari("patron-bulut", `tetikleyiciler açılamadı (${r.code}, ${r.retries} tekrar; ${reason}) — eşitleme BAŞLAMADI`);
         return "TETIKLEYICI_ACILAMADI";
       }
       if (r.changed > 0) bilgi("patron-bulut", `tetikleyiciler açıldı (${r.changed}; ${reason})`);
       deps.start();
       reports.start();
+      users.start();
       await reconcileInbox(inbox, reason);
       return "BASLADI";
     }
     deps.stop();
     inbox.stop();
     reports.stop();
+    users.stop();
     // Ön koşul kapalı: yalnız AÇIK kalmış tetikleyici varsa anahtara dokunulur (salt okuma ilk adım).
     if ((await deps.switch.enabledCount()) === 0) return "DURDU";
     const r = await switchTriggers(false, deps.switch);
@@ -184,6 +192,7 @@ export async function reconcilePatronCloud(reason: string, deps: ReconcileDeps =
     deps.stop();
     inbox.stop();
     reports.stop();
+    users.stop();
     const msg = err instanceof Error ? err.message : String(err);
     uyari("patron-bulut", `uzlaştırma hata verdi (${reason}): ${msg.replace(/\s+/g, " ").slice(0, 200)}`);
     return "HATA";
@@ -213,6 +222,7 @@ export function stopPatronCloudJobs(): void {
   stopCloudSync();
   stopCloudInbox();
   stopCloudReports();
+  stopCloudUsers();
 }
 
 /** `SystemSettingService.set` her yazımdan sonra çağırır; yalnız `patronCloud.*` anahtarında iş yapar. Fırlatmaz, beklenmez. */
