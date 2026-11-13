@@ -60,6 +60,7 @@ Birden çok alanı kesen konvansiyonlar (audit, katman sırası, hata/mesaj söz
 - Ekran manifestosu okunamazsa "gizlenecekler" listesi hiç çizilmez; boş liste "hiçbir şey gizlenmez" yalanıdır.
 - `ModalTextInput`ta eşitleme koşulu `value` prop'unun değişmesidir, "taslaktan farklı olması" değil.
 - Komut kancası (`bash-guard.mjs`) yasağı yalnız çalıştırılan kabuk komutunda arar; dosyaya yazılıp çalıştırılan script kapsam dışıdır. Kanca yolu göreli yazılırsa kanca sessizce ölür.
+- Backend 2.12.1 + eski panel (≤ 1.3.16): zayıf parolalı kullanıcı "Bu uygulamayı kullanma yetkin yok" görür (kısıtlı token izinsiz, eski panel alanı tanımaz) ve giriş ekranında kalır; çare panel 1.3.17 (backend'den önce ya da aynı pencerede) ya da yöneticinin parolayı sıfırlaması.
 - Yeni ekran görünmüyorsa sırayla bak: izin satırı DB'de mi, kullanıcıya atanmış mı, kullanıcı yeniden giriş yaptı mı (JWT bayat).
 
 ## Bekçiler

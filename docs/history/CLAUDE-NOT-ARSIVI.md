@@ -13241,3 +13241,20 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Değişmezler.** Süperadmin/sistem/teknik kullanıcı hiç gitmez (sorgu + yüklem, iki kat); açık select, PIN/kart/TOTP/oturum sayacı okunmaz; log yalnız sayı; katalog ve sözleşme sürümü değişmez; migration yok.
 
 **Dilimler (fabrika).** W tel sözleşmesi iki uçta bayt-eşit · F1 izin + türetme + dışa aktarım + `scripts/patron-bulut-kullanicilar.ts --kuru` · F2 fabrika işi (`jobs/cloud-users.job.ts`) · F3 gelen kutusu yazarın güncel iznini denetler. Bulut servis/uç kodu (C1–C4) ve sürüm (F4) ayrı dilimlerdir.
+
+
+## 2026-11-13 — Şifre sıkılaştırma: parola kuralı, kısıtlı oturum, PIN yalnız saha (backend 2.12.1 · panel 1.3.17) [ÇEKİRDEK]
+
+**Neden.** Fabrikada parola eşiği 6 karakterdi, yaygın/kişisel parola serbestti, kullanıcının kendi parolasını değiştireceği yol yoktu ve PIN/kart girişi panelden de denenebiliyordu. Güvenlik denetimi (2026-11-13) ek olarak IP kovasının başarılı girişle sıfırlanmasını (Y4), yönetici hesaplarının PIN'le girebilmesini (Y5) ve zayıf parolalı kullanıcı özetinin buluta gidebilmesini (Y8) buldu.
+
+**Kararlar.**
+- Tek kural helper'ı `helpers/password-policy.helper.ts` (≥ 10 karakter, ≤ 72 bayt, tekrar/dizi/klavye sırası, yaygın liste, kullanıcı adı/ad-soyad tabanlı parola yasak; ret 400 `PASSWORD_POLICY`). Her parola yazımı `newPasswordFields` ile `passwordPolicyVersion` damgalar; buluta yalnız güncel sürümle yazılmış parola gider (Y8).
+- Zayıf parolayla giriş reddedilmez, KISITLANIR: masaüstünde izinsiz + claim'li token yalnız `change-password` + `logout`a geçer; sahada token yalnız `mobile:*` taşır (tablet 1.0.14 Play turu istemeden çalışır). Durum JWT claim'inde, migration yok.
+- `POST /api/auth/change-password` eski parolayı ister, `tokenVersion++` ile bütün oturumları düşürür, yeni tam token döner (ölçüldü: eski kısıtlı ve mobil token 401, yeni token 200).
+- Panel (D4): zorunlu adım kaçışsızdır, tek çıkışı "Çıkış yap"tır; kısıtlı token diske yazılmaz — uygulama kapanırsa açılış giriş ekranıdır. Normal oturumda hesap menüsü → "Parolamı değiştir" aynı form; yeni token yerinde yazılır, sekmeler kalır. Panel ön denetimi yalnız uzunluk (kural kopyalanmaz, sunucu cümlesi alan altında).
+- PIN ve QR kart yalnız onaylı + aktif saha cihazından (`req.device`), süperadmin ve `admin:` izinli hesap hiç giremez (cevap tanınmayan PIN'le birebir). Bu yüzden `superadmin:kur` artık PIN üretmez, `--rotate` eski PIN'i siler.
+- Başarılı giriş geniş (IP) kilit kovasını sıfırlamaz; yalnız o kimliğin kendi hataları düşer (Y4).
+
+**Yayın.** Backend 2.12.1 ile panel 1.3.17 AYNI bakım penceresinde (ya da panel önce): eski panel kısıtlı token'ı "yetkin yok" diye reddeder ve giriş ekranında kalır (fail-closed, kalıcı kilit yok). Mobil değişmez.
+
+**Kaynak.** Plan: `PLAN-sifre-sikilastirma.md` (repo dışı plan klasörü) (D1 `7fb2f37d` · D2 `ee086a4e` · D3 `bbd4ebe9` · D6 `aba60bb7` `6d5de827` `9d611137` `9f6f5018` `b8e4420e` · D4 + PIN + D5 bu dal). Kural satırları `docs/kurallar/yetki-izin.md` § Parola ve giriş yöntemi, eski panel tuzağı `docs/kurallar/genel.md`.
