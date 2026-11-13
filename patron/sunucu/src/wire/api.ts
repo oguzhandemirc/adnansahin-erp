@@ -264,7 +264,7 @@ export const LIST_SORT: Readonly<Record<string, Readonly<Record<string, ListSort
 
 // ---------------------------------------------------------------- görünüm tercihleri (veri tablosu)
 /** `GET|POST /oturum/tercihler/:anahtar` — hesabın KENDİ görünüm tercihi; beyaz listeli anahtar, değer boyut sınırlı JSON. */
-export const VIEW_PREF_KEYS = ["tablo.siparis", "tablo.cari-kart", "tablo.sevkiyat", "tablo.stok"] as const;
+export const VIEW_PREF_KEYS = ["tablo.siparis", "tablo.cari-kart", "tablo.sevkiyat", "tablo.stok", "tablo.stok-kalem", "tablo.stok-top", "stok.gorunum"] as const;
 export type ViewPrefKey = (typeof VIEW_PREF_KEYS)[number];
 /** Değerin JSON metni en çok bu kadar bayt (UTF-8). */
 export const VIEW_PREF_MAX_BYTES = 4096;

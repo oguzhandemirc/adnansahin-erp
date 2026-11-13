@@ -568,6 +568,13 @@
       ]
     },
     {
+      "name": "stok-kalem",
+      "kind": "ANLIK",
+      "permissions": [
+        "bulut:stok:oku"
+      ]
+    },
+    {
       "name": "acik-siparis-karsilama",
       "kind": "ANLIK",
       "permissions": [
@@ -795,6 +802,9 @@
       "bulut:fatura:oku"
     ],
     "stok-karnesi": [
+      "bulut:stok:oku"
+    ],
+    "stok-kalem": [
       "bulut:stok:oku"
     ],
     "acik-siparis-karsilama": [
