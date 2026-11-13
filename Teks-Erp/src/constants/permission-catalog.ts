@@ -185,6 +185,10 @@ export const PERMISSION_CATALOG = [
   { code: "report:finance", module: "REPORTS", category: "web", description: "Cari bakiye · yaşlandırma · ekstre · kasa-banka raporları" },
   { code: "admin:users", module: "ADMIN", category: "admin", description: "Kullanıcı + yetki yönetimi" },
   { code: "admin:settings", module: "ADMIN", category: "admin", description: "Sistem ayarları + log arşiv" },
+  // 2026-11-13: PATRON TELEFONU GİRİŞİ — taşıyan kullanıcı Electron kullanıcı adı + şifresiyle patron uygulamasına
+  // girer; telefon izinleri fabrika izinlerinden TÜRETİLİR (`cloud-sync/user-permission-map.ts`). Birebir açık
+  // atamayla geçer: `*` (süperadmin) ve "Admin (Tam Yetki)" şablonu bu kodu TAŞIMAZ (`ALL_MODE_EXCLUDED`).
+  { code: "patron:giris", module: "ADMIN", category: "web", description: "Patron telefon uygulamasına giriş (Electron kullanıcı adı + şifresiyle; telefon izinleri fabrika izinlerinden türetilir)" },
   // 2026-08-05: "Bu Bilgisayar" (yerel donanım) ayarları — etiket yazıcısı,
   // kantar, barkod tabancası, sunucu adresi. `admin:settings`ten AYRI olması
   // ürün kararıdır: bu ayarların HİÇBİRİ sunucuya yazılmaz, yalnız o makinenin

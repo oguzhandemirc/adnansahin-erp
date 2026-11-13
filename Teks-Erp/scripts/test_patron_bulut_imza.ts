@@ -16,6 +16,7 @@
 //   · cloud-client gzip'te imzayı SIKIŞTIRILMAMIŞ gövdeye attı → §1 gzip kabulü ✗ (ISTEK_GOVDE_OZETI)
 //   · key-file `keyFileModeOk` her zaman true → §2 "izni geniş dosya açılmaz" ✗
 //   · key-file parseBody JSON hatasında metni mesaja ekledi → §3 sızıntı kontrolleri ✗
+//   · (2026-11-13) bulut tel kopyasına tek satır eklendi → §0 "bulut kopyasıyla bayt-eşit" ✗ (35/1)
 // =============================================================================
 import { createHash, randomUUID } from "node:crypto";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -81,12 +82,19 @@ async function main(): Promise<void> {
       "src/lib/cloud-signing/parmak-izi.ts": "8e9de778bab11815b6ae2e13ecfaaaf2ac94cba1639fbb114f62e2214723b1e6",
       "src/lib/cloud-signing/belgeler.ts": "336593a378b06aaadfa0c88b90542b90385b81c1ac5b998f419f00fe0e8d357f",
       "src/lib/cloud-signing/istek.ts": "09dbf16ef7e8e43456ff69bd5072933dd291df4fe9486d34f91d0fe6efa5d865",
-      "src/cloud-sync/wire/esitleme.ts": "e25027f80602ae5ec5118d1e59fe75b897e50fc071d087c727d8dfb769e28519",
+      "src/cloud-sync/wire/esitleme.ts": "bcc2c8cca83a7bee6c81f428e7dbe7c2b28e0a4906e087c2ea43ab56f97ea923",
     };
     for (const [f, h] of Object.entries(SEAL)) {
       const got = createHash("sha256").update(readFileSync(path.join(ROOT, f))).digest("hex");
       check(`${f} mühürle aynı`, got === h, got === h ? "" : `değişti → bulut kopyasıyla birlikte güncelle (${got.slice(0, 12)}…)`);
     }
+    // Tel aynası: monorepo'da bulut kopyası da durur — iki uç aynı commit'te, bayt-eşit.
+    const cloudWire = path.join(ROOT, "..", "patron", "sunucu", "src", "wire", "esitleme.ts");
+    check(
+      "tel sözleşmesi bulut kopyasıyla (patron/sunucu/src/wire/esitleme.ts) bayt-eşit",
+      existsSync(cloudWire) && readFileSync(cloudWire).equals(readFileSync(path.join(ROOT, "src/cloud-sync/wire/esitleme.ts"))),
+      existsSync(cloudWire) ? "" : "bulut kopyası yok",
+    );
 
     // ── §1 İmza gidiş-dönüş ─────────────────────────────────────────────────
     console.log("\n§1 fabrika imzası → bulut doğrulaması");

@@ -118,6 +118,9 @@ const DINAMIK_IZIN_KAYNAKLARI: Record<string, readonly string[]> = {
   // "kim değiştirdi"sini de okuyamamalı. Allowlist DIŞI tablo 400 ile reddedilir
   // (serbest tableName, audit'i dolaylı bir arama yüzeyine çevirirdi).
   "src/routes/record-info.routes.ts": ["TABLE_PERMISSIONS"],
+  // matchesPermission(perms, s) — s ∈ CLOUD_PERMISSION_SOURCES[bulut izni]: patron telefonu izin türetme
+  // tablosu (2026-11-13); fabrika kodları değerlerdedir, anahtarlar bulut kodudur (`bulut:*`).
+  "src/cloud-sync/user-permission-map.ts": ["CLOUD_PERMISSION_SOURCES"],
   // matchesPermission(perms, adapter.writePermission / adapter.readPermission)
   // — adaptör `import-registry`den `:entity` ile çözülür. Yetki AKTARILAN
   // VERİYE göredir: `data:import` yalnız "toplu yükleme yapabilir" demektir,

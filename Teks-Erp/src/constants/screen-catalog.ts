@@ -457,6 +457,7 @@ export const SCREENLESS_PERMISSIONS: ReadonlyArray<{ code: string; reason: strin
   { code: "loom:doff", reason: "Panel doff yüzeyi yok; tablet `mobile:dokuma` ile kaydeder — web kodu API/entegrasyon için." },
   { code: "loom:doff-revoke", reason: "Panel geri alma yüzeyi yok; tablet `mobile:dokuma-geri-al` ile — web kodu API/entegrasyon için." },
   // Tezgah künyesi + gölge mod (B3, 2026-09-14): "Devreye Alma" ekranı AYRI dilim (Faz 2 ingest ile, `tezgah.enabled`).
+  { code: "patron:giris", reason: "Panel ekranı yok: patron telefon uygulamasına giriş izni (2026-11-13); atama Kullanıcılar ekranındaki izin listesinden." },
   { code: "loom:spec-manage", reason: "Devreye Alma ekranı ayrı dilim (Faz 2 ingest ile doğar); künye/gölge mod uçları API için." },
 ];
 

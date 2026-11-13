@@ -22,6 +22,7 @@ export const SYNC_PATHS = {
   ACCOUNT_LOCK: "/v1/hesap-kilitle",
   REPORT_CLAIM: "/v1/rapor/al",
   REPORT_RESULT: "/v1/rapor/sonuc",
+  USERS: "/v1/kullanicilar",
 } as const;
 export type SyncPath = (typeof SYNC_PATHS)[keyof typeof SYNC_PATHS];
 
@@ -279,6 +280,35 @@ export const AccountLockRequestSchema = z.strictObject({
 export type AccountLockRequest = z.infer<typeof AccountLockRequestSchema>;
 export const AccountLockResponseSchema = z.object({ v: z.literal(ENVELOPE_VERSION), hesap: CloudAccountSchema });
 export type AccountLockResponse = z.input<typeof AccountLockResponseSchema>;
+
+// ---------------------------------------------------------------- kullanıcı listesi (üyelik = fabrika parolası)
+
+/**
+ * Telefona giriş izni (`patron:giris`) taşıyan fabrika kullanıcılarının TAM kümesi; her gönderimde hepsi gider —
+ * kümede olmayan hesap bulutta kapatılır (projeksiyon DEĞİL: satırı `projection_rows`a girmez). İzinler fabrikada
+ * TÜRETİLİR, telde yalnız `bulut:*` kodu taşınır; ham fabrika izni, PIN, kart, TOTP sırrı, oturum sayacı GİTMEZ.
+ * `ozet` = `sha256(JSON.stringify(kullanicilar))` (hex) — dizi `id`ye göre sıralı, her kullanıcıda anahtar sırası
+ * şemadaki sıradır ve `izinler` sıralıdır; bulut aynı değeri ayrıştırdığı gövdeden yeniden hesaplayabilir.
+ */
+export const USERS_PUSH_MAX = 1000;
+export const CLOUD_USER_PERMISSIONS_MAX = 50;
+export const CLOUD_USERNAME_PATTERN = /^[A-Za-z0-9._-]{1,50}$/;
+/** bcrypt özeti (`$2a`/`$2b`/`$2y`), maliyet ≥ 10. */
+export const BCRYPT_DIGEST_PATTERN = /^\$2[aby]\$(1\d|2\d|3[01])\$[./A-Za-z0-9]{53}$/;
+export const CLOUD_PERMISSION_PATTERN = /^bulut:[a-z][a-z-]*(:[a-z][a-z-]*)?$/;
+export const CloudUserSchema = z.strictObject({
+  id: Uuid, kullaniciAdi: z.string().regex(CLOUD_USERNAME_PATTERN), ad: z.string().trim().min(1).max(200), parolaOzeti: z.string().regex(BCRYPT_DIGEST_PATTERN),
+  izinler: z.array(z.string().regex(CLOUD_PERMISSION_PATTERN)).max(CLOUD_USER_PERMISSIONS_MAX),
+});
+export type CloudUser = z.infer<typeof CloudUserSchema>;
+const distinct = (xs: readonly string[]): boolean => new Set(xs).size === xs.length;
+export const UsersPushRequestSchema = z
+  .strictObject({ v: z.literal(ENVELOPE_VERSION), uretildi: Iso, ozet: z.string().regex(/^[0-9a-f]{64}$/), kullanicilar: z.array(CloudUserSchema).max(USERS_PUSH_MAX) })
+  .refine((r) => distinct(r.kullanicilar.map((k) => k.id)) && distinct(r.kullanicilar.map((k) => k.kullaniciAdi.toLowerCase())), "Kullanıcı kimliği/adı tekrar ediyor");
+export type UsersPushRequest = z.infer<typeof UsersPushRequestSchema>;
+const Count = z.number().int().min(0).default(0);
+export const UsersPushResponseSchema = z.object({ v: z.literal(ENVELOPE_VERSION), ozet: z.string(), eklenen: Count, guncellenen: Count, kapatilan: Count });
+export type UsersPushResponse = z.input<typeof UsersPushResponseSchema>;
 
 // ---------------------------------------------------------------- rapor isteği (§7, S13, S14)
 
