@@ -117,4 +117,6 @@ aynı. Şema sorununda: backend durdurulur, `[3/9]`un `premigrate_` yedeğinden 
 
 D8 provası (2026-11-12, 2026-11-11 yedeğinin kopyası): 301 GET çağrısının 301'inde HTTP durumu aynı; ortam ve
 prova anı alanları maskelenince gövde farkı 0; yazma dizisinde fazladan yazılan tablo yok; performans farkı
-gürültü düzeyinde. Sınır: `kur.ps1` ve pm2 Windows'ta koşulmadı; gerçek panel/tablet duman testi yapılmadı.
+gürültü düzeyinde. D9 provası (2026-11-13, yeniden paketlenen kod `ad19d317`): 301/301 HTTP durumu aynı; maskeden
+sonra kalan farklar yalnız yeni `system:sessions` izni (açılış uzlaştırması + 2 audit satırı), sürüm numarası ve prova
+kullanıcısının doğuş anı; `/api/sessions/active` yalnız yeni tarafta 200; 5 adımlık yazma dizisi aynı. Sınır: `kur.ps1` ve pm2 Windows'ta koşulmadı; gerçek panel/tablet duman testi yapılmadı.
