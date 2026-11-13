@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import apiClient from "@/services/apiClient";
 import { getOrCreateDeviceId } from "@/lib/deviceId";
+import { buildAnnounceBody, resolveHwClaim } from "@/lib/device-hw";
 import { IS_ELECTRON } from "@/lib/runtime-env";
 
 /**
@@ -32,9 +33,12 @@ export function useDeviceAnnounce(): void {
         // Electron PC → tür DESKTOP (tablet/telefon değil).
         // ⚠️ `suppressErrorToast`: kullanıcının BAŞLATMADIĞI bir arka plan çağrısı
         // asla toast basmamalı — üstteki kapı düşse bile bu ikinci hat kalır.
+        // Donanım özeti (2026-11-13): yalnız okunabildiyse eklenir; backend bayrağı kapalıyken yok sayılır.
+        const hw = await resolveHwClaim();
+        if (cancelled) return;
         await apiClient.post(
           "/api/devices/announce",
-          { deviceId, name, kind: "DESKTOP" },
+          buildAnnounceBody({ deviceId, name, kind: "DESKTOP" }, hw),
           { suppressErrorToast: true },
         );
       } catch {

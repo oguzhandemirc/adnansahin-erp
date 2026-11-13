@@ -330,10 +330,36 @@ export interface DiscoveryApi {
   pin: (installationId: string | null) => Promise<void>;
 }
 
+/** Cihaz kimliği (2026-11-13, ana ürün PR #134): donanım kaynağı — backend `HW_SOURCES` ile aynı küme. */
+export type HwSource = "ANDROID_ID" | "WIN_MACHINE_GUID" | "MAC_PLATFORM_UUID" | "LINUX_MACHINE_ID";
+/** Sunucuya giden donanım iddiası — yalnız kuruluma özgü HMAC özeti; ham değer ana süreçten çıkmaz. */
+export interface HwClaim {
+  v: 1;
+  kaynak: HwSource;
+  ozet: string;
+}
+export interface DeviceIdentityDescription {
+  hw: HwClaim | null;
+  /** Makine kimliği okundu ama özet anahtarı (sabitlenmiş kurulum kimliği) yok → çağıran anahtar verebilir. */
+  needsKey: boolean;
+}
+/** Yerel kimlik okuması: "yok" ile "okunamadı" ayrı (okunamayan kimliğin üstüne yazılmaz). */
+export type LocalIdRead = { status: "ABSENT" } | { status: "OK"; value: string } | { status: "UNREADABLE" };
+/** `primary` = asıl kimlik; `fallback` = asıl okunamazken kullanılan yedek yuva (asıl ezilmesin diye). */
+export type LocalIdSlot = "primary" | "fallback";
+export interface DeviceIdentityApi {
+  /** Makine özeti. `installationId` yalnız sabitlenmiş kimlik yoksa anahtar olarak kullanılır. */
+  describe: (installationId?: string | null) => Promise<DeviceIdentityDescription>;
+  readLocalId: (slot: LocalIdSlot) => Promise<LocalIdRead>;
+  /** Yalnız yuva YOKSA (ya da bizim yazamayacağımız kısa bir değerse) yazar; yazdıysa `true`. */
+  createLocalId: (slot: LocalIdSlot, value: string) => Promise<boolean>;
+}
+
 export interface ApiBridge {
   secureStore: SecureStoreApi;
   discovery: DiscoveryApi;
   appInfo: AppInfoApi;
+  deviceIdentity: DeviceIdentityApi;
   window: WindowApi;
   system: SystemApi;
   power: PowerApi;

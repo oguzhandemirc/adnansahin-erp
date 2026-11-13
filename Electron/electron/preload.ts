@@ -26,6 +26,11 @@ const api: ApiBridge = {
     probe: (baseUrl: string) => ipcRenderer.invoke("discovery:probe", baseUrl),
     pin: (installationId: string | null) => ipcRenderer.invoke("discovery:pin", installationId),
   },
+  deviceIdentity: {
+    describe: (installationId) => ipcRenderer.invoke("device-identity:describe", installationId ?? null),
+    readLocalId: (slot) => ipcRenderer.invoke("device-identity:read-local-id", slot),
+    createLocalId: (slot, value) => ipcRenderer.invoke("device-identity:create-local-id", slot, value),
+  },
   appInfo: {
     version: () => ipcRenderer.invoke("app:version"),
     platform: () => process.platform as AppPlatform,

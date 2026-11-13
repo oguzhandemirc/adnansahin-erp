@@ -1,5 +1,6 @@
 import { ipcMain, safeStorage } from "electron";
 import Store from "electron-store";
+import { decodeStored, type SecureInspect } from "./secure-store.core.js";
 
 interface StoreSchema {
   encrypted: Record<string, string>;
@@ -11,15 +12,22 @@ const store: Store<StoreSchema> = new Store<StoreSchema>({
 });
 
 function read(key: string): string | null {
-  const all = store.get("encrypted");
-  const ciphertext = all[key];
-  if (!ciphertext) return null;
+  const r = decodeStored(store.get("encrypted")[key], safeStorage);
+  return r.status === "OK" ? r.value : null;
+}
+
+/**
+ * Üç durumlu okuma (ABSENT / OK / UNREADABLE) — yalnız ana süreç içi.
+ * Depo dosyası okunamazsa da UNREADABLE ("yok" sayılıp üstüne yazılmasın).
+ */
+export function inspectSecureValue(key: string): SecureInspect {
+  let stored: string | undefined;
   try {
-    if (!safeStorage.isEncryptionAvailable()) return ciphertext;
-    return safeStorage.decryptString(Buffer.from(ciphertext, "base64"));
+    stored = store.get("encrypted")[key];
   } catch {
-    return null;
+    return { status: "UNREADABLE" };
   }
+  return decodeStored(stored, safeStorage);
 }
 
 function write(key: string, value: string): void {
