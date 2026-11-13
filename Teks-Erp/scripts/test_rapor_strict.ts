@@ -33,7 +33,9 @@ function strictTanimli(ad: string, kaynak: string): boolean {
   const re = new RegExp(`(?:export )?const ${ad}\\s*=\\s*([\\s\\S]*?);\\n`, "m");
   for (const metin of [kaynak, SHARED]) {
     const m = re.exec(metin);
-    if (m && /\.strict\(\)\s*$/.test(m[1]!.trim())) return true;
+    // `.strict()` zinciri ya da Zod 4'ün eşdeğer kurucusu `z.strictObject(…)` (bilinmeyen anahtar ikisinde de 400).
+    const tanim = m?.[1]!.trim() ?? "";
+    if (m && (/\.strict\(\)\s*$/.test(tanim) || /^z\.strictObject\(/.test(tanim))) return true;
   }
   return false;
 }
