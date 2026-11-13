@@ -117,19 +117,37 @@ export function ConfirmButton(p: { label: string; question: string; onConfirm: (
   );
 }
 
+/** Metin alanı. `secureTextEntry` verilirse sağda göz düğmesi parolayı gösterir/gizler (varsayılan gizli). */
 export function Field(p: TextInputProps & { label: string; hint?: string; error?: string }) {
   const t = useTokens();
   const s = useStyles();
-  const { label, hint, error, style, ...rest } = p;
+  const { label, hint, error, style, secureTextEntry, ...rest } = p;
+  const [goster, setGoster] = useState(false);
+  const gizli = !!secureTextEntry;
   return (
     <View style={s.field}>
       <Text style={s.label}>{label}</Text>
-      <TextInput
-        placeholderTextColor={t.textMuted}
-        accessibilityLabel={label}
-        style={[s.input, error ? { borderColor: t.status.kritik.fill } : null, style]}
-        {...rest}
-      />
+      <View>
+        <TextInput
+          placeholderTextColor={t.textMuted}
+          accessibilityLabel={label}
+          secureTextEntry={gizli && !goster}
+          style={[s.input, gizli && s.inputGoz, error ? { borderColor: t.status.kritik.fill } : null, style]}
+          {...rest}
+        />
+        {gizli ? (
+          <Pressable
+            onPress={() => setGoster((g) => !g)}
+            style={s.goz}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={goster ? "Parolayı gizle" : "Parolayı göster"}
+            testID={rest.testID ? `${rest.testID}-goster` : undefined}
+          >
+            <Ionicons name={goster ? "eye-off-outline" : "eye-outline"} size={22} color={t.textSecondary} />
+          </Pressable>
+        ) : null}
+      </View>
       {error ? <Text style={[s.muted, { color: t.status.kritik.fill }]}>{error}</Text> : hint ? <Text style={s.muted}>{hint}</Text> : null}
     </View>
   );
@@ -229,6 +247,8 @@ const useStyles = makeStyles((t) => ({
   row: { flexDirection: "row" as const, gap: space.s, flexWrap: "wrap" as const },
   flex: { flex: 1, minWidth: 120 },
   field: { marginBottom: space.m },
+  inputGoz: { paddingRight: 48 },
+  goz: { position: "absolute" as const, right: 0, top: 0, bottom: 0, width: 48, alignItems: "center" as const, justifyContent: "center" as const },
   label: { ...typography.footnote, fontWeight: "600" as const, color: t.textSecondary, marginBottom: space.xs },
   input: {
     minHeight: 52,
