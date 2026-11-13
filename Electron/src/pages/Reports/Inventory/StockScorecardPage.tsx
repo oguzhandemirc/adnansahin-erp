@@ -5,7 +5,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartCard, DetailTable, MetricCard, ReportExportBar, ReportPageLayout, SimpleBarChart } from "../_components";
 import { fmtInt, fmtNum } from "../_components/formatters";
 import { buildStockExport, stockScorecardApi } from "./stockScorecard";
-import { buildStockKalemExport, kalemErrorText, stockKalemApi } from "./stockKalem";
+import {
+  buildStockKalemExport,
+  buildStockKalemRollsExport,
+  kalemErrorText,
+  stockKalemApi,
+  stockKalemRollsKey,
+  type KalemGorunum,
+} from "./stockKalem";
 import { itemColumns, oldColumns } from "./stockScorecardColumns";
 import { StockKalemTab } from "./StockKalemTab";
 
@@ -27,14 +34,25 @@ export function StockScorecardPage() {
     enabled: sekme === "kalem",
   });
 
+  // "Top bazında" görünümde Excel/PDF iki bölümün top listesini basar (sekmeyle aynı önbellek).
+  const [kalemGorunum, setKalemGorunum] = useState<KalemGorunum>("kalem");
+  const rollsOn = sekme === "kalem" && kalemGorunum === "top";
+  const hamRolls = useQuery({ queryKey: stockKalemRollsKey("ham"), queryFn: () => stockKalemApi.toplar("ham"), staleTime: 30_000, enabled: rollsOn });
+  const bitmisRolls = useQuery({ queryKey: stockKalemRollsKey("bitmis"), queryFn: () => stockKalemApi.toplar("bitmis"), staleTime: 30_000, enabled: rollsOn });
+
   const sc = query.data?.data;
   const kalem = kalemQuery.data?.data;
   const kalemWarnings = kalemQuery.data?.warnings;
-  const spec = useMemo(
-    () => () => (sekme === "kalem" ? (kalem ? buildStockKalemExport(kalem, kalemWarnings) : null) : sc ? buildStockExport(sc) : null),
-    [sekme, sc, kalem, kalemWarnings],
+  const rolls = useMemo(
+    () => (hamRolls.data && bitmisRolls.data ? { ham: hamRolls.data, bitmis: bitmisRolls.data } : undefined),
+    [hamRolls.data, bitmisRolls.data],
   );
-  const exportDisabled = sekme === "kalem" ? !kalem : !sc;
+  const spec = useMemo(() => {
+    if (sekme !== "kalem") return () => (sc ? buildStockExport(sc) : null);
+    if (kalemGorunum === "top") return () => (kalem && rolls ? buildStockKalemRollsExport(kalem, rolls, kalemWarnings) : null);
+    return () => (kalem ? buildStockKalemExport(kalem, kalemWarnings) : null);
+  }, [sekme, sc, kalem, kalemWarnings, kalemGorunum, rolls]);
+  const exportDisabled = sekme === "kalem" ? !kalem || (kalemGorunum === "top" && !rolls) : !sc;
 
   return (
     <ReportPageLayout
@@ -48,7 +66,7 @@ export function StockScorecardPage() {
       <Tabs value={sekme} onValueChange={(v) => setSekme(v as Sekme)}>
         <TabsList>
           <TabsTrigger value="genel">Genel</TabsTrigger>
-          <TabsTrigger value="kalem">Kalem bazında</TabsTrigger>
+          <TabsTrigger value="kalem">Kalem ve top</TabsTrigger>
         </TabsList>
         <TabsContent value="genel" className="flex flex-col gap-4">
           {sc && sc.summary.unagedCount > 0 ? (
@@ -146,6 +164,8 @@ export function StockScorecardPage() {
             isLoading={kalemQuery.isLoading}
             warnings={kalemWarnings}
             errorText={kalemQuery.isError ? kalemErrorText(kalemQuery.error) : undefined}
+            gorunum={kalemGorunum}
+            onGorunumChange={setKalemGorunum}
           />
         </TabsContent>
       </Tabs>

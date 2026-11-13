@@ -1,5 +1,5 @@
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -21,6 +21,24 @@ interface Props<T> {
   maxHeight?: number;
   /** Altta sabit toplam satırı — kolon başına bir hücre (sıra `columns` ile aynı). */
   totalRow?: ReactNode[];
+  /** Verilirse satır tıklanır (fare + Enter/Boşluk) — döküm diyaloğu açmak için. */
+  onRowClick?: (row: T) => void;
+}
+
+/** Tıklanabilir satırın fare + klavye (Enter/Boşluk) özellikleri; işleyici yoksa boş. */
+function clickableRow<T>(onRowClick: ((row: T) => void) | undefined, original: T) {
+  if (!onRowClick) return {};
+  return {
+    tabIndex: 0,
+    className: "cursor-pointer",
+    onClick: () => onRowClick(original),
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onRowClick(original);
+      }
+    },
+  };
 }
 
 /**
@@ -36,6 +54,7 @@ export function DetailTable<T>({
   emptyLabel = "Bu aralıkta veri yok",
   maxHeight = 480,
   totalRow,
+  onRowClick,
 }: Props<T>) {
   const table = useReactTable({
     data,
@@ -79,7 +98,7 @@ export function DetailTable<T>({
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} {...clickableRow(onRowClick, row.original)}>
                   {row.getVisibleCells().map((c) => (
                     <TableCell key={c.id} className="text-xs">
                       {flexRender(c.column.columnDef.cell, c.getContext())}
