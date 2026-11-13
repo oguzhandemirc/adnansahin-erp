@@ -33,7 +33,8 @@ function DurumHucresi({ durum }: { durum: unknown }) {
 
 const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "no", baslik: "No", ad: "Sipariş no", agirlik: 1.15, sirala: "siparisNo", hucre: (r) => kisaBelgeNo(str(k(r).siparisNo)) ?? "—" },
-  { key: "musteri", baslik: "Müşteri", agirlik: 1.05, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
+  // Müşteri adı kesilmez: geniş sütun + alt satıra kayar (en çok 3 satır).
+  { key: "musteri", baslik: "Müşteri", agirlik: 1.5, satir: 3, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
   { key: "tarih", baslik: "Tarih", ad: "Sipariş tarihi", agirlik: 1, sirala: "siparisTarihi", hucre: (r) => (str(k(r).siparisTarihi) ? formatDate(k(r).siparisTarihi) : "—") },
   // Sevk edilen / sipariş toplamı (m, brüt). Toplamı fabrika hesaplar (`toplamMiktar`); gelmiyorsa (eski fabrika) "—".
   {
