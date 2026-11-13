@@ -68,7 +68,7 @@ function section0(): void {
   check("change-password route verifyToken arkasında", /router\.post\("\/change-password",\s*verifyToken,/.test(routes));
   const svc = readFileSync(join(ROOT, "src/services/auth.service.ts"), "utf8");
   check("login kuralı helper'dan ölçüyor (checkPasswordPolicy)", /checkPasswordPolicy\(password,/.test(svc));
-  check("değiştirme yeni parolayı helper'dan hash'liyor", /hashNewPassword\(newPassword,/.test(svc));
+  check("değiştirme yeni parolayı helper'dan hash'liyor (newPasswordFields, Y8 sürümüyle)", /newPasswordFields\(newPassword,/.test(svc));
   const mw = readFileSync(join(ROOT, "src/middlewares/auth.middleware.ts"), "utf8");
   check("verifyToken kısıtlı claim'i soruyor", /payload\.passwordChangeRequired === true/.test(mw));
 }

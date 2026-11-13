@@ -15,7 +15,7 @@ import { readLoginMethods } from "./system-setting.service";
 import { SessionRegistryService } from "./session-registry.service";
 import { foldNameForCompare } from "./helpers/name-normalize.helper";
 import { readPatronCloudUserId } from "./helpers/patron-cloud-user.helper";
-import { hashNewPassword } from "./helpers/password-policy.helper";
+import { newPasswordFields } from "./helpers/password-policy.helper";
 
 /** Yetki (son-admin) guard'ı advisory lock namespace'i (F-KIM-GUV-003). Tek anahtar:
  *  guard sistem geneli tek bir seri kapıdır, kullanıcı başına DEĞİL. */
@@ -462,14 +462,14 @@ export class PermissionManagementService {
     if (!user) throw AppError.notFound("Kullanıcı bulunamadı");
 
     // Parola kuralı TEK helper'da (≥ 10 karakter + yaygın/kişisel parola yasağı).
-    const passwordHash = await hashNewPassword(newPassword, {
+    const passwordFields = await newPasswordFields(newPassword, {
       username: user.username,
       fullName: user.fullName,
     });
     // Şifre sıfırlandı → mevcut tüm oturumları düşür (tokenVersion bump).
     await prisma.user.update({
       where: { id: userId },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: { ...passwordFields, tokenVersion: { increment: 1 } },
     });
     // Session registry'yi de temizle (tokenVersion ile birlikte — anlık iptalin ikinci
     // katmanı: eski token hem tokenVersion hem revokedAt'ten düşer). Best-effort.
@@ -526,7 +526,7 @@ export class PermissionManagementService {
       : [];
 
     // Parola kuralı TEK helper'da — kullanıcı yaratılmadan ÖNCE.
-    const passwordHash = await hashNewPassword(input.password, {
+    const passwordFields = await newPasswordFields(input.password, {
       username: input.username,
       fullName: input.fullName,
     });
@@ -538,7 +538,7 @@ export class PermissionManagementService {
         updatedById: actorUserId ?? null,
         username: input.username,
         fullName: normalizeFullName(input.fullName),
-        passwordHash,
+        ...passwordFields,
         isActive: input.isActive ?? true,
         ...(defaultPerms.length
           ? {

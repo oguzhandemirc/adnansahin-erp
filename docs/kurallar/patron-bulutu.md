@@ -70,6 +70,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 ### Kullanıcı listesi (üyelik = Electron şifresi)
 
+- Buluta yalnız parolası GÜNCEL kural sürümüyle belirlenmiş kullanıcının özeti gider (Y8): `User.passwordPolicyVersion >= PASSWORD_POLICY_VERSION` hem sorguda hem satır yükleminde; sürümü yalnız `newPasswordFields` (yarat · yönetici sıfırla · kendi değiştir · süperadmin kur) günceller, eski parolalı kullanıcı yeniden belirleyene kadar ne girer ne yazar; bulut tarafında `PAROLA_ZAYIF` yanıtı yoktur (kâhin olurdu). [bekçi: test_password_policy_version]
 - Telefona yalnız `patron:giris` iznini BİREBİR taşıyan fabrika kullanıcısı girer; `*`/`patron:*` jokeri ve "Admin (Tam Yetki)" şablonu bu izni vermez, panelden kişi kişi atanır. [bekçi: test_patron_bulut_kullanicilar]
 - Telefon izni bulutta atanmaz, fabrika izinlerinden türetilir; tablonun tek kaynağı `cloud-sync/user-permission-map.ts`tir ve finans izni türetmez. [bekçi: test_patron_bulut_kullanicilar]
 - Süperadmin, sistem ve teknik kullanıcı buluta ASLA gitmez; pasif, silinmiş ve izin penceresi dışındaki kullanıcı kümeden düşer (süzgeç sorguda ve satır yükleminde iki kat). [bekçi: test_patron_bulut_kullanicilar]

@@ -43,7 +43,7 @@ import { createInterface } from "node:readline/promises";
 import bwipjs from "bwip-js";
 
 import prisma, { pool } from "../src/lib/prisma";
-import { checkPasswordPolicy, hashNewPassword } from "../src/services/helpers/password-policy.helper";
+import { checkPasswordPolicy, hashNewPassword, PASSWORD_POLICY_VERSION } from "../src/services/helpers/password-policy.helper";
 import { buildOtpauthUri, generateTotpSecret } from "../src/services/totp.service";
 import {
   SYSTEM_ACCOUNT_FULLNAME,
@@ -218,6 +218,8 @@ export async function provisionSuperadmin(
         where: { id: mevcut.id },
         data: {
           passwordHash,
+          // Y8: parola kural helper'ından geçti → güncel kural sürümü.
+          passwordPolicyVersion: PASSWORD_POLICY_VERSION,
           quickPin: pinSonuc.pin,
           totpSecret: secret,
           totpEnabledAt: deps.now(),
@@ -302,6 +304,7 @@ export async function provisionSuperadmin(
         // `fullName`i basar, yani gerçek ad hiçbir zaman DB'ye girmez.
         fullName: SYSTEM_ACCOUNT_FULLNAME,
         passwordHash,
+        passwordPolicyVersion: PASSWORD_POLICY_VERSION,
         quickPin: pinSonuc.pin,
         totpSecret: secret,
         // ⚠️ İKİ ALAN BİRDEN: `getStatus` yalnız ikisi de doluyken "kurulu" der.

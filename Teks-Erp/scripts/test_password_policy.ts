@@ -117,7 +117,9 @@ const HASH_MUAF: Record<string, string> = {
 };
 /** Kullanıcı parolası yazan bilinen yollar → helper'ı çağırmak ZORUNDA. */
 const YAZICILAR: Array<{ dosya: string; en_az: number; desen: RegExp }> = [
-  { dosya: "src/services/permission-management.service.ts", en_az: 2, desen: /hashNewPassword\(/g },
+  // Y8: servisler hash'i `newPasswordFields` (= hashNewPassword + kural sürümü) ile yazar.
+  { dosya: "src/services/permission-management.service.ts", en_az: 2, desen: /newPasswordFields\(/g },
+  { dosya: "src/services/auth.service.ts", en_az: 1, desen: /newPasswordFields\(/g },
   { dosya: "scripts/superadmin-olustur.ts", en_az: 1, desen: /checkPasswordPolicy\(/g },
   { dosya: "scripts/superadmin-olustur.ts", en_az: 1, desen: /hashNewPassword\(/g },
 ];

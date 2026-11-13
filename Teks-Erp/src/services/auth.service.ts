@@ -20,7 +20,7 @@ import {
 } from "./system-setting.service";
 import { SessionRegistryService } from "./session-registry.service";
 import { TotpAccountService } from "./totp-account.service";
-import { checkPasswordPolicy, hashNewPassword } from "./helpers/password-policy.helper";
+import { checkPasswordPolicy, newPasswordFields } from "./helpers/password-policy.helper";
 
 /**
  * Üretilen token'ın KAPSAMI (2026-11-13, parola sıkılaştırma):
@@ -214,7 +214,7 @@ export class AuthService {
         reason: "SAME_AS_CURRENT",
       });
     }
-    const passwordHash = await hashNewPassword(newPassword, {
+    const passwordFields = await newPasswordFields(newPassword, {
       username: user.username,
       fullName: user.fullName,
     });
@@ -223,7 +223,7 @@ export class AuthService {
     // yazım yeni durumu ezmesin).
     const claimed = await prisma.user.updateMany({
       where: { id: user.id, isActive: true, tokenVersion: user.tokenVersion },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: { ...passwordFields, tokenVersion: { increment: 1 } },
     });
     if (claimed.count === 0) {
       throw AppError.conflict("Hesap bu sırada değişti. Tekrar giriş yapın.", { code: "SESSION_CHANGED" });

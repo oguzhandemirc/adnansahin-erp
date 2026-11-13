@@ -1,7 +1,8 @@
 // =============================================================================
 // Patron bulutu KULLANICI LİSTESİ — telefona giriş izni olan fabrika kullanıcılarının TAM kümesi (dışa aktarım)
 // =============================================================================
-// Kim gider: aktif ∧ silinmemiş ∧ süperadmin DEĞİL ∧ teknik kullanıcı DEĞİL ∧ etkin izinlerinde `patron:giris`
+// Kim gider: aktif ∧ silinmemiş ∧ süperadmin DEĞİL ∧ teknik kullanıcı DEĞİL ∧ parolası GÜNCEL kural sürümüyle
+// belirlenmiş (Y8: `passwordPolicyVersion >= PASSWORD_POLICY_VERSION`; zayıf/ölçülmemiş özet VDS'e hiç ulaşmaz) ∧ etkin izinlerinde `patron:giris`
 // BİREBİR (`AuthService.getEffectivePermissions` — süreli iznin penceresi tek kaynaktan). Ne gider: açık select
 // (`CLOUD_USER_SELECT`) — PIN, kart, TOTP sırrı, oturum sayacı OKUNMAZ bile. Süzgeç iki katlıdır: sorgu (`where`) ve
 // satır yüklemi (`isCloudUserCandidate`); biri bozulsa öteki tutar, bekçi ikisini ayrı ölçer. Log/audit/hata özeti
@@ -12,11 +13,12 @@ import type { Prisma } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { AuthService } from "../services/auth.service";
 import { readPatronCloudUserId } from "../services/helpers/patron-cloud-user.helper";
+import { PASSWORD_POLICY_VERSION } from "../services/helpers/password-policy.helper";
 import { deriveCloudPermissions, hasPatronLogin, PATRON_LOGIN_PERMISSION } from "./user-permission-map";
 import { CloudUserSchema, type CloudUser } from "./wire";
 
 /** Okunan TEK alan kümesi — genişletmek bir sözleşme kararıdır (bekçi anahtar kümesini birebir ölçer). */
-export const CLOUD_USER_SELECT = { id: true, username: true, fullName: true, passwordHash: true, isActive: true, deletedAt: true, isSystemAccount: true } as const;
+export const CLOUD_USER_SELECT = { id: true, username: true, fullName: true, passwordHash: true, passwordPolicyVersion: true, isActive: true, deletedAt: true, isSystemAccount: true } as const;
 export type CloudUserRow = Prisma.UserGetPayload<{ select: typeof CLOUD_USER_SELECT }>;
 
 /** Aday sorgusu: giriş izni satırı olan (pencereye bakılmaz — etkin izin ayrıca sorulur) insan kullanıcılar. */
@@ -25,6 +27,8 @@ export function cloudUserCandidateWhere(technicalUserId: string | null): Prisma.
     isActive: true,
     deletedAt: null,
     isSystemAccount: false,
+    // Y8: yeni kuralla belirlenmemiş parola buluta ASLA gitmez (kullanıcı/yönetici parolayı yeniden belirleyince gider).
+    passwordPolicyVersion: { gte: PASSWORD_POLICY_VERSION },
     ...(technicalUserId ? { id: { not: technicalUserId } } : {}),
     permissions: { some: { permission: { code: PATRON_LOGIN_PERMISSION } } },
   };
@@ -32,7 +36,7 @@ export function cloudUserCandidateWhere(technicalUserId: string | null): Prisma.
 
 /** Satır yüklemi — sorgudan bağımsız ikinci sed. */
 export function isCloudUserCandidate(row: CloudUserRow, technicalUserId: string | null, effective: readonly string[]): boolean {
-  return row.isActive && row.deletedAt === null && !row.isSystemAccount && row.id !== technicalUserId && hasPatronLogin(effective);
+  return row.isActive && row.deletedAt === null && !row.isSystemAccount && row.passwordPolicyVersion >= PASSWORD_POLICY_VERSION && row.id !== technicalUserId && hasPatronLogin(effective);
 }
 
 /** Satır → tel kaydı (katı şemadan geçer; geçmeyen null — ör. tele sığmayan kullanıcı adı). */

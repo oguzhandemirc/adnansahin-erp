@@ -22,6 +22,14 @@ import bcrypt from "bcryptjs";
 import { AppError } from "../../utils/app-error";
 import { COMMON_PASSWORDS } from "../../constants/common-passwords";
 
+/**
+ * Parola kuralının SÜRÜMÜ (Y8, 2026-11-13). Kural sıkılaşırsa artırılır; o
+ * zaman eski sürümle belirlenmiş parolalar patron bulutuna gitmeyi bırakır.
+ * `User.passwordPolicyVersion` yalnız `newPasswordFields` ile bu değere çekilir.
+ * 0 = kural helper'ından geçmeden yazılmış (D1 öncesi) parola.
+ */
+export const PASSWORD_POLICY_VERSION = 1;
+
 export const PASSWORD_MIN_LENGTH = 10;
 /** bcrypt 72 baytın ötesini SESSİZCE kırpar — üst sınır bu yüzden bayt cinsinden. */
 export const PASSWORD_MAX_BYTES = 72;
@@ -188,4 +196,17 @@ export function assertPasswordPolicy(password: string, ctx: PasswordPolicyContex
 export async function hashNewPassword(password: string, ctx: PasswordPolicyContext = {}): Promise<string> {
   assertPasswordPolicy(password, ctx);
   return bcrypt.hash(password, BCRYPT_COST);
+}
+
+/**
+ * YENİ parolanın User'a yazılacak iki alanı: kural + bcrypt (`hashNewPassword`) ve
+ * kural SÜRÜMÜ (Y8). Kullanıcı parolası yazan her servis bunu yayarak yazar —
+ * `passwordHash` tek başına yazılırsa sürüm 0'da kalır ve kullanıcı buluta hiç
+ * gitmez (fail-closed). Bekçi: `test_password_policy_version`.
+ */
+export async function newPasswordFields(
+  password: string,
+  ctx: PasswordPolicyContext = {},
+): Promise<{ passwordHash: string; passwordPolicyVersion: number }> {
+  return { passwordHash: await hashNewPassword(password, ctx), passwordPolicyVersion: PASSWORD_POLICY_VERSION };
 }
