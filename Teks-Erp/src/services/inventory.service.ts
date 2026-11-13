@@ -179,6 +179,7 @@ import {
   STEP_QUALITY_SELECT,
   stepCanApplyQuality,
 } from "./helpers/quality-station.helper";
+import { KURSUN_FLOW_STEP_WHERE, TAMBUR_FLOW_STEP_WHERE } from "./helpers/production-flow-where.helper";
 import { touchWarehouseSackTx } from "./helpers/shipment-locks.helper";
 import {
   assertTargetablePropertyIds,
@@ -1954,8 +1955,7 @@ export class InventoryService {
         // ⚠️ Kolon ADI "Kurşun" KALIR. Faz A'da küme birebir aynı (backfill
         // yalnız PROCESS_QC'yi işaretler); ikinci bir KK istasyonu doğarsa
         // kolonun ölçtüğü şey ile adı ayrışır — etiket kararı Faz B'de.
-        station: { ...QUALITY_STATION_WHERE },
-        status: { not: StepStatus.COMPLETED },
+        ...KURSUN_FLOW_STEP_WHERE,
         currentRolls: { some: {} },
       };
       const [steps, total] = await Promise.all([
@@ -2008,8 +2008,7 @@ export class InventoryService {
     const tamburColumn = async (): Promise<{ cards: ProductionFlowQueueCard[]; total: number }> => {
       if (!opts.includeQueues) return { cards: [], total: 0 };
       const where: Prisma.WorkOrderStepWhereInput = {
-        station: { kind: StationKind.TAMBUR },
-        status: { not: StepStatus.COMPLETED },
+        ...TAMBUR_FLOW_STEP_WHERE,
         currentRolls: { some: {} },
       };
       const [steps, total] = await Promise.all([

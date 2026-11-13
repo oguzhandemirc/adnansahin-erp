@@ -28,8 +28,10 @@ export const LIVE_SWATCH: Prisma.SwatchWhereInput = {
   status: { in: [SwatchStatus.IN_STOCK, SwatchStatus.IN_SACK, SwatchStatus.IN_SHIPMENT] },
 };
 
+/** Açık iş emri durumları — WHERE parçası ve bellek yüklemi (`cloud-sync/work-order-facts`) bu tek listeden. */
+export const OPEN_WORK_ORDER_STATUSES: readonly WorkOrderStatus[] = [WorkOrderStatus.PLANNED, WorkOrderStatus.IN_PROGRESS];
 export const OPEN_WORK_ORDER: Prisma.WorkOrderWhereInput = {
-  status: { in: [WorkOrderStatus.PLANNED, WorkOrderStatus.IN_PROGRESS] },
+  status: { in: [...OPEN_WORK_ORDER_STATUSES] },
 };
 export const OPEN_WEAVING_ORDER: Prisma.WeavingOrderWhereInput = {
   status: { in: [WeavingOrderStatus.PLANNED, WeavingOrderStatus.IN_PROGRESS] },

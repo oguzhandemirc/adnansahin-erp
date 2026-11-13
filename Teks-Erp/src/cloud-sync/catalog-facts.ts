@@ -8,12 +8,32 @@ import { col, derived, lookup, self, via, type RecordProjection } from "./projec
 
 // ── OLGU projeksiyonları ──────────────────────────────────────────────────────
 // Top adımı değişince (üretilen/bulunduğu adım) o iş emri yeniden gider.
-const WO_OF_ROLLS = 'SELECT s."workOrderId" AS root_id FROM "rolls" r JOIN "work_order_steps" s ON s."id" IN (r."producedInStepId", r."currentStepId") WHERE r."id" = ANY($1::uuid[])';
+// Üç yol `whereRollsOfWorkOrders` ile aynı: üretildiği adım · durduğu adım · parti.
+const WO_OF_ROLLS =
+  'SELECT s."workOrderId" AS root_id FROM "rolls" r JOIN "work_order_steps" s ON s."id" IN (r."producedInStepId", r."currentStepId") WHERE r."id" = ANY($1::uuid[]) ' +
+  'UNION SELECT b."workOrderId" AS root_id FROM "rolls" r JOIN "batches" b ON b."id" = r."batchId" WHERE r."id" = ANY($1::uuid[])';
 const WO_OF_STEPS = 'SELECT DISTINCT s."workOrderId" AS root_id FROM "work_order_steps" s WHERE s."id" = ANY($1::uuid[])';
 const WO_OF_ORDER_LINES =
   'SELECT DISTINCT l."workOrderId" AS root_id FROM "work_order_to_order_lines" l WHERE l."orderLineId" = ANY($1::uuid[]) AND l."unlinkedAt" IS NULL';
 const WO_OF_ORDERS =
   'SELECT DISTINCT l."workOrderId" AS root_id FROM "work_order_to_order_lines" l JOIN "order_lines" ol ON ol."id" = l."orderLineId" WHERE ol."orderId" = ANY($1::uuid[]) AND l."unlinkedAt" IS NULL';
+
+const WOS_OF_CUSTOMERS =
+  'SELECT DISTINCT l."workOrderId" AS root_id FROM "work_order_to_order_lines" l JOIN "order_lines" ol ON ol."id" = l."orderLineId" JOIN "orders" o ON o."id" = ol."orderId" WHERE o."customerId" = ANY($1::uuid[]) AND l."unlinkedAt" IS NULL';
+const WOS_OF_ITEMS = 'SELECT w."id" AS root_id FROM "work_orders" w WHERE w."targetItemId" = ANY($1::uuid[])';
+const WOS_OF_COLORS = 'SELECT w."id" AS root_id FROM "work_orders" w WHERE w."targetColorId" = ANY($1::uuid[])';
+const WOS_OF_STATIONS = 'SELECT DISTINCT s."workOrderId" AS root_id FROM "work_order_steps" s WHERE s."stationId" = ANY($1::uuid[])';
+// Fason firma adı/kategorisi: firmada açık (iptalsiz, doğrudan sevk edilmemiş, kalanı kapanmamış) kalemi olan topların İE'leri.
+const rollsAtFirms = (firms: string): string =>
+  'SELECT i."rollId" FROM "subcontractor_dispatch_items" i JOIN "subcontractor_dispatches" d ON d."id" = i."dispatchId" ' +
+  `WHERE d."subcontractorId" = ANY(${firms}) AND d."cancelledAt" IS NULL AND d."directShippedAt" IS NULL AND i."remainderClosedAt" IS NULL AND i."rollId" IS NOT NULL`;
+const wosOfRollSet = (rolls: string): string =>
+  `SELECT s."workOrderId" AS root_id FROM "rolls" r JOIN "work_order_steps" s ON s."id" IN (r."producedInStepId", r."currentStepId") WHERE r."id" IN (${rolls}) ` +
+  `UNION SELECT b."workOrderId" AS root_id FROM "rolls" r JOIN "batches" b ON b."id" = r."batchId" WHERE r."id" IN (${rolls})`;
+const WOS_OF_SUBCONTRACTORS = wosOfRollSet(rollsAtFirms("$1::uuid[]"));
+const WOS_OF_SUBCONTRACTOR_CATEGORIES = wosOfRollSet(
+  rollsAtFirms('ARRAY(SELECT k."subcontractorId" FROM "subcontractor_category_links" k WHERE k."categoryId" = ANY($1::uuid[]))'),
+);
 
 // Görünen ad (cari/ürün/renk) olgu satırında türetilir: ad değişince bağlı kökler yeniden gider.
 const ORDERS_OF_CUSTOMERS = 'SELECT o."id" AS root_id FROM "orders" o WHERE o."customerId" = ANY($1::uuid[])';
@@ -139,6 +159,24 @@ export const FACTS: readonly RecordProjection[] = [
       derived("siparisMetre", "workorder.service withProductionMeters.orderedMeters", ["work_order_to_order_lines", "order_lines"]),
       derived("cariKartIdleri", "workorder.service withProductionMeters.customers (helpers/work-order-customers.helper rollupWorkOrderCustomers: açık bağların siparişlerinin müşterileri; liste önizlemesi)", ["work_order_to_order_lines", "order_lines", "orders"]),
       derived("aktifIstasyonId", "helpers/work-order-current-step.helper currentWorkOrderStep", ["work_order_steps"]),
+      // 3 (patron İE ekranı): aşağıdakiler YALNIZ EKLENDİ; ortak okumalar `cloud-sync/work-order-facts`.
+      derived("acik", "helpers/live-ref-where.helper OPEN_WORK_ORDER_STATUSES (PLANNED · IN_PROGRESS)", ["work_orders"]),
+      derived("kapanisTarihi", "work-order-facts loadCloseDates: iptalde cancelledAt · son STATUS_CHANGED olayı · kapanış künyesi (audit DEĞİL)", ["work_orders", "work_order_events", "work_order_close_snapshots"]),
+      derived("musteriAdi", "work-order-customers.helper rollupWorkOrderCustomers: cariKartIdleri ilkinin adı", ["work_order_to_order_lines", "order_lines", "orders", "customers"]),
+      derived("musteriAdlari", "work-order-customers.helper rollupWorkOrderCustomers: cariKartIdleri sırasıyla adlar", ["work_order_to_order_lines", "order_lines", "orders", "customers"]),
+      derived("siparisIdleri", "work-order-facts WO_ORDER_LINKS_SELECT (ACTIVE_ORDER_LINK, bağlanma sırası): farklı siparişler", ["work_order_to_order_lines", "order_lines", "orders"]),
+      derived("siparisNolari", "work-order-facts WO_ORDER_LINKS_SELECT: siparisIdleri ile aynı sırada Order.orderNumber", ["work_order_to_order_lines", "order_lines", "orders"]),
+      derived("urunAdi", NAME_OF("Item"), ["items"]),
+      derived("renkAdi", NAME_OF("Color"), ["colors"]),
+      derived("asama", "work-order-facts workOrderStage(currentWorkOrderStep istasyonu): fason · kursun (stepCanApplyQuality) · tambur · kk1 · diger; kapalıda null", ["work_order_steps", "stations"]),
+      derived("asamaTop", "work-order-facts loadRollStagesOfWorkOrders: whereRollsOfWorkOrders − K18 ölü; durum + KURSUN/TAMBUR_FLOW_STEP_WHERE (akış panosuyla aynı)", ["rolls", "batches", "work_order_steps", "stations"]),
+      derived("topSayisi", "asamaTop toplamı", ["rolls", "batches", "work_order_steps", "stations"]),
+      derived("metre", "asamaTop toplamı (currentQty)", ["rolls", "batches", "work_order_steps", "stations"]),
+      derived("fasonFirmaId", "work-order-facts loadOpenFasonOfWorkOrders (outstandingItemOfOpenDispatch): en çok topu olan firma", ["subcontractor_dispatch_items", "subcontractor_dispatches", "subcontractor_receipt_items", "subcontractor_receipts", "rolls", "batches"]),
+      derived("fasonFirmaAdi", "loadOpenFasonOfWorkOrders: firma adı", ["subcontractor_dispatch_items", "subcontractor_dispatches", "subcontractors"]),
+      derived("fasonKategoriler", "loadOpenFasonOfWorkOrders: firmanın hizmet kategori adları", ["subcontractor_dispatch_items", "subcontractor_dispatches", "subcontractor_category_links", "subcontractor_categories"]),
+      derived("fasonGonderim", "loadOpenFasonOfWorkOrders: o firmadaki en eski açık sevk dispatchedAt", ["subcontractor_dispatch_items", "subcontractor_dispatches"]),
+      derived("fasonFirmaIdleri", "loadOpenFasonOfWorkOrders: AT_SUBCONTRACTOR topların açık kalemlerinin firmaları (tekil, sıralı)", ["subcontractor_dispatch_items", "subcontractor_dispatches", "rolls"]),
     ],
     sources: [self("work_orders"),
       via("work_order_steps", "workOrderId"),
@@ -146,9 +184,16 @@ export const FACTS: readonly RecordProjection[] = [
       lookup("roll_movements", "workOrderStepId", WO_OF_STEPS),
       via("work_order_to_order_lines", "workOrderId"),
       lookup("order_lines", "id", WO_OF_ORDER_LINES),
-      lookup("orders", "id", WO_OF_ORDERS)],
+      lookup("orders", "id", WO_OF_ORDERS),
+      lookup("customers", "id", WOS_OF_CUSTOMERS, "cari adı değişince açık bağlı iş emirleri yeniden gider"),
+      lookup("items", "id", WOS_OF_ITEMS, "ürün adı değişince iş emirleri yeniden gider"),
+      lookup("colors", "id", WOS_OF_COLORS, "renk adı değişince iş emirleri yeniden gider"),
+      lookup("stations", "id", WOS_OF_STATIONS, "istasyon türü/kalite yeteneği değişince aşama yeniden hesaplanır"),
+      lookup("subcontractors", "id", WOS_OF_SUBCONTRACTORS, "fason firma adı değişince açık kalemli iş emirleri yeniden gider"),
+      lookup("subcontractor_categories", "id", WOS_OF_SUBCONTRACTOR_CATEGORIES, "kategori adı değişince (küçük tablo, filigran indekssiz)")],
     deletion: "YOK", permission: "bulut:uretim:oku", module: "production.enabled",
-    // 2 (2026-11-06): `cariKartIdleri` anlamı genişledi (bağsız İE'de top sahibi) — TAM gönderim eski satırları doldurur.
-    retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 2,
+    // 2 (2026-11-06): TAM gönderim; `cariKartIdleri` yalnız açık sipariş bağından (≤5), bağsız İE'de boş.
+    // 3 (2026-11-13): patron İE ekranı alanları EKLENDİ (açık, kapanış, müşteri/sipariş, aşama, fason) — TAM gönderim.
+    retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 3,
   },
 ];
