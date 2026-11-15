@@ -88,3 +88,11 @@ Paket `deploy/` ve `scripts/`yi TAŞIMAZ (`docs/KOD-KURALLARI.md` § deploy) —
 | HTTP · ORM · şema · ortam | `express` 5 · `@prisma/client` + `prisma` + `pg` + `@prisma/adapter-pg` · `zod` · `dotenv` | sürümler TAM SABİT (projenin kendi düzeni) |
 | Telefon bildirimi | `web-push` | Expo push paketsiz (`fetch`) |
 | Fabrika parolası doğrulaması | `bcryptjs` ^3.0.3 (fabrikayla aynı) | §9 kaydı (2026-11-14); bulutun kendi parolası `node:crypto` scrypt'tir, bcrypt yalnız fabrikanın özetini doğrular |
+
+### 2.5 Patron uygulaması (`patron/uygulama/`) — Expo SDK 54, iPhone + Android
+
+Tam envanter DEĞİL: uygulama TeksERP'den içe aktarıldı (`9a72279f`) ve paketleri bu tabloya henüz dökülmedi; bekçi §(c) bu bölümü ölçmez. Buraya yalnız bu repoda EKLENEN paket yazılır.
+
+| İhtiyaç | Paket | Not / reddedilen |
+|---|---|---|
+| Destek: ekran yakalama | `react-native-view-shot` 4.0.3 (yalnız `src/destek/yakala.ts` + `app/(app)/destek/ciz.tsx`, lazy `require`) | sahayla aynı paket ve sürüm; çizim katmanı içe aktarımla gelen `react-native-svg` 15.12.1 (yeni paket değil); galeri/dosya seçici paketi EKLENMEZ · §9 (2026-11-15) |

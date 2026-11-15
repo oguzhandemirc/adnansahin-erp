@@ -99,7 +99,7 @@ Ayrıca kayıtta duran iki küçük borç: OFL-1.1 font lisans metninin dağıt�
 
 ## 9 · Kayıt defteri
 
-Yeni **npm paketi** patron bulutuna (`bcryptjs`, 2026-11-14) ve tablete (`expo-application`, 2026-11-13) eklendi; tek native Maven bağımlılığı 2026-11-12 — kayıtlar aşağıda. Bir karar da "paket YOK"tur:
+Yeni **npm paketi** patron uygulamasına (`react-native-view-shot`, 2026-11-15), patron bulutuna (`bcryptjs`, 2026-11-14) ve tablete (`expo-application`, 2026-11-13) eklendi; tek native Maven bağımlılığı 2026-11-12 — kayıtlar aşağıda. Bir karar da "paket YOK"tur:
 **backend log kanalı** (2026-09-07) — `pino`/`winston` yerine **elle yazmak**
 seçildi ([KU-07]), çünkü taşımayı pm2 ve rotasyonu `pm2-logrotate` zaten
 yapıyordu; kalan tek eksik seviye + alan etiketiydi. Altı satırlık kayıt, ölçüm
@@ -114,6 +114,14 @@ ve sonuç arşivde: `docs/history/CLAUDE-NOT-ARSIVI.md` (2026-09-07) ve
 4. Bakım        : Expo pinli tam sürüm (`npx expo install`) — elle değiştirilmez ([KU-12]); SDK ile yükselir
 5. Lisans       : ikisi de MIT
 6. Dağıtım      : yerel modül → `expo prebuild --clean` + yeni APK/AAB (Play) ister; yeni Android izni YOK (yakalama uygulamanın kendi penceresidir, MediaProjection değil)
+
+### react-native-view-shot@4.0.3 · patron/uygulama · 2026-11-15 (kullanıcı onayı)
+1. Problem      : patron uygulaması "Sorun bildir" — anlık ekran görüntüsü (`captureScreen`, `src/destek/yakala.ts`) ve çizimli tuvalin tek JPEG'e basılması (`captureRef`, `app/(app)/destek/ciz.tsx`) · §2.5 "Destek: ekran yakalama"
+2. Alternatifler: saha kaydıyla aynı — `expo-screen-capture` (yalnız engeller/dinler, yakalamaz → red), elle yerel modül (iOS + Android iki ayrı yakalama kodu; view-shot'un bakımlı kopyası olurdu → red); view-shot (SEÇİLDİ, sahayla aynı paket ve aynı sabit sürüm). Çizim katmanı için YENİ paket yok: `react-native-svg` 15.12.1 uygulamada zaten vardı (içe aktarım `9a72279f`)
+3. Boyut/biçim  : native (autolink, config plugin YOK); lazy `require` — yerel modülü olmayan eski derlemede ve web'de görüntü adımı atlanır, talep yalnız metinle gider
+4. Bakım        : tam sabit sürüm (`4.0.3`, sahadaki ile aynı; native → [KU-12]) — elle değiştirilmez
+5. Lisans       : MIT
+6. Dağıtım      : yerel modül → yeni iOS + Android derlemesi (mağaza) ister, OTA yetmez; yeni izin YOK (yakalama uygulamanın kendi penceresidir)
 
 ### com.google.android.play:app-update@2.1.0 · mobil · 2026-11-12 (kullanıcı onayı)
 1. Problem      : Play dahili testten kurulan saha uygulaması yeni sürümü kendisi bildirsin (Play In-App Updates) · §2.3 "Play uygulama içi güncelleme"
