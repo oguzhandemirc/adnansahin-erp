@@ -17,6 +17,20 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-16b",
+      "baslik": "Harfli şifreyle giriş",
+      "surumler": {
+        "tablet": "1.0.19"
+      },
+      "maddeler": [
+        {
+          "kapsam": "tablet",
+          "tip": "duzeltme",
+          "metin": "El terminalinde ve telefonda harf içeren şifreyle giriş yapılabilir (önceden yalnız rakam kabul ediyordu)."
+        }
+      ]
+    },
+    {
       "id": "2026-11-16",
       "baslik": "Destek talebi",
       "surumler": {
