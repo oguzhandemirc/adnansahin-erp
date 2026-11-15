@@ -67,8 +67,9 @@ export function securityTick(nowMs: number = Date.now()): void {
   if (ozet) deliver({ kind: "ozet", ozet });
 }
 
-/** Sır: ortamdan ya da dosyadan (ikisi birden belirsiz; dosya herkese okunursa red). Gerekçe yalnız değişken adı. */
-function secret(env: NodeJS.ProcessEnv, name: string): { value: string } | { reason: string } {
+/** Sır: ortamdan ya da dosyadan (ikisi birden belirsiz; dosya herkese okunursa red). Gerekçe yalnız değişken adı.
+ *  Etkili Destek sırları da (`DESTEK_API_KEY`, `DESTEK_WEBHOOK_SECRET`) bu kuralla okunur (`services/destek/config.ts`). */
+export function secret(env: NodeJS.ProcessEnv, name: string): { value: string } | { reason: string } {
   const direct = env[name]?.trim() || undefined;
   const file = env[`${name}_DOSYASI`]?.trim() || undefined;
   if (direct && file) return { reason: `${name} ve ${name}_DOSYASI birlikte verilmiş (belirsiz)` };

@@ -2,6 +2,7 @@
 // ve `sync` (fabrika kanalı + bakım budaması), ikisi de aynı (tek) veritabanına. Saat enjekte edilebilir (bekçiler `now`u kaydırır).
 import type { SecretBox } from "../auth/secret-box";
 import type { CloudConfig } from "../config";
+import type { SupportRuntime } from "./destek/config";
 import type { Doorbell } from "./doorbell";
 import type { InstallationDirectory } from "./installation-directory";
 import type { NotificationRuntime } from "./notification-scheduler";
@@ -17,4 +18,6 @@ export interface CloudContext {
   readonly now: () => number;
   /** Bildirim çalışma zamanı (`BILDIRIM_KIPI=kapali` iken yok). */
   readonly notifications?: NotificationRuntime | null;
+  /** Etkili Destek çalışma zamanı; yoksa destek KAPALI (uçlar 403 `MODULE_DISABLED`, webhook 404, dış istek yok). */
+  readonly destek?: SupportRuntime | null;
 }

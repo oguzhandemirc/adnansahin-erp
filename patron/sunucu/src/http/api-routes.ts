@@ -17,6 +17,7 @@ import { cancelReportRequest, createReportRequest, getReportRequest, listReportR
 import { requestSyncNow } from "../services/sync-request.service";
 import { Token, body, page, param, s, sendFile, text, uuidCursor, written, type ApiCall, type ApiRouteDef } from "./api-route-kit";
 import { CHANGE_ROUTES } from "./change-routes";
+import { DESTEK_ROUTES, jsonBodies } from "./destek-routes";
 import { EXPORT_ROUTES } from "./export-routes";
 import { OptionalCode, OWN_FACTOR_ROUTES } from "./own-factor-routes";
 import { NOTIFICATION_ROUTES } from "./notification-routes";
@@ -175,6 +176,8 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
   },
   ...NOTIFICATION_ROUTES,
   ...EXPORT_ROUTES,
+  // ---- Etkili Destek (talepler merkezde; bulut yalnız aktarır) ----
+  ...DESTEK_ROUTES,
 ];
 
 function bearer(req: Request): string | undefined {
@@ -199,7 +202,8 @@ export function createApiRouter(ctx: CloudContext): Router {
   router.use(noStore);
   router.use(rateLimit({ perMinute: ctx.config.API_HIZ_DK, config: ctx.config }));
   router.use(jsonOnlyWrites);
-  router.use(express.json({ limit: "256kb", strict: true }));
+  // Genel 256 KB; YALNIZ destek ekli iki uçta 70 MB (destek-routes.ts jsonBodies).
+  router.use(jsonBodies(ctx, express.json({ limit: "256kb", strict: true })));
   const loginLimit = rateLimit({ perMinute: ctx.config.GIRIS_HIZ_DK, config: ctx.config });
   const tokenGate = invalidTokenGate({ perMinute: ctx.config.OTURUM_RED_HIZ_DK, config: ctx.config });
   for (const def of API_ROUTES) {

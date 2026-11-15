@@ -4,7 +4,8 @@
 // (`patron-hazirla`, yerel duman 2026-10-09). Tersi (verilen ama okunmayan sır) en az yetkiyi bozar.
 //   §1 patron-baslat.sh GERÇEKTEN koşulur (sır dizini geçici kopyada): her rol yalnız kendi sırlarıyla açılır ve
 //      tablo dışı sırrı okumaz; göç URL'i süper kullanıcı OLMAYAN `patron_goc` rolüyle kurulur; eksik sır /
-//      tanınmayan (eski `hazirla` dahil) rol → çıkış 1; güvenlik bildirimi sırları İSTEĞE BAĞLI
+//      tanınmayan (eski `hazirla` dahil) rol → çıkış 1; güvenlik bildirimi ve Etkili Destek sırları İSTEĞE BAĞLI
+//      (compose'da yolsuzken /dev/null → özellik KAPALI; sonda: zorunlu dosyaya bağlanırsa ❌)
 //   §2 Adnan compose (deploy/patron/compose.yaml): her servis rolünün sırlarını eksiksiz/fazlasız alır, db yalnız
 //      kök + göç parolasını alır, hiçbir serviste `ports:` yok, satıcı/çok tesis kalıntısı (ic_api_belirteci,
 //      KURULUM_KAYNAGI, tesis-db, GOC_DATABASE_URL ortamda, POSTGRES_PASSWORD .env'de) YOK, göç profilli ve elle
@@ -47,11 +48,18 @@ function baslat(rol: string | null, sirlar: readonly string[], betik = BASLAT): 
 }
 
 kontrol("§1 betik `S=/run/secrets` satırını taşır (sonda onu geçici dizine çevirir)", /^S=\/run\/secrets$/m.test(BASLAT));
-const SUNUCU = ["uygulama_parolasi", "esitleme_parolasi", "guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id"];
+const SUNUCU = ["uygulama_parolasi", "esitleme_parolasi", "guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id", "destek_api_anahtari", "destek_webhook_sirri"];
 {
   const r = baslat(null, SUNUCU);
-  kontrol("§1 rol verilmezse sunucu: dört sırla açılır, DB + eşitleme URL'i + güvenlik bildirimi yolları kurulur, göç URL'i ve eski tesis anahtarı yolu YOK", r.status === 0 && !!r.env.DATABASE_URL && !!r.env.ESITLEME_DATABASE_URL && !r.env.TESIS_ROL_ANAHTARI_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_BOT_TOKEN_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_CHAT_ID_DOSYASI && !r.env.GOC_DATABASE_URL, r.hata.trim());
+  kontrol("§1 rol verilmezse sunucu: altı sırla açılır, DB + eşitleme URL'i + güvenlik bildirimi + destek yolları kurulur, göç URL'i ve eski tesis anahtarı yolu YOK", r.status === 0 && !!r.env.DATABASE_URL && !!r.env.ESITLEME_DATABASE_URL && !r.env.TESIS_ROL_ANAHTARI_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_BOT_TOKEN_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_CHAT_ID_DOSYASI && !!r.env.DESTEK_API_KEY_DOSYASI && !!r.env.DESTEK_WEBHOOK_SECRET_DOSYASI && !r.env.GOC_DATABASE_URL, r.hata.trim());
   kontrol("§1 sunucu satıcı iç API belirtecini KURMAZ", !("SATICI_IC_API_BELIRTECI" in r.env));
+}
+{
+  // Etkili Destek sırları İSTEĞE BAĞLI: yoksa sunucu açılır, destek yolları kurulmaz (özellik KAPALI), uyarı stderr'e.
+  const r = baslat("sunucu", SUNUCU.slice(0, 4));
+  kontrol("§1 destek sırları YOKKEN sunucu açılır, destek yolları kurulmaz, uyarı basılır", r.status === 0 && !!r.env.DATABASE_URL && !!r.env.GUVENLIK_TELEGRAM_BOT_TOKEN_DOSYASI && !r.env.DESTEK_API_KEY_DOSYASI && !r.env.DESTEK_WEBHOOK_SECRET_DOSYASI && /destek_api_anahtari okunamıyor[^\n]*KAPALI/.test(r.hata) && /destek_webhook_sirri okunamıyor[^\n]*KAPALI/.test(r.hata), `${r.status} · ${r.hata.trim()}`);
+  const g = baslat("goc", ["goc_parolasi", "uygulama_parolasi", "esitleme_parolasi", "destek_api_anahtari", "destek_webhook_sirri"]);
+  kontrol("§1 göç rolü destek sırlarını OKUMAZ (yol kurulmaz)", g.status === 0 && !g.env.DESTEK_API_KEY_DOSYASI && !g.env.DESTEK_WEBHOOK_SECRET_DOSYASI, g.hata.trim());
 }
 {
   const r = baslat("goc", ["goc_parolasi", "uygulama_parolasi", "esitleme_parolasi"]);
@@ -70,7 +78,7 @@ kontrol("§1 tanınmayan PATRON_ROL çıkış 1 (eski `hazirla` dahil)", baslat(
 // §2–§3 Adnan compose (deploy/patron/compose.yaml) ↔ rol tablosu. DB'siz ve docker'sız: compose akış listesiyle
 // (`secrets: [a, b]`) yazılır, servis blokları girintiden ayrılır. Ortamda hazır verilen URL sırrın yerine geçer
 // (betikteki `[ -z "${X:-}" ]` dalları) → o sır compose'da GEREKMEZ (göç rolü GOC_DATABASE_URL'i .env'den alır).
-const ISTEGE_BAGLI = new Set(["guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id"]);
+const ISTEGE_BAGLI = new Set(["guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id", "destek_api_anahtari", "destek_webhook_sirri"]);
 const ORTAM_KARSILIGI: Record<string, string> = {
   uygulama_parolasi: "DATABASE_URL",
   esitleme_parolasi: "ESITLEME_DATABASE_URL",
@@ -130,6 +138,12 @@ const COMPOSE = readFileSync(path.join(D, "compose.yaml"), "utf8");
   kontrol("§2 compose servisleri çözüldü (db · api · goc)", ss.map((s) => s.ad).join(",") === "db,api,goc", ss.map((s) => s.ad).join(","));
   const sorun = denetle(COMPOSE, BASLAT);
   kontrol("§2 ⭐ her servis rolünün sırlarını eksiksiz ve fazlasız alır, hiçbir serviste ports: yok", sorun.length === 0, sorun.join(" | ") || "uyumlu");
+  // Etkili Destek sırları İSTEĞE BAĞLI: `.env`te yol yoksa /dev/null bağlanır (dosya yokluğu compose'u DURDURMAZ);
+  // adres boş varsayılanla → özellik KAPALI, api bugünkü gibi açılır.
+  const destekVarsayilan = (c: string): boolean => /destek_api_anahtari:\n\s+file: \$\{DESTEK_API_ANAHTARI_DOSYASI_HOST:-\/dev\/null\}/.test(c) && /destek_webhook_sirri:\n\s+file: \$\{DESTEK_WEBHOOK_SIRRI_DOSYASI_HOST:-\/dev\/null\}/.test(c) && /^\s+DESTEK_API_URL: \$\{DESTEK_API_URL:-\}$/m.test(c);
+  kontrol("§2 destek sırları yolsuzken /dev/null (KAPALI), DESTEK_API_URL boş varsayılan", destekVarsayilan(COMPOSE));
+  const zorunluDestek = COMPOSE.replace("${DESTEK_API_ANAHTARI_DOSYASI_HOST:-/dev/null}", "./sirlar/destek_api_anahtari");
+  kontrol("§2 sonda: destek anahtarı zorunlu dosyaya bağlanır → ❌", zorunluDestek !== COMPOSE && !destekVarsayilan(zorunluDestek));
   const api = ss.find((s) => s.ad === "api");
   const kalinti = ["ic_api_belirteci", "KURULUM_KAYNAGI", "SATICI_IC", "tesis-db", "hazirla", "GOC_DATABASE_URL", "POSTGRES_PASSWORD:"].filter((x) => COMPOSE.includes(x)).concat(["tesis_rol_anahtari:", "TESIS_ROL_ANAHTARI"].filter((x) => COMPOSE.includes(x) || BASLAT.includes(x)));
   kontrol("§2 satıcı/çok tesis kalıntısı, sökülen e-posta özeti anahtarı ve ortamda parola YOK (compose + betik)", kalinti.length === 0, kalinti.join(","));
@@ -143,9 +157,10 @@ const COMPOSE = readFileSync(path.join(D, "compose.yaml"), "utf8");
 
 // §3 kalıcı negatif sondalar (sentetik; her koşumda)
 {
-  const apiSirsiz = COMPOSE.replace("secrets: [uygulama_parolasi, esitleme_parolasi]", "secrets: [uygulama_parolasi]");
+  // api listesinin öneki (sonuna isteğe bağlı destek sırları gelir).
+  const apiSirsiz = COMPOSE.replace("secrets: [uygulama_parolasi, esitleme_parolasi,", "secrets: [uygulama_parolasi,");
   kontrol("§3 api'den eşitleme parolası düşer → EKSİK ❌", apiSirsiz !== COMPOSE && denetle(apiSirsiz, BASLAT).some((x) => x === "api: EKSİK esitleme_parolasi"));
-  const eskiAnahtar = COMPOSE.replace("secrets: [uygulama_parolasi, esitleme_parolasi]", "secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari]");
+  const eskiAnahtar = COMPOSE.replace("secrets: [uygulama_parolasi, esitleme_parolasi,", "secrets: [uygulama_parolasi, esitleme_parolasi, tesis_rol_anahtari,");
   kontrol("§3 sökülen tesis_rol_anahtari compose'a geri gelir → FAZLA ❌", eskiAnahtar !== COMPOSE && denetle(eskiAnahtar, BASLAT).some((x) => x === "api: FAZLA tesis_rol_anahtari"));
   const gocEsitlemesiz = BASLAT.replace('goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi"', 'goc) echo "goc_parolasi uygulama_parolasi"');
   kontrol("§3 göç rolü eşitleme parolasını okumaz, compose verir → FAZLA ❌", gocEsitlemesiz !== BASLAT && denetle(COMPOSE, gocEsitlemesiz).some((x) => x === "goc: FAZLA esitleme_parolasi"));

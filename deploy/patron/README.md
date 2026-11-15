@@ -23,7 +23,8 @@ rolle KALKMAZ.
 
 Sırlar `/opt/adnan/patron/sirlar/`, HEPSİ root:10001 0440 (db kapsayıcısı ek grup 10001 ile yalnız kendine bağlanan iki
 sırrı okur): `db_kok_parolasi` · `goc_parolasi` · `uygulama_parolasi` · `esitleme_parolasi` (yalnız harf/rakam) ·
-isteğe bağlı `guvenlik_telegram_bot_token` / `guvenlik_telegram_chat_id`. TOTP sarma
+isteğe bağlı `guvenlik_telegram_bot_token` / `guvenlik_telegram_chat_id` · isteğe bağlı Etkili Destek
+`destek_api_anahtari` / `destek_webhook_sirri` (§ Etkili Destek). TOTP sarma
 anahtarı `anahtarlar/patron-totp.key` (10001 0600). `.env` (0600, PAROLA TAŞIMAZ): `POSTGRES_USER`, `POSTGRES_DB`,
 `PATRON_IMAJ`, `ADNAN_AG_ALT_AGI`; `proxy/.env`: `PATRON_ALAN_ADI`, `ACME_EPOSTA`, `ADNAN_AG_ALT_AGI` (aynı değer).
 
@@ -78,6 +79,20 @@ Kalıcı kapatma ve parola sıfırlama fabrikada (panel) yapılır.
   24 sa'te 50 başarısız → 1 sa yeni giriş kilidi (DB'de; `kullanici-ac` sıfırlar).
 - Hız sınırları (IP başına, sunucuda): `/api` geneli 600/dk · geçersiz belirteç 30/dk (aşılınca oturumlu istekler DB'ye
   inmeden 429) · giriş 20/dk · `/v1` 600/dk. Kenarda (Caddy) yalnız `/api`, `/v1`, `/saglik` geçer; gerisi 404.
+
+## Etkili Destek (isteğe bağlı; varsayılan KAPALI)
+
+Patron uygulamasının destek talepleri bulut üzerinden Etkili Destek merkezine gider; uç sözleşmesi ve ayrıntı
+`docs/ops/DESTEK-ENTEGRASYONU-BULUT.md`. Göç YOK, Caddy değişikliği YOK (`/api/*` zaten geçer).
+
+- Sırlar yokken (`.env`te yol yok) compose iki sırrı `/dev/null`a bağlar → özellik KAPALI, api bugünkü gibi açılır;
+  destek uçları 403 `MODULE_DISABLED`, webhook 404, merkeze istek yok.
+- Açmak: `sirlar/destek_api_anahtari` ve `sirlar/destek_webhook_sirri` (root:10001 0440; yalnız değer, satır sonu
+  önemsiz) → `.env`e `DESTEK_API_URL=<merkez HTTPS adresi>` · `DESTEK_API_ANAHTARI_DOSYASI_HOST=./sirlar/destek_api_anahtari`
+  · `DESTEK_WEBHOOK_SIRRI_DOSYASI_HOST=./sirlar/destek_webhook_sirri` → `docker compose up -d api` → günlükte
+  `destek: uçlar AÇIK · webhook AÇIK` (biçimsiz/eksikse KAPALI + neden; sır günlüğe yazılmaz).
+- Webhook adresi (merkez paneline): `https://<alan>/api/destek/webhook`.
+- Kapatmak: `.env`ten üç satırı sil → `docker compose up -d api` (tek ayar; veri yok, geri alınacak bir şey yok).
 
 ## Güncelleme
 

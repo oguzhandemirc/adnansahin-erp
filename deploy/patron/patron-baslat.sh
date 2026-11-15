@@ -2,7 +2,8 @@
 # Patron konteyner girişi: DB URL'lerini ve anahtar yollarını docker SECRET dosyalarından kurar,
 # komutu çalıştırır — sırlar imaj yapılandırmasına ve `docker inspect`e girmez. Rol (PATRON_ROL) hangi sırların
 # okunacağını belirler; her rol YALNIZ kendi sırlarını okur ve hepsini ZORUNLU sayar (en az yetki) — tek istisna
-# güvenlik bildirimi sırları (guvenlik_telegram_*): İSTEĞE BAĞLI, okunamazsa kanal KAPALI:
+# güvenlik bildirimi sırları (guvenlik_telegram_*) ve Etkili Destek sırları (destek_api_anahtari, destek_webhook_sirri):
+# İSTEĞE BAĞLI, okunamazsa (ya da boşsa) o özellik KAPALI:
 #   sunucu  → uygulama + eşitleme parolası
 #   goc     → göç (patron_goc, süper kullanıcı DEĞİL) + uygulama + eşitleme parolası
 #             (migrate deploy · db-rolleri · tesis CLI'si)
@@ -15,7 +16,7 @@ DB="${DB_HOST:-patron-db}:5432/${DB_ADI:-patron}?schema=public"
 
 rol_sirlari() {
   case "$1" in
-    sunucu) echo "uygulama_parolasi esitleme_parolasi guvenlik_telegram_bot_token guvenlik_telegram_chat_id" ;;
+    sunucu) echo "uygulama_parolasi esitleme_parolasi guvenlik_telegram_bot_token guvenlik_telegram_chat_id destek_api_anahtari destek_webhook_sirri" ;;
     goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi" ;;
     *) return 1 ;;
   esac
@@ -77,6 +78,21 @@ for sir in $SIRLAR; do
         if istege_bagli_sir guvenlik_telegram_chat_id; then
           GUVENLIK_TELEGRAM_CHAT_ID_DOSYASI="$S/guvenlik_telegram_chat_id"
           export GUVENLIK_TELEGRAM_CHAT_ID_DOSYASI
+        fi
+      fi ;;
+    destek_api_anahtari)
+      # Etkili Destek İSTEĞE BAĞLI: okunamazsa yol verilmez; boş (/dev/null) ya da biçimsizse sunucu özelliği KAPALI sayar.
+      if [ -z "${DESTEK_API_KEY_DOSYASI:-}" ] && [ -z "${DESTEK_API_KEY:-}" ]; then
+        if istege_bagli_sir destek_api_anahtari; then
+          DESTEK_API_KEY_DOSYASI="$S/destek_api_anahtari"
+          export DESTEK_API_KEY_DOSYASI
+        fi
+      fi ;;
+    destek_webhook_sirri)
+      if [ -z "${DESTEK_WEBHOOK_SECRET_DOSYASI:-}" ] && [ -z "${DESTEK_WEBHOOK_SECRET:-}" ]; then
+        if istege_bagli_sir destek_webhook_sirri; then
+          DESTEK_WEBHOOK_SECRET_DOSYASI="$S/destek_webhook_sirri"
+          export DESTEK_WEBHOOK_SECRET_DOSYASI
         fi
       fi ;;
     *) echo "[patron] rol tablosunda tanınmayan sır: $sir" >&2; exit 1 ;;

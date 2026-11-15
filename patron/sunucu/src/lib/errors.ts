@@ -1,6 +1,7 @@
 // Bulut hata tipi — gövde backend/satıcı ile aynı: {success:false, message:<TR>, details:{code}}.
 // Kod `details.code` altındadır (kök `code` YOK). (tek DB; tesis DB'si hazırlık 503'ü yok).
 import type { ProtocolErrorCode } from "../lisans-protokol";
+import { DESTEK_ERROR_CODES } from "../services/destek/codes";
 import { FACTORY_CHANNEL_ERROR_CODES } from "../wire/esitleme";
 
 /**
@@ -18,6 +19,8 @@ export const CLOUD_ERROR_CODES = [
   "RAPOR_BULUTTA_YOK",
   "KURULUM_BASKA_TESISTE",
   "FABRIKA_BAGLANTISI_YOK",
+  // Etkili Destek uçları (fabrika sözleşmesiyle aynı adlar; `services/destek/codes.ts`).
+  ...DESTEK_ERROR_CODES,
 ] as const;
 export type CloudErrorCode = (typeof CLOUD_ERROR_CODES)[number];
 
