@@ -84,6 +84,7 @@ export default function Shipments() {
                 ikincil={`${musteri ? `${no} · ` : ""}${tarih}${yurtdisi}`}
                 deger={metre}
                 rozet={gitti ? undefined : <KayitDurumRozeti entry={st} testID={`durum-${r.id}`} />}
+                ikiSatir
                 ayrac={i > 0}
                 ok={false}
                 onPress={() => openRecord(router, "sevkiyat", r.id)}

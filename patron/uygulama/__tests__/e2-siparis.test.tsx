@@ -2,7 +2,7 @@
 // süzgeç ve arama SUNUCUYA parametre olarak gider (istemci süzmez), sipariş ayrıntısı kendi rotasına açılır.
 // P6: kalem listesi (`siparisId`), sipariş araması + görünüm çipleri YALNIZ sunucu
 // `/oturum` `liste` yeteneğinde beyan ettiyse; eski sunucuda (alan yok) E2 görünümü kalır.
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
 import type { ReactElement } from "react";
 
 const mockList = jest.fn();
@@ -268,6 +268,19 @@ describe("§6 P6 sipariş kalemleri (sunucu `siparisId` süzgeci)", () => {
     expect(lineRowText(rec("a", { urunAdi: "X", miktar: "5", birim: "ADET", iptalTarihi: "2026-01-01", acikMiktar: "5" }) as never).subtitle).toBe("İptal edildi");
     expect(lineRowText(rec("a", { urunAdi: "X", miktar: "5", birim: "MT", renkId: "r", sevkMiktari: "2" }) as never).subtitle).toBe("Renk — · Sevk 2 m");
     expect(lineRowText(rec("a", { miktar: "5", birim: "KG" }) as never)).toMatchObject({ title: "—", value: "5 kg" });
+  });
+
+  it("panel eşliği: kalemde en, parça boyu ve müşterinin adı; ayrıntıda şube adı (`sube` boyutu) ve sevk edilen / toplam", async () => {
+    expect(lineRowText(rec("a", { urunAdi: "X", miktar: "5", birim: "MT", en: "280.00", parcaBoyu: "50", musteriUrunAdi: "Saten A", musteriRenkAdi: "Krem" }) as never).subtitle)
+      .toBe("En 280 cm · Parça 50 m · Müşteride: Saten A Krem");
+    mockParams = { id: ID1 };
+    mockRecord.mockImplementation(async (p: string, id: string) =>
+      p === "sube" ? rec(id, { ad: "Bursa Merkez" }) : rec(ID1, { siparisNo: "SP-9", durum: "PARTIAL_SHIPPED", subeId: "b1", sevkMiktari: "1200", toplamMiktar: "3000", acikMiktar: "1800" }));
+    render(<OrderDetail />);
+    await settle();
+    expect(mockRecord).toHaveBeenCalledWith("sube", "b1");
+    expect(within(screen.getByTestId("bilgi-sube")).getByText("Bursa Merkez")).toBeTruthy();
+    expect(within(screen.getByTestId("bilgi-sevk")).getByText("1.200 / 3.000 m")).toBeTruthy();
   });
 });
 

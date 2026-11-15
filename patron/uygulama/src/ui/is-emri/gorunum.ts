@@ -156,6 +156,25 @@ export function locationDays(k: Kayit, stage: string | null, simdi: number = Dat
 
 const m0 = (v: unknown): string | null => (sayi(v) === null ? null : `${formatNumber(sayi(v), 0)} m`);
 
+// ── Liste hücreleri (panel eşliği) ──
+export const meterCell = (v: unknown): string => (sayi(v) === null ? "—" : formatNumber(sayi(v), 0));
+export const typeLabel = (k: Kayit): string => (metin(k.tur) ? (WORK_ORDER_TYPE[k.tur as string] ?? (k.tur as string)) : "—");
+export const statusLabelOf = (k: Kayit): string => (metin(k.durum) ? (WORK_ORDER_STATUS[k.durum as string]?.label ?? (k.durum as string)) : "—");
+/** Panelin "Fason" sütunu: en çok topu olan firma (+N firma); fasonda değilse "—". */
+export function fasonFirmCell(k: Kayit): string {
+  const ad = metin(k.fasonFirmaAdi);
+  if (!ad) return "—";
+  const n = metinDizisi(k.fasonFirmaIdleri).length;
+  return n > 1 ? `${ad} +${n - 1}` : ad;
+}
+/** Panelin "İlerleme"si yüzde çizer; burada yüzde HESAPLANMAZ — fabrikanın iki sayısı yan yana ("470 / 2.200"). */
+export function progressCell(k: Kayit): string {
+  const u = sayi(k.uretilenMetre);
+  const g = sayi(k.girenMetre);
+  if (u === null && g === null) return "—";
+  return `${u === null ? "—" : formatNumber(u, 0)} / ${g === null ? "—" : formatNumber(g, 0)}`;
+}
+
 /** "Üretim ayrıntıları" satırları: yalnız fabrikanın gönderdiği alanlar (gelmeyen satır çizilmez). */
 export function detailRows(k: Kayit): { key: string; etiket: string; deger: string }[] {
   const tur = metin(k.tur);

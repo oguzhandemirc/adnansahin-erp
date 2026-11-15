@@ -23,6 +23,7 @@ const Orders = (require("../app/(app)/(tabs)/siparisler/index") as { default: ()
 const OrderDetail = (require("../app/(app)/(tabs)/siparisler/[id]") as { default: () => ReactElement }).default;
 const { uretimMetni } = require("../src/ui/siparis/OrderRow") as typeof import("../src/ui/siparis/OrderRow");
 const { workOrderRowText } = require("../src/ui/siparis/OrderWorkOrders") as typeof import("../src/ui/siparis/OrderWorkOrders");
+const { keepPhrases } = require("../src/lib/format") as typeof import("../src/lib/format");
 const G = require("../src/ui/is-emri/gorunum") as typeof import("../src/ui/is-emri/gorunum");
 const { LIST_ID_FILTERS, LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT } = require("../src/api/wire") as typeof import("../src/api/wire");
 const { ORNEK_LISTE } = require("../src/ornek/veri") as typeof import("../src/ornek/veri");
@@ -102,10 +103,10 @@ describe("§2 ayrıntı: İş emirleri bölümü", () => {
     for (const c of isEmriCagrilari()) expect(c[1]).toMatchObject({ siparisId: SID });
     const blok = screen.getByTestId("siparis-is-emirleri");
     expect(within(blok).getByText("IE-2026-0318")).toBeTruthy();
-    expect(within(blok).getByText("Fasonda – Örnek Boyahane")).toBeTruthy();
-    expect(within(blok).getByText("18 top · 2.160 m")).toBeTruthy();
-    expect(within(blok).getByText("Kurşun")).toBeTruthy();
-    expect(within(blok).getAllByText("Tamamlandı").length).toBeGreaterThan(0); // kapanmış: yer + durum rozeti
+    // Çizimde ifade içi boşluklar bölünmez boşluk (`keepPhrases`); metin erişilebilirlik etiketinde düz.
+    expect(within(blok).getByText(keepPhrases("Fasonda – Örnek Boyahane · 18 top · 2.160 m"))).toBeTruthy();
+    expect(within(blok).getByText(/^Kurşun · /)).toBeTruthy();
+    expect(within(blok).getAllByText(/^Tamamlandı/).length).toBeGreaterThan(0); // kapanmış: yer + durum rozeti
     expect(within(blok).queryByText("IE-2026-0300")).toBeNull();
     expect(within(blok).queryByText("IE-2026-0301")).toBeNull();
     expect(screen.queryByTestId("siparis-is-emri-w0")).toBeNull();

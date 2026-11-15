@@ -2,7 +2,7 @@
 // Süzgeç yalnız sunucu beyan ettiyse çağrılır (`useListCapability`); istemci listeyi süzmez, değerler fabrikadan.
 import { useEffect, useRef } from "react";
 import type { ProjectionRecord } from "../../api/wire";
-import { formatNumber } from "../../lib/format";
+import { formatNumber, keepPhrases } from "../../lib/format";
 import { unitLabel } from "../../lib/labels/siparis";
 import { MODULE_ICON } from "../icons";
 import { ListeBlogu, ListeSatiri } from "../ortak";
@@ -31,9 +31,14 @@ export function lineRowText(r: ProjectionRecord) {
   const color = str(k.renkAdi) ?? (str(k.renkId) ? "—" : null);
   const open = !cancelled && present(k.acikMiktar) ? `Açık ${formatNumber(k.acikMiktar)} ${unit}` : null;
   const shipped = present(k.sevkMiktari) ? `Sevk ${formatNumber(k.sevkMiktari)} ${unit}` : null;
+  // Panel kalem alanları (buluta gelenler): en, parça boyu, müşterinin kendi ürün/renk adı.
+  const width = present(k.en) ? `En ${formatNumber(k.en, 0)} cm` : null;
+  const piece = present(k.parcaBoyu) ? `Parça ${formatNumber(k.parcaBoyu, 0)} m` : null;
+  const alias = [str(k.musteriUrunAdi), str(k.musteriRenkAdi)].filter(Boolean).join(" ");
+
   return {
     title: str(k.urunAdi) ?? "—",
-    subtitle: [cancelled ? "İptal edildi" : null, color ? `Renk ${color}` : null, shipped, open].filter(Boolean).join(" · ") || undefined,
+    subtitle: [cancelled ? "İptal edildi" : null, color ? `Renk ${color}` : null, width, piece, shipped, open, alias ? `Müşteride: ${alias}` : null].filter(Boolean).join(" · ") || undefined,
     value: present(k.miktar) ? `${formatNumber(k.miktar)} ${unit}` : "—",
     cancelled,
   };
@@ -53,7 +58,7 @@ export function OrderLines({ list, tick = 0 }: { list: RemoteList; tick?: number
         <ListeBlogu baslik="Kalemler" sayi={list.hasMore ? undefined : list.items.length} testID="siparis-kalemleri">
           {list.items.map((r, i) => {
             const x = lineRowText(r);
-            return <ListeSatiri key={r.id} birincil={x.title} ikincil={x.subtitle} deger={x.value} ayrac={i > 0} testID={`kalem-${r.id}`} />;
+            return <ListeSatiri key={r.id} birincil={x.title} ikincil={x.subtitle ? keepPhrases(x.subtitle) : undefined} ikiSatir deger={x.value} ayrac={i > 0} accessibilityLabel={[x.title, x.subtitle, x.value].filter(Boolean).join(", ")} testID={`kalem-${r.id}`} />;
           })}
         </ListeBlogu>
       ) : null}

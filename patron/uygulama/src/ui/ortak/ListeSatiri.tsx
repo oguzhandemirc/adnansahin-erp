@@ -41,7 +41,7 @@ export function ListeSatiri(p: ListeSatiriProps) {
   const etiket = p.accessibilityLabel ?? [p.birincil, p.ikincil, p.deger].filter(Boolean).join(", ");
   const iki = !!p.ikincil && (p.ikiSatir ?? !!p.rozet);
   const birincil = (
-    <Text style={[s.birincil, iki && s.birincilTam, p.birincilGenislik ? { width: p.birincilGenislik } : null]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.birincil}</Text>
+    <Text style={[s.birincil, (iki || !p.ikincil) && s.birincilTam, p.birincilGenislik ? { width: p.birincilGenislik } : null]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.birincil}</Text>
   );
   const ic = (
     <View style={[s.satir, iki && s.satirIki, p.girinti && s.girinti]} testID={p.testID ? `${p.testID}-satir` : undefined}>
@@ -50,7 +50,7 @@ export function ListeSatiri(p: ListeSatiriProps) {
         {iki ? (
           <View style={s.yigin}>
             {birincil}
-            <Text style={s.ikincilAlt} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.ikincil}</Text>
+            <Text style={s.ikincilAlt} numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE.title}>{p.ikincil}</Text>
           </View>
         ) : (
           <>

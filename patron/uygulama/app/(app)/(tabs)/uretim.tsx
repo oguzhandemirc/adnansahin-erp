@@ -84,7 +84,7 @@ export default function Production() {
       </KademeliGiris>
 
       {bugunBiten !== null || hamGiris !== null ? (
-        <KademeliGiris sira={1}>
+        <KademeliGiris sira={1} style={s.blok}>
           <BlokBasligi baslik="Bugün ne bitti?" testID="bolum-bugun" />
           <View style={s.ikili} testID="uretim-kpi">
             {bugunBiten !== null ? (
@@ -138,4 +138,5 @@ const useStyles = makeStyles(() => ({
   ikili: { flexDirection: "row" as const, gap: space.m },
   yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
   tumu: { fontWeight: "600" as const },
+  blok: { marginTop: space.l },
 }));

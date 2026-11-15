@@ -8,9 +8,9 @@ import { Text, useWindowDimensions, View } from "react-native";
 import type { ProjectionRecord } from "../../../src/api/wire";
 import { Screen } from "../../../src/ui/Frame";
 import { MODULE_ICON } from "../../../src/ui/icons";
-import { locationRowText, type Kayit } from "../../../src/ui/is-emri/gorunum";
+import { fasonFirmCell, locationRowText, type Kayit } from "../../../src/ui/is-emri/gorunum";
 import { openRecord } from "../../../src/ui/nav";
-import { ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
+import { BlokBasligi, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
 import { useListCapability } from "../../../src/ui/siparis/capabilities";
 import { ListStates, StaleNote } from "../../../src/ui/siparis/parts";
 import { useRemoteList } from "../../../src/ui/siparis/useRemoteList";
@@ -26,6 +26,13 @@ const k = (r: ProjectionRecord): Kayit => (typeof r.kayit === "object" && r.kayi
 const ASAMALAR = new Set(["KURSUN", "TAMBUR", "FASON"]);
 /** Tablonun tam sütunlu çizildiği genişlik (altında satır kartı). */
 const TABLO_MIN = 600;
+/** Sipariş no dar kartta tirede bölünmesin (U+2011 bölünmez tire). */
+const noBreak = (s: string) => s.replace(/-/g, "\u2011");
+/** Kartın alt yazısı: 1. satır kumaş · renk, 2. satır sipariş (müşteri yoksa başlıkta) · gün; boşsa tek satır. */
+const cardSecondLine = (x: { musteri: string; kumas: string; siparis: string; gun: string | null }): string => {
+  const alt = [x.musteri === "—" ? null : noBreak(x.siparis), x.gun].filter(Boolean).join(" · ");
+  return alt ? `${x.kumas}\n${alt}` : x.kumas;
+};
 
 export default function LocationWorkOrders() {
   const router = useRouter();
@@ -47,6 +54,7 @@ export default function LocationWorkOrders() {
     { key: "top", baslik: "Top", agirlik: 0.5, sayi: true, hucre: (y) => y.x.top },
     { key: "metre", baslik: "Metre", agirlik: 0.75, sayi: true, hucre: (y) => y.x.metre },
     { key: "siparis", baslik: "Sipariş", agirlik: 1.3, hucre: (y) => y.x.siparis },
+    ...(stage === "fason" && !p.fasonFirmaId ? [{ key: "firma", baslik: "Boyahane", agirlik: 1.2, hucre: (y: (typeof rows)[number]) => fasonFirmCell(k(y.r)) }] : []),
     ...(stage === "fason" ? [{ key: "gun", baslik: "Gündür", agirlik: 0.8, hucre: (y: (typeof rows)[number]) => y.x.gun ?? "—" }] : []),
   ];
   const sayi = list.hasMore ? undefined : rows.length;
@@ -68,6 +76,7 @@ export default function LocationWorkOrders() {
     >
       {rows.length > 0 && tablo ? (
         <View testID="konum-tablo">
+          <BlokBasligi baslik="Açık iş emirleri" sayi={sayi} />
           <TabloBasligi testID="konum" sutunlar={sutunlar} siralama={null} siralanabilir={[]} onSirala={() => undefined} />
           <TabloGovdesi testID="konum-govde">
             {rows.map((y, i) => (
@@ -82,7 +91,7 @@ export default function LocationWorkOrders() {
             <ListeSatiri
               key={y.r.id}
               birincil={y.x.musteri === "—" ? y.x.siparis : y.x.musteri}
-              ikincil={[y.x.kumas, y.x.musteri === "—" ? null : y.x.siparis, y.x.gun].filter(Boolean).join(" · ")}
+              ikincil={cardSecondLine(y.x)}
               ikiSatir
               deger={`${y.x.metre} m`}
               ayrac={i > 0}

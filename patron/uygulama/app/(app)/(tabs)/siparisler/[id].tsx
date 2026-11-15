@@ -43,7 +43,15 @@ export default function OrderDetail() {
   const cariId = str(k.cariKartId);
   const cariAc = cariId && moduleVisible(permissions, "cariler") ? () => router.push({ pathname: "/cariler/[id]", params: { id: cariId } } as never) : undefined;
   const showOpen = isOpenOrder(k.durum) && present(k.acikMiktar);
+  // Şube adı `sube` boyutundan (bulutta oturum izniyle var); yoksa satır çizilmez.
+  const subeId = str(k.subeId);
+  const sube = useRemote(subeId ? `kayit:sube:${subeId}` : null, () => api.record("sube", String(subeId)));
+  const subeAdi = str(asObj(sube.data?.kayit).ad);
+  const m = (v: unknown) => `${formatNumber(v, 0)} m`;
   const bilgiler = [
+    subeAdi ? { key: "sube", etiket: "Şube", deger: subeAdi } : null,
+    // Sevk edilen / sipariş toplamı (brüt, fabrikanın türevleri) — panelin "Sevk durumu" + "Metre" sütunları.
+    present(k.toplamMiktar) ? { key: "sevk", etiket: "Sevk edilen / toplam", deger: `${present(k.sevkMiktari) ? formatNumber(k.sevkMiktari, 0) : "—"} / ${m(k.toplamMiktar)}` } : null,
     { key: "tarih", etiket: "Sipariş tarihi", deger: formatDate(k.siparisTarihi) },
     str(k.termin) ? { key: "termin", etiket: "Termin", deger: formatDate(k.termin) } : null,
     { key: "yon", etiket: "Sevk yönü", deger: destinationLabel(k.yon) },

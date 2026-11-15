@@ -269,6 +269,7 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         siparisNo: `SIP-2026-${String(451 - i).padStart(4, "0")}`,
         musteriAdi: c.ad,
         cariKartId: c.id,
+        subeId: c.id === "c1" ? "b1" : null,
         durum,
         // Fabrikanın türettiği "açık" (PENDING · APPROVED · PARTIAL_SHIPPED); bulut `suzgec=ACIK` bununla süzer.
         acik: durum === "PENDING" || durum === "APPROVED" || durum === "PARTIAL_SHIPPED",
@@ -290,6 +291,7 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         siparisId: s.id,
         urunAdi: ["Örnek Saten 280 cm", "Deneme Keten 150 cm", "Numune Tül 320 cm"][j]!,
         renkAdi: ["Krem", "Antrasit", "Ekru"][j]!,
+        en: [280, 150, 320][j]!,
         miktar: 1200 + j * 600,
         sevkMiktari: j === 0 ? 400 : 0,
         acikMiktar: 800 + j * 600,
@@ -374,7 +376,8 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
       sebepAdi: x.sebep, musteriAdi: CARILER[0]!.ad, iptalTarihi: x.iptal ? once(x.gun - 1) : null, olusturulma: once(x.gun, 2),
     }),
   );
-  return { siparis, "siparis-kalemi": kalem, "cari-kart": cari, sevkiyat, "is-emri": isEmri, iade };
+  const sube = [kayit("b1", { ad: "Bursa Merkez Depo", cariKartId: "c1", kod: "ORN-001-01", il: "Bursa", aktif: true })];
+  return { siparis, "siparis-kalemi": kalem, "cari-kart": cari, sevkiyat, "is-emri": isEmri, iade, sube };
 }
 
 const donemOzeti = (o: { siparis: number; mt: number; kg?: number; sevkM: number; top: number; cuval: number; tartili: number; kgSevk: number; iadeTop: number; iadeM: number; urunCarpan: number }): CustomerSummaryPeriod => ({

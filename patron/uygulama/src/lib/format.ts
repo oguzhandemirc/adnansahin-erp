@@ -51,6 +51,12 @@ const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/;
  * Dar liste sütununda belge numarasının harf öneki atılır: "SIP-2026-0444" → "2026-0444". Yalnız GÖSTERİM içindir;
  * numaranın kendisi (arama, ayrıntı, paylaşım) fabrikanın verdiği tam haliyle kalır.
  */
+/**
+ * " · " ile ayrılmış alt yazı dar satırda yalnız ayraçta kırılsın: her ifadenin içindeki boşluk bölünmez boşluk olur
+ * ("Açık 2.000 m" iki satıra bölünmez). Yalnız çizim içindir; erişilebilirlik ve test düz metni kullanır.
+ */
+export const keepPhrases = (s: string): string => s.split(" · ").map((p) => p.replace(/ /g, " ")).join(" · ");
+
 export function kisaBelgeNo(no: string | null | undefined): string | null {
   if (!no) return null;
   return no.replace(/^[A-ZÇĞİÖŞÜ]{1,6}-(?=\d{4}-\d)/u, ""); // yalnız "ÖNEK-YYYY-sıra" biçimi kısalır

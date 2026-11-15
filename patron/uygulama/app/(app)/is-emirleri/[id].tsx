@@ -12,7 +12,7 @@ import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { Screen } from "../../../src/ui/Frame";
 import { KademeliGiris } from "../../../src/ui/hareket";
-import { acik, asamaSayilari, detailRows, fasonGunu, gunMetni, isEmriNo, kumasMetni, NO_ORDER_TEXT, siparisIdleri, siparisNolari, siparissiz, stageAmount, topMetreMetni, whereText, type Kayit } from "../../../src/ui/is-emri/gorunum";
+import { acik, asamaSayilari, detailRows, fasonFirmCell, fasonGunu, gunMetni, isEmriNo, kumasMetni, NO_ORDER_TEXT, siparisIdleri, siparisNolari, siparissiz, stageAmount, topMetreMetni, whereText, type Kayit } from "../../../src/ui/is-emri/gorunum";
 import { AcilirKart, HataDurumu, Iskelet, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
 import { StaleNote } from "../../../src/ui/siparis/parts";
 import { makeStyles } from "../../../src/ui/theme-context";
@@ -42,7 +42,11 @@ export default function WorkOrderDetail() {
   const fasonda = acik(k) && k.asama === "fason" && metin(k.fasonFirmaAdi) !== null;
   const gun = fasonda ? fasonGunu(k) : null;
   const burada = acik(k) ? stageAmount(k, metin(k.asama)) : { top: null, metre: null };
-  const buradaMetni = [burada.top === null ? null : `${formatNumber(burada.top, 0)} top`, burada.metre === null ? null : `${formatNumber(burada.metre, 0)} m`].filter(Boolean).join(" · ");
+  // Firma adı kesilmesin: büyük değer yalnız top; metre ve gün alt satırda (gün küçük, renksiz).
+  const buradaTop = burada.top === null ? undefined : `${formatNumber(burada.top, 0)} top`;
+  // Fasondayken başlık yalnız firma adı (dar ekranda kesilmesin); "Boyahanede" + metre + gün alt satırda.
+  const yer = whereText(k);
+  const buradaAlt = [fasonda ? yer.split(" – ")[0] : null, burada.metre === null ? null : `${formatNumber(burada.metre, 0)} m`, gun !== null ? gunMetni(gun) : null].filter(Boolean).join(" · ");
 
   return (
     <Screen title={r.data ? isEmriNo(k) : "İş emri"} module="uretim" back onRefresh={r.reload} refreshing={r.refreshing} subtitle={<StaleNote stale={r.stale} savedAt={r.savedAt} />}>
@@ -90,10 +94,10 @@ export default function WorkOrderDetail() {
           <KademeliGiris sira={3}>
             <ListeBlogu baslik="Nerede" testID="is-emri-nerede">
               <ListeSatiri
-                birincil={whereText(k)}
-                ikincil={gun !== null ? gunMetni(gun) : undefined}
-                ikiSatir={gun !== null}
-                deger={buradaMetni || undefined}
+                birincil={fasonda ? fasonFirmCell(k) : yer}
+                ikincil={buradaAlt || undefined}
+                ikiSatir={!!buradaAlt}
+                deger={buradaTop}
                 icon={fasonda ? "business-outline" : "location-outline"} ton={fasonda ? "orange" : "violet"}
                 ayrac={false}
                 onPress={fasonda && firmaIdleri.length >= 1 ? () => router.push({ pathname: "/fason/[firmaId]", params: { firmaId: firmaIdleri[0]!, ad: metin(k.fasonFirmaAdi)! } } as never) : undefined}

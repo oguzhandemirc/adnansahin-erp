@@ -139,9 +139,9 @@ describe("§3 ayrıntı", () => {
     expect(screen.getByText(buyukHarf("İş emrinin siparişi"))).toBeTruthy();
     expect(within(screen.getByTestId("is-emri-kumas")).getByText("Örnek Saten 280 cm · Krem")).toBeTruthy();
     const yer = screen.getByTestId("is-emri-fason-firma");
-    expect(within(yer).getByText("Boyahanede – Örnek Boyahane")).toBeTruthy();
-    expect(within(yer).getByText("6 gündür")).toBeTruthy();
-    expect(within(yer).getByText("14 top · 1.690 m")).toBeTruthy();
+    expect(within(yer).getByText("Örnek Boyahane")).toBeTruthy();
+    expect(within(yer).getByText("14 top")).toBeTruthy();
+    expect(within(yer).getByText("Boyahanede · 1.690 m · 6 gündür")).toBeTruthy();
     expect(screen.queryByText(/gecik|termin/i)).toBeNull();
     fireEvent.press(screen.getByTestId("is-emri-musteri"));
     expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/cariler/[id]", params: { id: "c1" } });
@@ -254,6 +254,18 @@ describe("§4 Üretim: üretimdeki toplar nerede? + açık iş emirleri", () => 
     await settle();
     expect(mockList).not.toHaveBeenCalled();
     expect(screen.queryByTestId("bolum-is-emirleri")).toBeNull();
+  });
+});
+
+describe("§6 panel eşliği: liste sütunları", () => {
+  it("fason firması (+N), üretilen / giren (yüzde HESAPLANMAZ), sipariş/hedef metresi, tür ve durum sözlükten", () => {
+    expect(G.fasonFirmCell({ fasonFirmaAdi: "Örnek Boyahane", fasonFirmaIdleri: ["f1", "f2"] })).toBe("Örnek Boyahane +1");
+    expect(G.fasonFirmCell({})).toBe("—");
+    expect(G.progressCell({ uretilenMetre: 470, girenMetre: "2200.00" })).toBe("470 / 2.200");
+    expect(G.progressCell({})).toBe("—");
+    expect(G.meterCell("2400.00")).toBe("2.400");
+    expect(G.typeLabel({ tur: "STOCK_PRODUCTION" })).toBe("Stoka üretim");
+    expect(G.statusLabelOf({ durum: "IN_PROGRESS" })).toBe("Üretimde");
   });
 });
 

@@ -5,6 +5,7 @@
 import { useRouter } from "expo-router";
 import type { ProjectionRecord } from "../../api/wire";
 import { can } from "../../lib/access";
+import { keepPhrases } from "../../lib/format";
 import { WORK_ORDER_STATUS, recordStatus } from "../../lib/labels/uretim";
 import { useSession } from "../../state/session";
 import { iptalMi, isEmriNo, topMetreMetni, yerMetni, type Kayit } from "../is-emri/gorunum";
@@ -57,8 +58,8 @@ export function OrderWorkOrders({ list, tick = 0 }: { list: RemoteList & { reado
               <ListeSatiri
                 key={r.id}
                 birincil={x.no}
-                ikincil={x.yer}
-                deger={x.miktar}
+                ikincil={keepPhrases(`${x.yer} · ${x.miktar}`)}
+                ikiSatir
                 rozet={<KayitDurumRozeti entry={x.durum} />}
                 ayrac={i > 0}
                 ok={false}

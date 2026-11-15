@@ -8,7 +8,7 @@ import { formatDate, formatNumber } from "../../../src/lib/format";
 import { FilterChip } from "../../../src/ui/FilterChip";
 import { Screen } from "../../../src/ui/Frame";
 import { MODULE_ICON } from "../../../src/ui/icons";
-import { asamaMetni, isEmriNo, kumasMetni, metre, musteriMetni, siparisNolari, sonOtuzGunde, topMetni, type Kayit } from "../../../src/ui/is-emri/gorunum";
+import { asamaMetni, fasonFirmCell, isEmriNo, kumasMetni, meterCell, metre, musteriMetni, progressCell, siparisNolari, sonOtuzGunde, statusLabelOf, topMetni, typeLabel, type Kayit } from "../../../src/ui/is-emri/gorunum";
 import { openRecord } from "../../../src/ui/nav";
 import { AltSekmeler } from "../../../src/ui/ortak";
 import { useListCapability } from "../../../src/ui/siparis/capabilities";
@@ -28,6 +28,13 @@ const SUTUNLAR: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "metre", baslik: "Metre", agirlik: 0.9, sayi: true, sirala: "metre", hucre: (r) => { const m = metre(k(r)); return m === null ? "—" : formatNumber(m, 0); } },
   { key: "siparis", baslik: "Sipariş", ad: "Sipariş no", agirlik: 1.3, hucre: (r) => siparisNolari(k(r)).join(", ") || "—" },
   { key: "tarih", baslik: "Açılış", ad: "Açılış tarihi", agirlik: 0.9, sirala: "olusturulma", hucre: (r) => (typeof k(r).olusturulma === "string" ? formatDate(k(r).olusturulma) : "—") },
+  // Panel eşliği (2026-11-16): panel sütunlarından buluta zaten gelenler; sıralama beyanı yok → sıralanmaz.
+  { key: "fason", baslik: "Fason", ad: "Fason firması", agirlik: 1.3, hucre: (r) => fasonFirmCell(k(r)) },
+  { key: "ilerleme", baslik: "Üretilen / giren", ad: "İlerleme (üretilen / giren m)", agirlik: 1.4, sayi: true, hucre: (r) => progressCell(k(r)) },
+  { key: "siparisMetre", baslik: "Sipariş m", ad: "Sipariş metresi", agirlik: 0.9, sayi: true, hucre: (r) => meterCell(k(r).siparisMetre) },
+  { key: "hedef", baslik: "Hedef m", ad: "Hedef metre", agirlik: 0.9, sayi: true, hucre: (r) => meterCell(k(r).hedefMiktar) },
+  { key: "tur", baslik: "Tür", agirlik: 1.1, hucre: (r) => typeLabel(k(r)) },
+  { key: "durum", baslik: "Durum", agirlik: 0.9, hucre: (r) => statusLabelOf(k(r)) },
 ];
 
 const AYAR = {
