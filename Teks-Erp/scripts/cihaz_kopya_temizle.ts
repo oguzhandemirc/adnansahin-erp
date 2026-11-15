@@ -108,7 +108,7 @@ async function main() {
   const esik = esikAni(new Date(), gun);
 
   console.log(`\n=== CİHAZ KOPYA TEMİZLİĞİ ${APPLY ? "(--apply)" : "(TEŞHİS — hiçbir şey yazılmaz)"} ===`);
-  console.log(`Veritabanı: ${db} · eşik: ${gun} gün (${tarih(esik)} UTC öncesi) · tür: ${tur ?? "hepsi"}`);
+  console.log(`🎯 Hedef veritabanı: ${db} · eşik: ${gun} gün (${tarih(esik)} UTC öncesi) · tür: ${tur ?? "hepsi"}`);
   const liste = await eskiCihazlariListele(esik, tur);
   const toplam = await prisma.device.groupBy({ by: ["kind"], where: { isActive: true }, _count: true });
   console.log(`Aktif cihaz: ${toplam.map((t) => `${t.kind} ${t._count}`).join(" · ") || "yok"}`);

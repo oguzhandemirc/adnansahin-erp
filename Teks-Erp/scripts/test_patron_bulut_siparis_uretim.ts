@@ -34,6 +34,15 @@ const S = `TEST-PBSU-${Date.now()}-`;
 const DAY = 86_400_000;
 const j = (v: unknown): string => JSON.stringify(v);
 
+/** `attachNerede` satıra `nerede` ekler ama tipi `T[]` döner: alanı zorlamadan, daraltarak oku. */
+function neredeOf(r: object): { kind: string; text: string } {
+  const n: unknown = "nerede" in r ? r.nerede : undefined;
+  if (typeof n !== "object" || n === null || !("kind" in n) || !("text" in n)) throw new Error(`nerede yok: ${j(r)}`);
+  const { kind, text } = n;
+  if (typeof kind !== "string" || typeof text !== "string") throw new Error(`nerede biçimi bozuk: ${j(n)}`);
+  return { kind, text };
+}
+
 const fx = {
   customers: [] as string[], items: [] as string[], colors: [] as string[], orders: [] as string[], wos: [] as string[],
   stations: [] as string[], firms: [] as string[], dispatches: [] as string[], rolls: [] as string[], batches: [] as string[],
@@ -204,7 +213,7 @@ async function main(): Promise<void> {
         lines: { select: { quantity: true, shippedQty: true, unit: true, cancelledAt: true, workOrderLinks: { where: ACTIVE_ORDER_LINK, select: { workOrder: { select: { id: true, status: true } } } } } },
       },
     });
-    const panel = new Map((await attachNerede(panelRows)).map((r) => [r.id, (r as unknown as { nerede: { kind: string; text: string } }).nerede]));
+    const panel = new Map((await attachNerede(panelRows)).map((r) => [r.id, neredeOf(r)]));
     const KIND: Record<string, string> = { IS_EMRI_YOK: "NO_WORK_ORDER", HAZIR: "READY", FASON: "FASON", ASAMA: "STEP", GONDERILDI: "PRODUCED_SHIPPED", BASLAMADI: "NOT_STARTED" };
     const diff = fx.orders.filter((id) => {
       const u = rows.get(id) as { tur: string; metin: string };

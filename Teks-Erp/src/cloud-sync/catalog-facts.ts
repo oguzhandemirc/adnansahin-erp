@@ -38,8 +38,7 @@ const WOS_OF_SUBCONTRACTOR_CATEGORIES = wosOfRollSet(
 // Sipariş `uretim` (patron "Üretim" sütunu): bağlı İE'lerin topu/durumu/bağı değişince sipariş yeniden gider. Bağ
 // yüklemi `ACTIVE_ORDER_LINK` ile aynı (`unlinkedAt IS NULL`); top → İE üç yolu `WO_OF_ROLLS` ile aynı.
 const ordersOfWos = (wos: string): string =>
-  'SELECT DISTINCT ol."orderId" AS root_id FROM "work_order_to_order_lines" l JOIN "order_lines" ol ON ol."id" = l."orderLineId" ' +
-  `WHERE l."unlinkedAt" IS NULL AND l."workOrderId" IN (${wos})`;
+  `SELECT DISTINCT ol."orderId" AS root_id FROM "work_order_to_order_lines" l JOIN "order_lines" ol ON ol."id" = l."orderLineId" WHERE l."unlinkedAt" IS NULL AND l."workOrderId" IN (${wos})`;
 const ORDERS_OF_ROLLS = ordersOfWos(`SELECT w.root_id FROM (${WO_OF_ROLLS}) w`);
 const ORDERS_OF_WORK_ORDERS = ordersOfWos("SELECT unnest($1::uuid[])");
 // Bağ eklenince/koparılınca (koparılmış bağ DAHİL: eski cümle düzelsin) bağın siparişi.
