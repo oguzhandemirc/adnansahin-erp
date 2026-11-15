@@ -182,3 +182,21 @@ geri yüklenir (`docs/kurallar/surum-yayin.md` § Migration).
   katalog dışı 2 izni ve yeni şablonu KORUDU; eski kod (yeni şema) ↔ eski kod (eski şema) 301/301 HTTP durumu aynı.
 - Sınır: `kur.ps1`/pm2 Windows'ta, gerçek panel/tablet ile duman testi yapılmadı; anahtar AÇIK hâli provada
   ölçülmedi. Ayrıntı: repo dışı `PROVA-D11-SONUC.md`.
+
+## 8. Kurulum kaydı — fabrika, 2026-11-15
+
+- **Kurulum:** 16:32–16:35, `uzaktan-kos.ps1` + `kur.ps1 -Zorla`; önceki sürüm 2.11.7 ölçüldü, paket özeti
+  kurulumdan önce sunucuda doğrulandı. Fabrikada o gün çalışan yoktu (son işlem 14-11).
+- **Önce prova:** aynı paket, aynı günün yedeğiyle Windows'ta (ayrı makine) kuruldu; kesinti ~46 sn, `-GeriAl`
+  çalıştı. Eski tablet uygulaması (1.0.14), saha 1.0.16, panel 1.3.15 ve 1.3.17 bu kopyada denendi.
+- **Sonuç:** `/health` UP/UP 2.12.1 · 4 migration, 367 bitmiş / 0 sorunlu · `patron_sync_status()` `0 · 28 · 0` ·
+  `sync_marks` 0 · kullanıcı 13, hepsi `passwordPolicyVersion = 0` · `patron:giris` ve `system:sessions`
+  katalogda, kimseye atanmadı · yeni ayar satırı yok.
+- **Veri:** sipariş 999 · satır 1003 · iş emri 1202 · top 25.070 · hareket 7907 · çuval 1754 · sevkiyat 525 ·
+  cihaz 38 · toplam ilk metre 2.195.349,50 — kurulum öncesi yedekle aynı.
+- **Geri dönüş noktaları:** kod `app.eski-20261115_163235` (`kur.ps1 -GeriAl`), veri
+  `backups\premigrate_20261115_163235.dump`, önceki kurulum betiği `kur.ps1.onceki-2.11.7`.
+- **Sonrası:** panel 1.3.17 aynı gün yayınlandı (gerçek 1.3.15 → 1.3.17 otomatik güncelleme ayrı makinede
+  ölçüldü); saha 1.0.17 (vc 63) Play dahili kanala yüklendi. Eşitleme KAPALI bırakıldı.
+- **Kurulumla ilgisiz, ayrıca bakılacak:** dış yedek kopyası (rclone) kurulum günü de hata verdi; gece yedeği
+  yerelde alınıyor.
