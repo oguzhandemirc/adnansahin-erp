@@ -3,24 +3,28 @@
 // tablo. Kutular ve ürün tablosu `stok-karnesi`nden (eşitleme aralığında yeniden hesaplanan anlık; tazelik başlıkta).
 // Ürün tablosu tek belgenin içidir (sayfasız, bulut sıralamaz/süzmez) → başlık sıralamasız, süzgeç/arama yok; yalnız sütun
 // seçimi profilde (`tablo.stok`). Yaş dağılımı açılır-kapanır: varsayılan kapalı, durum cihazda (`useAcikKapali`).
-import { useMemo, useState } from "react";
+// Kart seçimi (2026-11-16): başlıktaki simge → hangi özet kartları görünsün (aç/kapa, en az bir). Seçim aynı `tablo.stok`
+// tercihinde (`src/ui/stok/kartlar.ts`); bu yüzden tercih kancası TEK ve burada — ürün tablosu ona prop'la bağlanır.
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useMemo, useState, type ReactElement } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
 import { DEAD_STOCK_STATUS, FREE_STOCK_HINT, FREE_STOCK_LABEL, STOCK_AGE_TONE, UNIT } from "../../../src/lib/labels/uretim";
 import { AgingBar } from "../../../src/ui/charts";
 import { Screen } from "../../../src/ui/Frame";
-import { KademeliGiris } from "../../../src/ui/hareket";
+import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { AcilirKart, BlokBasligi, StatCard } from "../../../src/ui/ortak";
 import { useAcikKapali } from "../../../src/ui/ortak/useAcikKapali";
 import { arr, num, obj, pct, qty, str } from "../../../src/ui/pano/read";
 import { SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
+import { STOCK_CARDS, resetCards, shownCards, toggleCard, type StockCardKey } from "../../../src/ui/stok/kartlar";
 import { StokKalemBolumu } from "../../../src/ui/stok/StokKalemBolumu";
 import { siganSutun as azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
-import { SutunSecici } from "../../../src/ui/tablo/Seciciler";
-import { useTabloTercihi } from "../../../src/ui/tablo/useTabloTercihi";
+import { SutunSecici, VisibilityPicker } from "../../../src/ui/tablo/Seciciler";
+import { useTabloTercihi, type TabloTercihiDurumu } from "../../../src/ui/tablo/useTabloTercihi";
 import { AracDugmesi, TabloBasligi, TabloGovdesi, TabloSatiri } from "../../../src/ui/tablo/VeriTablosu";
-import { makeStyles } from "../../../src/ui/theme-context";
-import { space, typography } from "../../../src/ui/tokens";
+import { makeStyles, useTokens } from "../../../src/ui/theme-context";
+import { TOUCH, space, typography } from "../../../src/ui/tokens";
 
 type Satir = Readonly<Record<string, unknown>>;
 const sayiHucre = (v: unknown) => (num(v) === null ? "—" : qty(v));
@@ -36,10 +40,8 @@ const STOK_VARSAYILAN: TabloTercihi = { surum: 1, sutunlar: ["urun", "miktar", "
 const STOK_ANAHTARLAR = STOK_SUTUNLARI.map((c) => c.key);
 
 /** Ürün bazında tablo: fabrikanın sırasıyla (sıralama/süzme yok — tek belge); sütun seçimi profilde. */
-function UrunTablosu({ items }: { readonly items: readonly Satir[] }) {
-  const azami = azamiSutun(useWindowDimensions().width);
-  const temizle = useMemo(() => (ham: unknown) => tercihiTemizle(ham, { varsayilan: STOK_VARSAYILAN, sutunlar: STOK_ANAHTARLAR, azami }), [azami]);
-  const { tercih, degistir } = useTabloTercihi("tablo.stok", temizle);
+function UrunTablosu({ items, pref, azami }: { readonly items: readonly Satir[]; readonly pref: TabloTercihiDurumu; readonly azami: number }) {
+  const { tercih, degistir } = pref;
   const [acik, setAcik] = useState(false);
   const gorunur = tercih.sutunlar.flatMap((k) => STOK_SUTUNLARI.filter((c) => c.key === k));
   return (
@@ -62,16 +64,35 @@ function UrunTablosu({ items }: { readonly items: readonly Satir[] }) {
 
 export default function Stock() {
   const card = useSnapshot("stok-karnesi");
+  const t = useTokens();
+  const s = useStyles();
+  const azami = azamiSutun(useWindowDimensions().width);
+  const temizle = useMemo(() => (ham: unknown) => tercihiTemizle(ham, { varsayilan: STOK_VARSAYILAN, sutunlar: STOK_ANAHTARLAR, azami }), [azami]);
+  const pref = useTabloTercihi("tablo.stok", temizle);
+  const [secici, setSecici] = useState(false);
+  const shown = shownCards(pref.tercih);
+  const kartDugmesi = (
+    <Basilabilir onPress={() => setSecici(true)} style={s.kartDugmesi} accessibilityRole="button" accessibilityLabel="Kartları seç" testID="stok-kart-sec">
+      <Ionicons name="options-outline" size={22} color={t.color.link} />
+    </Basilabilir>
+  );
   return (
-    <Screen module="stok" onRefresh={card.reload} refreshing={card.refreshing}>
+    <Screen module="stok" onRefresh={card.reload} refreshing={card.refreshing} headerRight={kartDugmesi}>
       <SnapshotGate remote={card} domain="stok" rows={3} empty="Fabrikadan stok karnesi henüz gelmedi" testID="stok-karnesi">
-        {(veri) => <StockBody data={veri} />}
+        {(veri) => <StockBody data={veri} shown={shown} pref={pref} azami={azami} />}
       </SnapshotGate>
+      <VisibilityPicker
+        visible={secici} title="Kartları seç" testID="stok-kart-secici"
+        items={STOCK_CARDS} shown={shown}
+        onToggle={(k) => pref.degistir((x) => toggleCard(x, k as StockCardKey))}
+        onDefault={() => pref.degistir(resetCards)}
+        onClose={() => setSecici(false)}
+      />
     </Screen>
   );
 }
 
-function StockBody({ data }: { readonly data: unknown }) {
+function StockBody({ data, shown, pref, azami }: { readonly data: unknown; readonly shown: readonly StockCardKey[]; readonly pref: TabloTercihiDurumu; readonly azami: number }) {
   const s = useStyles();
   const o = obj(obj(data).ozet);
   const dead = (num(o.oluMiktar) ?? 0) > 0;
@@ -79,31 +100,32 @@ function StockBody({ data }: { readonly data: unknown }) {
   const ages = arr(obj(data).yasKovalari);
   const items = arr(obj(data).urunler);
   const yas = useAcikKapali("stok.yas-dagilimi", false);
+  const stat: Partial<Record<StockCardKey, ReactElement>> = {
+    ham: <StatCard etiket="Ham" icon="layers-outline" ton="teal" degerler={[{ deger: qty(o.hamMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.hamAdet)} ${UNIT.top}`} testID="kpi-ham" />,
+    yari: <StatCard etiket="Yarı mamul" icon="sync-outline" ton="blue" degerler={[{ deger: qty(o.yariMamulMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.yariMamulAdet)} ${UNIT.top}`} testID="kpi-yari" />,
+    bitmis: <StatCard etiket={FREE_STOCK_LABEL} icon="cube-outline" ton="green" degerler={[{ deger: qty(o.bitmisMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.bitmisAdet)} ${UNIT.top} · ${FREE_STOCK_HINT}`} testID="kpi-bitmis" />,
+    olu: (
+      <StatCard
+        etiket="Ölü stok" icon="hourglass-outline" ton={dead ? "amber" : "green"}
+        degerler={[{ deger: qty(o.oluMiktar), birim: UNIT.metre }]}
+        ipucu={`${deadSt.label} · ${qty(o.oluStokGun)} günden uzun, siparişsiz`}
+        testID="olu-stok"
+      />
+    ),
+  };
+  // Görünür gösterge kartları tanım sırasıyla ikişer; tek kalan tam genişlik.
+  const kpis = shown.flatMap((k) => (stat[k] ? [{ k, el: stat[k] }] : []));
+  const rows: { k: string; el: ReactElement }[][] = [];
+  for (let i = 0; i < kpis.length; i += 2) rows.push(kpis.slice(i, i + 2));
   return (
     <View>
-      <KademeliGiris sira={0} style={s.ikili}>
-        <View style={s.yarim}>
-          <StatCard etiket="Ham" icon="layers-outline" ton="teal" degerler={[{ deger: qty(o.hamMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.hamAdet)} ${UNIT.top}`} testID="kpi-ham" />
-        </View>
-        <View style={s.yarim}>
-          <StatCard etiket="Yarı mamul" icon="sync-outline" ton="blue" degerler={[{ deger: qty(o.yariMamulMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.yariMamulAdet)} ${UNIT.top}`} testID="kpi-yari" />
-        </View>
-      </KademeliGiris>
-      <KademeliGiris sira={1} style={s.ikili}>
-        <View style={s.yarim}>
-          <StatCard etiket={FREE_STOCK_LABEL} icon="cube-outline" ton="green" degerler={[{ deger: qty(o.bitmisMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.bitmisAdet)} ${UNIT.top} · ${FREE_STOCK_HINT}`} testID="kpi-bitmis" />
-        </View>
-        <View style={s.yarim}>
-          <StatCard
-            etiket="Ölü stok" icon="hourglass-outline" ton={dead ? "amber" : "green"}
-            degerler={[{ deger: qty(o.oluMiktar), birim: UNIT.metre }]}
-            ipucu={`${deadSt.label} · ${qty(o.oluStokGun)} günden uzun, siparişsiz`}
-            testID="olu-stok"
-          />
-        </View>
-      </KademeliGiris>
+      {rows.map((row, i) => (
+        <KademeliGiris key={row.map((x) => x.k).join("+")} sira={i} style={s.ikili}>
+          {row.map((x) => <View key={x.k} style={s.yarim}>{x.el}</View>)}
+        </KademeliGiris>
+      ))}
 
-      {ages.length > 0 ? (
+      {shown.includes("yas") && ages.length > 0 ? (
         <KademeliGiris sira={2} style={s.blok}>
           <AcilirKart baslik="Yaş dağılımı" aciklama={`Yaşlı ${qty(o.yasliMiktar)} ${UNIT.metre}`} acik={yas.acik} hazir={yas.hazir} onDegistir={yas.degistir} testID="bolum-yas">
             <AgingBar
@@ -126,7 +148,7 @@ function StockBody({ data }: { readonly data: unknown }) {
 
       {items.length > 0 ? (
         <KademeliGiris sira={4}>
-          <UrunTablosu items={items} />
+          <UrunTablosu items={items} pref={pref} azami={azami} />
         </KademeliGiris>
       ) : null}
     </View>
@@ -138,4 +160,5 @@ const useStyles = makeStyles((t) => ({
   yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
   blok: { marginBottom: space.m },
   footnote: { ...typography.footnote, color: t.color.textMuted, marginTop: space.m },
+  kartDugmesi: { minWidth: TOUCH, minHeight: TOUCH, alignItems: "center" as const, justifyContent: "center" as const },
 }));

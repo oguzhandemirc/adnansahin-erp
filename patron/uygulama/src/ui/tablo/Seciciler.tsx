@@ -101,6 +101,58 @@ export function SutunSecici<R>(p: {
   );
 }
 
+/** Sade görünürlük seçimi (ör. Stok kartları): aç/kapa, sıra değiştirme YOK; en az bir öğe açık kalır. */
+export function VisibilityPicker(p: {
+  readonly visible: boolean;
+  readonly title: string;
+  readonly items: readonly { readonly key: string; readonly label: string }[];
+  readonly shown: readonly string[];
+  readonly onToggle: (key: string) => void;
+  readonly onDefault: () => void;
+  readonly onClose: () => void;
+  readonly testID: string;
+}) {
+  const t = useTokens();
+  const s = useStyles();
+  return (
+    <AltSayfa
+      visible={p.visible} title={p.title} onClose={p.onClose} testID={p.testID}
+      alt={
+        <View style={s.altSatir}>
+          <Text style={s.not}>En az 1 kart açık kalır</Text>
+          <Pressable onPress={p.onDefault} hitSlop={8} accessibilityRole="button" testID={`${p.testID}-varsayilan`}>
+            <Text style={[s.bittiYazi, { color: t.tint }]}>Varsayılana dön</Text>
+          </Pressable>
+        </View>
+      }
+    >
+      {p.items.map((c, i) => {
+        const on = p.shown.includes(c.key);
+        const locked = on && p.shown.length <= 1;
+        return (
+          <View key={c.key} style={[s.row, i > 0 && s.rowSep]}>
+            <Pressable
+              onPress={() => {
+                haptic("selection");
+                p.onToggle(c.key);
+              }}
+              disabled={locked}
+              style={({ pressed }) => [s.rowMain, pressed && { opacity: BASMA.opaklik }, locked && { opacity: 0.45 }]}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on, disabled: locked }}
+              accessibilityLabel={c.label}
+              testID={`${p.testID}-${c.key}`}
+            >
+              <Ionicons name={on ? "checkbox" : "square-outline"} size={22} color={on ? t.tint : t.textMuted} />
+              <Text style={s.rowText} numberOfLines={1}>{c.label}</Text>
+            </Pressable>
+          </View>
+        );
+      })}
+    </AltSayfa>
+  );
+}
+
 export function SuzgecSecici(p: {
   readonly visible: boolean;
   readonly gruplar: readonly SuzgecGrubu[];
