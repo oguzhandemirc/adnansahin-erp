@@ -20,7 +20,6 @@ import { ShipmentRow, cariRowText } from "../../../../src/ui/siparis/CustomerRow
 import { OrderRow, asObj, str } from "../../../../src/ui/siparis/OrderRow";
 import { ListStates, StaleNote } from "../../../../src/ui/siparis/parts";
 import { SegmentedControl } from "../../../../src/ui/SegmentedControl";
-import { SyncIndicator } from "../../../../src/ui/SyncIndicator";
 import { useRemoteList } from "../../../../src/ui/siparis/useRemoteList";
 import { makeStyles } from "../../../../src/ui/theme-context";
 import { space, tabularNums, typography } from "../../../../src/ui/tokens";
@@ -32,7 +31,7 @@ const OZET_SATIR = 5;
 
 export default function CustomerDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { api, permissions, factoryStamp, offline } = useSession();
+  const { api, permissions } = useSession();
   const router = useRouter();
   const s = useStyles();
   const cap = useListCapability();
@@ -78,15 +77,14 @@ export default function CustomerDetail() {
     { key: "yer", etiket: "Adres", deger: place || null },
     { key: "yon", etiket: "Varsayılan sevk yönü", deger: str(k.varsayilanYon) ? destinationLabel(k.varsayilanYon) : null },
   ].filter((x) => x.deger !== null);
-  // Kimlik başlıkla TEK satırda (2026-11-16): ad · "kod · il" · tür rozeti · tazelik. Dar ekranda ad sarılırsa bu öğe
+  // Kimlik başlıkla TEK satırda (2026-11-16): ad · "kod · il" · tür rozeti (ardından ortak tazelik öğesi). Dar ekranda ad sarılırsa bu öğe
   // adın altına küçük alt yazı olarak düşer; ayrı kimlik bloğu ve büyük simge yok.
   const kodIl = [str(k.kod), str(k.il)].filter(Boolean).join(" · ");
-  const meta = (
+  const meta = !kimlik ? undefined : (
     <View style={s.kimlik} testID="cari-kimlik">
-      {kimlik && kodIl ? <Text style={s.kod} numberOfLines={1}>{kodIl}</Text> : null}
-      {kimlik?.roles.map((x) => <Rozet key={x.key} label={x.label} tone="primary" />)}
-      {kimlik?.passive ? <Rozet label="Pasif" /> : null}
-      <SyncIndicator last={factoryStamp} offline={offline} onPress={refresh} />
+      {kodIl ? <Text style={s.kod} numberOfLines={1}>{kodIl}</Text> : null}
+      {kimlik.roles.map((x) => <Rozet key={x.key} label={x.label} tone="primary" />)}
+      {kimlik.passive ? <Rozet label="Pasif" /> : null}
     </View>
   );
 

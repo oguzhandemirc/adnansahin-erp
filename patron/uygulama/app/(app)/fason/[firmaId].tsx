@@ -13,7 +13,7 @@ import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { asamaMetni, kumasMetni, musteriMetni, topMetni, type Kayit } from "../../../src/ui/is-emri/gorunum";
 import { openRecord } from "../../../src/ui/nav";
 import { AltSekmeler, ListeBlogu, ListeSatiri, StatCard } from "../../../src/ui/ortak";
-import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
+import { SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { useListCapability } from "../../../src/ui/siparis/capabilities";
 import { ListStates } from "../../../src/ui/siparis/parts";
@@ -57,13 +57,12 @@ export default function SubcontractFirm() {
   return (
     <Screen title={ad || (acik.data ? firmaGorunumu(acik.data.veri, String(firmaId ?? ""))?.ad : null) || "Fason firması"} module="uretim" back onRefresh={() => { acik.reload(); if (sekme === "isEmri") ie.reload(); }} refreshing={acik.refreshing || ie.refreshing}>
       <SnapshotGate remote={acik} rows={3} empty="Fabrikadan fason verisi henüz gelmedi" testID="fason-firma">
-        {(veri, snap) => {
+        {(veri) => {
           const f = firmaGorunumu(veri, String(firmaId ?? ""));
           if (!f) return <Text style={s.not} testID="fason-firma-yok">Bu firmada fasonda top yok</Text>;
           return (
             <>
               <KademeliGiris sira={0}>
-                <FactoryStamp snap={snap} offline={acik.offline} />
                 <View style={s.ikili}>
                   <View style={s.yarim}>
                     <StatCard etiket="Top" icon="cube-outline" ton="orange" degerler={[{ deger: f.top, birim: UNIT.top }]} testID="fason-firma-top" />

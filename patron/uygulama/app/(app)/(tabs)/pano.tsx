@@ -21,7 +21,6 @@ import { DuzenCubugu, DuzenListesi, KutuEkleSayfasi } from "../../../src/ui/pano
 import { useDuzen } from "../../../src/ui/pano/duzen";
 import { KUTU_CIZICI, type KutuBaglami } from "../../../src/ui/pano/KutuCizici";
 import { istenenKaynaklar, izinliKutular, kutu, satirlar } from "../../../src/ui/pano/kutular";
-import { SyncNowFeedbackText, SyncNowIndicator, useSyncNow } from "../../../src/ui/pano/SimdiGuncelle";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { SectionHeader } from "../../../src/ui/SectionHeader";
 import { SegmentedControl } from "../../../src/ui/SegmentedControl";
@@ -44,7 +43,7 @@ const MODULE_HINT: Readonly<Partial<Record<ModuleKey, string>>> = {
 };
 
 export default function Dashboard() {
-  const { facility, permissions, refresh, factoryStamp, offline } = useSession();
+  const { facility, permissions, refresh } = useSession();
   const router = useRouter();
   const wide = useWide();
   const t = useTokens();
@@ -83,20 +82,7 @@ export default function Dashboard() {
   const baglam: KutuBaglami = { anlik, liste, donem, router, permissions };
   const donemli = duzen.kutular.some((a) => kutu(a).donemli);
 
-  // Tazelik + "Şimdi güncelle" başlıkta TEK öğe (ayrı satır yok); tesis adı Menü/Profil/rayda. Uç beyan edilmemişse
-  // (eski bulut) başlık ortak eşitleme göstergesine döner. Dokunuş eşitleme ister ve bulut verisini de tazeler.
-  const syncNow = useSyncNow();
-  const meta = syncNow.available ? (
-    <SyncNowIndicator
-      last={factoryStamp}
-      offline={offline}
-      busy={syncNow.busy}
-      onPress={() => {
-        if (!duzenle) reloadAll();
-        syncNow.trigger();
-      }}
-    />
-  ) : undefined;
+  // Tazelik + "Şimdi güncelle" ortak başlıkta TEK öğedir (`Screen`); ayrı satır yok, tesis adı Menü/Profil/rayda.
   // ☰ menü (Sevkiyat · Raporlar · Gönderdiklerim · Profil): yalnız telefonda; geniş ekranda aynı gruplar raydadır.
   // Okunmamış ret (fabrikanın kabul etmediği gönderim) rozeti burada; kayıt açılınca söner.
   const okunmamis = useOkunmamisRet();
@@ -137,8 +123,6 @@ export default function Dashboard() {
     <Screen
       title="Pano"
       back={false}
-      meta={meta}
-      subtitle={syncNow.feedback ? <SyncNowFeedbackText feedback={syncNow.feedback} /> : undefined}
       headerRight={basliktaEylem}
       onRefresh={duzenle ? undefined : reloadAll}
       refreshing={hepsi.some((r) => r.refreshing)}

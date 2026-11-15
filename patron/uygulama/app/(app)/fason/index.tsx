@@ -10,7 +10,7 @@ import { fasonGorunumu } from "../../../src/ui/fason/gorunum";
 import { Screen } from "../../../src/ui/Frame";
 import { KademeliGiris } from "../../../src/ui/hareket";
 import { BlokBasligi, ListeBlogu, ListeSatiri, StatCard } from "../../../src/ui/ortak";
-import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
+import { SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { makeStyles } from "../../../src/ui/theme-context";
 import { space, typography } from "../../../src/ui/tokens";
@@ -23,13 +23,12 @@ export default function Subcontract() {
   return (
     <Screen title="Fason" module="uretim" onRefresh={acik.reload} refreshing={acik.refreshing}>
       <SnapshotGate remote={acik} rows={3} empty="Fabrikadan fason verisi henüz gelmedi" testID="fason-acik">
-        {(veri, snap) => {
+        {(veri) => {
           const v = fasonGorunumu(veri);
           if (!v) return <Text style={s.not}>Fabrika güncellenince gelir</Text>;
           return (
             <>
               <KademeliGiris sira={0}>
-                <FactoryStamp snap={snap} offline={acik.offline} />
                 <BlokBasligi baslik="Fasonda ne var?" testID="fason-ne-var" />
                 <View style={s.ikili}>
                   <View style={s.yarim}>

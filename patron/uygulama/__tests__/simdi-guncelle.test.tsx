@@ -74,7 +74,7 @@ describe("Şimdi güncelle", () => {
     render(<Harness request={request} />);
     await press();
     expect(screen.getByTestId("simdi-guncelle-cark")).toBeTruthy();
-    expect(screen.getByText("Gönderiliyor…")).toBeTruthy();
+    expect(screen.getByText("İsteniyor…")).toBeTruthy();
     expect(screen.getByTestId("simdi-guncelle").props.accessibilityState).toMatchObject({ disabled: true, busy: true });
     await press();
     expect(request).toHaveBeenCalledTimes(1);
@@ -119,11 +119,9 @@ describe("Şimdi güncelle", () => {
     expect(ornekSimdiGuncelle(t0 + 60_000).durum).toBe("BEKLIYOR");
   });
 
-  it("pano: eylem başlığın tazelik yuvasında, başlık altında tesis adı/eylem satırı yok", () => {
+  it("pano: ayrı tesis adı / eylem satırı yok; tazelik + eylem ortak başlıktan (Screen) gelir", () => {
     const pano = readFileSync(path.join(__dirname, "../app/(app)/(tabs)/pano.tsx"), "utf8");
-    expect(pano).toMatch(/meta=\{meta\}/);
-    expect(pano).toMatch(/<SyncNowIndicator/);
-    expect(pano).toMatch(/subtitle=\{syncNow\.feedback \? <SyncNowFeedbackText feedback=\{syncNow\.feedback\} \/> : undefined\}/);
+    expect(pano).not.toMatch(/subtitle=|SimdiGuncelle|SyncNowIndicator/);
     expect(pano).not.toMatch(/FacilityName/);
   });
 });

@@ -16,7 +16,7 @@ import { AltSekmeler, ListeSatiri, StatCard } from "../../src/ui/ortak";
 import { obj, period, qty, str } from "../../src/ui/pano/read";
 import { KayitDurumRozeti } from "../../src/ui/pano/KayitDurumRozeti";
 import { RemoteList, useRecordPage } from "../../src/ui/pano/RemoteList";
-import { FactoryStamp, SnapshotGate } from "../../src/ui/pano/SnapshotGate";
+import { SnapshotGate } from "../../src/ui/pano/SnapshotGate";
 import { combine, useSnapshot } from "../../src/ui/pano/useSnapshot";
 import { makeStyles } from "../../src/ui/theme-context";
 import { space, typography } from "../../src/ui/tokens";
@@ -39,11 +39,10 @@ export default function Shipments() {
           <AltSekmeler sekmeler={DONEMLER} secili={p} onSec={setP} testID="donem" />
           <View style={s.ozet}>
             <SnapshotGate remote={summary} rows={2} testID="sevk-ozet">
-              {(veri, snap) => {
+              {(veri) => {
                 const d = period(veri, p);
                 return (
                   <>
-                    <FactoryStamp snap={snap} offline={summary.offline} note="brüt, iade düşülmez" />
                     <View style={s.ikili} testID="sevk-kpi">
                       <View style={s.yarim}>
                         <StatCard etiket="Sevk (brüt)" icon={MODULE_ICON.sevkiyat.icon} ton="green" degerler={[{ deger: qty(d.sevkMiktari), birim: UNIT.metre }]} ipucu={PERIOD_LABEL[p]} testID="kpi-sevk-metre" />

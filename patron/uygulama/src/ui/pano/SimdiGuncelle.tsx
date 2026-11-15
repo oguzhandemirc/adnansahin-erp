@@ -88,7 +88,7 @@ export function SyncNowIndicator({ last, offline = false, busy, onPress }: {
   const s = useStyles();
   const now = useMinuteClock();
   const since = last ? formatSince(last, now) : null;
-  const text = busy ? "Gönderiliyor…" : since ?? "Şimdi güncelle";
+  const text = busy ? "İsteniyor…" : since ?? "Şimdi güncelle";
   const state = since ? `${offline ? "Çevrimdışı · son eşitleme" : "Son eşitleme"} ${since}` : null;
   return (
     <Pressable

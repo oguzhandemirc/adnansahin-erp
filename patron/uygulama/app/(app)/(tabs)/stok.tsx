@@ -1,9 +1,9 @@
 // Stok — "ne var, kaç gündür duruyor": ham · yarı mamul · bitmiş (metre + top) · ölü stok uyarısı · yaş dağılımı ·
 // kalem/top listesi (Ham | Bitmiş; anlık `stok-kalem`, `src/ui/stok`) · ürün bazında
-// tablo. Kutular ve ürün tablosu `stok-karnesi`nden (saatlik anlık; "Fabrika verisi HH:MM" ile söylenir).
+// tablo. Kutular ve ürün tablosu `stok-karnesi`nden (eşitleme aralığında yeniden hesaplanan anlık; tazelik başlıkta).
 // Ürün tablosu tek belgenin içidir (sayfasız, bulut sıralamaz/süzmez) → başlık sıralamasız, süzgeç/arama yok; yalnız sütun
 // seçimi profilde (`tablo.stok`). Yaş dağılımı açılır-kapanır: varsayılan kapalı, durum cihazda (`useAcikKapali`).
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
 import { DEAD_STOCK_STATUS, FREE_STOCK_HINT, FREE_STOCK_LABEL, STOCK_AGE_TONE, UNIT } from "../../../src/lib/labels/uretim";
 import { AgingBar } from "../../../src/ui/charts";
@@ -12,7 +12,7 @@ import { KademeliGiris } from "../../../src/ui/hareket";
 import { AcilirKart, BlokBasligi, StatCard } from "../../../src/ui/ortak";
 import { useAcikKapali } from "../../../src/ui/ortak/useAcikKapali";
 import { arr, num, obj, pct, qty, str } from "../../../src/ui/pano/read";
-import { FactoryStamp, SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
+import { SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { StokKalemBolumu } from "../../../src/ui/stok/StokKalemBolumu";
 import { siganSutun as azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
@@ -65,13 +65,13 @@ export default function Stock() {
   return (
     <Screen module="stok" onRefresh={card.reload} refreshing={card.refreshing}>
       <SnapshotGate remote={card} domain="stok" rows={3} empty="Fabrikadan stok karnesi henüz gelmedi" testID="stok-karnesi">
-        {(veri, snap) => <StockBody data={veri} stamp={<FactoryStamp snap={snap} offline={card.offline} note="saatlik güncellenir" testID="fabrika-verisi" />} />}
+        {(veri) => <StockBody data={veri} />}
       </SnapshotGate>
     </Screen>
   );
 }
 
-function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: ReactNode }) {
+function StockBody({ data }: { readonly data: unknown }) {
   const s = useStyles();
   const o = obj(obj(data).ozet);
   const dead = (num(o.oluMiktar) ?? 0) > 0;
@@ -81,7 +81,6 @@ function StockBody({ data, stamp }: { readonly data: unknown; readonly stamp: Re
   const yas = useAcikKapali("stok.yas-dagilimi", false);
   return (
     <View>
-      {stamp}
       <KademeliGiris sira={0} style={s.ikili}>
         <View style={s.yarim}>
           <StatCard etiket="Ham" icon="layers-outline" ton="teal" degerler={[{ deger: qty(o.hamMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.hamAdet)} ${UNIT.top}`} testID="kpi-ham" />

@@ -55,7 +55,9 @@ describe("gezinme grupları (P2)", () => {
 });
 
 describe("boş durumlar", () => {
-  const TAG = /<(Empty|ListStates|RemoteList|SnapshotGate)\b[\s\S]*?\/>/g;
+  // SnapshotGate çocuklu bir sarmalayıcıdır: yalnız AÇILIŞ etiketi taranır (tembel `/>` aramasından içteki ilk
+  // kendini kapatan elemana — ör. `StatCard icon=` — taşıp yanlış pozitif vermesin).
+  const TAG = /<(Empty|ListStates|RemoteList)\b[\s\S]*?\/>|<SnapshotGate\b[^>]*>/g;
   const elements = SOURCES.flatMap((f) => [...readFileSync(f, "utf8").matchAll(TAG)].map((m) => ({ f: f.slice(ROOT.length + 1), src: m[0] })));
   it("tarayıcı gerçekten eleman buluyor (sonda)", () => {
     expect(elements.length).toBeGreaterThan(15);

@@ -14,6 +14,7 @@ import { MODULE_ICON } from "./icons";
 import { Banner } from "./kit";
 import { ScreenHeader, useHeaderScroll } from "./LargeHeader";
 import { SyncIndicator } from "./SyncIndicator";
+import { SyncNowFeedbackText, SyncNowIndicator, useSyncNow } from "./pano/SimdiGuncelle";
 import { RoleBadge } from "./RoleBadge";
 import { RAIL_GROUPS, TABS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
@@ -122,7 +123,7 @@ export interface ScreenProps {
   readonly subtitle?: ReactNode;
   /** Kaydırmanın altında sabit kalan çubuk (ör. düzenleme kipinin eylemleri). */
   readonly footer?: ReactNode;
-  /** Başlığın yanındaki tazelik öğesi; verilmezse eşitleme göstergesi (pano: "Şimdi güncelle" ile birleşik hâli). */
+  /** Başlığın yanında, tazelik öğesinden ÖNCE çizilen kısa bilgi (ör. cari kartı: kod · il · rozet). */
   readonly meta?: ReactNode;
 }
 
@@ -166,7 +167,25 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/pano"));
   const pull = useUserPull(refreshing, onRefresh);
   const [subFilled, setSubFilled] = useState(true);
-  const seamless = !!subtitle && subFilled;
+  // TEK tazelik öğesi (2026-11-16): fabrikanın son eşitleme anı; bulut "Şimdi güncelle"yi beyan ettiyse aynı öğe
+  // eylemdir (fabrika bütün anlıkları yeniden hesaplar + bu ekranın bulut verisi tazelenir). Yanıt cümlesi alt satırda.
+  const syncNow = useSyncNow();
+  const freshness = syncNow.available ? (
+    <SyncNowIndicator
+      last={factoryStamp}
+      offline={offline}
+      busy={syncNow.busy}
+      onPress={() => {
+        onRefresh?.();
+        syncNow.trigger();
+      }}
+    />
+  ) : (
+    <SyncIndicator last={factoryStamp} offline={offline} onPress={onRefresh} />
+  );
+  const feedback = syncNow.feedback ? <SyncNowFeedbackText feedback={syncNow.feedback} /> : null;
+  const sub = subtitle || feedback ? <>{subtitle}{feedback}</> : null;
+  const seamless = !!sub && subFilled;
   return (
     <View style={s.screen}>
       <ScreenHeader
@@ -177,7 +196,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         seamless={seamless}
         onBack={showBack ? goBack : undefined}
         action={sorunBildir ? <>{headerRight}<SorunBildirDugmesi /></> : headerRight}
-        meta={meta ?? <SyncIndicator last={factoryStamp} offline={offline} onPress={onRefresh} />}
+        meta={meta ? <View style={s.meta}>{meta}{freshness}</View> : freshness}
       />
       <Animated.ScrollView
         onScroll={onScroll}
@@ -192,10 +211,10 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
       >
         <View>
           {/* Alt satır (ör. tesis adı, özet şeridi) başlığın krom zemininde devam eder ama kaydırmayla gider. */}
-          {subtitle ? (
+          {sub ? (
             <View style={[subFilled ? s.subtitle : s.subtitleEmpty, { marginHorizontal: -pad, paddingHorizontal: pad }]} testID="baslik-alt-satiri">
               {/* Alt satır boş çizilebilir (ör. taze veride `StaleNote`): boşken krom şerit bırakmaz. */}
-              <View onLayout={(e) => setSubFilled(e.nativeEvent.layout.height > 0)}>{subtitle}</View>
+              <View onLayout={(e) => setSubFilled(e.nativeEvent.layout.height > 0)}>{sub}</View>
             </View>
           ) : null}
           <StatusBands />
@@ -213,6 +232,7 @@ const useStyles = makeStyles((t) => ({
   sticky: { backgroundColor: t.bg, zIndex: 2 },
   subtitle: { backgroundColor: t.color.chrome, borderBottomWidth: 1, borderBottomColor: t.color.chromeBorder, paddingBottom: space.m, marginBottom: space.l },
   subtitleEmpty: { height: 0, overflow: "hidden" as const },
+  meta: { flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, columnGap: space.s, rowGap: space.xs },
   content: { maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },
   rail: { width: RAIL_WIDTH, borderRightWidth: 1, borderColor: t.separator, backgroundColor: t.surface, paddingTop: space.l, paddingHorizontal: space.s },
