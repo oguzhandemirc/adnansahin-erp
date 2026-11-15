@@ -1,8 +1,8 @@
 # Backend `2.12.2`
 
-**Paket:** _(paketleme doldurur)_
-**SHA256:** _(paketleme doldurur)_
-**Commit:** _(paketleme doldurur)_
+**Paket:** `tekserp-backend-20261116_011623-b276031b.zip`
+**SHA256:** `83733A5C0F7F29CB360F6FFDB19B2AAFBAE582BDB5A835477A27063A2FBF2B3E`
+**Commit:** `b276031b`
 **İçerik:** 2.12.1 paketinin (`c329dfac`) bütün içeriği + sonrasında `main`e gelenler: Etkili Destek uçları `/api/destek/*` (`1c4a2a5e`; varsayılan KAPALI) · tarayıcı panelinde destek sayfası, "Sorun bildir" ve okunmamış rozeti (`5dc94576`; destek kapalıyken görünmez) · üç statik bekçi düzeltmesi (`218c3910`; eşitleme kataloğundaki SQL metni yalnız biçim olarak değişti, sorgu aynı) · `DEVICE_REQUIRED` mesajı yol gösterici (bu sürümün commit'i).
 **Önceki saha sürümü:** **2.12.1** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.12.1 olduğunu ÖLÇER — farklıysa DUR).
 
@@ -64,9 +64,9 @@ yeni ayar anahtarı **0** · yeni npm paketi **0** (`package.json`da yalnız `ve
 
 ## 5. Kurulum notu
 
-- **Beklenen kesinti:** ≈ 45–50 sn (2.12.1 Windows provasında ölçülen pm2 durdur → dosya taşıma → başlat süresi;
-  migration yok). Kesintiden ÖNCEKİ `[1/9]`–`[3/9]` (paket açma + yedek) ≈ 5 dk; bu sürede fabrika ÇALIŞIR ve
-  ekranda `[1/9]` satırından başka çıktı olmayabilir — kesme.
+- **Beklenen kesinti:** ≈ 70 sn (Windows provasında bu paketle ölçülen 67,6 ve 70,0 sn; migration yok). Kesintiden
+  ÖNCEKİ `[1/9]`–`[3/9]` (paket açma + yedek) ≈ 9 dk, toplam ≈ 11 dk; bu sürede fabrika ÇALIŞIR ve ekranda `[1/9]`
+  satırından başka çıktı olmayabilir — kesme.
 - **Sıra:** bu backend (destek KAPALI) → doğrulama → destek açma ayrı adım (§5.1, isteğe bağlı) → saha/panel
   sürümleri ayrı onayla.
 - **Kurulum yöntemi:** 2.12.1 ile aynı — paket `C:\TeksERP\guncelleme\`e; paketin kendi `kur.ps1` +
@@ -111,3 +111,18 @@ kapatma yeterli.
 - oturumla `GET /api/destek/durum` → `{ etkin: false }`; `GET /api/destek/okunmamis` → 403 `MODULE_DISABLED`
 - panelde parolayla giriş + sipariş listesi; tabletten PIN ile giriş + bir okutma
 - ölçülen kesinti
+
+**Windows provası (2026-11-16, ThinkPad'deki fabrika kopyası, 2.12.1 → bu paket; `.env`de fazladan satır + patron
+bulutu satırları, tetikleyiciler AÇIK) — GEÇTİ:**
+- Kurulum (`uzaktan-kos.ps1` + `kur.ps1 -Zorla`): 11 dk 7 sn, kesinti 67,6 sn; `[7/9]` "367 migrations found" +
+  "No pending migrations to apply"; UP/UP 2.12.2, `_prisma_migrations` 367 / 0.
+- Kullanıcı, sipariş, satır, top, müşteri, çuval, sevkiyat ve iş emri sayıları aynı; `patron_sync_status()` önce ve
+  sonra `28·28·1`; `.env` SHA256 aynı (fazladan satır yerinde), ACL yalnız Administrators + SYSTEM; pm2 süreci SYSTEM.
+- Kapalı hâl: `durum` 200 `{ etkin: false }`, diğer destek uçları 403 `MODULE_DISABLED`, sipariş/top listesi 200.
+- Açma (§5.1, anahtar SSH stdin'i ile): restart'tan ≈ 10 sn sonra UP; `durum` `{ etkin: true, firmaYoneticisi: true }`
+  (sistem hesabı), `okunmamis` ve `talepler` 200 (canlı merkeze salt okuma); günlüklerde anahtar 0. Talep açan/yazan
+  uçlar çağrılmadı. Kapatma (yedek `.env` geri + restart) → `{ etkin: false }`.
+- Geri alma (`-GeriAl -Zorla`): 24,6 sn, kesinti 11,1 sn, UP/UP 2.12.1, sayılar ve `.env` aynı. Yeniden kurulum:
+  11 dk 5 sn, kesinti 70,0 sn, sonuçlar aynı.
+- Sınır: patron bulutu kopyada yoktu (eşitleme işleri `EGRESS_NETWORK` yazdı); fabrikadan destek merkezine çıkış,
+  gerçek panel/tablet ile duman testi ölçülmedi. Ayrıntı ve canlı reçetesi: repo dışı `PROVA-2.12.2-2026-11-16.md`.
