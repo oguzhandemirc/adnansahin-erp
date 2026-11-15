@@ -15,6 +15,7 @@ import {
   Handshake,
   Users,
   History,
+  LifeBuoy,
   type LucideIcon,
 } from "lucide-react";
 import { allCommandEntries } from "@/components/layout/command-entries";
@@ -29,6 +30,8 @@ const STATIC: Record<string, TabMeta> = {
   "/": { title: "Anasayfa", icon: LayoutDashboard },
   "/settings": { title: "Kullanıcı Tercihleri", icon: Settings },
   "/release-notes": { title: "Sürüm Notları", icon: FileText },
+  // Kapısız destek sayfası (talepler); giriş üst çubuktaki Destek düğmesinden.
+  "/destek": { title: "Destek", icon: LifeBuoy },
   "/forbidden": { title: "Yetki yok", icon: ShieldAlert },
   "/definitions": { title: "Tanımlar", icon: Library },
   "/operations": { title: "Operasyon", icon: ClipboardList },

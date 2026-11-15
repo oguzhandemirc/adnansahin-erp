@@ -20,6 +20,7 @@ import { useDeviceScanner } from "@/hooks/useDeviceScanner";
 import { useDeviceAnnounce } from "@/hooks/useDeviceAnnounce";
 import { useScannerStore } from "@/store/scanner";
 import { useMachineConfig } from "@/hooks/useMachineConfig";
+import { DestekRoot } from "@/pages/Destek/DestekRoot";
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(() => {
@@ -105,6 +106,7 @@ export function AppShell() {
       <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
       <ScanResultOverlay />
       <SurumNotlariDialog kuruluSurum={kuruluSurum} />
+      <DestekRoot />
     </div>
   );
 }

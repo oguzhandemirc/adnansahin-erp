@@ -11,6 +11,7 @@ import { registerScaleIpc } from "./scale.ipc.js";
 import { registerPdfIpc } from "./pdf.ipc.js";
 import { registerFilesIpc } from "./files.ipc.js";
 import { registerUpdaterIpc } from "./updater.ipc.js";
+import { registerScreenIpc } from "./screen.ipc.js";
 
 export function registerIpcHandlers(): void {
   registerSecureStoreIpc();
@@ -26,4 +27,5 @@ export function registerIpcHandlers(): void {
   registerPdfIpc();
   registerFilesIpc();
   registerUpdaterIpc();
+  registerScreenIpc();
 }

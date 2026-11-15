@@ -7,6 +7,7 @@ import { ChannelBadge } from "./ChannelBadge";
 import { AppearanceMenu } from "./AppearanceMenu";
 import { NotificationBell } from "./NotificationBell";
 import { GuncellemeDugmesi } from "./GuncellemeDugmesi";
+import { DestekTopbarButton } from "@/pages/Destek/DestekTopbarButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,6 +93,9 @@ export function Topbar({ onToggleSidebar, onOpenCommand }: Props) {
             Durum eşlemesi tek kaynaktan (`@/lib/updater-durum`); web panelinde
             hiç çizilmez. */}
         <GuncellemeDugmesi />
+
+        {/* Destek (talep) girişi — `/api/destek/durum` kapalı derse hiç çizilmez. */}
+        <DestekTopbarButton />
 
         <NotificationBell />
 

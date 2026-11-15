@@ -21,6 +21,7 @@ import { BossPage } from "@/pages/Boss/BossPage";
 import { BOSS_PATH } from "@/lib/boss-path";
 import { SettingsPage } from "@/pages/Settings/SettingsPage";
 import { ReleaseNotesPage } from "@/pages/ReleaseNotes/ReleaseNotesPage";
+import { DestekPage } from "@/pages/Destek/DestekPage";
 import { DefinitionsHubPage } from "@/pages/Definitions/DefinitionsHubPage";
 import { WarpSpecsPage } from "@/pages/WarpSpecs/WarpSpecsPage";
 import { AccessHubPage } from "@/pages/Access/AccessHubPage";
@@ -178,6 +179,9 @@ export const contentRoutes: RouteObject[] = [
   { path: "settings", element: <SettingsPage /> },
   // Kapısız: sürüm notlarını operatör de okur (`system/*` altı `admin:settings` ister).
   { path: "release-notes", element: <ReleaseNotesPage /> },
+  // Kapısız: kullanıcı yalnız KENDİ talebini görür (kimlik oturumdan, süzme sunucuda); firma kapsamını backend
+  // `admin:settings` ile kapılar. Özellik kapalıyken sayfa istek atmaz, "kapalı" kutusu çizer (`DestekPage`).
+  { path: "destek", element: <DestekPage /> },
   // PATRON ÖZETİ — `BossShell`in açılış sayfası, ama içerik rotası olarak
   // burada yaşıyor ki detaya iniş (Envanter/Karşılanma/Kanban) AYNI router'da
   // kalsın ve geri oku çalışsın.
