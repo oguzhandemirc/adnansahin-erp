@@ -43,8 +43,10 @@ export function SideNav() {
   const destekEtkin = useDestekEtkin();
   const destekRozeti = destekRozetMetni(useDestekOkunmamis());
   const destekAktif = path === "/destek" || path.startsWith("/destek/");
+  // Ray ekranın tepesine ve sol kenarına oturur: durum çubuğu (saat/tarih) ve yatay çentik payı burada uygulanır.
+  const insets = useSafeAreaInsets();
   return (
-    <View style={s.rail}>
+    <View style={[s.rail, { paddingTop: insets.top + space.l, paddingLeft: insets.left + space.s }]} testID="yan-ray">
       <View style={s.railHead}>
         <FacilityName />
         <RoleBadge permissions={permissions} />
@@ -167,7 +169,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
     <View style={s.screen}>
       <ScreenHeader
         title={title}
-        topInset={(wide ? 0 : insets.top) + space.xs}
+        topInset={insets.top + space.xs}
         gutter={pad}
         scrollY={scrollY}
         seamless={seamless}
