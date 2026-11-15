@@ -1,13 +1,15 @@
 // Liste satırı (şartname §3 liste satırı): TEK satır 48 pt, tam genişlik (yan oluk 0, köşe 0). [simge xs] · birincil
 // `rowTitle` (isteğe bağlı sabit genişlik, ör. belge no) · ikincil muted esnek + "…" · değer 15/600 tabular · rozet ·
 // chevron. Ayraç 1 px `cardBorder`, metin başından. Basılabilirse tüm satır dokunma hedefidir.
+// İki satırlı kip (56 pt): birincil üstte, ikincil altında. Rozetli satırda kendiliğinden açılır — dar ekranda (360 pt)
+// değer + rozet sabit genişlikte kalınca tek satırda ikincil metne yer kalmıyor, tek harfe kesiliyordu.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { Basilabilir } from "../hareket/Basilabilir";
 import type { IconName } from "../icons";
 import { makeStyles, useTokens } from "../theme-context";
-import { FONT_SCALE, GUTTER, ROW, space, tabularNums, typography } from "../tokens";
+import { FONT_SCALE, GUTTER, ROW, ROW_TWO, space, tabularNums, typography } from "../tokens";
 import { IconTile, type IconTileTone } from "./IconTile";
 
 export interface ListeSatiriProps {
@@ -24,6 +26,10 @@ export interface ListeSatiriProps {
   readonly onPress?: () => void;
   /** Basılabilir satırda ok; yoğun tek satırlık listede (4 alan) yer açmak için kapatılır. */
   readonly ok?: boolean;
+  /** İkincil metin birincilin altında (verilmezse yalnız rozet + ikincil birlikteyken). */
+  readonly ikiSatir?: boolean;
+  /** Üst satırın alt kırılımı (ör. boyahane toplamının altındaki firma): içeri kaydırılır. */
+  readonly girinti?: boolean;
   readonly testID?: string;
   /** Verilmezse görünen metinlerden kurulur. */
   readonly accessibilityLabel?: string;
@@ -33,12 +39,25 @@ export function ListeSatiri(p: ListeSatiriProps) {
   const t = useTokens();
   const s = useStyles();
   const etiket = p.accessibilityLabel ?? [p.birincil, p.ikincil, p.deger].filter(Boolean).join(", ");
+  const iki = !!p.ikincil && (p.ikiSatir ?? !!p.rozet);
+  const birincil = (
+    <Text style={[s.birincil, iki && s.birincilTam, p.birincilGenislik ? { width: p.birincilGenislik } : null]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.birincil}</Text>
+  );
   const ic = (
-    <View style={s.satir} testID={p.testID ? `${p.testID}-satir` : undefined}>
+    <View style={[s.satir, iki && s.satirIki, p.girinti && s.girinti]} testID={p.testID ? `${p.testID}-satir` : undefined}>
       {p.icon ? <IconTile icon={p.icon} tone={p.ton ?? "primary"} size="xs" /> : null}
-      <View style={[s.metin, p.ayrac !== false && s.ayrac]}>
-        <Text style={[s.birincil, p.birincilGenislik ? { width: p.birincilGenislik } : null]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.birincil}</Text>
-        {p.ikincil ? <Text style={s.ikincil} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.ikincil}</Text> : <View style={s.esnek} />}
+      <View style={[s.metin, iki && s.satirIki, p.ayrac !== false && s.ayrac]}>
+        {iki ? (
+          <View style={s.yigin}>
+            {birincil}
+            <Text style={s.ikincilAlt} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.ikincil}</Text>
+          </View>
+        ) : (
+          <>
+            {birincil}
+            {p.ikincil ? <Text style={s.ikincil} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.ikincil}</Text> : <View style={s.esnek} />}
+          </>
+        )}
         {p.deger ? <Text style={s.deger} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{p.deger}</Text> : null}
         {p.rozet ? <View style={s.rozet}>{p.rozet}</View> : null}
         {p.onPress && p.ok !== false ? <Ionicons name="chevron-forward" size={16} color={t.color.textMuted} /> : null}
@@ -57,12 +76,17 @@ export function ListeSatiri(p: ListeSatiriProps) {
 
 const useStyles = makeStyles((t) => ({
   satir: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingLeft: GUTTER, minHeight: ROW },
+  satirIki: { minHeight: ROW_TWO },
+  girinti: { paddingLeft: GUTTER + space.xl },
   kap: { backgroundColor: t.color.card },
   metin: { flex: 1, minWidth: 0, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, minHeight: ROW, paddingRight: GUTTER },
   ayrac: { borderTopWidth: 1, borderTopColor: t.color.cardBorder },
   // Değer ve rozet asla kırpılmaz (flexShrink 0); sıkışınca önce ikincil, sonra birincil "…" ile kısalır.
   birincil: { ...typography.rowTitle, color: t.color.text, flexShrink: 1, maxWidth: "60%" as const },
+  birincilTam: { maxWidth: "100%" as const },
   ikincil: { ...typography.label, color: t.color.textMuted, flex: 1, minWidth: 0 },
+  yigin: { flex: 1, minWidth: 0, justifyContent: "center" as const, paddingVertical: space.xsm },
+  ikincilAlt: { ...typography.label, color: t.color.textMuted },
   esnek: { flex: 1 },
   // Rozet kendi içinde `alignSelf: flex-start`; satırda dikey ortalansın diye sarılır.
   rozet: { justifyContent: "center" as const, flexShrink: 0 },

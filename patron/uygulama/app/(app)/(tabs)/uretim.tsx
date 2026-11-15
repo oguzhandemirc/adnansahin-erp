@@ -1,6 +1,8 @@
-// Üretim sekmesi (soru-cevap tasarımı §3.2): üç soru, hepsi ANLIK (dönem şeridi yok). "Bugün ne bitti?" —
-// `ozet.uretim` bugün biten + KK1 istasyonlarının bugünkü girişi · "Mal şu an nerede?" — `uretim-akisi` kolonları
-// dikey liste (satır → ilgili ekran) · "Açık iş emirleri" — ilk satırlar + Tümü. Fason ayrıntısı Fason ekranında.
+// Üretim sekmesi (soru-cevap tasarımı §3.2): üç soru, hepsi ANLIK (dönem şeridi yok). İLK blok "Üretimdeki toplar
+// nerede?" (2026-11-16, patronun en sık sorusu) — Kurşun + KK2 · Tambur · Boyahane + firmalar; satırlar TEK seçiciden
+// (`ui/uretim/nerede` productionLocations: bugün `uretim-akisi` + `fason-acik`, ileride `uretim-toplar`); satır → o
+// konumun iş emri listesi. "Bugün ne bitti?" — `ozet.uretim` bugün biten + KK1 girişi · "Açık iş emirleri" — ilk
+// satırlar + Tümü. Ham stok ve depo Stok sekmesinde; ekran toplamaz.
 import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import { can } from "../../../src/lib/access";
@@ -17,7 +19,8 @@ import { combine, useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { useListCapability } from "../../../src/ui/siparis/capabilities";
 import { ListStates } from "../../../src/ui/siparis/parts";
 import { useRemoteList } from "../../../src/ui/siparis/useRemoteList";
-import { neredeSatirlari } from "../../../src/ui/uretim/nerede";
+import { productionLocations } from "../../../src/ui/uretim/nerede";
+import { Iskelet } from "../../../src/ui/ortak";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
 import { space, typography } from "../../../src/ui/tokens";
 
@@ -34,12 +37,15 @@ export default function Production() {
   const summary = read && can(permissions, "bulut:ozet:oku");
   const today = useSnapshot("ozet.uretim", summary);
   const flow = useSnapshot("uretim-akisi", read);
+  const fason = useSnapshot("fason-acik", read);
   // Açık süzgeci yalnız sunucu is-emri aramasını beyan ettiyse: eski sunucu süzgeci yok sayar, kapananları da döndürürdü.
   const ieArama = useListCapability().search("is-emri");
   const ieAcik = read && ieArama !== null;
   const isEmirleri = useRemoteList("is-emri", { suzgec: "ACIK" }, { limit: ILK_IS_EMRI, enabled: ieAcik });
   const t = useTokens();
-  const all = combine([today, flow]);
+  const all = combine([today, flow, fason]);
+  // Fason anlığı yüklenirken akışın kaba "Fasonda" satırı çizilip sonra firma satırlarına dönmesin: o sırada iskelet.
+  const fasonLoading = fason.loading && !fason.data;
 
   const bugunBiten = today.data ? num(obj(today.data.veri).bugunTamamlananToplam) : null;
   const kk1 = flow.data ? arr(obj(flow.data.veri).istasyonlar).filter((x) => str(x.tur) === HAM_GIRIS_TURU) : [];
@@ -47,8 +53,38 @@ export default function Production() {
 
   return (
     <Screen module="uretim" onRefresh={() => { all.reload(); if (ieAcik) isEmirleri.reload(); }} refreshing={all.refreshing || isEmirleri.refreshing}>
+      <KademeliGiris sira={0}>
+        <SnapshotGate remote={flow} variant="list" rows={4} empty="Fabrikadan üretim verisi henüz gelmedi" testID="uretim-akisi">
+          {(veri) => {
+            const rows = productionLocations({ flow: veri, fason: fason.data?.veri }).filter((r) => !(fasonLoading && r.location === "fason"));
+            return (
+              <>
+                <ListeBlogu baslik="Üretimdeki toplar nerede?" testID="bolum-nerede">
+                  {rows.map((r, i) => (
+                    <ListeSatiri
+                      key={r.key}
+                      birincil={r.label}
+                      ikincil={r.detail ?? undefined}
+                      ikiSatir={!!r.detail}
+                      deger={r.value}
+                      icon={r.icon}
+                      ton={r.tone}
+                      girinti={r.firm}
+                      ayrac={i > 0}
+                      onPress={() => router.push({ pathname: "/is-emirleri/konum", params: r.params } as never)}
+                      testID={`nerede-${r.key}`}
+                    />
+                  ))}
+                </ListeBlogu>
+                {fasonLoading ? <Iskelet bicim="liste" satir={1} testID="nerede-fason-yukleniyor" /> : null}
+              </>
+            );
+          }}
+        </SnapshotGate>
+      </KademeliGiris>
+
       {bugunBiten !== null || hamGiris !== null ? (
-        <KademeliGiris sira={0}>
+        <KademeliGiris sira={1}>
           <BlokBasligi baslik="Bugün ne bitti?" testID="bolum-bugun" />
           <View style={s.ikili} testID="uretim-kpi">
             {bugunBiten !== null ? (
@@ -64,27 +100,6 @@ export default function Production() {
           </View>
         </KademeliGiris>
       ) : null}
-
-      <KademeliGiris sira={1}>
-        <SnapshotGate remote={flow} variant="list" rows={4} empty="Fabrikadan üretim verisi henüz gelmedi" testID="uretim-akisi">
-          {(veri) => (
-            <ListeBlogu baslik="Mal şu an nerede?" testID="bolum-nerede">
-              {neredeSatirlari(veri).map((r, i) => (
-                <ListeSatiri
-                  key={r.anahtar}
-                  birincil={r.etiket}
-                  deger={r.deger}
-                  icon={r.icon}
-                  ton={r.ton}
-                  ayrac={i > 0}
-                  onPress={r.git ? () => router.push(r.git as never) : undefined}
-                  testID={`nerede-${r.anahtar}`}
-                />
-              ))}
-            </ListeBlogu>
-          )}
-        </SnapshotGate>
-      </KademeliGiris>
 
       {ieAcik && !isEmirleri.forbidden ? (
         <KademeliGiris sira={2}>

@@ -1,41 +1,48 @@
-// İş emri ayrıntısı (soru-cevap tasarımı §3.3) — kimin malı · hangi sipariş · kumaş · kaç top/metre · aşama başına
-// SAYILAR · fasondaysa nerede ve kaç gündür (küçük ikincil yazı; termin/gecikme değil, renk yok). Sayıları fabrika
-// türetir; ekran yalnız etikete çevirir. Sipariş satırı sipariş ayrıntısını, müşteri satırı cari kartını açar.
+// İş emri ayrıntısı (soru-cevap tasarımı §3.3; 2026-11-16 "üretimdeki toplar nerede?"): üstte dört net satır —
+// Kimin (müşteri → cari kartı) · Hangi sipariş ("İş emrinin siparişi" → sipariş; çokluysa hepsi; bağsızsa
+// "Siparişsiz (stok)") · Ne (kumaş · renk) · Nerede (aşama; boyahanedeyse firma + "N gündür" küçük ve renksiz; top · metre).
+// Altında KAPALI gelen "Üretim ayrıntıları": no, tür, durum, açılış, hedef, en, giren/üretilen/sipariş metresi, aşama
+// başına top · metre. Hepsi fabrikanın alanları; ekran yalnız etikete çevirir (yeniden hesap yok; termin/gecikme yok).
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View } from "react-native";
+import { useState } from "react";
+import { Text, View } from "react-native";
 import { moduleVisible } from "../../../src/lib/access";
-import { formatDate, formatNumber } from "../../../src/lib/format";
-import { UNIT } from "../../../src/lib/labels/uretim";
+import { formatNumber } from "../../../src/lib/format";
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { Screen } from "../../../src/ui/Frame";
 import { KademeliGiris } from "../../../src/ui/hareket";
-import { acik, asamaMetni, asamaSayilari, fasonGunu, gunMetni, isEmriNo, kumasMetni, metre, musteriMetni, siparisIdleri, siparisNolari, topSayisi, type Kayit } from "../../../src/ui/is-emri/gorunum";
-import { HataDurumu, Iskelet, ListeBlogu, ListeSatiri, StatCard } from "../../../src/ui/ortak";
+import { acik, asamaSayilari, detailRows, fasonGunu, gunMetni, isEmriNo, kumasMetni, NO_ORDER_TEXT, siparisIdleri, siparisNolari, siparissiz, stageAmount, topMetreMetni, whereText, type Kayit } from "../../../src/ui/is-emri/gorunum";
+import { AcilirKart, HataDurumu, Iskelet, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
 import { StaleNote } from "../../../src/ui/siparis/parts";
 import { makeStyles } from "../../../src/ui/theme-context";
-import { space } from "../../../src/ui/tokens";
+import { space, typography } from "../../../src/ui/tokens";
 
 const metin = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
+const metinler = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x !== "") : []);
 
 export default function WorkOrderDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api, permissions } = useSession();
   const router = useRouter();
   const s = useStyles();
+  const [ayrinti, setAyrinti] = useState(false);
   const r = useRemote(id ? `kayit:is-emri:${id}` : null, () => api.record("is-emri", String(id)));
   const k: Kayit = typeof r.data?.kayit === "object" && r.data?.kayit !== null ? (r.data.kayit as Kayit) : {};
-  const cariIdleri = Array.isArray(k.cariKartIdleri) ? k.cariKartIdleri.filter((x): x is string => typeof x === "string") : [];
-  const tekCari = cariIdleri.length === 1 && moduleVisible(permissions, "cariler") ? cariIdleri[0]! : null;
+  const cariIdleri = metinler(k.cariKartIdleri);
+  const musteriAdlari = metinler(k.musteriAdlari);
+  const cariAcik = moduleVisible(permissions, "cariler");
+  const musteriler = cariIdleri.length > 0
+    ? cariIdleri.map((cid, i) => ({ id: cid, ad: musteriAdlari[i] ?? (i === 0 ? metin(k.musteriAdi) : null) ?? "—" }))
+    : [{ id: null as string | null, ad: metin(k.musteriAdi) ?? (siparissiz(k) ? "Stok için üretim" : "—") }];
   const sipNo = siparisNolari(k);
   const sipId = siparisIdleri(k);
   const sayilar = asamaSayilari(k);
-  const top = topSayisi(k);
-  const m = metre(k);
-  const firmaIdleri = Array.isArray(k.fasonFirmaIdleri) ? k.fasonFirmaIdleri.filter((x): x is string => typeof x === "string") : [];
-  const firmaAdi = metin(k.fasonFirmaAdi);
-  const gun = fasonGunu(k);
-  const kapanis = metin(k.kapanisTarihi);
+  const firmaIdleri = metinler(k.fasonFirmaIdleri);
+  const fasonda = acik(k) && k.asama === "fason" && metin(k.fasonFirmaAdi) !== null;
+  const gun = fasonda ? fasonGunu(k) : null;
+  const burada = acik(k) ? stageAmount(k, metin(k.asama)) : { top: null, metre: null };
+  const buradaMetni = [burada.top === null ? null : `${formatNumber(burada.top, 0)} top`, burada.metre === null ? null : `${formatNumber(burada.metre, 0)} m`].filter(Boolean).join(" · ");
 
   return (
     <Screen title={r.data ? isEmriNo(k) : "İş emri"} module="uretim" back onRefresh={r.reload} refreshing={r.refreshing} subtitle={<StaleNote stale={r.stale} savedAt={r.savedAt} />}>
@@ -44,23 +51,27 @@ export default function WorkOrderDetail() {
       {r.data ? (
         <>
           <KademeliGiris sira={0}>
-            <ListeBlogu testID="is-emri-kim">
-              <ListeSatiri
-                birincil={musteriMetni(k)}
-                ikincil={acik(k) ? `Şu an: ${asamaMetni(k)}` : `Kapandı${kapanis ? ` · ${formatDate(kapanis)}` : ""}`}
-                icon="person-outline" ton="primary"
-                onPress={tekCari ? () => router.push({ pathname: "/cariler/[id]", params: { id: tekCari } } as never) : undefined}
-                testID="is-emri-musteri"
-              />
-              <ListeSatiri birincil={metin(k.urunAdi) ?? kumasMetni(k)} deger={metin(k.urunAdi) ? (metin(k.renkAdi) ?? undefined) : undefined} icon="layers-outline" ton="teal" ayrac testID="is-emri-kumas" />
+            <ListeBlogu baslik="Kimin" testID="is-emri-kim">
+              {musteriler.map((m, i) => (
+                <ListeSatiri
+                  key={m.id ?? "yok"} birincil={m.ad} icon="person-outline" ton="primary" ayrac={i > 0}
+                  onPress={m.id && cariAcik ? () => router.push({ pathname: "/cariler/[id]", params: { id: m.id! } } as never) : undefined}
+                  testID={i === 0 ? "is-emri-musteri" : `is-emri-musteri-${i}`}
+                />
+              ))}
+            </ListeBlogu>
+          </KademeliGiris>
+
+          <KademeliGiris sira={1}>
+            <ListeBlogu baslik="İş emrinin siparişi" sayi={sipNo.length > 1 ? sipNo.length : undefined} testID="is-emri-siparisler">
               {sipNo.length === 0 ? (
-                <ListeSatiri birincil="Siparişsiz" ikincil="Stok için üretim" icon="document-text-outline" ton="sky" ayrac testID="is-emri-siparissiz" />
+                <ListeSatiri birincil={siparissiz(k) ? NO_ORDER_TEXT : "—"} icon="document-text-outline" ton="sky" ayrac={false} testID="is-emri-siparissiz" />
               ) : (
                 sipNo.map((no, i) => {
                   const sid = sipId[i];
                   return (
                     <ListeSatiri
-                      key={`${no}-${i}`} birincil={no} icon="document-text-outline" ton="blue" ayrac
+                      key={`${no}-${i}`} birincil={no} icon="document-text-outline" ton="blue" ayrac={i > 0}
                       onPress={sid ? () => router.push({ pathname: "/siparisler/[id]", params: { id: sid } } as never) : undefined}
                       testID={`is-emri-siparis-${i}`}
                     />
@@ -70,51 +81,54 @@ export default function WorkOrderDetail() {
             </ListeBlogu>
           </KademeliGiris>
 
-          <KademeliGiris sira={1}>
-            <View style={s.ikili} testID="is-emri-kpi">
-              <View style={s.yarim}>
-                <StatCard etiket="Top" icon="cube-outline" ton="violet" degerler={[{ deger: top === null ? "—" : formatNumber(top, 0), birim: UNIT.top }]} testID="is-emri-top" />
-              </View>
-              <View style={s.yarim}>
-                <StatCard etiket="Metre" icon="resize-outline" ton="teal" degerler={[{ deger: m === null ? "—" : formatNumber(m, 0), birim: UNIT.metre }]} testID="is-emri-metre" />
-              </View>
-            </View>
+          <KademeliGiris sira={2}>
+            <ListeBlogu baslik="Ne" testID="is-emri-ne">
+              <ListeSatiri birincil={kumasMetni(k)} icon="layers-outline" ton="teal" ayrac={false} testID="is-emri-kumas" />
+            </ListeBlogu>
           </KademeliGiris>
 
-          {sayilar.length > 0 ? (
-            <KademeliGiris sira={2}>
-              <ListeBlogu baslik="Toplar nerede?" testID="is-emri-asamalar">
-                {sayilar.map((a, i) => (
-                  <ListeSatiri
-                    key={a.anahtar} birincil={a.etiket} icon={a.icon} ton={a.ton} ayrac={i > 0}
-                    deger={`${formatNumber(a.top, 0)} top${a.metre !== null ? ` · ${formatNumber(a.metre, 0)} m` : ""}`}
-                    testID={`is-emri-asama-${a.anahtar}`}
-                  />
-                ))}
-              </ListeBlogu>
-            </KademeliGiris>
-          ) : null}
+          <KademeliGiris sira={3}>
+            <ListeBlogu baslik="Nerede" testID="is-emri-nerede">
+              <ListeSatiri
+                birincil={whereText(k)}
+                ikincil={gun !== null ? gunMetni(gun) : undefined}
+                ikiSatir={gun !== null}
+                deger={buradaMetni || undefined}
+                icon={fasonda ? "business-outline" : "location-outline"} ton={fasonda ? "orange" : "violet"}
+                ayrac={false}
+                onPress={fasonda && firmaIdleri.length >= 1 ? () => router.push({ pathname: "/fason/[firmaId]", params: { firmaId: firmaIdleri[0]!, ad: metin(k.fasonFirmaAdi)! } } as never) : undefined}
+                testID={fasonda ? "is-emri-fason-firma" : "is-emri-yer"}
+              />
+            </ListeBlogu>
+          </KademeliGiris>
 
-          {firmaAdi ? (
-            <KademeliGiris sira={3}>
-              <ListeBlogu baslik="Fasonda nerede?" testID="is-emri-fason">
-                <ListeSatiri
-                  birincil={firmaAdi}
-                  ikincil={gun !== null ? gunMetni(gun) : undefined}
-                  icon="business-outline" ton="orange"
-                  onPress={firmaIdleri.length >= 1 ? () => router.push({ pathname: "/fason/[firmaId]", params: { firmaId: firmaIdleri[0]!, ad: firmaAdi } } as never) : undefined}
-                  testID="is-emri-fason-firma"
-                />
-              </ListeBlogu>
-            </KademeliGiris>
-          ) : null}
+          <KademeliGiris sira={4} style={s.ayrinti}>
+            <AcilirKart baslik="Üretim ayrıntıları" aciklama={topMetreMetni(k)} acik={ayrinti} onDegistir={() => setAyrinti((x) => !x)} testID="is-emri-ayrinti">
+              {detailRows(k).map((b) => (
+                <View key={b.key} style={s.bilgi} testID={`is-emri-bilgi-${b.key}`}>
+                  <Text style={s.etiket} numberOfLines={1}>{b.etiket}</Text>
+                  <Text style={s.deger} numberOfLines={1}>{b.deger}</Text>
+                </View>
+              ))}
+              {sayilar.length > 0 ? <Text style={s.alt}>Toplar nerede?</Text> : null}
+              {sayilar.map((a) => (
+                <View key={a.anahtar} style={s.bilgi} testID={`is-emri-asama-${a.anahtar}`}>
+                  <Text style={s.etiket} numberOfLines={1}>{a.etiket}</Text>
+                  <Text style={s.deger} numberOfLines={1}>{`${formatNumber(a.top, 0)} top${a.metre !== null ? ` · ${formatNumber(a.metre, 0)} m` : ""}`}</Text>
+                </View>
+              ))}
+            </AcilirKart>
+          </KademeliGiris>
         </>
       ) : null}
     </Screen>
   );
 }
 
-const useStyles = makeStyles(() => ({
-  ikili: { flexDirection: "row" as const, gap: space.m, marginTop: space.m },
-  yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
+const useStyles = makeStyles((t) => ({
+  ayrinti: { marginTop: space.l },
+  bilgi: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, gap: space.m, minHeight: 40, borderTopWidth: 1, borderTopColor: t.color.cardBorder },
+  etiket: { ...typography.label, color: t.color.textMuted, flexShrink: 1 },
+  deger: { fontSize: 15, lineHeight: 20, fontWeight: "600" as const, color: t.color.text, flexShrink: 0, maxWidth: "65%" as const },
+  alt: { ...typography.caption, color: t.color.textMuted, marginTop: space.m, marginBottom: space.xs },
 }));

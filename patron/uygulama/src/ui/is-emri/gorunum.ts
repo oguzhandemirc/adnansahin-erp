@@ -1,6 +1,7 @@
 // İş emri satırının görünümü — SAF okuyucular. Aşama, sayılar ve kimlikler FABRİKANIN türettiği alanlardır; burada
 // yalnız etikete çevrilir (yeniden hesap yok). Siparişsiz iş emri "Siparişsiz" yazar (+ iş emrinde müşteri varsa adı).
-import { formatNumber } from "../../lib/format";
+import { formatDate, formatNumber } from "../../lib/format";
+import { WORK_ORDER_STATUS, WORK_ORDER_TYPE } from "../../lib/labels/uretim";
 import type { IconName } from "../icons";
 import type { IconTileTone } from "../ortak";
 
@@ -119,4 +120,78 @@ export function sonOtuzGunde(k: Kayit, simdi: number = Date.now()): boolean {
   const t = metin(k.kapanisTarihi);
   const ms = t ? Date.parse(t) : NaN;
   return Number.isFinite(ms) && simdi - ms <= KAPANAN_GUN * 86_400_000;
+}
+
+// ── Konum listesi ve ayrıntı (Üretimdeki toplar nerede?) ─────────────────────────────────────────────────────────
+// "Sipariş" İŞ EMRİNİN siparişidir (top↔sipariş bağı yok; karşılama sevk anında): ilk no + "+N"; bağsız "Siparişsiz (stok)".
+
+export const NO_ORDER_TEXT = "Siparişsiz (stok)";
+
+/** Liste hücresi: ilk sipariş no (+N); bağsızsa "Siparişsiz (stok)"; alan hiç gelmediyse "—". */
+export function orderCell(k: Kayit): string {
+  if (siparissiz(k)) return NO_ORDER_TEXT;
+  const nos = siparisNolari(k);
+  if (nos.length === 0) return "—";
+  return nos.length === 1 ? nos[0]! : `${nos[0]!} +${nos.length - 1}`;
+}
+
+/** Konum listesinin müşteri hücresi: ad; siparişsiz ve adsızsa "—" (sipariş hücresi zaten "Siparişsiz (stok)" der). */
+export const customerCell = (k: Kayit): string => metin(k.musteriAdi) ?? "—";
+
+/** Bu konumdaki top · metre (`asamaTop` satırı; fabrikanın sayısı). Satır yoksa iş emrinin toplamı. */
+export function stageAmount(k: Kayit, stage: string | null): { readonly top: number | null; readonly metre: number | null } {
+  if (stage && Array.isArray(k.asamaTop)) {
+    const row = k.asamaTop.find((x: unknown) => typeof x === "object" && x !== null && (x as Kayit).anahtar === stage) as Kayit | undefined;
+    if (row) return { top: sayi(row.top), metre: sayi(row.metre) };
+  }
+  return { top: topSayisi(k), metre: metre(k) };
+}
+
+/** Konumda "N gündür": yalnız fasonda (gönderimden bu yana); kurşun/tamburda bugünkü veride gün yok → null. */
+export function locationDays(k: Kayit, stage: string | null, simdi: number = Date.now()): string | null {
+  if (stage !== "fason" && k.asama !== "fason") return null;
+  const g = fasonGunu(k, simdi);
+  return g === null ? null : gunMetni(g);
+}
+
+const m0 = (v: unknown): string | null => (sayi(v) === null ? null : `${formatNumber(sayi(v), 0)} m`);
+
+/** "Üretim ayrıntıları" satırları: yalnız fabrikanın gönderdiği alanlar (gelmeyen satır çizilmez). */
+export function detailRows(k: Kayit): { key: string; etiket: string; deger: string }[] {
+  const tur = metin(k.tur);
+  const durum = metin(k.durum);
+  const en = sayi(k.en);
+  const kat = metinDizisi(k.fasonKategoriler);
+  return [
+    { key: "no", etiket: "İş emri no", deger: isEmriNo(k) },
+    tur ? { key: "tur", etiket: "Tür", deger: WORK_ORDER_TYPE[tur] ?? tur } : null,
+    durum ? { key: "durum", etiket: "Durum", deger: WORK_ORDER_STATUS[durum]?.label ?? durum } : null,
+    metin(k.olusturulma) ? { key: "acilis", etiket: "Açılış", deger: formatDate(k.olusturulma) } : null,
+    !acik(k) && metin(k.kapanisTarihi) ? { key: "kapanis", etiket: "Kapanış", deger: formatDate(k.kapanisTarihi) } : null,
+    m0(k.hedefMiktar) ? { key: "hedef", etiket: "Hedef", deger: m0(k.hedefMiktar)! } : null,
+    en !== null ? { key: "en", etiket: "En", deger: `${formatNumber(en, 0)} cm` } : null,
+    m0(k.siparisMetre) ? { key: "siparisMetre", etiket: "Sipariş metresi", deger: m0(k.siparisMetre)! } : null,
+    m0(k.girenMetre) ? { key: "giren", etiket: "Giren", deger: m0(k.girenMetre)! } : null,
+    m0(k.uretilenMetre) ? { key: "uretilen", etiket: "Üretilen", deger: m0(k.uretilenMetre)! } : null,
+    { key: "toplam", etiket: "Toplam", deger: topMetreMetni(k) },
+    kat.length > 0 ? { key: "fasonIs", etiket: "Fason işi", deger: kat.join(", ") } : null,
+  ].filter((x): x is { key: string; etiket: string; deger: string } => x !== null);
+}
+
+/** Konum listesi satırının görünen metinleri — kart, tablo, erişilebilirlik ve test aynı kaynaktan. */
+export function locationRowText(k: Kayit, stage: string | null, simdi: number = Date.now()) {
+  const m = stageAmount(k, stage);
+  const n = (v: number | null) => (v === null ? "—" : formatNumber(v, 0));
+  return { musteri: customerCell(k), kumas: kumasMetni(k), top: n(m.top), metre: n(m.metre), siparis: orderCell(k), gun: locationDays(k, stage, simdi) };
+}
+
+/** "Nerede" cümlesi: açıkta aşama; fasondaysa firma (+N firma); kapalıda "Tamamlandı"/"Kapandı". */
+export function whereText(k: Kayit): string {
+  if (!acik(k)) return yerMetni(k);
+  const firma = metin(k.fasonFirmaAdi);
+  const firmalar = metinDizisi(k.fasonFirmaIdleri).length;
+  const kat = metinDizisi(k.fasonKategoriler);
+  const yer = kat.length > 0 && kat.every((x) => /boyahane/i.test(x)) ? "Boyahanede" : "Fasonda";
+  if (k.asama === "fason" && firma) return `${yer} – ${firma}${firmalar > 1 ? ` +${firmalar - 1}` : ""}`;
+  return k.asama === "kursun" ? "Kurşun + KK2" : asamaMetni(k);
 }

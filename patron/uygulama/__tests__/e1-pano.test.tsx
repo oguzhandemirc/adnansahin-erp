@@ -69,6 +69,7 @@ const Dashboard = (require("../app/(app)/(tabs)/pano") as { default: () => React
 const Production = (require("../app/(app)/(tabs)/uretim") as { default: () => React.ReactElement }).default;
 const { areaSummary } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
 const L = require("../src/lib/labels/uretim") as typeof import("../src/lib/labels/uretim");
+const { buyukHarf } = require("../src/ui/ortak") as typeof import("../src/ui/ortak");
 
 beforeEach(() => {
   mockSession.cache = createCache(mockMem(), "t1:h1", () => new Date("2026-10-22T09:00:00Z"));
@@ -107,23 +108,25 @@ describe("Üretim", () => {
     expect(within(screen.getByTestId("kpi-ham-giris")).getByText("80")).toBeTruthy();
     for (const id of ["donem-bugun", "kpi-fasonda", "kpi-fason-fire", "bolum-akis", "bolum-istasyonlar", "is-emirleri"]) expect(screen.queryByTestId(id)).toBeNull();
     expect(mockApi.snapshot).not.toHaveBeenCalledWith("ozet.fason");
-    expect(mockApi.snapshot).not.toHaveBeenCalledWith("fason-acik");
+    // 2026-11-16: boyahane firmaları "Üretimdeki toplar nerede?" bloğunda → `fason-acik` artık Üretim'de okunur.
+    expect(mockApi.snapshot).toHaveBeenCalledWith("fason-acik");
   });
 
-  it("§5 'Mal şu an nerede?' dikey liste: birim kolonun ölçtüğü şey; sıfır yarı mamul ve sevk kolonu çizilmez", async () => {
+  it("§5 'Üretimdeki toplar nerede?': Kurşun/Tambur iş emri sayısı (metre uydurulmaz); ham stok, depo, sevk yok; eski fabrikada fason akış kolonundan", async () => {
     mockSession.permissions = ["bulut:oturum", "bulut:uretim:oku"];
     render(<Production />);
-    await screen.findByTestId("nerede-hamStok");
-    expect(within(screen.getByTestId("nerede-hamStok")).getByText("342 top")).toBeTruthy();
-    expect(within(screen.getByTestId("nerede-fason")).getByText("294 top")).toBeTruthy();
+    await screen.findByTestId("nerede-kursun");
+    expect(screen.getByText(buyukHarf("Üretimdeki toplar nerede?"))).toBeTruthy();
     expect(within(screen.getByTestId("nerede-kursun")).getByText("110 iş emri")).toBeTruthy();
-    expect(within(screen.getByTestId("nerede-depo")).getByText("2.359 top")).toBeTruthy();
-    expect(screen.queryByTestId("nerede-yariMamul")).toBeNull();
-    expect(screen.queryByTestId("nerede-sevk")).toBeNull();
+    expect(within(screen.getByTestId("nerede-tambur")).getByText("20 iş emri")).toBeTruthy();
+    // `fason-acik` bu fabrikada boş → akışın fason kolonu, dürüst ad "Fasonda", firma satırı yok.
+    expect(within(screen.getByTestId("nerede-fason")).getByText("294 top")).toBeTruthy();
+    expect(within(screen.getByTestId("nerede-fason")).getByText("Fasonda")).toBeTruthy();
+    for (const id of ["nerede-hamStok", "nerede-depo", "nerede-yariMamul", "nerede-sevk"]) expect(screen.queryByTestId(id)).toBeNull();
     // Özet izni yoksa "Bugün ne bitti?" özet anlığı istenmez.
     expect(mockApi.snapshot).not.toHaveBeenCalledWith("ozet.uretim");
-    fireEvent.press(screen.getByTestId("nerede-fason"));
-    expect(mockRouter.push).toHaveBeenCalledWith("/fason");
+    fireEvent.press(screen.getByTestId("nerede-kursun"));
+    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/is-emirleri/konum", params: { asama: "KURSUN" } });
   });
 
   it("§6 görünüm sınıflamaz: bilinmeyen kod ve bozuk alan rozet çizmez", () => {

@@ -113,9 +113,22 @@ describe("ListeSatiri", () => {
     expect(st.borderRadius).toBeUndefined();
     expect(st.marginHorizontal).toBeUndefined();
     expect(st.backgroundColor).toBe(T.color.card);
-    expect(flat("s-satir").minHeight).toBe(48);
+    // Rozet + ikincil: iki satır (56 pt) — tek satırda değer + rozet ikincili tek harfe kesiyordu (360 pt Sevkiyat).
+    expect(flat("s-satir").minHeight).toBe(56);
     fireEvent.press(row);
     expect(onPress).toHaveBeenCalled();
+  });
+
+  it("rozetsiz satır tek satır 48 pt; ikiSatir ve girinti isteğe bağlı", async () => {
+    await withTheme(
+      <>
+        <ListeSatiri birincil="Kurşun + KK2" deger="94 iş emri" testID="a" />
+        <ListeSatiri birincil="Örnek Boyahane" ikincil="2.900 m · 11 gündür" ikiSatir girinti deger="24 top" testID="b" />
+      </>,
+    );
+    expect(flat("a-satir").minHeight).toBe(48);
+    expect(flat("b-satir").minHeight).toBe(56);
+    expect(flat("b-satir").paddingLeft).toBeGreaterThan(flat("a-satir").paddingLeft as number);
   });
 });
 

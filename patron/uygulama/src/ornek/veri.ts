@@ -66,7 +66,7 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
       kolonlar: [
         { anahtar: "hamStok", etiket: "Ham stok", adet: 310 },
         { anahtar: "yariMamul", etiket: "Yarı mamul", adet: 126 },
-        { anahtar: "fason", etiket: "Fasonda", adet: 32 },
+        { anahtar: "fason", etiket: "Fasonda", adet: 46 },
         { anahtar: "depo", etiket: "Depo", adet: 240 },
       ],
     },
@@ -76,9 +76,10 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
       kolonlar: [
         { anahtar: "hamStok", etiket: "Ham stok", adet: 310 },
         { anahtar: "yariMamul", etiket: "Yarı mamul", adet: 126 },
-        { anahtar: "fason", etiket: "Fasonda", adet: 32 },
-        { anahtar: "kursun", etiket: "Kurşun", adet: 34 },
-        { anahtar: "tambur", etiket: "Tambur", adet: 22 },
+        { anahtar: "fason", etiket: "Fasonda", adet: 46 },
+        // Örnek açık iş emirleriyle tutarlı (Kurşun: w2 · w5 · w8; Tambur: w4 · w9 · w11).
+        { anahtar: "kursun", etiket: "Kurşun", adet: 3 },
+        { anahtar: "tambur", etiket: "Tambur", adet: 3 },
         { anahtar: "depo", etiket: "Depo", adet: 240 },
       ],
       istasyonlar: [
@@ -89,17 +90,18 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
       ],
     },
     "fason-acik": {
-      acikSevk: 4,
-      kalanMiktar: "4200.000",
-      acikTop: 32,
-      boyahanedeTop: 24,
-      isEmriSayisi: 3,
-      musteriSayisi: 2,
+      acikSevk: 5,
+      kalanMiktar: "5460.000",
+      acikTop: 46,
+      boyahanedeTop: 46,
+      isEmriSayisi: 4,
+      musteriSayisi: 3,
       kategoriler: [
-        { kod: "BOYAHANE", ad: "Boyahane", acikTop: 24, kalanMiktar: "2900.000" },
-        { kod: "ZIMPARA", ad: "Zımpara", acikTop: 8, kalanMiktar: "1300.000" },
+        { kod: "BOYAHANE", ad: "Boyahane", acikTop: 46, kalanMiktar: "5460.000" },
+        { kod: "ZIMPARA", ad: "Zımpara", acikTop: 0, kalanMiktar: "0" },
         { kod: "APRE", ad: "Apre", acikTop: 0, kalanMiktar: "0" },
       ],
+      // Örnek iş emirleriyle (w1 + w6 → f1, w10 → f2, w3 → f3) tutarlı.
       firmalar: [
         {
           fasonFirmaId: "00000000-0000-4000-8000-0000000000f1", etiket: "Örnek Boyahane", acikSevk: 2, kalanMiktar: "2900.000", acikTop: 24, kategoriler: ["Boyahane"],
@@ -111,7 +113,13 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
           ],
         },
         {
-          fasonFirmaId: "00000000-0000-4000-8000-0000000000f2", etiket: "Deneme Zımpara", acikSevk: 2, kalanMiktar: "1300.000", acikTop: 8, kategoriler: ["Zımpara"],
+          fasonFirmaId: "00000000-0000-4000-8000-0000000000f2", etiket: "Deneme Boya Apre", acikSevk: 2, kalanMiktar: "1620.000", acikTop: 14, kategoriler: ["Boyahane"],
+          enEskiGonderim: once(23), isEmriSayisi: 1,
+          musteriler: [{ cariKartId: "00000000-0000-4000-8000-0000000000c4", ad: "Taslak Konfeksiyon", top: 14, metre: 1620 }],
+          urunler: [{ urunId: "00000000-0000-4000-8000-0000000000a4", urunAdi: "Taslak Kadife 140 cm", renkId: null, renkAdi: "Bordo", top: 14, metre: 1620 }],
+        },
+        {
+          fasonFirmaId: "00000000-0000-4000-8000-0000000000f3", etiket: "Numune Boyahane", acikSevk: 1, kalanMiktar: "940.000", acikTop: 8, kategoriler: ["Boyahane"],
           enEskiGonderim: once(2), isEmriSayisi: 1,
           musteriler: [{ cariKartId: "00000000-0000-4000-8000-0000000000c3", ad: "Numune Perde San. ve Tic.", top: 8, metre: 940 }],
           urunler: [{ urunId: "00000000-0000-4000-8000-0000000000a3", urunAdi: "Numune Tül 320 cm", renkId: null, renkAdi: "Ekru", top: 8, metre: 940 }],
@@ -240,7 +248,7 @@ const DURUMLAR = ["APPROVED", "PARTIAL_SHIPPED", "PENDING", "APPROVED", "COMPLET
 const URETIM: readonly { readonly tur: string; readonly metin: string }[] = [
   { tur: "FASON", metin: "Fasonda – Örnek Boyahane · +1 yerde daha" }, // s1 ← w1: fason 14 · depo 4
   { tur: "ASAMA", metin: "Kurşun · +2 yerde daha" }, // s2 ← w2: kurşun 9 · tambur 3 · depo 6
-  { tur: "FASON", metin: "Fasonda – Deneme Zımpara · +1 yerde daha" }, // s3 ← w3: fason 8 · depo 2
+  { tur: "FASON", metin: "Fasonda – Numune Boyahane · +1 yerde daha" }, // s3 ← w3: fason 8 · depo 2 (+ w8 kurşun)
   { tur: "HAZIR", metin: "Sevke hazır · +1 yerde daha" }, // s4 ← w4: depo 11 · tambur 5
   { tur: "TAMAMLANDI", metin: "Tamamlandı" }, // s5 ← w7 (tamamlandı)
   { tur: "FASON", metin: "Fasonda – Örnek Boyahane · +1 yerde daha" }, // s6 ← w6: fason 10 · kurşun 2
@@ -303,16 +311,21 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
     }),
   );
   // İş emri: fabrikanın türettiği hâliyle (açık/aşama/aşama sayıları/kimlik dizileri); biri siparişsiz, biri kapanmış.
-  const FIRMA = { f1: "Örnek Boyahane", f2: "Deneme Zımpara" } as const;
-  const FIRMA_ID = { f1: "00000000-0000-4000-8000-0000000000f1", f2: "00000000-0000-4000-8000-0000000000f2" } as const;
+  // Üç boyahane (fason-acik ile tutarlı); w8 üç siparişli, w5 ve w11 siparişsiz (stok üretimi).
+  const FIRMA = { f1: "Örnek Boyahane", f2: "Deneme Boya Apre", f3: "Numune Boyahane" } as const;
+  const FIRMA_ID = { f1: "00000000-0000-4000-8000-0000000000f1", f2: "00000000-0000-4000-8000-0000000000f2", f3: "00000000-0000-4000-8000-0000000000f3" } as const;
   const IE = [
-    { c: 0, s: [0], u: "Örnek Saten 280 cm", r: "Krem", asama: "fason", f: "f1", gun: 6, top: [["fason", 14, 1690], ["kursun", 0, 0], ["tambur", 0, 0], ["depo", 4, 470]] },
-    { c: 1, s: [1], u: "Deneme Keten 150 cm", r: "Antrasit", asama: "kursun", top: [["kursun", 9, 1085], ["tambur", 3, 360], ["depo", 6, 720]] },
-    { c: 2, s: [2], u: "Numune Tül 320 cm", r: "Ekru", asama: "fason", f: "f2", gun: 2, top: [["fason", 8, 940], ["depo", 2, 230]] },
-    { c: 3, s: [3, 6], u: "Taslak Kadife 140 cm", r: "Lacivert", asama: "tambur", top: [["tambur", 5, 610], ["depo", 11, 1340], ["sevkEdildi", 4, 480]] },
-    { c: -1, s: [], u: "Örnek Saten 280 cm", r: "Beyaz", asama: "kk1", top: [["diger", 12, 1450]] },
-    { c: 0, s: [5], u: "Deneme Keten 150 cm", r: "Bej", asama: "fason", f: "f1", gun: 11, top: [["fason", 10, 1210], ["kursun", 2, 240]] },
-    { c: 1, s: [4], u: "Numune Tül 320 cm", r: "Gri", asama: null, kapandi: 5, top: [["sevkEdildi", 16, 1920]] },
+    { c: 0, s: [0], u: "Örnek Saten 280 cm", r: "Krem", en: 280, asama: "fason", f: "f1", gun: 6, top: [["fason", 14, 1690], ["kursun", 0, 0], ["tambur", 0, 0], ["depo", 4, 470]] },
+    { c: 1, s: [1], u: "Deneme Keten 150 cm", r: "Antrasit", en: 150, asama: "kursun", top: [["kursun", 9, 1085], ["tambur", 3, 360], ["depo", 6, 720]] },
+    { c: 2, s: [2], u: "Numune Tül 320 cm", r: "Ekru", en: 320, asama: "fason", f: "f3", gun: 2, top: [["fason", 8, 940], ["depo", 2, 230]] },
+    { c: 3, s: [3, 6], u: "Taslak Kadife 140 cm", r: "Lacivert", en: 140, asama: "tambur", top: [["tambur", 5, 610], ["depo", 11, 1340], ["sevkEdildi", 4, 480]] },
+    { c: -1, s: [], u: "Örnek Saten 280 cm", r: "Beyaz", en: 280, asama: "kursun", top: [["kursun", 1, 1450]] },
+    { c: 0, s: [5], u: "Deneme Keten 150 cm", r: "Bej", en: 150, asama: "fason", f: "f1", gun: 11, top: [["fason", 10, 1210], ["kursun", 2, 240]] },
+    { c: 1, s: [4], u: "Numune Tül 320 cm", r: "Gri", en: 320, asama: null, kapandi: 5, top: [["sevkEdildi", 16, 1920]] },
+    { c: 2, s: [2, 3, 1], u: "Numune Tül 320 cm", r: "Gri", en: 320, asama: "kursun", top: [["kursun", 1, 620]] },
+    { c: 1, s: [1], u: "Deneme Keten 150 cm", r: "Antrasit", en: 150, asama: "tambur", top: [["tambur", 1, 580], ["depo", 2, 1150]] },
+    { c: 3, s: [3], u: "Taslak Kadife 140 cm", r: "Bordo", en: 140, asama: "fason", f: "f2", gun: 23, top: [["fason", 14, 1620]] },
+    { c: -1, s: [], u: "Deneme Keten 150 cm", r: "Ekru", en: 150, asama: "tambur", top: [["tambur", 1, 540]] },
   ] as const;
   const isEmri = IE.map((x, i) => {
     const c = x.c >= 0 ? CARILER[x.c]! : null;
@@ -328,6 +341,14 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
       kapanisTarihi: "kapandi" in x ? once(x.kapandi) : null,
       musteriAdi: c?.ad ?? null,
       cariKartIdleri: c ? [c.id] : [],
+      musteriAdlari: c ? [c.ad] : [],
+      urunId: `u-${i}`,
+      en: x.en,
+      hedefMiktar: asamaTop.reduce((n, a) => n + a.metre, 0) + 200,
+      siparisMetre: sip.length > 0 ? asamaTop.reduce((n, a) => n + a.metre, 0) + 150 : null,
+      girenMetre: asamaTop.reduce((n, a) => n + a.metre, 0) + 35,
+      uretilenMetre: asamaTop.filter((a) => a.anahtar === "depo" || a.anahtar === "sevkEdildi").reduce((n, a) => n + a.metre, 0),
+      fasonKategoriler: "f" in x ? ["Boyahane"] : [],
       siparisIdleri: sip.map((y) => y.id),
       siparisNolari: sip.map((y) => y.no),
       urunAdi: x.u,

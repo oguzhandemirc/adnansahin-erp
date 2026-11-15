@@ -23,6 +23,7 @@ const List = (require("../app/(app)/is-emirleri/index") as { default: () => Reac
 const Detail = (require("../app/(app)/is-emirleri/[id]") as { default: () => ReactElement }).default;
 const Production = (require("../app/(app)/(tabs)/uretim") as { default: () => ReactElement }).default;
 const G = require("../src/ui/is-emri/gorunum") as typeof import("../src/ui/is-emri/gorunum");
+const { buyukHarf } = require("../src/ui/ortak") as typeof import("../src/ui/ortak");
 const { LIST_ID_FILTERS, LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT } = require("../src/api/wire") as typeof import("../src/api/wire");
 
 const GUN = 86_400_000;
@@ -129,39 +130,115 @@ describe("§2 liste: süzgeç SUNUCUDA", () => {
 });
 
 describe("§3 ayrıntı", () => {
-  it("kimin malı · sipariş → sipariş ayrıntısı · aşama sayıları · fasonda kaç gündür (termin/gecikme yok)", async () => {
+  it("dört net satır: kimin → cari · iş emrinin siparişi → sipariş · ne · nerede (boyahane firması + kaç gündür; termin/gecikme yok)", async () => {
     mockParams = { id: "w1" };
-    mockRecord.mockResolvedValue(rec("w1", FASONDA));
+    mockRecord.mockResolvedValue(rec("w1", { ...FASONDA, fasonKategoriler: ["Boyahane"] }));
     render(<Detail />);
     await settle();
     expect(within(await screen.findByTestId("is-emri-musteri")).getByText("Örnek Tekstil A.Ş.")).toBeTruthy();
-    expect(within(screen.getByTestId("is-emri-asama-fason")).getByText("14 top · 1.690 m")).toBeTruthy();
-    expect(screen.queryByTestId("is-emri-asama-kursun")).toBeNull();
-    expect(within(screen.getByTestId("is-emri-fason-firma")).getByText("6 gündür")).toBeTruthy();
+    expect(screen.getByText(buyukHarf("İş emrinin siparişi"))).toBeTruthy();
+    expect(within(screen.getByTestId("is-emri-kumas")).getByText("Örnek Saten 280 cm · Krem")).toBeTruthy();
+    const yer = screen.getByTestId("is-emri-fason-firma");
+    expect(within(yer).getByText("Boyahanede – Örnek Boyahane")).toBeTruthy();
+    expect(within(yer).getByText("6 gündür")).toBeTruthy();
+    expect(within(yer).getByText("14 top · 1.690 m")).toBeTruthy();
     expect(screen.queryByText(/gecik|termin/i)).toBeNull();
+    fireEvent.press(screen.getByTestId("is-emri-musteri"));
+    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/cariler/[id]", params: { id: "c1" } });
     fireEvent.press(screen.getByTestId("is-emri-siparis-0"));
     expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/siparisler/[id]", params: { id: "s1" } });
-    fireEvent.press(screen.getByTestId("is-emri-fason-firma"));
+    fireEvent.press(yer);
     expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/fason/[firmaId]", params: { firmaId: "f1", ad: "Örnek Boyahane" } });
   });
 
-  it("siparişsiz iş emri sipariş satırı yerine 'Siparişsiz' çizer", async () => {
-    mockParams = { id: "w5" };
-    mockRecord.mockResolvedValue(rec("w5", { ...FASONDA, siparisIdleri: [], siparisNolari: [], musteriAdi: null, fasonFirmaAdi: null }));
+  it("'Üretim ayrıntıları' KAPALI başlar; dokununca aşama başına top · metre ve üretim alanları görünür", async () => {
+    mockParams = { id: "w1" };
+    mockRecord.mockResolvedValue(rec("w1", { ...FASONDA, tur: "ORDER_PRODUCTION", durum: "IN_PROGRESS", hedefMiktar: "2400.00", en: "280.00", girenMetre: 2200, uretilenMetre: 470, olusturulma: "2026-11-01T08:00:00Z" }));
     render(<Detail />);
     await settle();
-    expect(await screen.findByTestId("is-emri-siparissiz")).toBeTruthy();
-    expect(within(screen.getByTestId("is-emri-musteri")).getByText("Siparişsiz")).toBeTruthy();
-    expect(screen.queryByTestId("is-emri-fason")).toBeNull();
+    await screen.findByTestId("is-emri-ayrinti");
+    expect(screen.getByTestId("is-emri-ayrinti-basligi").props.accessibilityState).toEqual(expect.objectContaining({ expanded: false }));
+    expect(screen.queryByTestId("is-emri-asama-fason")).toBeNull();
+    expect(screen.queryByTestId("is-emri-bilgi-hedef")).toBeNull();
+    fireEvent.press(screen.getByTestId("is-emri-ayrinti-basligi"));
+    await settle();
+    expect(screen.getByTestId("is-emri-ayrinti-basligi").props.accessibilityState).toEqual(expect.objectContaining({ expanded: true }));
+    expect(within(screen.getByTestId("is-emri-asama-fason")).getByText("14 top · 1.690 m")).toBeTruthy();
+    expect(screen.queryByTestId("is-emri-asama-kursun")).toBeNull();
+    expect(within(screen.getByTestId("is-emri-bilgi-tur")).getByText("Siparişe üretim")).toBeTruthy();
+    expect(within(screen.getByTestId("is-emri-bilgi-hedef")).getByText("2.400 m")).toBeTruthy();
+    expect(within(screen.getByTestId("is-emri-bilgi-en")).getByText("280 cm")).toBeTruthy();
+    expect(within(screen.getByTestId("is-emri-bilgi-uretilen")).getByText("470 m")).toBeTruthy();
+  });
+
+  it("siparişsiz iş emri 'Siparişsiz (stok)'; çok siparişli iş emrinde her sipariş ayrı satır", async () => {
+    mockParams = { id: "w5" };
+    mockRecord.mockResolvedValue(rec("w5", { ...FASONDA, siparisIdleri: [], siparisNolari: [], cariKartIdleri: [], musteriAdi: null, fasonFirmaAdi: null, asama: "kursun" }));
+    const { unmount } = render(<Detail />);
+    await settle();
+    expect(within(await screen.findByTestId("is-emri-siparissiz")).getByText("Siparişsiz (stok)")).toBeTruthy();
+    expect(within(screen.getByTestId("is-emri-musteri")).getByText("Stok için üretim")).toBeTruthy();
+    expect(within(screen.getByTestId("is-emri-yer")).getByText("Kurşun + KK2")).toBeTruthy();
+    expect(screen.queryByTestId("is-emri-fason-firma")).toBeNull();
+    unmount();
+    mockRecord.mockResolvedValue(rec("w8", { ...FASONDA, siparisIdleri: ["s1", "s2", "s3"], siparisNolari: ["SIP-1", "SIP-2", "SIP-3"] }));
+    render(<Detail />);
+    await settle();
+    expect(await screen.findByTestId("is-emri-siparis-2")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("is-emri-siparis-2"));
+    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/siparisler/[id]", params: { id: "s3" } });
   });
 });
 
-describe("§4 Üretim: açık iş emirleri", () => {
+describe("§4 Üretim: üretimdeki toplar nerede? + açık iş emirleri", () => {
+  const AKIS = { kolonlar: [{ anahtar: "hamStok", adet: 300 }, { anahtar: "kursun", etiket: "Kurşun", adet: 94 }, { anahtar: "tambur", adet: 22 }, { anahtar: "fason", adet: 233 }, { anahtar: "depo", adet: 900 }], istasyonlar: [] };
+  const FIRMALAR = (kat: string) => ({
+    acikTop: 233, kalanMiktar: "26960.000",
+    firmalar: [
+      { fasonFirmaId: "f1", etiket: "Örnek Boyahane", acikTop: 142, kalanMiktar: "16400.000", kategoriler: [kat], enEskiGonderim: once(93) },
+      { fasonFirmaId: "f2", etiket: "Deneme Boya", acikTop: 58, kalanMiktar: "6800.000", kategoriler: ["Boyahane"], enEskiGonderim: once(103) },
+      { fasonFirmaId: "f3", etiket: "Numune Boya", acikTop: 33, kalanMiktar: "3760.000", kategoriler: ["Boyahane"], enEskiGonderim: once(10) },
+      { fasonFirmaId: "f4", etiket: "Boş Firma", acikTop: 0, kalanMiktar: "0", kategoriler: ["Boyahane"], enEskiGonderim: null },
+    ],
+  });
   beforeEach(() => {
-    (mockSession.api.snapshot as jest.Mock).mockResolvedValue({ projeksiyon: "uretim-akisi", veri: { kolonlar: [{ anahtar: "kursun", etiket: "Kurşun", adet: 3 }], istasyonlar: [] }, surum: "x" });
+    (mockSession.api.snapshot as jest.Mock).mockImplementation(async (p: string) => ({ projeksiyon: p, veri: p === "fason-acik" ? FIRMALAR("Boyahane") : AKIS, surum: "x" }));
   });
 
-  it("ilk 10 açık iş emri (`suzgec=ACIK`, limit 10); Tümü ve Kurşun satırı İş emirleri ekranını açar", async () => {
+  it("seçici (saf): Kurşun + KK2 · Tambur iş emri sayısıyla; Boyahane top · metre · en eski gün; firma firma (boş firma yok); ham/depo yok", () => {
+    const N = require("../src/ui/uretim/nerede") as typeof import("../src/ui/uretim/nerede");
+    const rows = N.productionLocations({ flow: AKIS, fason: FIRMALAR("Boyahane") });
+    expect(rows.map((r) => [r.key, r.label, r.value, r.detail, r.firm])).toEqual([
+      ["kursun", "Kurşun + KK2", "94 iş emri", null, false],
+      ["tambur", "Tambur", "22 iş emri", null, false],
+      ["fason", "Boyahane", "233 top", "26.960 m · 103 gündür", false],
+      ["fason:f1", "Örnek Boyahane", "142 top", "16.400 m · 93 gündür", true],
+      ["fason:f2", "Deneme Boya", "58 top", "6.800 m · 103 gündür", true],
+      ["fason:f3", "Numune Boya", "33 top", "3.760 m · 10 gündür", true],
+    ]);
+    expect(rows.find((r) => r.key === "fason:f1")!.params).toEqual({ fasonFirmaId: "f1", firma: "Örnek Boyahane" });
+    // Boyahane olmayan firma varsa toplam dürüstçe "Fasonda".
+    expect(N.productionLocations({ flow: AKIS, fason: FIRMALAR("Zımpara") }).find((r) => r.key === "fason")!.label).toBe("Fasonda");
+    // Y2 anlığı gelirse satırlar ondan (kurşunda da top · metre · gün).
+    const y2 = N.productionLocations({ snapshot: { konumlar: [{ anahtar: "kursun", etiket: "Kurşun", top: 94, metre: 54478, isEmri: 94, enEskiGun: 4 }] }, flow: AKIS, fason: null });
+    expect(y2.map((r) => [r.label, r.value, r.detail])).toEqual([["Kurşun + KK2", "94 top", "54.478 m · 4 gündür"]]);
+  });
+
+  it("blok ilk sırada; firma satırına dokununca o firmaya süzülü konum listesi", async () => {
+    mockList.mockResolvedValue(page());
+    render(<Production />);
+    await settle();
+    expect(within(await screen.findByTestId("nerede-fason")).getByText("26.960 m · 103 gündür")).toBeTruthy();
+    expect(within(screen.getByTestId("nerede-fason:f2")).getByText("58 top")).toBeTruthy();
+    expect(screen.queryByTestId("nerede-fason:f4")).toBeNull();
+    expect(screen.queryByTestId("nerede-hamStok")).toBeNull();
+    fireEvent.press(screen.getByTestId("nerede-fason:f2"));
+    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/is-emirleri/konum", params: { fasonFirmaId: "f2", firma: "Deneme Boya" } });
+    fireEvent.press(screen.getByTestId("nerede-tambur"));
+    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/is-emirleri/konum", params: { asama: "TAMBUR" } });
+  });
+
+  it("ilk 10 açık iş emri (`suzgec=ACIK`, limit 10); Tümü İş emirleri ekranını açar", async () => {
     mockList.mockResolvedValue(page(rec("w1", FASONDA)));
     render(<Production />);
     await settle();
@@ -169,8 +246,6 @@ describe("§4 Üretim: açık iş emirleri", () => {
     expect(within(await screen.findByTestId("ie-w1")).getByText("Fasonda")).toBeTruthy();
     fireEvent.press(screen.getByTestId("is-emirleri-tumu"));
     expect(mockRouter.push).toHaveBeenCalledWith("/is-emirleri");
-    fireEvent.press(screen.getByTestId("nerede-kursun"));
-    expect(mockRouter.push).toHaveBeenCalledWith("/is-emirleri?asama=KURSUN");
   });
 
   it("is-emri aramasını beyan etmeyen eski sunucuda bölüm çizilmez, liste istenmez", async () => {
@@ -179,5 +254,45 @@ describe("§4 Üretim: açık iş emirleri", () => {
     await settle();
     expect(mockList).not.toHaveBeenCalled();
     expect(screen.queryByTestId("bolum-is-emirleri")).toBeNull();
+  });
+});
+
+describe("§5 konum listesi", () => {
+  const Konum = (require("../app/(app)/is-emirleri/konum") as { default: () => ReactElement }).default;
+  const COK = { ...FASONDA, siparisIdleri: ["s1", "s2", "s3"], siparisNolari: ["SIP-2026-0451", "SIP-2026-0450", "SIP-2026-0449"] };
+  const STOK = { ...FASONDA, musteriAdi: null, cariKartIdleri: [], siparisIdleri: [], siparisNolari: [] };
+
+  it("hücreler (saf): çok siparişte ilk no '+N', bağsızda 'Siparişsiz (stok)'; top/metre o konumun sayısı; gün yalnız fasonda", () => {
+    expect(G.orderCell(COK)).toBe("SIP-2026-0451 +2");
+    expect(G.orderCell(FASONDA)).toBe("SIP-2026-0451");
+    expect(G.orderCell(STOK)).toBe("Siparişsiz (stok)");
+    expect(G.orderCell({})).toBe("—");
+    const simdi = Date.now();
+    expect(G.locationRowText(FASONDA, "fason", simdi)).toEqual({ musteri: "Örnek Tekstil A.Ş.", kumas: "Örnek Saten 280 cm · Krem", top: "14", metre: "1.690", siparis: "SIP-2026-0451", gun: "6 gündür" });
+    expect(G.locationRowText({ ...FASONDA, asama: "kursun" }, "kursun", simdi).gun).toBeNull();
+    expect(G.locationRowText({ ...FASONDA, asama: "kursun" }, "kursun", simdi).top).toBe("0");
+  });
+
+  it("aşama süzgeci SUNUCUYA; satırda sipariş '+N' ve 'Siparişsiz (stok)'; dokununca iş emri ayrıntısı", async () => {
+    mockParams = { asama: "KURSUN" };
+    mockList.mockResolvedValue(page(rec("w8", { ...COK, asama: "kursun" }), rec("w5", { ...STOK, asama: "kursun" })));
+    render(<Konum />);
+    await settle();
+    expect(mockList).toHaveBeenCalledWith("is-emri", expect.objectContaining({ suzgec: "ACIK,KURSUN" }));
+    expect(await screen.findByText("Kurşun + KK2")).toBeTruthy();
+    expect(within(screen.getByTestId("konum-w8")).getByText(/SIP-2026-0451 \+2/)).toBeTruthy();
+    expect(within(screen.getByTestId("konum-w5")).getByText("Siparişsiz (stok)")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("konum-w8"));
+    expect(mockRouter.push).toHaveBeenCalledWith(expect.objectContaining({ params: { id: "w8" } }));
+  });
+
+  it("boyahane firması: `fasonFirmaId` üyelik süzgeci (aşama süzülmez), başlık firma adı, gün görünür", async () => {
+    mockParams = { fasonFirmaId: "f1", firma: "Örnek Boyahane" };
+    mockList.mockResolvedValue(page(rec("w1", FASONDA)));
+    render(<Konum />);
+    await settle();
+    expect(mockList).toHaveBeenCalledWith("is-emri", expect.objectContaining({ suzgec: "ACIK", fasonFirmaId: "f1" }));
+    expect(await screen.findByText("Örnek Boyahane")).toBeTruthy();
+    expect(within(screen.getByTestId("konum-w1")).getByText(/6 gündür/)).toBeTruthy();
   });
 });
