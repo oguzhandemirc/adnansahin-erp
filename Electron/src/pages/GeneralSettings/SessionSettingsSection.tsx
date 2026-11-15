@@ -42,6 +42,9 @@ import { SETTINGS_ADMIN_PERMISSION } from "./settings-config";
 const POLICY_DESC =
   "Aynı kullanıcı aynı tip cihazda (ör. iki bilgisayar ya da iki telefon) ikinci kez giriş yaptığında ne olacağı. Farklı tipler (1 bilgisayar + 1 telefon) her zaman serbesttir. Değişiklik sonraki girişlerde geçerli olur.";
 
+const ENFORCE_PW_DESC =
+  "Açıkken parolası kurala uymayan (10 karakterden kısa ya da çok yaygın) bir kullanıcı kullanıcı adı + parolayla girdiğinde önce parolasını değiştirmek zorunda kalır; sahada tablet yalnız saha izinleriyle açılır. Kapalıyken (varsayılan) giriş eskisi gibi kısıtsızdır. Yeni belirlenen parolalar her iki durumda da kurala uymak zorundadır. Dikkat: eski panel sürümleri (1.3.16 ve öncesi) parola değiştirme ekranını tanımaz — açmadan önce bütün bilgisayarlardaki paneli güncelleyin, yoksa zayıf parolalı yöneticiler panele giremez.";
+
 export function SessionSettingsSection({
   writePermissions = [SETTINGS_ADMIN_PERMISSION],
 }: {
@@ -66,6 +69,7 @@ export function SessionSettingsSection({
           mobileLock={s.current.mobileLock}
           mobileLockMinutes={s.current.mobileLockMin}
           mobileLockBg={s.current.mobileLockBg}
+          enforcePw={s.current.enforcePw}
           methods={s.current.methods}
           absoluteCapDays={s.current.capDays}
           pinLockoutEnabled={s.current.pinEnabled}
@@ -297,6 +301,21 @@ export function SessionSettingsSection({
               />
             </div>
           )}
+        </div>
+
+        {/* 7b) Zayıf parolayla girişte zorunlu parola değiştirme — backend (login) ENFORCE.
+            Varsayılan KAPALI (2026-11-15): eski panel sürümleri kısıtlı oturumu tanımaz. */}
+        <div className="border-t pt-4">
+          <FlagToggle
+            hint={hint}
+            title="Zayıf parolayla girişte parola değiştirmeyi zorunlu tut"
+            summary="Açmadan önce bütün bilgisayarlarda paneli güncelleyin: eski panel sürümleri parola değiştirme ekranını tanımaz."
+            desc={ENFORCE_PW_DESC}
+            defaultOn={false}
+            checked={s.enforcePw}
+            disabled={s.isSaving}
+            onChange={s.setEnforcePw}
+          />
         </div>
 
         {/* 8) Mobil giriş yöntemleri */}

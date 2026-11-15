@@ -16,6 +16,11 @@
 //      401, audit yükünde parola YOK, yeni parolayla giriş kısıtsız.
 //   §3 SAHA ZAYIF GİRİŞ — mobil istemci kilitlenmez ama token yalnız mobile:*.
 //   §4 kısıtlı oturum çıkış yapabilir; normal oturum da parolasını değiştirir.
+//   §5 (ÖNCE koşar) ANAHTAR KAPALI — `auth.enforceStrongPasswordOnLogin` satırı
+//      yok / false: zayıf parola masaüstü + mobil + web TAM kapsam, yanıtta
+//      `passwordChangeRequired` YOK (2.11.7 davranışı, kullanıcı kararı 2026-11-15);
+//      change-password ucu ve yeni parola kuralı kapalıyken de AYNEN çalışır.
+//      §1–§4 anahtarı AÇAR; koşum sonunda anahtar eski hâline döner.
 //
 // Uygulama süreç İÇİNDE `app.listen(0)` ile kurulur (ikinci Node süreci yok).
 //
@@ -27,16 +32,30 @@
 //   S1 `verifyToken`daki kısıtlı oturum kapısı kaldırıldı — kırmızı.
 //   S2 login'de kapsam daraltması kaldırıldı (zayıf parola tam token) — kırmızı.
 //   S3 değiştirmede kural helper'ı atlandı (`AuthService.hashPassword`) — kırmızı.
+//   S4 (2026-11-15) login anahtarı yok saydı (her zaman ölç) — 40/6 kırmızı (§5).
+//   S5 (2026-11-15) login anahtarı hiç açmadı (her zaman tam) — 33/13 kırmızı (§1–§4).
 // =============================================================================
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import jwt from "jsonwebtoken";
+import type { Prisma } from "@prisma/client";
 import app from "../src/app";
 import prisma, { pool } from "../src/lib/prisma";
 import { AuthService } from "../src/services/auth.service";
 import { PASSWORD_CHANGE_ALLOWED } from "../src/middlewares/auth.middleware";
+import { SETTING_KEYS } from "../src/services/system-setting.service";
 import { hedefDbEngeli } from "./lib/hedef-db-kapisi";
+
+const ENFORCE_KEY = SETTING_KEYS.AUTH_ENFORCE_STRONG_PASSWORD_ON_LOGIN;
+/** Anahtarı doğrudan yazar (HTTP ucu ayar şifresi ister; burada sınanan login'dir). */
+async function setEnforce(value: boolean): Promise<void> {
+  await prisma.systemSetting.upsert({
+    where: { key: ENFORCE_KEY },
+    create: { key: ENFORCE_KEY, value },
+    update: { value },
+  });
+}
 
 let pass = 0;
 let fail = 0;
@@ -124,9 +143,40 @@ async function main(): Promise<void> {
   };
   const claims = (t: string): Record<string, unknown> => (jwt.decode(t) as Record<string, unknown>) ?? {};
 
+  // Anahtarın koşum öncesi hâli: finally'de AYNEN geri konur (satır yoksa yine yok).
+  const onceki = await prisma.systemSetting.findUnique({ where: { key: ENFORCE_KEY }, select: { value: true } });
+
   try {
+    // ── §5 ANAHTAR KAPALI (varsayılan) → 2.11.7 davranışı ────────────────────
+    // Satır YOKKEN ölçülür (Adnan'ın kurulum gecesi hâli): varsayılan KAPALI.
+    console.log("\n§5 anahtar kapalı — zayıf parola kapsamı daraltmaz");
+    if (onceki) await prisma.systemSetting.delete({ where: { key: ENFORCE_KEY } });
+    const offDesk = await mkUser("e", WEAK);
+    const od = await call("POST", "/api/auth/login", null, { username: offDesk.username, password: WEAK, clientType: "electron" });
+    const odc = claims(String(od.body.data?.token ?? ""));
+    check("[satır yok] masaüstü zayıf giriş 200", od.status === 200, String(od.status));
+    check("[satır yok] yanıtta passwordChangeRequired YOK", od.body.data !== undefined && !("passwordChangeRequired" in od.body.data), JSON.stringify(Object.keys(od.body.data ?? {})));
+    check("[satır yok] masaüstü token claim'siz ve TAM izinli", odc.passwordChangeRequired === undefined && JSON.stringify([...((odc.permissions as string[]) ?? [])].sort()) === JSON.stringify(["item:read", "mobile:kk1"]), JSON.stringify(odc.permissions));
+    const odItems = await call("GET", "/api/items", String(od.body.data?.token ?? ""));
+    check("[satır yok] masaüstü zayıf oturum /api/items 200", odItems.status === 200, String(odItems.status));
+    await setEnforce(false);
+    const offField = await mkUser("f", WEAK);
+    const of = await call("POST", "/api/auth/login", null, { username: offField.username, password: WEAK, clientType: "mobile" });
+    const ofc = claims(String(of.body.data?.token ?? ""));
+    check("[false] mobil zayıf giriş 200, passwordChangeRequired YOK", of.status === 200 && of.body.data !== undefined && !("passwordChangeRequired" in of.body.data), String(of.status));
+    check("[false] mobil token TAM kapsam (item:read dahil)", Array.isArray(ofc.permissions) && (ofc.permissions as string[]).includes("item:read") && (ofc.permissions as string[]).includes("mobile:kk1"), JSON.stringify(ofc.permissions));
+    const ow = await call("POST", "/api/auth/login", null, { username: offDesk.username, password: WEAK, clientType: "web" });
+    check("[false] web zayıf giriş de kısıtsız", ow.status === 200 && claims(String(ow.body.data?.token ?? "")).passwordChangeRequired === undefined);
+    const offChange = await call("POST", "/api/auth/change-password", String(od.body.data?.token ?? ""), { currentPassword: WEAK, newPassword: STRONG_1, clientType: "electron" });
+    check("[false] change-password ucu kapalıyken de çalışır (200)", offChange.status === 200, `${offChange.status} ${offChange.body.message ?? ""}`);
+    const offWeakNew = await call("POST", "/api/auth/change-password", String(offChange.body.data?.token ?? ""), { currentPassword: STRONG_1, newPassword: "1234567890", clientType: "electron" });
+    check("[false] yeni parola kuralı AYNEN (zayıf yeni → 400 PASSWORD_POLICY)", offWeakNew.status === 400 && offWeakNew.body.details?.code === "PASSWORD_POLICY", `${offWeakNew.status} ${offWeakNew.body.details?.code ?? ""}`);
+
+    // §1–§4: anahtar AÇIK — kısıtlı oturum davranışı (kullanıcı kararı 2026-11-13).
+    await setEnforce(true);
+
     // ── §1 masaüstü zayıf giriş ──────────────────────────────────────────────
-    console.log("\n§1 masaüstü zayıf parolayla giriş");
+    console.log("\n§1 masaüstü zayıf parolayla giriş (anahtar açık)");
     const weak = await mkUser("a", WEAK);
     const login = await call("POST", "/api/auth/login", null, { username: weak.username, password: WEAK, clientType: "electron" });
     check("giriş 200", login.status === 200, String(login.status));
@@ -200,6 +250,8 @@ async function main(): Promise<void> {
     check("normal oturum da parolasını değiştirir", sc.status === 200, String(sc.status));
   } finally {
     await new Promise<void>((r) => server.close(() => r()));
+    if (onceki) await prisma.systemSetting.update({ where: { key: ENFORCE_KEY }, data: { value: onceki.value as Prisma.InputJsonValue } }).catch(() => setEnforce(onceki.value === true));
+    else await prisma.systemSetting.delete({ where: { key: ENFORCE_KEY } }).catch(() => undefined);
     // Bekçi kullanıcısı sert silinmez (audit FK) — pasifleştirilir.
     if (created.length) await prisma.user.updateMany({ where: { id: { in: created } }, data: { isActive: false } });
   }

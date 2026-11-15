@@ -17,6 +17,7 @@ import {
   readLoginMethods,
   readSameTypeSessionPolicy,
   readAbsoluteSessionCapDays,
+  readEnforceStrongPasswordOnLogin,
 } from "./system-setting.service";
 import { SessionRegistryService } from "./session-registry.service";
 import { TotpAccountService } from "./totp-account.service";
@@ -168,7 +169,12 @@ export class AuthService {
     // Mevcut parola kurala uyuyor mu? Düz metin YALNIZ burada elde — PIN/kart
     // girişinde ölçülemez. Uymuyorsa giriş BAŞARILI ama kapsam daralır (bkz.
     // `TokenScope`). Sonuç sır değildir; parola hiçbir çıktıya girmez.
-    const weak = checkPasswordPolicy(password, { username: user.username, fullName: user.fullName }) !== null;
+    // ⚠️ ANAHTAR (2026-11-15): yalnız `auth.enforceStrongPasswordOnLogin` AÇIKKEN
+    // ölçülür; KAPALIYKEN (varsayılan) giriş 2.11.7 ile birebir — kapsam "full",
+    // `passwordChangeRequired` yok (eski panel kısıtlı oturumu tanımıyor).
+    const weak =
+      (await readEnforceStrongPasswordOnLogin()) &&
+      checkPasswordPolicy(password, { username: user.username, fullName: user.fullName }) !== null;
     const scope: TokenScope = !weak
       ? "full"
       : isDesktopClient(ctx?.clientType)

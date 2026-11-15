@@ -13317,3 +13317,13 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Uyum.** Yeni bulut + eski fabrika: işaret tüketilir ama tur hemen tetiklenmez, veri normal aralıkta gelir. Eski bulut + yeni fabrika: alan yok → bugünkü davranış; uygulama eylemi gizler. Eski uygulama yeni bulutta etkilenmez. Kurulum sırası önce bulut (migration `20261115090000_simdi_guncelle`), sonra fabrika backend'i, sonra uygulama.
 
 **Bekçiler.** Bulut `test_simdi_guncelle` (25 kontrol, 6 negatif sonda) · fabrika `test_patron_bulut_simdi_guncelle` (17 kontrol, 5 negatif sonda) · uygulama `__tests__/simdi-guncelle.test.tsx` (7 test, 5 negatif sonda).
+
+## 2026-11-15 — Zayıf parolayla zorunlu parola değiştirme anahtara bağlandı (Adnan'da varsayılan KAPALI) [ÇEKİRDEK]
+
+**Karar (kullanıcı, 2026-11-15).** 2026-11-13 şifre sıkılaştırmasındaki "zayıf parolayla girişte kısıtlı oturum" davranışı sistem ayarı `auth.enforceStrongPasswordOnLogin`e (bayrak anahtarı `enforceStrongPasswordOnLogin`, izin `settings:session`) bağlandı; satır yoksa KAPALI. Neden: sahadaki eski panel 1.3.15 kısıtlı oturumu tanımıyor; kurulum gecesi (backend 2.12.1) ile panel güncellemesi arasında yöneticiler kilitlenmesin.
+
+**Davranış.** KAPALIYKEN login 2.11.7 ile birebir: parola ölçülmez, kapsam her zaman `full`, yanıtta `passwordChangeRequired` yok. AÇIKKEN 2026-11-13 davranışı aynen (masaüstü `password-change`, saha `mobile-only`). Değişmeyenler: yeni parola yazımındaki kural (≥ 10 + yaygın parola reddi) ve `passwordPolicyVersion`; `POST /api/auth/change-password` iki durumda da çalışır; cloud-sync users-export filtresi; PIN yalnız saha. Migration yok (system_settings satırı).
+
+**Panel.** Ayarlar → Oturum & Güvenlik'te "Zayıf parolayla girişte parola değiştirmeyi zorunlu tut" anahtarı (eski panel sürümleri uyarısıyla); alan yalnız değiştiyse gönderilir (anahtarı bilmeyen backend'in katı şeması 400 vermesin).
+
+**Bekçiler.** `test_password_change_required` §5 (satır yok / false → masaüstü, mobil, web tam kapsam; change-password ve yeni parola kuralı çalışır), §1–§4 anahtar açıkken; negatif sondalar S4 anahtar yok sayıldı 40/6, S5 anahtar hiç açılmadı 33/13. Panel `SessionSettingsSection.enforce-password.test.tsx` (5 test; sonda A varsayılan true 2/5, B alanı her zaman gönder 1/5).

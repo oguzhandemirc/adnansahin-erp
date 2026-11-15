@@ -156,6 +156,7 @@ export const SETTINGS_SCOPES: readonly SettingsScope[] = [
       "autoLogoutOnExpiry",
       "mobileIdleLockEnabled",
       "mobileLockOnBackground",
+      "enforceStrongPasswordOnLogin",
       "sameTypeSessionPolicy",
       "loginMethods",
       "absoluteSessionCapDays",

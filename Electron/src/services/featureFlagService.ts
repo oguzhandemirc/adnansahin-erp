@@ -550,6 +550,9 @@ export interface FeatureFlags {
   /** Mobil uygulama arka plana geçince (operatör çıkınca) anında kilitlensin mi
    *  (default true). Idle kilitten bağımsız. Client ENFORCE (yalnız mobil). */
   mobileLockOnBackground: boolean;
+  /** Zayıf parolayla girişte parola değiştirme zorunlu mu (default false = kısıtlı oturum
+   *  YOK, 2.11.7 davranışı). Backend ENFORCE (login). Eski backend alanı göndermez → false. */
+  enforceStrongPasswordOnLogin: boolean;
   /** Mutlak oturum tavanı — gün (default 30, 0..365; 0 = süresiz). Zaman aşımı kapalı
    *  olsa bile token en fazla bu kadar gün yaşar (sızan token sonsuza kadar geçerli
    *  kalmasın). Backend ENFORCE eder (issueToken). */

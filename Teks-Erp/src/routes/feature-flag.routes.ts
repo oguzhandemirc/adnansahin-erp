@@ -483,6 +483,8 @@ export const updateSchema = z.strictObject({
   mobileIdleLockMinutes: z.number().int().min(1).max(120).optional(),
   // auth.mobileLockOnBackground — uygulama arka plana geçince anında kilitle (default true). Client (mobil) ENFORCE.
   mobileLockOnBackground: z.boolean().optional(),
+  // auth.enforceStrongPasswordOnLogin — zayıf parolayla girişte zorunlu parola değiştirme (default false = 2.11.7 davranışı). Backend ENFORCE (login).
+  enforceStrongPasswordOnLogin: z.boolean().optional(),
   // label.mobileRasterEnabled — mobil (HC-06/BT) baskıda raster GW bitmap gönder (default false → komut yolu). Client (mobil) ENFORCE.
   mobileRasterEnabled: z.boolean().optional(),
   // label.scrapGradeLabelEnabled — fire (QualityGrade.skipLabel) kalitede de OTOMATİK etiket bas (default false → fire topa kâğıt çıkmaz). Client (mobil) ENFORCE; elle baskı onayla mümkün.

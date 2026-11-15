@@ -15,6 +15,7 @@ export function SessionSettingsReadOnly({
   mobileLock,
   mobileLockMinutes,
   mobileLockBg,
+  enforcePw,
   methods,
   absoluteCapDays,
   pinLockoutEnabled,
@@ -31,6 +32,7 @@ export function SessionSettingsReadOnly({
   mobileLock: boolean;
   mobileLockMinutes: number;
   mobileLockBg: boolean;
+  enforcePw: boolean;
   methods: { enabled: LoginMethod[]; primary: LoginMethod };
   absoluteCapDays: number;
   pinLockoutEnabled: boolean;
@@ -62,6 +64,10 @@ export function SessionSettingsReadOnly({
       <ReadOnlyLine
         label="Uygulamadan çıkınca kilitle (mobil)"
         value={mobileLockBg ? "Açık" : "Kapalı"}
+      />
+      <ReadOnlyLine
+        label="Zayıf parolayla girişte parola değiştirme zorunlu"
+        value={enforcePw ? "Açık" : "Kapalı"}
       />
       <ReadOnlyLine
         label="Mutlak oturum tavanı"

@@ -710,6 +710,12 @@ export const SETTING_KEYS = {
    *  kilitten BAĞIMSIZ — operatör uygulamadan çıkınca (home/başka app) hemen kilit
    *  ekranı gelir (work session AÇIK kalır; kart/PIN ile açılır). Client (mobil) ENFORCE. */
   AUTH_MOBILE_LOCK_ON_BACKGROUND: "auth.mobileLockOnBackground",
+  /** Parolayla girişte parola kurala uymuyorsa oturum daraltılsın mı (zorunlu parola
+   *  değiştirme). Default false (KAPALI, kullanıcı kararı 2026-11-15): giriş 2.11.7 ile
+   *  birebir — kapsam her zaman "full", yanıtta `passwordChangeRequired` yok. AÇIKKEN
+   *  masaüstü "password-change", saha "mobile-only" kapsamı alır. Backend ENFORCE (login).
+   *  Neden anahtar: eski panel (≤ 1.3.16) kısıtlı oturumu tanımaz, yönetici kilitlenir. */
+  AUTH_ENFORCE_STRONG_PASSWORD_ON_LOGIN: "auth.enforceStrongPasswordOnLogin",
   /** Mutlak oturum tavanı, GÜN. Default 30 (0..365). Zaman aşımı KAPALI iken bile
    *  token en fazla bu kadar gün geçerli olur (sızan token sonsuza kadar yaşamasın).
    *  0 = gerçekten süresiz (exp claim'i yok). Backend ENFORCE eder (issueToken). */
@@ -1813,6 +1819,9 @@ export interface FeatureFlags {
   /** Mobil "uygulama arka plana geçince anında kilitle" açık mı (default true).
    *  Idle kilitten bağımsız. Client (mobil) ENFORCE. */
   mobileLockOnBackground: boolean;
+  /** Zayıf parolayla girişte parola değiştirme zorunlu mu (default false = 2.11.7
+   *  davranışı, kapsam daralmaz). Backend ENFORCE (login). */
+  enforceStrongPasswordOnLogin: boolean;
   /** Mutlak oturum tavanı — gün (default 30, 0..365; 0 = süresiz). Zaman aşımı kapalı
    *  olsa bile token en fazla bu kadar gün yaşar. Backend ENFORCE (issueToken). */
   absoluteSessionCapDays: number;
@@ -2185,6 +2194,7 @@ export class SystemSettingService {
       mobileIdleLockEnabled: await readMobileIdleLockEnabled(cacheClient),
       mobileIdleLockMinutes: await readMobileIdleLockMinutes(cacheClient),
       mobileLockOnBackground: await readMobileLockOnBackground(cacheClient),
+      enforceStrongPasswordOnLogin: await readEnforceStrongPasswordOnLogin(cacheClient),
       absoluteSessionCapDays: await readAbsoluteSessionCapDays(cacheClient),
       pinLockoutEnabled: await readPinLockoutEnabled(cacheClient),
       pinLockoutAttempts: await readPinLockoutAttempts(cacheClient),
@@ -3664,6 +3674,18 @@ export class SystemSettingService {
         SETTING_KEYS.AUTH_MOBILE_LOCK_ON_BACKGROUND,
         input.mobileLockOnBackground,
         "Mobil uygulama arka plana geçince (operatör uygulamadan çıkınca) anında kilitlensin",
+        userId
+      );
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input, "enforceStrongPasswordOnLogin")) {
+      if (typeof input.enforceStrongPasswordOnLogin !== "boolean") {
+        throw AppError.badRequest("enforceStrongPasswordOnLogin boolean olmalı");
+      }
+      await this.set(
+        SETTING_KEYS.AUTH_ENFORCE_STRONG_PASSWORD_ON_LOGIN,
+        input.enforceStrongPasswordOnLogin,
+        "Zayıf parolayla girişte parola değiştirmeyi zorunlu tut (kapalıyken giriş kısıtsız)",
         userId
       );
     }
@@ -6174,6 +6196,24 @@ export async function readMobileLockOnBackground(
   });
   if (!setting) return DEFAULT_MOBILE_LOCK_ON_BACKGROUND;
   return asBoolean(setting.value);
+}
+
+/**
+ * Zayıf parolayla girişte zorunlu parola değiştirme açık mı
+ * (`auth.enforceStrongPasswordOnLogin`)? Kayıt yok → false (KAPALI; kullanıcı kararı
+ * 2026-11-15, Adnan'da varsayılan kapalı). Kapalıyken login 2.11.7 ile birebir:
+ * kapsam "full", `passwordChangeRequired` yok. Yeni parola yazımındaki kural ve
+ * `passwordPolicyVersion` bu ayardan BAĞIMSIZDIR.
+ */
+export async function readEnforceStrongPasswordOnLogin(
+  tx?: Pick<typeof prisma, "systemSetting">,
+): Promise<boolean> {
+  const client = tx ?? prisma;
+  const setting = await client.systemSetting.findUnique({
+    where: { key: SETTING_KEYS.AUTH_ENFORCE_STRONG_PASSWORD_ON_LOGIN },
+    select: { value: true },
+  });
+  return asBoolean(setting?.value);
 }
 
 /**

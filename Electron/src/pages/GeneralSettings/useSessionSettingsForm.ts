@@ -55,6 +55,8 @@ export function useSessionSettingsForm() {
   const currentMobileLock = f?.mobileIdleLockEnabled ?? true;
   const currentMobileLockMin = f?.mobileIdleLockMinutes ?? DEFAULT_MOBILE_IDLE_LOCK_MIN;
   const currentMobileLockBg = f?.mobileLockOnBackground ?? true;
+  // Eski backend alanı göndermez → false (kısıtlı oturum yok, 2.11.7 davranışı).
+  const currentEnforcePw = f?.enforceStrongPasswordOnLogin ?? false;
   const currentPolicy = isSameTypeSessionPolicy(f?.sameTypeSessionPolicy)
     ? f!.sameTypeSessionPolicy
     : DEFAULT_SAME_TYPE_SESSION_POLICY;
@@ -72,6 +74,7 @@ export function useSessionSettingsForm() {
   const [mobileLock, setMobileLock] = useState(currentMobileLock);
   const [mobileLockMin, setMobileLockMin] = useState(currentMobileLockMin);
   const [mobileLockBg, setMobileLockBg] = useState(currentMobileLockBg);
+  const [enforcePw, setEnforcePw] = useState(currentEnforcePw);
   const [workEnabled, setWorkEnabled] = useState(currentWorkIdle > 0);
   const [workMin, setWorkMin] = useState(
     currentWorkIdle > 0 ? currentWorkIdle : DEFAULT_WORK_SESSION_IDLE,
@@ -95,6 +98,7 @@ export function useSessionSettingsForm() {
     setMobileLock(currentMobileLock);
     setMobileLockMin(currentMobileLockMin);
     setMobileLockBg(currentMobileLockBg);
+    setEnforcePw(currentEnforcePw);
     setWorkEnabled(currentWorkIdle > 0);
     setWorkMin(currentWorkIdle > 0 ? currentWorkIdle : DEFAULT_WORK_SESSION_IDLE);
     setPolicy(currentPolicy);
@@ -115,6 +119,7 @@ export function useSessionSettingsForm() {
     currentAutoLogout,
     currentMobileLock,
     currentMobileLockBg,
+    currentEnforcePw,
     currentPolicy,
     methodsKey,
     currentCapDays,
@@ -134,6 +139,7 @@ export function useSessionSettingsForm() {
       autoLogoutOnExpiry: boolean;
       mobileIdleLockEnabled: boolean;
       mobileLockOnBackground: boolean;
+      enforceStrongPasswordOnLogin?: boolean;
       sameTypeSessionPolicy: SameTypeSessionPolicy;
       loginMethods: { enabled: LoginMethod[]; primary: LoginMethod };
       absoluteSessionCapDays: number;
@@ -217,6 +223,7 @@ export function useSessionSettingsForm() {
     autoLogout !== currentAutoLogout ||
     mobileLock !== currentMobileLock ||
     mobileLockBg !== currentMobileLockBg ||
+    enforcePw !== currentEnforcePw ||
     policy !== currentPolicy ||
     methodsDirty ||
     capDaysNum !== currentCapDays ||
@@ -259,6 +266,7 @@ export function useSessionSettingsForm() {
     setMobileLock(currentMobileLock);
     setMobileLockMin(currentMobileLockMin);
     setMobileLockBg(currentMobileLockBg);
+    setEnforcePw(currentEnforcePw);
     setWorkEnabled(currentWorkIdle > 0);
     setWorkMin(currentWorkIdle > 0 ? currentWorkIdle : DEFAULT_WORK_SESSION_IDLE);
     setPolicy(currentPolicy);
@@ -281,6 +289,8 @@ export function useSessionSettingsForm() {
       autoLogoutOnExpiry: autoLogout,
       mobileIdleLockEnabled: mobileLock,
       mobileLockOnBackground: mobileLockBg,
+      // Yalnız değiştiyse gönderilir: anahtarı bilmeyen eski backend (strictObject) 400 vermesin.
+      ...(enforcePw !== currentEnforcePw ? { enforceStrongPasswordOnLogin: enforcePw } : {}),
       sameTypeSessionPolicy: policy,
       loginMethods: { enabled: enabledMethods, primary: primaryMethod },
       absoluteSessionCapDays: capDaysNum,
@@ -299,6 +309,7 @@ export function useSessionSettingsForm() {
     idleEnabled, idleMin, setIdleMin, toggleIdle,
     mobileLock, setMobileLock, mobileLockMin, setMobileLockMin,
     mobileLockBg, setMobileLockBg,
+    enforcePw, setEnforcePw,
     workEnabled, workMin, setWorkMin, toggleWork,
     policy, setPolicy,
     enabledMethods, primaryMethod, setPrimaryMethod, toggleMethod,
@@ -322,6 +333,7 @@ export function useSessionSettingsForm() {
       mobileLock: currentMobileLock,
       mobileLockMin: currentMobileLockMin,
       mobileLockBg: currentMobileLockBg,
+      enforcePw: currentEnforcePw,
       policy: currentPolicy,
       methods: currentMethods,
       capDays: currentCapDays,
