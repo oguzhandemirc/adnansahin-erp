@@ -1,7 +1,7 @@
 // M2b bekçisi: cari kartı Özet bölümleri doğru uca doğru parametreyle gider (`/cari-ozeti/:id`, `iade?cariKartId=`,
 // `siparis?cariKartId=&suzgec=ACIK`); "henüz gelmedi" (404) ≠ "hareketi yok" (`ozet: null`) ≠ "iadesi yok" (boş liste);
 // bir bölümün hatası diğerlerini düşürmez; para çizilmez; birimler toplanmaz (ayrı değer); dönem değişince sayılar değişir.
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
 import type { ReactElement } from "react";
 
 const mockList = jest.fn();
@@ -69,6 +69,20 @@ beforeEach(() => {
   mockRecord.mockResolvedValue(rec(ID, { ad: "Örnek Tekstil A.Ş.", kod: "ORN-001", musteriRolu: true }));
   mockSummary.mockResolvedValue(OZET);
   mockList.mockImplementation(byProjection({ iade: () => Promise.resolve(page(IADE, IADE_IPTAL)), acik: () => Promise.resolve(page(ACIK)) }));
+});
+
+describe("§0 tek satır başlık (2026-11-16)", () => {
+  it("kod · il ve tür rozeti başlık kutusunda; ayrı kimlik bloğu yok", async () => {
+    mockRecord.mockResolvedValue(rec(ID, { ad: "Örnek Tekstil A.Ş.", kod: "ORN-001", il: "Bursa", musteriRolu: true }));
+    render(<CustomerDetail />);
+    await settle();
+    const kutu = screen.getByTestId("baslik-kutusu");
+    expect(within(kutu).getByText("Örnek Tekstil A.Ş.")).toBeTruthy();
+    const kimlik = within(kutu).getByTestId("cari-kimlik");
+    expect(within(kimlik).getByText("ORN-001 · Bursa")).toBeTruthy();
+    expect(within(kimlik).getByText("Müşteri")).toBeTruthy();
+    expect(screen.getAllByTestId("cari-kimlik")).toHaveLength(1);
+  });
 });
 
 describe("§1 doğru uç + doğru parametre", () => {
