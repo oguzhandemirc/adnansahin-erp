@@ -126,3 +126,12 @@ bulutu satırları, tetikleyiciler AÇIK) — GEÇTİ:**
   11 dk 5 sn, kesinti 70,0 sn, sonuçlar aynı.
 - Sınır: patron bulutu kopyada yoktu (eşitleme işleri `EGRESS_NETWORK` yazdı); fabrikadan destek merkezine çıkış,
   gerçek panel/tablet ile duman testi ölçülmedi. Ayrıntı ve canlı reçetesi: repo dışı `PROVA-2.12.2-2026-11-16.md`.
+
+**Canlı kurulum (2026-11-16 ≈ 02:00, fabrika sunucusu, 2.12.1 → bu paket) — GEÇTİ:**
+- Kurulum sonrası: UP/UP 2.12.2, `_prisma_migrations` 367 / 0, `patron_sync_status()` önce ve sonra `28·28·0`, kullanıcı /
+  sipariş / top / cihaz sayıları aynı, `.env` özeti aynı, pm2 süreci SYSTEM, eşitleme işleri yeniden başladı.
+- Destek açıldı (aynı gece): `.env`e iki satır SSH stdin ile eklendi (yedek `patron-anahtar\env.yedek-destek-*`), süreç
+  yeniden başlatıldı; salt okuma hesabıyla `durum` `{ etkin: true }`, `okunmamis` ve `talepler` 200 (merkeze ulaşıyor),
+  sipariş listesi 200; günlüklerde anahtar 0. Talep açan uç çağrılmadı.
+- Sapma: canlı `.env` son satırı LF ile bitiyordu (prova kopyasında CRLF); ekleme betiğinin satır sonu denetimi yalnız
+  "satır sonuyla bitiyor" olarak gevşetildi.
