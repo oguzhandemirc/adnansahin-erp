@@ -1,5 +1,6 @@
 import { useSessionStore } from './sessionStore';
 import { workSessionService } from '../services/workSession.service';
+import { announceDevice } from '../services/deviceAnnounce';
 
 jest.mock('../services/workSession.service', () => ({
   workSessionService: {
@@ -9,7 +10,10 @@ jest.mock('../services/workSession.service', () => ({
   },
 }));
 
+jest.mock('../services/deviceAnnounce', () => ({ announceDevice: jest.fn(async () => undefined) }));
+
 const svc = workSessionService as jest.Mocked<typeof workSessionService>;
+const announce = announceDevice as jest.MockedFunction<typeof announceDevice>;
 
 const session = (id: string) => ({
   id,
@@ -52,6 +56,33 @@ describe('sessionStore', () => {
     svc.open.mockRejectedValue(Object.assign(new Error('dolu'), { details: { code: 'MACHINE_OCCUPIED' } }));
     await expect(useSessionStore.getState().openSession({ machineId: 'm1' })).rejects.toThrow('dolu');
     expect(useSessionStore.getState().active).toBeNull();
+    expect(announce).not.toHaveBeenCalled();
+  });
+
+  const deviceRequired = () => Object.assign(new Error('Onaylı cihaz gerekli'), { details: { code: 'DEVICE_REQUIRED' } });
+
+  it('DEVICE_REQUIRED → bir kez announce + bir kez yeniden dener; başarıda oturum açılır', async () => {
+    svc.open.mockRejectedValueOnce(deviceRequired()).mockResolvedValueOnce(session('d'));
+    const s = await useSessionStore.getState().openSession({ machineId: 'm1' });
+    expect(s.id).toBe('d');
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(svc.open).toHaveBeenCalledTimes(2);
+    expect(useSessionStore.getState().active?.id).toBe('d');
+  });
+
+  it('DEVICE_REQUIRED ikinci denemede de gelirse döngü yok: hata çağırana fırlar', async () => {
+    svc.open.mockRejectedValue(deviceRequired());
+    await expect(useSessionStore.getState().openSession({ machineId: 'm1' })).rejects.toThrow('Onaylı cihaz gerekli');
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(svc.open).toHaveBeenCalledTimes(2);
+    expect(useSessionStore.getState().active).toBeNull();
+  });
+
+  it('DEVICE_REQUIRED + announce da başarısız → yeniden denemeden ilk hata fırlar', async () => {
+    svc.open.mockRejectedValue(deviceRequired());
+    announce.mockRejectedValueOnce(new Error('ağ'));
+    await expect(useSessionStore.getState().openSession({ machineId: 'm1' })).rejects.toThrow('Onaylı cihaz gerekli');
+    expect(svc.open).toHaveBeenCalledTimes(1);
   });
 
   it('closeSession offline olsa da yerel state temizlenir', async () => {

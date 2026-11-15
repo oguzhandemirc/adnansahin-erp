@@ -13,7 +13,8 @@ import { setUnauthorizedHandler, setWorkSessionRequiredHandler } from '../servic
 import { nudgeOutbox, clearUserScopedQueries } from '../offline/sessionSwitch';
 import { deviceService } from '../services/device.service';
 import { shouldShowPairingGate } from './pairingGate';
-import { getOrCreateDeviceId } from '../utils/deviceId';
+import { announceDevice, startDeviceAnnounce } from '../services/deviceAnnounce';
+import { queryClient } from '../offline/queryClient';
 import { usePermissions } from '../hooks/usePermission';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import AwaitingAssignmentScreen from '../screens/Auth/AwaitingAssignmentScreen';
@@ -90,9 +91,6 @@ export default function RootNavigator() {
   });
 
   useEffect(() => {
-    let disposed = false;
-    let announceRetry: ReturnType<typeof setTimeout> | null = null;
-
     // Tablet kendini bildirir (bilinmiyorsa PENDING kaydı açılır → admin onaylar).
     // SAHA BUG'ı (test #1): tek atışlık announce açılış yarışlarında sessizce
     // düşüyordu — (a) initBaseUrl beklenmeden ateşleniyordu (istek yanlış/varsayılan
@@ -104,33 +102,28 @@ export default function RootNavigator() {
     // Ardışık hata sayısına göre 5sn→60sn üstel geri çekilme: ölü sunucuda
     // sabit 5sn'lik denemeler askıda soket biriktirip yükü büyütmesin.
     // Başarıda ve uygulama öne gelince sayaç sıfırlanır (hızlı toparlanma).
-    let announceFailures = 0;
-    const announce = async () => {
-      if (disposed) return;
-      try {
-        const deviceId = await getOrCreateDeviceId();
-        await deviceService.announce({ deviceId });
-        announceFailures = 0;
-      } catch {
-        announceFailures += 1;
-        const delay = Math.min(5000 * 2 ** Math.min(announceFailures - 1, 4), 60_000);
-        if (!disposed) announceRetry = setTimeout(() => void announce(), delay);
-      }
-    };
-
+    // Döngü + geri çekilme TEK KAYNAK `services/deviceAnnounce.ts`; taban adres
+    // (Ayarlar → API Sunucusu) değişince de aynı döngü dürtülür ve atama durumu
+    // yeni sunucudan tazelenir (2026-11-16 canlı vaka: DEVICE_REQUIRED).
+    // Başarılı bildirimden sonra atama durumu hemen tazelenir (yeni sunucuda PENDING
+    // kaydı açılmış olabilir; 45 sn'lik seyrek poll'u beklemesin).
     void initDevice();
     void initDeviceSettings();
     loadStoredAuth();
-    void initBaseUrl().then(() => void announce());
+    const announceLoop = startDeviceAnnounce({
+      ready: initBaseUrl(),
+      baseUrl: useBaseUrlStore,
+      send: async () => {
+        await announceDevice();
+        void queryClient.invalidateQueries({ queryKey: ['device', 'status'] });
+      },
+      // Eski sunucunun atama/eşleme cevabı yeni sunucuda geçersiz: hemen tazele.
+      onBaseUrlChange: () => void queryClient.invalidateQueries({ queryKey: ['device'] }),
+    });
 
     const appStateSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
-        if (announceRetry) {
-          clearTimeout(announceRetry);
-          announceRetry = null;
-        }
-        announceFailures = 0; // öne geliş = taze başlangıç, backoff sıfırlanır
-        void announce();
+        announceLoop.kick(); // öne geliş = taze başlangıç, backoff sıfırlanır
       } else {
         // Arka planda Android RFCOMM soketini koparabilir ama HC-06 köprüsü bunu
         // her zaman görmez → `isDeviceConnected` "bağlı" der, yazma ÖLÜ sokete
@@ -158,8 +151,7 @@ export default function RootNavigator() {
     });
 
     return () => {
-      disposed = true;
-      if (announceRetry) clearTimeout(announceRetry);
+      announceLoop.dispose();
       appStateSub.remove();
     };
   }, []);

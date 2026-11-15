@@ -19,6 +19,34 @@ import {
   type LastPlace,
 } from '../services/workSession.service';
 import { useSessionEntriesStore } from './sessionEntriesStore';
+import { announceDevice } from '../services/deviceAnnounce';
+
+/** Hata `details.code` (backend sözleşmesi; `body.code` okunmaz). */
+function errorCode(e: unknown): string | undefined {
+  return (e as { details?: { code?: string } } | null)?.details?.code;
+}
+
+/**
+ * Oturum aç; sunucu cihazı tanımıyorsa (`DEVICE_REQUIRED` — ör. adres yeni değişti ve
+ * announce henüz yetişmedi) BİR KEZ kendini bildirip isteği BİR KEZ yeniden dener.
+ * Bildirim de başarısızsa ya da ikinci deneme yine reddedilirse hata çağırana fırlar
+ * (döngü yok). Cihaz onay bekliyorsa ikinci deneme de reddedilir — doğru davranış.
+ */
+async function openWithAnnounceRetry(
+  input: Parameters<typeof workSessionService.open>[0],
+): Promise<ActiveWorkSession> {
+  try {
+    return await workSessionService.open(input);
+  } catch (e) {
+    if (errorCode(e) !== 'DEVICE_REQUIRED') throw e;
+    try {
+      await announceDevice();
+    } catch {
+      throw e;
+    }
+    return workSessionService.open(input);
+  }
+}
 
 // Son yer snapshot'ı — CİHAZ hafızası (kullanıcıya özel değil; server-side
 // lastPlace ile aynı anlam). Ağ/timeout'ta GET current düşerse öneri
@@ -88,7 +116,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   openSession: async (input) => {
-    const session = await workSessionService.open(input);
+    const session = await openWithAnnounceRetry(input);
     const lastPlace: LastPlace = {
       machine: session.machine ? { ...session.machine, isActive: true } : null,
       station: { ...session.station, isActive: true },
