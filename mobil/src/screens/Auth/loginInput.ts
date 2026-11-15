@@ -19,3 +19,13 @@ export function sanitizeNumericInput(text: string, cap: number): string {
 export function sanitizeAlphaInput(text: string, cap: number): string {
   return text.slice(0, cap);
 }
+
+/**
+ * Telefon / el terminali (compact) düzenindeki görünmez giriş alanı: bu düzende numpad ve "ABC ↔ 123"
+ * geçişi YOK, sistem klavyesi kullanılır. Liste+şifre kipinde parola ALFASAYISALdır → rakam SÜZÜLMEZ
+ * (canlı bulgu 2026-11-16: el terminalinde harfli parola `\D` ile düşüyor, sunucu 401 veriyordu).
+ * Salt-PIN / hızlı-PIN kipinde yalnız rakam.
+ */
+export function sanitizeCompactLoginInput(text: string, isPasswordList: boolean, cap: number): string {
+  return isPasswordList ? sanitizeAlphaInput(text, cap) : sanitizeNumericInput(text, cap);
+}

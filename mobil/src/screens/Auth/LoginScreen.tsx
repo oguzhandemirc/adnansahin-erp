@@ -12,7 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../store/authStore';
 import { authService, type LoginMethod } from '../../services/auth.service';
 import { useAlphaKeyboardPref } from './useAlphaKeyboardPref';
-import { sanitizeAlphaInput, sanitizeNumericInput } from './loginInput';
+import { sanitizeAlphaInput, sanitizeCompactLoginInput } from './loginInput';
 import { isLoginLocked } from '../../services/api';
 import { authActions } from '../../services/authActions';
 import { pinServerIdentityAfterLogin } from '../../services/serverIdentity';
@@ -349,17 +349,19 @@ export default function LoginScreen({ lock }: { lock?: LoginLockContext } = {}) 
     [submitPinByMethod],
   );
 
-  // Telefon/dikey modda donanım numpad'i yerine Android sayı klavyesi kullanılıyor.
+  // Telefon/dikey modda donanım numpad'i yerine sistem klavyesi kullanılıyor. Liste+şifre kipinde
+  // parola alfasayısaldır → rakam SÜZÜLMEZ (bu düzende ABC↔123 geçişi yok; canlı bulgu 2026-11-16).
+  // Salt-PIN yalnız rakam.
   const handlePinChange = useCallback(
     (text: string) => {
       const isList = methodRef.current === 'list';
       if ((isList && !selectedUserRef.current) || submittingRef.current) return;
       const cap = isList ? PASSWORD_MAX : PIN_LENGTH;
-      const digits = sanitizeNumericInput(text, cap);
-      setPin(digits);
+      const value = sanitizeCompactLoginInput(text, isList, cap);
+      setPin(value);
       setError('');
       // Yalnız salt-PIN 6 hanede oto-gönderir; şifrede kullanıcı butonla gönderir.
-      if (!isList && digits.length === PIN_LENGTH) submitPinByMethod(digits);
+      if (!isList && value.length === PIN_LENGTH) submitPinByMethod(value);
     },
     [submitPinByMethod],
   );
@@ -1395,7 +1397,7 @@ const styles = StyleSheet.create({
   retryBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   pinRow: { flexDirection: 'row', gap: 14 },
-  pinRowCompact: { gap: 10, justifyContent: 'center' },
+  pinRowCompact: { gap: 10, justifyContent: 'center', flexWrap: 'wrap' }, // uzun harfli parolada dar ekranda taşmasın
   // Dokunma hedefi: noktaların etrafını sarar, min 56dp yükseklik için padding.
   pinInputTap: { alignSelf: 'center', borderRadius: 14 },
   pinInputWrap: { position: 'relative', paddingVertical: 14, paddingHorizontal: 18 },
