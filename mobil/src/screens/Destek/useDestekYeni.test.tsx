@@ -1,5 +1,5 @@
 // clientToken TEK üretim + çift dokunuş + ağ hatasında aynı token + çevrimdışı.
-// ⭐ NEGATİF SONDA (2026-11-16, ölçüldü): `hataSonrasiToken`ın belirsiz-hata dalı
+// ⭐ NEGATİF SONDA (2026-11-16, ölçüldü): `tokenAfterError`ın belirsiz-hata dalı
 //    kapatılınca bu dosya + destekForm.test ❌4; uçuş kilidi (`ucusta`) kapatılınca
 //    ❌1 ("çift dokunuş TEK istek"). İkisi de geri alındı, temiz ağaçta yeşil.
 import type { ReactNode } from 'react';

@@ -6,11 +6,11 @@ import {
   okYolu,
   sigdir,
   uzunKenaraSigdir,
-  type CizimDurumu,
+  type DrawingState,
   type CizimEylemi,
 } from './cizim';
 
-const uygula = (d: CizimDurumu, ...e: CizimEylemi[]) => e.reduce(cizimReducer, d);
+const uygula = (d: DrawingState, ...e: CizimEylemi[]) => e.reduce(cizimReducer, d);
 const kutu = (x0: number, y0: number, x1: number, y1: number): CizimEylemi[] => [
   { tip: 'basla', arac: 'kutu', renk: 'kirmizi', nokta: { x: x0, y: y0 } },
   { tip: 'ilerle', nokta: { x: x1, y: y1 } },

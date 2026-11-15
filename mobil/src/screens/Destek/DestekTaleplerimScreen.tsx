@@ -1,4 +1,4 @@
-// "Taleplerim" — ince kabuk (mantık `useTaleplerim`, satır `TalepSatiri`).
+// "Taleplerim" — ince kabuk (mantık `useTaleplerim`, satır `TicketRow`).
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Button, SegmentedButtons, Text } from 'react-native-paper';
@@ -9,21 +9,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '../../theme';
 import type { RootStackParamList } from '../../navigation/types';
-import type { DestekKapsam } from '../../services/destek.service';
-import DestekBaslik from './DestekBaslik';
-import TalepSatiri from './TalepSatiri';
-import { AYDINLATMA, destekHataMetni } from './destekMetin';
+import type { DestekScope } from '../../services/destek.service';
+import DestekHeader from './DestekHeader';
+import TicketRow from './TicketRow';
+import { AYDINLATMA, destekErrorText } from './destekMetin';
 import { useTaleplerim } from './useTaleplerim';
 import { useYeniTalepBaslat } from './useSorunBildir';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-function BosVeyaHata({ l, onYeni }: { l: ReturnType<typeof useTaleplerim>; onYeni: () => void }) {
+function EmptyOrError({ l, onYeni }: { l: ReturnType<typeof useTaleplerim>; onYeni: () => void }) {
   if (l.yukleniyor) return <ActivityIndicator style={styles.orta} />;
   if (l.hata) {
     return (
       <View style={styles.orta}>
-        <Text style={styles.bilgi}>{destekHataMetni(l.hata)}</Text>
+        <Text style={styles.bilgi}>{destekErrorText(l.hata)}</Text>
         <Button mode="outlined" icon="refresh" onPress={l.yenile} contentStyle={styles.buyuk}>
           Tekrar dene
         </Button>
@@ -49,7 +49,7 @@ export default function DestekTaleplerimScreen() {
 
   return (
     <View style={styles.kok}>
-      <DestekBaslik
+      <DestekHeader
         baslik="Taleplerim"
         sag={
           <Button mode="contained" icon="plus" onPress={yeni} style={styles.yeni} contentStyle={styles.yeniIc}>
@@ -61,7 +61,7 @@ export default function DestekTaleplerimScreen() {
         <View style={styles.sekmeKap}>
           <SegmentedButtons
             value={l.kapsam}
-            onValueChange={(v) => l.setKapsam(v as DestekKapsam)}
+            onValueChange={(v) => l.setKapsam(v as DestekScope)}
             buttons={[
               { value: 'mine', label: 'Benim' },
               { value: 'tenant', label: 'Firmanın' },
@@ -70,10 +70,10 @@ export default function DestekTaleplerimScreen() {
         </View>
       ) : null}
       <FlashList
-        data={l.satirlar}
+        data={l.rows}
         keyExtractor={(t) => t.id}
         renderItem={({ item }) => (
-          <TalepSatiri
+          <TicketRow
             t={item}
             talepEdeniGoster={l.kapsam === 'tenant'}
             onPress={() => nav.navigate('DestekDetay', { id: item.id, number: item.number })}
@@ -83,7 +83,7 @@ export default function DestekTaleplerimScreen() {
         onRefresh={l.yenile}
         refreshing={l.yenileniyor}
         contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xxl + insets.bottom }}
-        ListEmptyComponent={<BosVeyaHata l={l} onYeni={yeni} />}
+        ListEmptyComponent={<EmptyOrError l={l} onYeni={yeni} />}
         ListFooterComponent={<Text style={styles.aydinlatma}>{AYDINLATMA}</Text>}
       />
     </View>

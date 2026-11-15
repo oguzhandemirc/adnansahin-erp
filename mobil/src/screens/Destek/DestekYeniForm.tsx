@@ -7,8 +7,8 @@ import { Button, HelperText, Text, TextInput, TouchableRipple } from 'react-nati
 
 import { colors, radius, spacing } from '../../theme';
 import type { DestekTur } from '../../services/destek.service';
-import type { YakalananEkran, CizimSonucu } from '../../store/destekTaslakStore';
-import { KONU_AZAMI, type DestekFormDegeri, type FormHatalari } from './destekForm';
+import type { YakalananEkran, DrawingResult } from '../../store/destekTaslakStore';
+import { KONU_AZAMI, type DestekFormValue, type FormErrors } from './destekForm';
 import { AYDINLATMA, TUR_ETIKET } from './destekMetin';
 
 const TURLER: { tur: DestekTur; simge: string }[] = [
@@ -51,12 +51,12 @@ export function TurSecici({
 
 export function EkranOnizleme({
   ekran,
-  sonuc,
+  result,
   onCiz,
   onKaldir,
 }: {
   ekran: YakalananEkran | null;
-  sonuc: CizimSonucu | null;
+  result: DrawingResult | null;
   onCiz: () => void;
   onKaldir: () => void;
 }) {
@@ -67,14 +67,14 @@ export function EkranOnizleme({
     <View style={styles.onizlemeKutu}>
       <TouchableRipple onPress={onCiz} accessibilityLabel="Ekran görüntüsünün üzerine çiz">
         <Image
-          source={{ uri: sonuc?.onizlemeUri ?? ekran.uri }}
+          source={{ uri: result?.onizlemeUri ?? ekran.uri }}
           style={[styles.onizleme, { aspectRatio: ekran.width / Math.max(1, ekran.height) }]}
           resizeMode="contain"
         />
       </TouchableRipple>
       <View style={styles.onizlemeDugmeler}>
         <Button mode="contained-tonal" icon="draw" onPress={onCiz} contentStyle={styles.buyuk}>
-          {sonuc ? 'Çizimi düzenle' : 'Üzerine çiz / gizle'}
+          {result ? 'Çizimi düzenle' : 'Üzerine çiz / gizle'}
         </Button>
         <Button mode="text" icon="image-remove" onPress={onKaldir} contentStyle={styles.buyuk}>
           Görüntüyü çıkar
@@ -89,9 +89,9 @@ export function MetinAlanlari({
   setForm,
   hatalar,
 }: {
-  form: DestekFormDegeri;
-  setForm: (f: DestekFormDegeri) => void;
-  hatalar: FormHatalari;
+  form: DestekFormValue;
+  setForm: (f: DestekFormValue) => void;
+  hatalar: FormErrors;
 }) {
   return (
     <View style={styles.alanlar}>

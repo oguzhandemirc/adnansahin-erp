@@ -10,17 +10,17 @@ import { useQuery } from '@tanstack/react-query';
 import AppModal from '../../components/AppModal';
 import { colors, radius, spacing } from '../../theme';
 import { destekService, type DestekEk, type DestekMesaj } from '../../services/destek.service';
-import { boyutMetni, hataKodu, silinmisEkMetni } from './destekMetin';
+import { boyutMetni, errorCode, silinmisEkMetni } from './destekMetin';
 
-const BAGLANTI_TAZE_MS = 4 * 60_000;
+const LINK_FRESH_MS = 4 * 60_000;
 
 function useEkBaglanti(ek: DestekEk, variant: 'thumb' | 'original', etkin: boolean) {
   return useQuery({
     queryKey: ['destek', 'ek', ek.id, variant],
     queryFn: () => destekService.ekBaglanti(ek.id, variant),
     enabled: etkin && !ek.deleted,
-    staleTime: BAGLANTI_TAZE_MS,
-    gcTime: BAGLANTI_TAZE_MS,
+    staleTime: LINK_FRESH_MS,
+    gcTime: LINK_FRESH_MS,
     retry: false,
   });
 }
@@ -57,7 +57,7 @@ function pdfAc(ek: DestekEk): void {
 function EkOnizleme({ ek }: { ek: DestekEk }) {
   const [acik, setAcik] = useState(false);
   const q = useEkBaglanti(ek, 'thumb', true);
-  if (ek.deleted || hataKodu(q.error) === 'ATTACHMENT_EXPIRED') {
+  if (ek.deleted || errorCode(q.error) === 'ATTACHMENT_EXPIRED') {
     return <Text style={styles.silinmis}>{silinmisEkMetni(ek)}</Text>;
   }
   const gorselMi = ek.mime.startsWith('image/');

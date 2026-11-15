@@ -4,21 +4,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
-import { destekService, type DestekKapsam } from '../../services/destek.service';
-import { LISTE_YENILEME_MS, sonrakiSayfa, yetkisizMi } from './destekGorunurluk';
+import { destekService, type DestekScope } from '../../services/destek.service';
+import { LIST_REFRESH_MS, nextPage, yetkisizMi } from './destekGorunurluk';
 import { destekKeys, useDestekFirmaYoneticisi } from './useDestek';
 
 export function useTaleplerim() {
   const aday = useDestekFirmaYoneticisi();
-  const [kapsam, setKapsam] = useState<DestekKapsam>('mine');
+  const [kapsam, setKapsam] = useState<DestekScope>('mine');
   const [firmaYasak, setFirmaYasak] = useState(false);
 
   const q = useInfiniteQuery({
     queryKey: destekKeys.liste(kapsam),
     queryFn: ({ pageParam }) => destekService.liste({ scope: kapsam, page: pageParam }),
     initialPageParam: 1,
-    getNextPageParam: sonrakiSayfa,
-    refetchInterval: LISTE_YENILEME_MS,
+    getNextPageParam: nextPage,
+    refetchInterval: LIST_REFRESH_MS,
     retry: false,
   });
 
@@ -29,13 +29,13 @@ export function useTaleplerim() {
     }
   }, [kapsam, q.error]);
 
-  const satirlar = useMemo(() => q.data?.pages.flatMap((p) => p.items) ?? [], [q.data]);
+  const rows = useMemo(() => q.data?.pages.flatMap((p) => p.items) ?? [], [q.data]);
 
   return {
     kapsam,
     setKapsam,
     firmaSekmesi: aday && !firmaYasak,
-    satirlar,
+    rows,
     yukleniyor: q.isPending,
     hata: q.error,
     yenile: () => void q.refetch(),

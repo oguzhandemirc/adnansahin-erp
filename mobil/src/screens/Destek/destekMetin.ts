@@ -26,8 +26,8 @@ export const DURUM_ETIKET: Record<DestekDurum, string> = {
 };
 
 /** Rozet tonu — renk jetonu seçimi görünümde yapılır. */
-export type DurumTonu = 'info' | 'warning' | 'success' | 'muted';
-export const DURUM_TONU: Record<DestekDurum, DurumTonu> = {
+export type StatusTone = 'info' | 'warning' | 'success' | 'muted';
+export const STATUS_TONE: Record<DestekDurum, StatusTone> = {
   NEW: 'info',
   IN_PROGRESS: 'info',
   WAITING_CUSTOMER: 'warning',
@@ -51,7 +51,7 @@ export function silinmisEkMetni(ek: Pick<DestekEk, 'name' | 'size'>): string {
   return `Ek süresi dolduğu için silindi · ${ek.name} · ${boyutMetni(ek.size)}`;
 }
 
-interface HataLike {
+interface ErrorLike {
   status?: number;
   message?: string;
   details?: { code?: string; retryAfterSec?: unknown };
@@ -59,13 +59,13 @@ interface HataLike {
 
 /** Sonucu BELİRSİZ hata mı (ağ yok / zaman aşımı / 5xx)? Aynı token'la yeniden denenir. */
 export function belirsizMi(err: unknown): boolean {
-  const s = (err as HataLike | null)?.status;
+  const s = (err as ErrorLike | null)?.status;
   return s === undefined || s >= 500;
 }
 
 /** Hata kodu (`details.code`). */
-export function hataKodu(err: unknown): string | undefined {
-  const c = (err as HataLike | null)?.details?.code;
+export function errorCode(err: unknown): string | undefined {
+  const c = (err as ErrorLike | null)?.details?.code;
   return typeof c === 'string' ? c : undefined;
 }
 
@@ -76,9 +76,9 @@ function beklemeMetni(sn: number): string {
 }
 
 /** Kullanıcıya gösterilecek sade Türkçe hata metni. */
-export function destekHataMetni(err: unknown): string {
-  const e = (err ?? {}) as HataLike;
-  const kod = hataKodu(err);
+export function destekErrorText(err: unknown): string {
+  const e = (err ?? {}) as ErrorLike;
+  const kod = errorCode(err);
   if (e.status === undefined) {
     return 'Sunucuya ulaşılamadı. Bağlantıyı kontrol edip tekrar deneyin.';
   }

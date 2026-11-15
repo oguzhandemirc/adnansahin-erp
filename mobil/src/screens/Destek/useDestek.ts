@@ -5,37 +5,37 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   destekService,
-  type DestekGorunurlukDurumu,
-  type DestekKapsam,
+  type DestekVisibility,
+  type DestekScope,
   type DestekOkunmamis,
 } from '../../services/destek.service';
 import { useAuthStore } from '../../store/authStore';
-import { DESTEK_KAPALI, durumGuvenli, okunmamisGuvenli, ROZET_YOKLAMA_MS } from './destekGorunurluk';
+import { DESTEK_OFF, safeStatus, okunmamisGuvenli, ROZET_YOKLAMA_MS } from './destekGorunurluk';
 
 export const destekKeys = {
   kok: ['destek'] as const,
   durum: (userId: string) => ['destek', 'durum', userId] as const,
-  okunmamis: (scope: DestekKapsam) => ['destek', 'okunmamis', scope] as const,
-  liste: (scope: DestekKapsam) => ['destek', 'liste', scope] as const,
+  okunmamis: (scope: DestekScope) => ['destek', 'okunmamis', scope] as const,
+  liste: (scope: DestekScope) => ['destek', 'liste', scope] as const,
   talep: (id: string) => ['destek', 'talep', id] as const,
 };
 
 /** `/durum` özeti; oturum yoksa / uç yoksa / hata → ikisi de false (hiç görünmez). */
-function useDestekDurumu(): DestekGorunurlukDurumu {
+function useDestekVisibility(): DestekVisibility {
   const userId = useAuthStore((s) => s.user?.userId ?? null);
   const q = useQuery({
     queryKey: destekKeys.durum(userId ?? '-'),
-    queryFn: () => durumGuvenli(destekService.durum),
+    queryFn: () => safeStatus(destekService.durum),
     enabled: !!userId,
     staleTime: 5 * 60_000,
     retry: false,
   });
-  return userId && q.data ? q.data : DESTEK_KAPALI;
+  return userId && q.data ? q.data : DESTEK_OFF;
 }
 
 /** Destek açık mı? Oturum yoksa / uç yoksa / hata → false (hiç görünmez). */
 export function useDestekEtkin(): boolean {
-  return useDestekDurumu().etkin;
+  return useDestekVisibility().etkin;
 }
 
 /**
@@ -43,14 +43,14 @@ export function useDestekEtkin(): boolean {
  * istemci izinden çıkarım YAPMAZ. Yine de 403 gelirse ekran sekmeyi kapatır.
  */
 export function useDestekFirmaYoneticisi(): boolean {
-  return useDestekDurumu().firmaYoneticisi;
+  return useDestekVisibility().firmaYoneticisi;
 }
 
 /**
  * Okunmamış rozet — seyrek yoklama (2 dk), YALNIZ uygulama ön plandayken.
  * Hata sessiz yutulur, rozet eski değerinde kalır.
  */
-export function useDestekOkunmamis(scope: DestekKapsam = 'mine'): DestekOkunmamis | undefined {
+export function useDestekOkunmamis(scope: DestekScope = 'mine'): DestekOkunmamis | undefined {
   const etkin = useDestekEtkin();
   const qc = useQueryClient();
   const key = destekKeys.okunmamis(scope);

@@ -6,9 +6,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { onlineManager, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { destekService, type DestekTalep } from '../../services/destek.service';
-import { destekHataMetni, hataKodu } from './destekMetin';
-import { LISTE_YENILEME_MS } from './destekGorunurluk';
-import { yanitGecerliMi } from './destekForm';
+import { destekErrorText, errorCode } from './destekMetin';
+import { LIST_REFRESH_MS } from './destekGorunurluk';
+import { isReplyValid } from './destekForm';
 import { CEVRIMDISI_METNI } from './useDestekYeni';
 import { destekKeys } from './useDestek';
 
@@ -17,7 +17,7 @@ export function useDestekDetay(id: string) {
   const q = useQuery({
     queryKey: destekKeys.talep(id),
     queryFn: () => destekService.detay(id),
-    refetchInterval: LISTE_YENILEME_MS,
+    refetchInterval: LIST_REFRESH_MS,
     retry: false,
   });
   const [yanit, setYanit] = useState('');
@@ -55,8 +55,8 @@ export function useDestekDetay(id: string) {
         })
         .catch((e: unknown) =>
           setIslemHatasi({
-            metin: destekHataMetni(e),
-            yeniTalepOner: hataKodu(e) === 'REOPEN_WINDOW_EXPIRED',
+            metin: destekErrorText(e),
+            yeniTalepOner: errorCode(e) === 'REOPEN_WINDOW_EXPIRED',
           }),
         )
         .finally(() => {
@@ -68,7 +68,7 @@ export function useDestekDetay(id: string) {
   );
 
   const yanitGonder = useCallback(() => {
-    if (!yanitGecerliMi(yanit)) return;
+    if (!isReplyValid(yanit)) return;
     const metin = yanit.trim();
     islem('yanit', () => destekService.yanitYaz(id, metin), () => setYanit(''));
   }, [yanit, id, islem]);
@@ -82,7 +82,7 @@ export function useDestekDetay(id: string) {
     yenile: () => void q.refetch(),
     yanit,
     setYanit,
-    yanitGecerli: yanitGecerliMi(yanit),
+    yanitGecerli: isReplyValid(yanit),
     yanitGonder,
     kapat,
     mesgul,

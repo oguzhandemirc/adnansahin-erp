@@ -1,13 +1,13 @@
-import { cihazAdi, destekBaglami, ekranAdiBul, yalnizYol, type BaglamGirdisi } from './destekBaglam';
+import { cihazAdi, destekBaglami, ekranAdiBul, yalnizYol, type ContextInput } from './destekBaglam';
 
-const girdi: BaglamGirdisi = {
+const girdi: ContextInput = {
   ekranAdi: 'Tambur',
   ekranAnahtari: 'Tambur',
   surum: '1.0.18',
   yapiKodu: 64,
   platform: { os: 'android', version: 33, constants: { Model: 'SM-X230', Manufacturer: 'samsung', Release: '13' } },
   cihazTuru: 'tablet',
-  sonHata: {
+  lastError: {
     at: '2026-11-15T10:00:00.000Z',
     method: 'POST',
     path: '/tambur/finalize',
@@ -30,7 +30,7 @@ describe('otomatik bağlam', () => {
     expect(b.client?.os).toBe('Android 13 (API 33)');
     expect(b.technical?.cihazTuru).toBe('Tablet');
     expect(b.technical?.yapiKodu).toBe(64);
-    expect(b.technical?.sonHata).toEqual({
+    expect(b.technical?.lastError).toEqual({
       at: '2026-11-15T10:00:00.000Z',
       istek: 'POST /tambur/finalize',
       durum: 409,
@@ -51,14 +51,14 @@ describe('otomatik bağlam', () => {
   });
 
   it('16 KB sınırının çok altında kalır (uzun hata mesajı kırpılır)', () => {
-    const uzun = destekBaglami({ ...girdi, sonHata: { ...girdi.sonHata!, message: 'x'.repeat(50_000) } });
+    const uzun = destekBaglami({ ...girdi, lastError: { ...girdi.lastError!, message: 'x'.repeat(50_000) } });
     expect(JSON.stringify(uzun).length).toBeLessThan(4_000);
   });
 
   it('el terminali ve son hatasız durum', () => {
-    const t = destekBaglami({ ...girdi, cihazTuru: 'phone', sonHata: null, platform: { os: 'android', version: 30 } });
+    const t = destekBaglami({ ...girdi, cihazTuru: 'phone', lastError: null, platform: { os: 'android', version: 30 } });
     expect(t.technical?.cihazTuru).toBe('El terminali / telefon');
-    expect(t.technical).not.toHaveProperty('sonHata');
+    expect(t.technical).not.toHaveProperty('lastError');
     expect(t.client?.device).toBeUndefined();
   });
 });

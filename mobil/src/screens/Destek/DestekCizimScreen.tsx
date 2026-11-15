@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '../../theme';
-import DestekBaslik from './DestekBaslik';
+import DestekHeader from './DestekHeader';
 import CizimAracCubugu from './CizimAracCubugu';
 import CizimTuvali from './CizimTuvali';
 import { useDestekCizim } from './useDestekCizim';
@@ -32,7 +32,7 @@ export default function DestekCizimScreen() {
 
   return (
     <View style={[styles.kok, { paddingBottom: insets.bottom }]}>
-      <DestekBaslik baslik="Üzerine çiz" sag={bittiDugmesi} />
+      <DestekHeader baslik="Üzerine çiz" sag={bittiDugmesi} />
       <View style={styles.alan} onLayout={c.onAlan}>
         {c.ekran && c.boyut.width > 0 ? (
           <CizimTuvali

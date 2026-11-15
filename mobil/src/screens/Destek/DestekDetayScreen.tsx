@@ -9,10 +9,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { colors, spacing } from '../../theme';
 import type { RootStackParamList } from '../../navigation/types';
-import DestekBaslik from './DestekBaslik';
+import DestekHeader from './DestekHeader';
 import MesajBalonu from './MesajBalonu';
-import { DurumRozeti } from './TalepSatiri';
-import { destekHataMetni, TUR_ETIKET } from './destekMetin';
+import { StatusBadge } from './TicketRow';
+import { destekErrorText, TUR_ETIKET } from './destekMetin';
 import { useDestekDetay } from './useDestekDetay';
 import { useYeniTalepBaslat } from './useSorunBildir';
 
@@ -64,11 +64,11 @@ export default function DestekDetayScreen() {
   const yeniTalep = useYeniTalepBaslat();
   const [kapatSor, setKapatSor] = useState(false);
   const t = d.talep;
-  const kapali = t?.status === 'CLOSED';
+  const isClosed = t?.status === 'CLOSED';
 
   return (
     <KeyboardAvoidingView behavior="padding" style={[styles.kok, { paddingBottom: insets.bottom }]}>
-      <DestekBaslik
+      <DestekHeader
         baslik={t?.number ?? params.number ?? 'Talep'}
         altBaslik={t ? `${TUR_ETIKET[t.type] ?? t.type} · ${t.subject}` : undefined}
       />
@@ -76,7 +76,7 @@ export default function DestekDetayScreen() {
         <ActivityIndicator style={styles.orta} />
       ) : !t ? (
         <View style={styles.orta}>
-          <Text style={styles.bilgi}>{destekHataMetni(d.hata)}</Text>
+          <Text style={styles.bilgi}>{destekErrorText(d.hata)}</Text>
           <Button mode="outlined" icon="refresh" onPress={d.yenile} contentStyle={styles.buyuk}>
             Tekrar dene
           </Button>
@@ -84,9 +84,9 @@ export default function DestekDetayScreen() {
       ) : (
         <>
           <View style={styles.durumSatir}>
-            <DurumRozeti durum={t.status} />
+            <StatusBadge durum={t.status} />
             <View style={styles.bosluk} />
-            {!kapali ? (
+            {!isClosed ? (
               <Button mode="outlined" icon="check-circle-outline" onPress={() => setKapatSor(true)}
                 loading={d.mesgul === 'kapat'} disabled={d.mesgul !== null} contentStyle={styles.buyuk}>
                 Çözüldü, kapat
@@ -97,7 +97,7 @@ export default function DestekDetayScreen() {
             {t.messages.map((m) => (
               <MesajBalonu key={m.id} m={m} />
             ))}
-            {kapali ? <Text style={styles.bilgi}>Talep kapandı. 14 gün içinde yanıt yazarsanız yeniden açılır.</Text> : null}
+            {isClosed ? <Text style={styles.bilgi}>Talep kapandı. 14 gün içinde yanıt yazarsanız yeniden açılır.</Text> : null}
           </ScrollView>
           <YanitAlani d={d} onYeniTalep={() => yeniTalep(`Talep ${t.number}`)} />
         </>

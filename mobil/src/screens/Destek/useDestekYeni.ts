@@ -11,9 +11,9 @@ import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { destekService, type DestekTalep, type TalepAcGovde } from '../../services/destek.service';
+import { destekService, type DestekTalep, type CreateTicketBody } from '../../services/destek.service';
 import { kuruluVersionCode, kuruluVersionName } from '../../services/appVersion';
-import { sonHata } from '../../services/sonHata';
+import { lastError } from '../../services/lastError';
 import { useDeviceType } from '../../hooks/useDeviceType';
 import { useDestekTaslakStore } from '../../store/destekTaslakStore';
 import type { RootStackParamList } from '../../navigation/types';
@@ -21,14 +21,14 @@ import { destekBaglami } from './destekBaglam';
 import {
   dataUriBase64,
   formuDogrula,
-  hataSonrasiToken,
-  hataYokMu,
-  talepGovdesi,
+  tokenAfterError,
+  hasNoErrors,
+  buildTicketBody,
   yeniToken,
-  type DestekFormDegeri,
-  type FormHatalari,
+  type DestekFormValue,
+  type FormErrors,
 } from './destekForm';
-import { destekHataMetni } from './destekMetin';
+import { destekErrorText } from './destekMetin';
 import { destekKeys } from './useDestek';
 
 export const CEVRIMDISI_METNI =
@@ -36,7 +36,7 @@ export const CEVRIMDISI_METNI =
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-function govdeKur(form: DestekFormDegeri, clientToken: string, cihaz: 'tablet' | 'phone'): TalepAcGovde {
+function buildBody(form: DestekFormValue, clientToken: string, cihaz: 'tablet' | 'phone'): CreateTicketBody {
   const t = useDestekTaslakStore.getState();
   const baglam = destekBaglami({
     ekranAdi: t.ekranAdi,
@@ -49,18 +49,18 @@ function govdeKur(form: DestekFormDegeri, clientToken: string, cihaz: 'tablet' |
       constants: Platform.constants as unknown as Record<string, unknown>,
     },
     cihazTuru: cihaz,
-    sonHata: sonHata(),
+    lastError: lastError(),
   });
-  const ekran = t.sonuc?.base64 ?? dataUriBase64(t.ekran?.uri);
-  return talepGovdesi({ form, clientToken, baglam, ekranJpegBase64: ekran });
+  const ekran = t.result?.base64 ?? dataUriBase64(t.ekran?.uri);
+  return buildTicketBody({ form, clientToken, baglam, ekranJpegBase64: ekran });
 }
 
 export function useDestekYeni() {
   const nav = useNavigation<Nav>();
   const qc = useQueryClient();
   const cihaz = useDeviceType();
-  const [form, setForm] = useState<DestekFormDegeri>({ tur: null, konu: '', mesaj: '' });
-  const [hatalar, setHatalar] = useState<FormHatalari>({});
+  const [form, setForm] = useState<DestekFormValue>({ tur: null, konu: '', mesaj: '' });
+  const [hatalar, setHatalar] = useState<FormErrors>({});
   const [gonderHatasi, setGonderHatasi] = useState<string | null>(null);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   // Mantıksal deneme kimliği: ilk render'da BİR KEZ (useState başlatıcısı).
@@ -83,7 +83,7 @@ export function useDestekYeni() {
     if (ucusta.current) return;
     const h = formuDogrula(form);
     setHatalar(h);
-    if (!hataYokMu(h)) return;
+    if (!hasNoErrors(h)) return;
     if (!onlineManager.isOnline()) {
       setGonderHatasi(CEVRIMDISI_METNI);
       return;
@@ -92,10 +92,10 @@ export function useDestekYeni() {
     setGonderiliyor(true);
     setGonderHatasi(null);
     destekService
-      .talepAc(govdeKur(form, tokenRef.current, cihaz))
+      .talepAc(buildBody(form, tokenRef.current, cihaz))
       .then(basarili, (e: unknown) => {
-        tokenRef.current = hataSonrasiToken(tokenRef.current, e);
-        setGonderHatasi(destekHataMetni(e));
+        tokenRef.current = tokenAfterError(tokenRef.current, e);
+        setGonderHatasi(destekErrorText(e));
       })
       .finally(() => {
         ucusta.current = false;

@@ -9,7 +9,7 @@
 
 import type { DestekBaglam } from '../../services/destek.service';
 
-export interface SonHata {
+export interface LastError {
   /** ISO zaman. */
   at: string;
   method: string;
@@ -19,7 +19,7 @@ export interface SonHata {
   message: string;
 }
 
-export interface BaglamGirdisi {
+export interface ContextInput {
   ekranAdi: string | null;
   ekranAnahtari: string | null;
   surum: string;
@@ -27,7 +27,7 @@ export interface BaglamGirdisi {
   /** RN `Platform.constants` (Android: Model, Manufacturer, Release). */
   platform: { os: string; version: string | number; constants?: Record<string, unknown> };
   cihazTuru: 'tablet' | 'phone';
-  sonHata: SonHata | null;
+  lastError: LastError | null;
 }
 
 const metin = (v: unknown, azami: number): string | undefined =>
@@ -42,23 +42,23 @@ export function cihazAdi(constants: Record<string, unknown> | undefined): string
   return model ?? uretici;
 }
 
-export function destekBaglami(g: BaglamGirdisi): DestekBaglam {
-  const surumAndroid = metin(g.platform.constants?.Release, 20);
+export function destekBaglami(g: ContextInput): DestekBaglam {
+  const androidVersion = metin(g.platform.constants?.Release, 20);
   const os =
     g.platform.os === 'android'
-      ? `Android ${surumAndroid ?? '?'} (API ${String(g.platform.version)})`
+      ? `Android ${androidVersion ?? '?'} (API ${String(g.platform.version)})`
       : `${g.platform.os} ${String(g.platform.version)}`;
   const technical: Record<string, unknown> = {
     yapiKodu: g.yapiKodu,
     cihazTuru: g.cihazTuru === 'tablet' ? 'Tablet' : 'El terminali / telefon',
   };
   if (g.ekranAnahtari) technical.ekranAnahtari = g.ekranAnahtari.slice(0, 100);
-  if (g.sonHata) {
-    technical.sonHata = {
-      at: g.sonHata.at,
-      istek: `${g.sonHata.method} ${g.sonHata.path}`.slice(0, 300),
-      durum: g.sonHata.status,
-      mesaj: g.sonHata.message.slice(0, 500),
+  if (g.lastError) {
+    technical.lastError = {
+      at: g.lastError.at,
+      istek: `${g.lastError.method} ${g.lastError.path}`.slice(0, 300),
+      durum: g.lastError.status,
+      mesaj: g.lastError.message.slice(0, 500),
     };
   }
   const baglam: DestekBaglam = {

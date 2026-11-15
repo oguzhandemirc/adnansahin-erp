@@ -11,26 +11,26 @@
 // =============================================================================
 
 import { freshEntryIdentity } from '../../offline/entryAttempt';
-import type { DestekBaglam, DestekDosya, DestekTur, TalepAcGovde } from '../../services/destek.service';
+import type { DestekBaglam, DestekFile, DestekTur, CreateTicketBody } from '../../services/destek.service';
 import { belirsizMi } from './destekMetin';
 
 export const KONU_AZAMI = 200;
 export const MESAJ_AZAMI = 20_000;
 
-export interface DestekFormDegeri {
+export interface DestekFormValue {
   tur: DestekTur | null;
   konu: string;
   mesaj: string;
 }
 
-export interface FormHatalari {
+export interface FormErrors {
   tur?: string;
   konu?: string;
   mesaj?: string;
 }
 
-export function formuDogrula(f: DestekFormDegeri): FormHatalari {
-  const h: FormHatalari = {};
+export function formuDogrula(f: DestekFormValue): FormErrors {
+  const h: FormErrors = {};
   if (!f.tur) h.tur = 'Talep türünü seçin.';
   const konu = f.konu.trim();
   if (!konu) h.konu = 'Konu yazın.';
@@ -41,12 +41,12 @@ export function formuDogrula(f: DestekFormDegeri): FormHatalari {
   return h;
 }
 
-export function hataYokMu(h: FormHatalari): boolean {
+export function hasNoErrors(h: FormErrors): boolean {
   return !h.tur && !h.konu && !h.mesaj;
 }
 
 /** Yanıt kutusu: 1–20 000 karakter (kırpılmış). */
-export function yanitGecerliMi(metin: string): boolean {
+export function isReplyValid(metin: string): boolean {
   const t = metin.trim();
   return t.length > 0 && t.length <= MESAJ_AZAMI;
 }
@@ -56,14 +56,14 @@ export function yeniToken(gen?: () => string): string {
 }
 
 /** Gönderim düştükten sonra hangi token'la devam edilir? */
-export function hataSonrasiToken(onceki: string, err: unknown, gen?: () => string): string {
+export function tokenAfterError(onceki: string, err: unknown, gen?: () => string): string {
   if (belirsizMi(err)) return onceki;
   if ((err as { status?: number } | null)?.status === 429) return onceki;
   return yeniToken(gen);
 }
 
-export interface GovdeGirdisi {
-  form: DestekFormDegeri;
+export interface BodyInput {
+  form: DestekFormValue;
   clientToken: string;
   baglam: DestekBaglam;
   /** Ekran görüntüsü (düz base64 JPEG) — yoksa yalnız metinli talep. */
@@ -80,8 +80,8 @@ export function dataUriBase64(uri: string | null | undefined): string | null {
 }
 
 /** Doğrulanmış formdan POST gövdesi. Kimlik alanı (user/tenant) GÖNDERİLMEZ. */
-export function talepGovdesi(g: GovdeGirdisi): TalepAcGovde {
-  const files: DestekDosya[] = g.ekranJpegBase64
+export function buildTicketBody(g: BodyInput): CreateTicketBody {
+  const files: DestekFile[] = g.ekranJpegBase64
     ? [{ name: 'ekran.jpg', contentType: 'image/jpeg', dataBase64: g.ekranJpegBase64 }]
     : [];
   return {

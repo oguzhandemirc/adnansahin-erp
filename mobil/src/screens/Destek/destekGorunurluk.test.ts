@@ -1,8 +1,8 @@
 import {
-  durumGuvenli,
+  safeStatus,
   okunmamisGuvenli,
   rozetMetni,
-  sonrakiSayfa,
+  nextPage,
   SIFIR_OKUNMAMIS,
   yetkisizMi,
 } from './destekGorunurluk';
@@ -10,26 +10,26 @@ import {
 const err = (status?: number) => Object.assign(new Error('x'), { status });
 
 describe('görünürlük — fail-closed', () => {
-  // ⭐ NEGATİF SONDA (2026-11-16, ölçüldü): `durumGuvenli`den `etkin &&` koşulu silindi →
+  // ⭐ NEGATİF SONDA (2026-11-16, ölçüldü): `safeStatus`tan `etkin &&` koşulu silindi →
   // "etkin:false … Firmanın kapalı" ❌1; geri konunca 9/9 yeşil.
   const KAPALI = { etkin: false, firmaYoneticisi: false };
 
   it('etkin:true → görünür; firma yöneticisi kararı sunucudan aynen', async () => {
-    expect(await durumGuvenli(async () => ({ etkin: true }))).toEqual({ etkin: true, firmaYoneticisi: false });
-    expect(await durumGuvenli(async () => ({ etkin: true, firmaYoneticisi: true }))).toEqual({
+    expect(await safeStatus(async () => ({ etkin: true }))).toEqual({ etkin: true, firmaYoneticisi: false });
+    expect(await safeStatus(async () => ({ etkin: true, firmaYoneticisi: true }))).toEqual({
       etkin: true,
       firmaYoneticisi: true,
     });
   });
 
   it('etkin:false → görünmez; firmaYoneticisi:true gelse de "Firmanın" kapalı', async () => {
-    expect(await durumGuvenli(async () => ({ etkin: false }))).toEqual(KAPALI);
-    expect(await durumGuvenli(async () => ({ etkin: false, firmaYoneticisi: true }))).toEqual(KAPALI);
+    expect(await safeStatus(async () => ({ etkin: false }))).toEqual(KAPALI);
+    expect(await safeStatus(async () => ({ etkin: false, firmaYoneticisi: true }))).toEqual(KAPALI);
   });
 
   it('eski backend (404), ağ hatası, 500 → görünmez, hata dışarı sızmaz', async () => {
     for (const e of [err(404), err(undefined), err(500)]) {
-      await expect(durumGuvenli(() => Promise.reject(e))).resolves.toEqual(KAPALI);
+      await expect(safeStatus(() => Promise.reject(e))).resolves.toEqual(KAPALI);
     }
   });
 });
@@ -60,9 +60,9 @@ describe('rozet yoklaması — hata SESSİZ yutulur', () => {
 
 describe('liste yardımcıları', () => {
   it('sonraki sayfa total/limit ile bulunur', () => {
-    expect(sonrakiSayfa({ page: 1, limit: 20, total: 45, items: [1] })).toBe(2);
-    expect(sonrakiSayfa({ page: 3, limit: 20, total: 45, items: [1] })).toBeUndefined();
-    expect(sonrakiSayfa({ page: 1, limit: 20, total: 45, items: [] })).toBeUndefined();
+    expect(nextPage({ page: 1, limit: 20, total: 45, items: [1] })).toBe(2);
+    expect(nextPage({ page: 3, limit: 20, total: 45, items: [1] })).toBeUndefined();
+    expect(nextPage({ page: 1, limit: 20, total: 45, items: [] })).toBeUndefined();
   });
 
   it('yalnız 403 "Firmanın" sekmesini gizler', () => {

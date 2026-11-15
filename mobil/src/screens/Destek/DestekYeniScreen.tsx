@@ -11,7 +11,7 @@ import { colors, spacing } from '../../theme';
 import { useDestekTaslakStore } from '../../store/destekTaslakStore';
 import { useAuthStore } from '../../store/authStore';
 import type { RootStackParamList } from '../../navigation/types';
-import DestekBaslik from './DestekBaslik';
+import DestekHeader from './DestekHeader';
 import { Aydinlatma, EkranOnizleme, MetinAlanlari, TurSecici } from './DestekYeniForm';
 import { useDestekYeni } from './useDestekYeni';
 
@@ -22,14 +22,14 @@ export default function DestekYeniScreen() {
   const insets = useSafeAreaInsets();
   const oturumVar = useAuthStore((s) => !!s.user);
   const ekran = useDestekTaslakStore((s) => s.ekran);
-  const sonuc = useDestekTaslakStore((s) => s.sonuc);
+  const result = useDestekTaslakStore((s) => s.result);
   const ekranAdi = useDestekTaslakStore((s) => s.ekranAdi);
   const ekraniKaldir = useDestekTaslakStore((s) => s.ekraniKaldir);
   const { form, setForm, hatalar, gonderHatasi, gonderiliyor, gonder } = useDestekYeni();
 
   return (
     <View style={styles.kok}>
-      <DestekBaslik baslik="Sorun bildir" />
+      <DestekHeader baslik="Sorun bildir" />
       <KeyboardAwareScrollView
         contentContainerStyle={[styles.icerik, { paddingBottom: spacing.xxxl + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
@@ -38,7 +38,7 @@ export default function DestekYeniScreen() {
         <MetinAlanlari form={form} setForm={setForm} hatalar={hatalar} />
         <EkranOnizleme
           ekran={ekran}
-          sonuc={sonuc}
+          result={result}
           onCiz={() => nav.navigate('DestekCizim')}
           onKaldir={ekraniKaldir}
         />

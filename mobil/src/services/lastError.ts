@@ -3,15 +3,15 @@
 // + durum + Türkçe mesaj; istek gövdesi, başlık ve token ASLA girmez.
 // Destek uçlarının kendi hataları kaydedilmez (talep "destek açılamadı"yı
 // bildirmek için açılmaz; asıl sorunun izini ezmesin).
-import type { SonHata } from '../screens/Destek/destekBaglam';
+import type { LastError } from '../screens/Destek/destekBaglam';
 import { yalnizYol } from '../screens/Destek/destekBaglam';
 
-let son: SonHata | null = null;
+let son: LastError | null = null;
 
-export function sonHataKaydet(p: {
+export function recordLastError(p: {
   method: string | undefined;
   url: string | undefined;
-  status: SonHata['status'];
+  status: LastError['status'];
   message: string;
 }): void {
   const path = yalnizYol(p.url);
@@ -25,6 +25,6 @@ export function sonHataKaydet(p: {
   };
 }
 
-export function sonHata(): SonHata | null {
+export function lastError(): LastError | null {
   return son;
 }

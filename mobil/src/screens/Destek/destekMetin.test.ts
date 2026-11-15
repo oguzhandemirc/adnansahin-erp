@@ -1,38 +1,38 @@
-import { boyutMetni, destekHataMetni, durumEtiketi, silinmisEkMetni } from './destekMetin';
+import { boyutMetni, destekErrorText, durumEtiketi, silinmisEkMetni } from './destekMetin';
 
 const hata = (status: number | undefined, code?: string, extra: Record<string, unknown> = {}, message = 'Sunucu metni') =>
   Object.assign(new Error(message), { status, details: code ? { code, ...extra } : undefined });
 
 describe('hata metni — details.code ile karar', () => {
   it('ağ hatası (yanıt yok) bağlantı ister', () => {
-    expect(destekHataMetni(hata(undefined))).toMatch(/Sunucuya ulaşılamadı/);
+    expect(destekErrorText(hata(undefined))).toMatch(/Sunucuya ulaşılamadı/);
   });
 
   it('502 / 504 merkez erişilemez', () => {
-    expect(destekHataMetni(hata(502, 'DESTEK_ULASILAMADI'))).toBe('Destek merkezine ulaşılamadı, tekrar deneyin.');
-    expect(destekHataMetni(hata(504, 'DESTEK_ZAMAN_ASIMI'))).toBe('Destek merkezine ulaşılamadı, tekrar deneyin.');
+    expect(destekErrorText(hata(502, 'DESTEK_ULASILAMADI'))).toBe('Destek merkezine ulaşılamadı, tekrar deneyin.');
+    expect(destekErrorText(hata(504, 'DESTEK_ZAMAN_ASIMI'))).toBe('Destek merkezine ulaşılamadı, tekrar deneyin.');
   });
 
   it('yapılandırma hatası yöneticiye yönlendirir (oturum kapatmaz)', () => {
-    expect(destekHataMetni(hata(502, 'DESTEK_YAPILANDIRMA'))).toMatch(/yöneticinize/);
+    expect(destekErrorText(hata(502, 'DESTEK_YAPILANDIRMA'))).toMatch(/yöneticinize/);
   });
 
   it('429 bekleme süresini söyler', () => {
-    expect(destekHataMetni(hata(429, 'RATE_LIMITED', { retryAfterSec: 30 }))).toMatch(/30 saniye/);
-    expect(destekHataMetni(hata(429, 'RATE_LIMITED', { retryAfterSec: 120 }))).toMatch(/2 dakika/);
+    expect(destekErrorText(hata(429, 'RATE_LIMITED', { retryAfterSec: 30 }))).toMatch(/30 saniye/);
+    expect(destekErrorText(hata(429, 'RATE_LIMITED', { retryAfterSec: 120 }))).toMatch(/2 dakika/);
   });
 
   it('413 (kodsuz da) görüntü büyük der', () => {
-    expect(destekHataMetni(hata(413))).toMatch(/çok büyük/);
-    expect(destekHataMetni(hata(413, 'PAYLOAD_TOO_LARGE'))).toMatch(/çok büyük/);
+    expect(destekErrorText(hata(413))).toMatch(/çok büyük/);
+    expect(destekErrorText(hata(413, 'PAYLOAD_TOO_LARGE'))).toMatch(/çok büyük/);
   });
 
   it('14 günlük pencere dolmuşsa yeni talep önerir', () => {
-    expect(destekHataMetni(hata(409, 'REOPEN_WINDOW_EXPIRED'))).toMatch(/yeni talep/);
+    expect(destekErrorText(hata(409, 'REOPEN_WINDOW_EXPIRED'))).toMatch(/yeni talep/);
   });
 
   it('diğer 4xx: sunucunun Türkçe mesajı aynen gösterilir', () => {
-    expect(destekHataMetni(hata(400, 'SUBJECT_EMPTY', {}, 'Konu boş olamaz'))).toBe('Konu boş olamaz');
+    expect(destekErrorText(hata(400, 'SUBJECT_EMPTY', {}, 'Konu boş olamaz'))).toBe('Konu boş olamaz');
   });
 });
 

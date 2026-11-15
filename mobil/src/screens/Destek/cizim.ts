@@ -23,13 +23,13 @@ export interface Sekil {
   noktalar: Nokta[];
 }
 
-export interface CizimDurumu {
+export interface DrawingState {
   sekiller: Sekil[];
   aktif: Sekil | null;
   sonId: number;
 }
 
-export const BOS_CIZIM: CizimDurumu = { sekiller: [], aktif: null, sonId: 0 };
+export const BOS_CIZIM: DrawingState = { sekiller: [], aktif: null, sonId: 0 };
 
 export type CizimEylemi =
   | { tip: 'basla'; arac: CizimAraci; renk: CizimRengi; nokta: Nokta }
@@ -65,7 +65,7 @@ function ilerlet(aktif: Sekil, p: Nokta): Sekil {
   return { ...aktif, noktalar: [aktif.noktalar[0], p] };
 }
 
-export function cizimReducer(d: CizimDurumu, e: CizimEylemi): CizimDurumu {
+export function cizimReducer(d: DrawingState, e: CizimEylemi): DrawingState {
   switch (e.tip) {
     case 'basla': {
       const id = d.sonId + 1;

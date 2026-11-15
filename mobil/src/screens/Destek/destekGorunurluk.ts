@@ -8,28 +8,28 @@
 // değerinde kalır, toast basılmaz, saha işleyişi etkilenmez.
 // =============================================================================
 
-import type { DestekGorunurlukDurumu, DestekOkunmamis } from '../../services/destek.service';
+import type { DestekVisibility, DestekOkunmamis } from '../../services/destek.service';
 
 /** Uygulama ön plandayken rozet yoklama aralığı. */
 export const ROZET_YOKLAMA_MS = 120_000;
 /** "Taleplerim" açıkken liste yenileme aralığı (sözleşme önerisi). */
-export const LISTE_YENILEME_MS = 30_000;
+export const LIST_REFRESH_MS = 30_000;
 
-export const DESTEK_KAPALI: DestekGorunurlukDurumu = { etkin: false, firmaYoneticisi: false };
+export const DESTEK_OFF: DestekVisibility = { etkin: false, firmaYoneticisi: false };
 
 /**
  * `/durum` yanıtını güvenli özete çevirir. "Firmanın" sekmesi YALNIZ sunucunun
  * `firmaYoneticisi` kararından açılır (tek kaynak, sözleşme §5.1); kapalı/hata → ikisi de false.
  */
-export async function durumGuvenli(
-  getir: () => Promise<Partial<DestekGorunurlukDurumu>>,
-): Promise<DestekGorunurlukDurumu> {
+export async function safeStatus(
+  getir: () => Promise<Partial<DestekVisibility>>,
+): Promise<DestekVisibility> {
   try {
     const d = await getir();
     const etkin = d?.etkin === true;
     return { etkin, firmaYoneticisi: etkin && d?.firmaYoneticisi === true };
   } catch {
-    return DESTEK_KAPALI;
+    return DESTEK_OFF;
   }
 }
 
@@ -54,7 +54,7 @@ export function rozetMetni(o: DestekOkunmamis | undefined): string | null {
 }
 
 /** Sayfa-numaralı liste (`page`/`limit`/`total`) → sonraki sayfa ya da undefined. */
-export function sonrakiSayfa(s: { page: number; limit: number; total: number; items: unknown[] }): number | undefined {
+export function nextPage(s: { page: number; limit: number; total: number; items: unknown[] }): number | undefined {
   if (s.items.length === 0) return undefined;
   return s.page * s.limit < s.total ? s.page + 1 : undefined;
 }

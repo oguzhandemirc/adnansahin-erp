@@ -4,19 +4,19 @@ import { StyleSheet, View } from 'react-native';
 import { Text, TouchableRipple } from 'react-native-paper';
 
 import { colors, radius, spacing } from '../../theme';
-import type { DestekDurum, DestekListeSatiri } from '../../services/destek.service';
+import type { DestekDurum, DestekTicketRow } from '../../services/destek.service';
 import { formatRelativeWait } from '../../utils/relativeTime';
-import { DURUM_TONU, durumEtiketi, TUR_ETIKET, type DurumTonu } from './destekMetin';
+import { STATUS_TONE, durumEtiketi, TUR_ETIKET, type StatusTone } from './destekMetin';
 
-const TON_RENGI: Record<DurumTonu, { bg: string; fg: string }> = {
+const TON_RENGI: Record<StatusTone, { bg: string; fg: string }> = {
   info: { bg: colors.infoContainer, fg: colors.infoText },
   warning: { bg: colors.warningContainer, fg: colors.warningText },
   success: { bg: colors.successContainer, fg: colors.successText },
   muted: { bg: colors.surfaceSunken, fg: colors.textSecondary },
 };
 
-export function DurumRozeti({ durum }: { durum: DestekDurum }) {
-  const ton = TON_RENGI[DURUM_TONU[durum] ?? 'muted'];
+export function StatusBadge({ durum }: { durum: DestekDurum }) {
+  const ton = TON_RENGI[STATUS_TONE[durum] ?? 'muted'];
   return (
     <View style={[styles.rozet, { backgroundColor: ton.bg }]}>
       <Text style={[styles.rozetMetin, { color: ton.fg }]}>{durumEtiketi(durum)}</Text>
@@ -24,12 +24,12 @@ export function DurumRozeti({ durum }: { durum: DestekDurum }) {
   );
 }
 
-export default function TalepSatiri({
+export default function TicketRow({
   t,
   talepEdeniGoster,
   onPress,
 }: {
-  t: DestekListeSatiri;
+  t: DestekTicketRow;
   talepEdeniGoster: boolean;
   onPress: () => void;
 }) {
@@ -42,7 +42,7 @@ export default function TalepSatiri({
           <Text style={styles.no}>{t.number}</Text>
           <Text style={styles.tur}>{TUR_ETIKET[t.type] ?? t.type}</Text>
           <View style={styles.bosluk} />
-          <DurumRozeti durum={t.status} />
+          <StatusBadge durum={t.status} />
         </View>
         <Text style={[styles.konu, okunmamis && styles.konuKalin]} numberOfLines={2}>
           {t.subject}

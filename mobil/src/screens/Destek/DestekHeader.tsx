@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '../../theme';
 
-export default function DestekBaslik({
+export default function DestekHeader({
   baslik,
   altBaslik,
   sag,

@@ -1,11 +1,11 @@
 import {
   dataUriBase64,
   formuDogrula,
-  hataSonrasiToken,
-  hataYokMu,
+  tokenAfterError,
+  hasNoErrors,
   KONU_AZAMI,
-  talepGovdesi,
-  yanitGecerliMi,
+  buildTicketBody,
+  isReplyValid,
   yeniToken,
 } from './destekForm';
 
@@ -13,7 +13,7 @@ const gecerli = { tur: 'BUG' as const, konu: ' Etiket basmıyor ', mesaj: ' Tamb
 
 describe('form doğrulama', () => {
   it('geçerli form hatasızdır', () => {
-    expect(hataYokMu(formuDogrula(gecerli))).toBe(true);
+    expect(hasNoErrors(formuDogrula(gecerli))).toBe(true);
   });
 
   it('tür, konu ve mesaj zorunlu; boşluk sayılmaz', () => {
@@ -21,7 +21,7 @@ describe('form doğrulama', () => {
     expect(h.tur).toBeTruthy();
     expect(h.konu).toBeTruthy();
     expect(h.mesaj).toBeTruthy();
-    expect(hataYokMu(h)).toBe(false);
+    expect(hasNoErrors(h)).toBe(false);
   });
 
   it('konu 200 karakteri aşamaz', () => {
@@ -30,9 +30,9 @@ describe('form doğrulama', () => {
   });
 
   it('yanıt kutusu: boş değil, 20 000 karakteri aşmaz', () => {
-    expect(yanitGecerliMi('  ')).toBe(false);
-    expect(yanitGecerliMi('tamam')).toBe(true);
-    expect(yanitGecerliMi('a'.repeat(20_001))).toBe(false);
+    expect(isReplyValid('  ')).toBe(false);
+    expect(isReplyValid('tamam')).toBe(true);
+    expect(isReplyValid('a'.repeat(20_001))).toBe(false);
   });
 });
 
@@ -44,22 +44,22 @@ describe('clientToken — mantıksal deneme başına bir kez', () => {
   });
 
   it('ağ hatası (status yok) → AYNI token', () => {
-    expect(hataSonrasiToken('tok-0', new Error('ağ'), gen)).toBe('tok-0');
+    expect(tokenAfterError('tok-0', new Error('ağ'), gen)).toBe('tok-0');
   });
 
   it('5xx / 502 / 504 → AYNI token', () => {
     for (const status of [500, 502, 504]) {
-      expect(hataSonrasiToken('tok-0', { status }, gen)).toBe('tok-0');
+      expect(tokenAfterError('tok-0', { status }, gen)).toBe('tok-0');
     }
   });
 
   it('429 → AYNI token (istek geçerli, yalnız erken)', () => {
-    expect(hataSonrasiToken('tok-0', { status: 429 }, gen)).toBe('tok-0');
+    expect(tokenAfterError('tok-0', { status: 429 }, gen)).toBe('tok-0');
   });
 
   it('kesin 4xx (400/403/413) → TAZE token', () => {
-    expect(hataSonrasiToken('tok-0', { status: 400 }, gen)).toBe('tok-1');
-    expect(hataSonrasiToken('tok-0', { status: 413 }, gen)).toBe('tok-2');
+    expect(tokenAfterError('tok-0', { status: 400 }, gen)).toBe('tok-1');
+    expect(tokenAfterError('tok-0', { status: 413 }, gen)).toBe('tok-2');
   });
 
   it('üretilen token sözleşme biçimine uyar ([A-Za-z0-9_.:-]{1,100})', () => {
@@ -69,7 +69,7 @@ describe('clientToken — mantıksal deneme başına bir kez', () => {
 
 describe('POST gövdesi', () => {
   it('kırpılmış metin, token ve bağlam taşır; kimlik alanı YOK', () => {
-    const g = talepGovdesi({ form: gecerli, clientToken: 'tok', baglam: { screen: 'Tambur' }, ekranJpegBase64: null });
+    const g = buildTicketBody({ form: gecerli, clientToken: 'tok', baglam: { screen: 'Tambur' }, ekranJpegBase64: null });
     expect(g).toEqual({
       type: 'BUG',
       subject: 'Etiket basmıyor',
@@ -83,7 +83,7 @@ describe('POST gövdesi', () => {
   });
 
   it('ekran görüntüsü tek JPEG dosyası olarak gider', () => {
-    const g = talepGovdesi({ form: gecerli, clientToken: 't', baglam: {}, ekranJpegBase64: 'QUJD' });
+    const g = buildTicketBody({ form: gecerli, clientToken: 't', baglam: {}, ekranJpegBase64: 'QUJD' });
     expect(g.files).toEqual([{ name: 'ekran.jpg', contentType: 'image/jpeg', dataBase64: 'QUJD' }]);
   });
 

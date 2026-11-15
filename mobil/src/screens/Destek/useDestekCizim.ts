@@ -37,13 +37,13 @@ export function useDestekCizim(onBitti: () => void) {
     }
     setKaydediliyor(true);
     try {
-      const cikti = uzunKenaraSigdir(ekran.width, ekran.height);
+      const output = uzunKenaraSigdir(ekran.width, ekran.height);
       const base64 = await captureRef(tuvalRef, {
         format: 'jpg',
         quality: JPEG_KALITE,
         result: 'base64',
-        width: cikti.width,
-        height: cikti.height,
+        width: output.width,
+        height: output.height,
       });
       kaydet(durum, { base64, onizlemeUri: `data:image/jpeg;base64,${base64}` });
       onBitti();

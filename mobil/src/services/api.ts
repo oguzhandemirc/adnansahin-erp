@@ -8,7 +8,7 @@ import { getOrCreateDeviceId } from '../utils/deviceId';
 // Import yönü güvenli: authStore yalnız utils/storage'a bağımlı (api'yi import etmez).
 import { useAuthStore } from '../store/authStore';
 import { recordNetSample } from './netStats';
-import { sonHataKaydet } from './sonHata';
+import { recordLastError } from './lastError';
 import {
   reportServerReachable,
   reportServerUnreachable,
@@ -253,8 +253,8 @@ apiClient.interceptors.response.use(
           ? 'Sunucuya ulaşılamıyor — Wi-Fi/ağ bağlantısını kontrol edin'
           : 'Sunucu hatası';
     const message = error.response?.data?.message || fallback;
-    // Destek talebinin "son hata" bağlamı — yalnız yol + durum + mesaj (bkz. sonHata.ts).
-    sonHataKaydet({
+    // Destek talebinin "son hata" bağlamı — yalnız yol + durum + mesaj (bkz. lastError.ts).
+    recordLastError({
       method: error.config?.method,
       url,
       status: status ?? (error.code === 'ECONNABORTED' ? 'ZAMAN_ASIMI' : 'AG'),

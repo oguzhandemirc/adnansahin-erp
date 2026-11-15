@@ -11,15 +11,15 @@ import { apiClient } from './api';
 
 export type DestekTur = 'BUG' | 'QUESTION' | 'REQUEST';
 export type DestekDurum = 'NEW' | 'IN_PROGRESS' | 'WAITING_CUSTOMER' | 'ANSWERED' | 'CLOSED';
-export type DestekKapsam = 'mine' | 'tenant';
+export type DestekScope = 'mine' | 'tenant';
 
 /** `GET /destek/durum` özeti: özellik açık mı + sunucunun firma yöneticisi kararı. */
-export interface DestekGorunurlukDurumu {
+export interface DestekVisibility {
   etkin: boolean;
   firmaYoneticisi: boolean;
 }
 
-export interface DestekDosya {
+export interface DestekFile {
   name: string;
   contentType: 'image/png' | 'image/jpeg';
   /** Düz base64 (`data:` öneki YOK). */
@@ -33,13 +33,13 @@ export interface DestekBaglam {
   technical?: Record<string, unknown>;
 }
 
-export interface TalepAcGovde {
+export interface CreateTicketBody {
   type: DestekTur;
   subject: string;
   message: string;
   clientToken: string;
   context?: DestekBaglam;
-  files?: DestekDosya[];
+  files?: DestekFile[];
 }
 
 export interface DestekEk {
@@ -75,7 +75,7 @@ export interface DestekTalep {
   idempotentReplay?: boolean;
 }
 
-export interface DestekListeSatiri {
+export interface DestekTicketRow {
   id: string;
   number: string;
   type: DestekTur;
@@ -87,8 +87,8 @@ export interface DestekListeSatiri {
   closedAt: string | null;
 }
 
-export interface DestekListe {
-  items: DestekListeSatiri[];
+export interface DestekTicketPage {
+  items: DestekTicketRow[];
   total: number;
   page: number;
   limit: number;
@@ -117,21 +117,21 @@ export const destekService = {
    * `firmaYoneticisi` sunucunun `scope=tenant` kararıdır (tek kaynak, sözleşme §5.1);
    * istemci izinden çıkarım YAPMAZ. Alan yoksa / özellik kapalıysa `false`.
    */
-  async durum(): Promise<DestekGorunurlukDurumu> {
+  async durum(): Promise<DestekVisibility> {
     const res = await apiClient.get<Zarf<{ etkin: boolean; firmaYoneticisi?: boolean }>>('/destek/durum');
     const etkin = res.data?.data?.etkin === true;
     return { etkin, firmaYoneticisi: etkin && res.data?.data?.firmaYoneticisi === true };
   },
 
-  async talepAc(govde: TalepAcGovde): Promise<DestekTalep> {
+  async talepAc(govde: CreateTicketBody): Promise<DestekTalep> {
     const res = await apiClient.post<Zarf<DestekTalep>>('/destek/talepler', govde, {
       timeout: govde.files && govde.files.length > 0 ? EKLI_ISTEK_MS : DUZ_ISTEK_MS,
     });
     return res.data.data;
   },
 
-  async liste(p: { scope: DestekKapsam; page: number; limit?: number }): Promise<DestekListe> {
-    const res = await apiClient.get<Zarf<DestekListe>>('/destek/talepler', {
+  async liste(p: { scope: DestekScope; page: number; limit?: number }): Promise<DestekTicketPage> {
+    const res = await apiClient.get<Zarf<DestekTicketPage>>('/destek/talepler', {
       params: { scope: p.scope, page: p.page, limit: p.limit ?? 20 },
       timeout: DUZ_ISTEK_MS,
     });
@@ -165,7 +165,7 @@ export const destekService = {
     await apiClient.post(`/destek/talepler/${id}/okundu`, undefined, { timeout: DUZ_ISTEK_MS });
   },
 
-  async okunmamis(scope: DestekKapsam = 'mine'): Promise<DestekOkunmamis> {
+  async okunmamis(scope: DestekScope = 'mine'): Promise<DestekOkunmamis> {
     const res = await apiClient.get<Zarf<DestekOkunmamis>>('/destek/okunmamis', {
       params: { scope },
       timeout: ROZET_MS,
