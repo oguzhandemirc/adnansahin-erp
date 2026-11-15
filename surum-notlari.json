@@ -17,6 +17,46 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-15",
+      "baslik": "Parola güvenliği ve Yalnız Görme rolü",
+      "surumler": {
+        "panel": "1.3.17",
+        "tablet": "1.0.17"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Üst çubuğa \"Parolamı değiştir\" eklendi: mevcut parolanızı girerek kendi parolanızı değiştirebilirsiniz."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "Yeni belirlenen parolalar en az 10 karakter olmalıdır; çok bilinen parolalar kabul edilmez. Mevcut parolanız çalışmaya devam eder."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Rol şablonlarına \"Patron (Yalnız Görme)\" eklendi: bu roldeki kullanıcı bütün ekranları görür, hiçbir kaydı değiştiremez."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Genel Ayarlar'a iki anahtar eklendi, ikisi de kapalı gelir: \"Zayıf parolayla girişte parola değiştirmeyi zorunlu tut\" ve \"Yeniden kurulan cihazı eski kaydına bağla\". Kapalıyken hiçbir şey değişmez."
+        },
+        {
+          "kapsam": "her-ikisi",
+          "tip": "iyilestirme",
+          "metin": "Kısa kodla giriş yalnız saha tabletlerinde çalışır; panelde kısa kod kullanılamaz. Yönetici hesapları kısa kodla giremez, kullanıcı adı ve parolayla girer."
+        },
+        {
+          "kapsam": "tablet",
+          "tip": "iyilestirme",
+          "metin": "Uygulama yeniden kurulduğunda aynı cihaz olarak tanınabilmesi için hazırlık yapıldı. Kullanımda bir değişiklik yoktur."
+        }
+      ]
+    },
+    {
       "id": "2026-11-13",
       "baslik": "Müşteri Özeti, yeni anasayfa ve Bağlı Cihazlar",
       "surumler": {
