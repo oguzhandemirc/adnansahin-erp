@@ -7,11 +7,7 @@ import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { AppError } from "../utils/app-error";
 import { p2002UniqueColumn } from "../utils/p2002";
-import {
-  BUYUK_GOVDE_LIMITI,
-  VARSAYILAN_GOVDE_LIMITI,
-  buyukGovdeYolu,
-} from "../constants/body-limits";
+import { bodyLimitFor } from "../constants/body-limits";
 import { AuditService } from "../services/audit.service";
 import { classifyPoolTimeout, recordPoolTimeout, getPoolHealth } from "../lib/pool-health";
 import "../types/express-augment";
@@ -467,7 +463,7 @@ export const errorHandler = (
       // Sınır METİNDE sabit yazılmaz: içe aktarım yolları 10 MB'lık kendi
       // katmanlarını taşıyor ve "1MB" demek operatöre yanlış sınırı söylerdi.
       message:
-        `İstek gövdesi çok büyük (${buyukGovdeYolu(req.originalUrl) ? BUYUK_GOVDE_LIMITI : VARSAYILAN_GOVDE_LIMITI} sınırı aşıldı). ` +
+        `İstek gövdesi çok büyük (${bodyLimitFor(req.originalUrl)} sınırı aşıldı). ` +
         "Daha az kayıtla tekrar deneyin.",
     });
     return;

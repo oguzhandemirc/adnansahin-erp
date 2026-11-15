@@ -100,3 +100,15 @@ export function readClientVersionHeader(
   const trimmed = v.trim();
   return trimmed && isPlausibleVersion(trimmed) ? trimmed : null;
 }
+
+/**
+ * İstemci türü (`electron` | `mobil` | `web`) — yalnız GÖZLEM. Destek talebinin
+ * bağlam bilgisine yazılır; hiçbir kapıya girmez. Tanınmayan değer NULL.
+ */
+export function readClientKindHeader(
+  headers: Record<string, string | string[] | undefined>,
+): ClientKind | null {
+  const raw = headers[CLIENT_INFO_HEADERS.kind];
+  const v = (Array.isArray(raw) ? raw[0] : raw)?.trim();
+  return v && isClientKind(v) ? v : null;
+}

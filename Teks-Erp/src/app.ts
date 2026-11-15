@@ -130,6 +130,7 @@ import searchRoutes from "./routes/search.routes";
 import mobileUpdateRoutes from "./routes/mobile-update.routes";
 import clientPolicyRoutes from "./routes/client-policy.routes";
 import bossRoutes from "./routes/boss.routes";
+import destekRoutes from "./routes/destek.routes";
 import { NIGHTLY_PREFIX } from "./services/helpers/backup-naming.helper";
 import { seriesExhaustionWarnings } from "./services/helpers/series-exhaustion.helper";
 import { masterDataArchiveHealthSnapshot } from "./services/helpers/master-data-health.helper";
@@ -1006,6 +1007,10 @@ app.use("/api/mobile", mobileUpdateRoutes);
 app.use("/api/client-policy", clientPolicyRoutes);
 // Patron özeti — bölüm bazlı izin süzmesi SERVİSTE (bkz. routes/boss.routes.ts).
 app.use("/api/boss", bossRoutes);
+// Etkili Destek talepleri — panel/tablet → bu backend → destek merkezi (giden HTTPS).
+// `.env` (DESTEK_API_URL + DESTEK_API_KEY) yoksa `/durum` dışındaki her uç 403
+// MODULE_DISABLED ve dış istek yok. Gövdeyi router kendi parser'ıyla okur.
+app.use("/api/destek", destekRoutes);
 
 // =============================================================================
 // JSON 404 — tanımsız /api/* route'lar için

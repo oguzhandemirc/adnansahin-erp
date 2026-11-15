@@ -184,6 +184,11 @@ const DINAMIK_IZIN_KAYNAKLARI: Record<string, readonly string[]> = {
   // İçe aktarım varlık listesi: kodlar `import-registry` ADAPTÖRLERİNDEN gelir —
   // `src/routes/import.routes.ts` ile BİREBİR aynı desen ve aynı devir.
   "src/services/import/import.service.ts": [`${DELEGE}scripts/test_import_framework.ts`],
+  // ETKİLİ DESTEK (2026-11-16): firma yöneticisi kararı (`scope=tenant` + `/durum`
+  // yanıtındaki `firmaYoneticisi`) TEK helper'da (`isTenantAdmin`) verilir; kod
+  // dosya-içi tek sabitte (`SUPPORT_TENANT_ADMIN_PERMISSION` = `admin:settings`).
+  // Tambur geri alma ile aynı desen: sabit adıyla beyan, AST değeri çözer.
+  "src/services/destek.service.ts": ["SUPPORT_TENANT_ADMIN_PERMISSION"],
 };
 
 // Taramanın gerçekten "bir şeye baktığını" doğrulayan zeminler. Bir refactor

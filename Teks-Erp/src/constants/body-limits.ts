@@ -15,8 +15,12 @@
 // olmalı (iki yönlü — ölü girdi de gerçek bir açığı gizler).
 // =============================================================================
 
-/** Global (1 MB) JSON katmanının ATLAYACAĞI mount ön ekleri. */
-export const BUYUK_GOVDE_YOLLARI = ["/api/import", "/api/config-bundle"] as const;
+/**
+ * Global (1 MB) JSON katmanının ATLAYACAĞI mount ön ekleri.
+ * `/api/destek`: destek talebi ekleri JSON içinde base64 gelir (5 × 10 MB); router
+ * kendi `SUPPORT_BODY_LIMIT` katmanını YALNIZ ekli iki POST ucunda taşır.
+ */
+export const BUYUK_GOVDE_YOLLARI = ["/api/import", "/api/config-bundle", "/api/destek"] as const;
 
 /** Global JSON gövde limiti — 413 mesajı da buradan okunur (metin sabiti YOK). */
 export const VARSAYILAN_GOVDE_LIMITI = "1mb";
@@ -24,8 +28,26 @@ export const VARSAYILAN_GOVDE_LIMITI = "1mb";
 /** Büyük gövde taşıyan router'ların limiti. */
 export const BUYUK_GOVDE_LIMITI = "10mb";
 
+/** Destek ekli uçlarının limiti: 5 dosya × 10 MB, base64 (×4/3) + metin payı. */
+export const SUPPORT_BODY_LIMIT = "70mb";
+
+/** Kendi limiti `BUYUK_GOVDE_LIMITI`ten farklı olan büyük-gövde ön ekleri. */
+const PREFIX_LIMITS: Readonly<Record<string, string>> = { "/api/destek": SUPPORT_BODY_LIMIT };
+
+function matchesPrefix(url: string, p: string): boolean {
+  return url === p || url.startsWith(`${p}/`) || url.startsWith(`${p}?`);
+}
+
 /** İstek yolu büyük-gövde router'larından birine mi ait. */
 export function buyukGovdeYolu(url: string | undefined): boolean {
   if (!url) return false;
-  return BUYUK_GOVDE_YOLLARI.some((p) => url === p || url.startsWith(`${p}/`) || url.startsWith(`${p}?`));
+  return BUYUK_GOVDE_YOLLARI.some((p) => matchesPrefix(url, p));
+}
+
+/** Yolun ETKİN gövde limiti — 413 mesajı bunu söyler. */
+export function bodyLimitFor(url: string | undefined): string {
+  if (!url) return VARSAYILAN_GOVDE_LIMITI;
+  const p = BUYUK_GOVDE_YOLLARI.find((x) => matchesPrefix(url, x));
+  if (!p) return VARSAYILAN_GOVDE_LIMITI;
+  return PREFIX_LIMITS[p] ?? BUYUK_GOVDE_LIMITI;
 }

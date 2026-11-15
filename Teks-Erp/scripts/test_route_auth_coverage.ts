@@ -189,8 +189,14 @@ const EXEMPT: Record<string, string> = {
  * uymuyor, izinler BOŞ) girebildiği iki uçtan biridir: izin guard'ı koymak
  * zayıf parolalı kullanıcıyı parolasını değiştiremez hâle kilitlerdi.
  * Bekçi: `test_password_change_required` §0/§2.
+ *
+ * ⚠️ 16 → 17 (2026-11-15, BİLİNÇLİ): `GET /api/destek/durum` yalnız `verifyToken`
+ * taşır. Tek bir boolean döner (`{ etkin }`: `.env`te destek adresi + anahtarı var
+ * mı); iş verisi, DB okuması ve dış istek yoktur. Destek kapısının ÖNÜNDE olmak
+ * zorundadır (kapalıyken de cevap vermeli) ve kullanıcı kararıyla destek uçlarına
+ * izin kodu açılmadı (giriş yapmış herkes). Bekçi: `test_destek_entegrasyonu` §2.
  */
-const BARE_CHAIN_BASELINE = 16;
+const BARE_CHAIN_BASELINE = 17;
 
 /** Körlük zemini: tarayıcı boşa düşerse "ihlal yok" ile "hiçbir şeye bakılmadı" aynı yeşile çıkmasın. */
 const MIN_ROUTE_LAYERS = 400;
