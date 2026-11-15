@@ -17,6 +17,36 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-16",
+      "baslik": "Destek talebi",
+      "surumler": {
+        "panel": "1.3.18",
+        "tablet": "1.0.18"
+      },
+      "maddeler": [
+        {
+          "kapsam": "her-ikisi",
+          "tip": "yeni",
+          "metin": "Destek talebi: \"Sorun bildir\" ile ekranın görüntüsünü alıp üstüne çizerek (kalem, ok, çerçeve) destek ekibine yazabilirsiniz. Cevapları panelde \"Destek\" ekranından, tablette \"Taleplerim\"den takip edersiniz; okunmamış cevap olduğunda yanında sayı görünür."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Panelde \"Sorun bildir\" penceresi Ctrl+Shift+B kısayoluyla da açılır."
+        },
+        {
+          "kapsam": "tablet",
+          "tip": "duzeltme",
+          "metin": "Ayarlar'dan sunucu adresi değiştirildiğinde tablet kendini yeni sunucuya hemen tanıtır; uygulamayı kapatıp açmadan iş başlatılabilir."
+        },
+        {
+          "kapsam": "tablet",
+          "tip": "duzeltme",
+          "metin": "Depo, paketleme ve fason sevk ekranlarında okutulan etiketin türünün tanınması düzeltildi."
+        }
+      ]
+    },
+    {
       "id": "2026-11-15",
       "baslik": "Parola güvenliği ve Yalnız Görme rolü",
       "surumler": {
