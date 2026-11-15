@@ -115,6 +115,14 @@ describe("Eşitleme göstergesi", () => {
     expect(screen.getByText("2 dk önce")).toBeTruthy();
   });
 
+  it("ekran kendi tazelik öğesini verirse (pano: Şimdi güncelle) başlık kutusunda çizilir; alt satır yok", async () => {
+    mockSession.factoryStamp = minutesAgo(5);
+    await draw(<Screen title="Pano" back={false} meta={<Text testID="ozel-meta">↻ 5 dk önce</Text>}><Text>içerik</Text></Screen>);
+    expect(within(screen.getByTestId("baslik-kutusu")).getByTestId("ozel-meta")).toBeTruthy();
+    expect(screen.queryByTestId("esitleme-gostergesi")).toBeNull();
+    expect(screen.queryByTestId("baslik-alt-satiri")).toBeNull();
+  });
+
   it("dokununca ekranın yenilemesi çağrılır", async () => {
     const yenile = jest.fn();
     mockSession.factoryStamp = minutesAgo(5);

@@ -1,4 +1,4 @@
-// Pano (şartname §4.1): başlık (tesis + eşitleme + Düzenle) → dönem şeridi (yalnız dönemli kutu varken) → kutular
+// Pano (şartname §4.1): başlık (Pano + "↻ tazelik" = Şimdi güncelle + Düzenle) → dönem şeridi (yalnız dönemli kutu varken) → kutular
 // kullanıcı sırasıyla (ardışık göstergeler 2 sütun, diğerleri tam genişlik). Düzen cihazda kalıcı; YALNIZ ekli ve
 // izinli kutuların kaynakları istenir, düzenleme kipinde hiç istek yok.
 // Özet izni olmayan çalışan boş ekran yerine "Görebildiğin alanlar" listesini görür.
@@ -13,7 +13,7 @@ import { destekRozetMetni, useDestekOkunmamis } from "../../../src/destek/gorunu
 import { rozetMetni, useOkunmamisRet } from "../../../src/state/okunmamis-ret";
 import { useSession } from "../../../src/state/session";
 import { useOpenRefresh } from "../../../src/state/useOpenRefresh";
-import { FacilityName, Screen, useWide } from "../../../src/ui/Frame";
+import { Screen, useWide } from "../../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../src/ui/icons";
 import { BosDurum, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
@@ -21,7 +21,7 @@ import { DuzenCubugu, DuzenListesi, KutuEkleSayfasi } from "../../../src/ui/pano
 import { useDuzen } from "../../../src/ui/pano/duzen";
 import { KUTU_CIZICI, type KutuBaglami } from "../../../src/ui/pano/KutuCizici";
 import { istenenKaynaklar, izinliKutular, kutu, satirlar } from "../../../src/ui/pano/kutular";
-import { SimdiGuncelle } from "../../../src/ui/pano/SimdiGuncelle";
+import { SyncNowFeedbackText, SyncNowIndicator, useSyncNow } from "../../../src/ui/pano/SimdiGuncelle";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { SectionHeader } from "../../../src/ui/SectionHeader";
 import { SegmentedControl } from "../../../src/ui/SegmentedControl";
@@ -44,7 +44,7 @@ const MODULE_HINT: Readonly<Partial<Record<ModuleKey, string>>> = {
 };
 
 export default function Dashboard() {
-  const { facility, permissions, refresh } = useSession();
+  const { facility, permissions, refresh, factoryStamp, offline } = useSession();
   const router = useRouter();
   const wide = useWide();
   const t = useTokens();
@@ -83,7 +83,20 @@ export default function Dashboard() {
   const baglam: KutuBaglami = { anlik, liste, donem, router, permissions };
   const donemli = duzen.kutular.some((a) => kutu(a).donemli);
 
-  const header = !wide ? <FacilityName /> : null;
+  // Tazelik + "Şimdi güncelle" başlıkta TEK öğe (ayrı satır yok); tesis adı Menü/Profil/rayda. Uç beyan edilmemişse
+  // (eski bulut) başlık ortak eşitleme göstergesine döner. Dokunuş eşitleme ister ve bulut verisini de tazeler.
+  const syncNow = useSyncNow();
+  const meta = syncNow.available ? (
+    <SyncNowIndicator
+      last={factoryStamp}
+      offline={offline}
+      busy={syncNow.busy}
+      onPress={() => {
+        if (!duzenle) reloadAll();
+        syncNow.trigger();
+      }}
+    />
+  ) : undefined;
   // ☰ menü (Sevkiyat · Raporlar · Gönderdiklerim · Profil): yalnız telefonda; geniş ekranda aynı gruplar raydadır.
   // Okunmamış ret (fabrikanın kabul etmediği gönderim) rozeti burada; kayıt açılınca söner.
   const okunmamis = useOkunmamisRet();
@@ -124,7 +137,8 @@ export default function Dashboard() {
     <Screen
       title="Pano"
       back={false}
-      subtitle={<SimdiGuncelle sol={header} />}
+      meta={meta}
+      subtitle={syncNow.feedback ? <SyncNowFeedbackText feedback={syncNow.feedback} /> : undefined}
       headerRight={basliktaEylem}
       onRefresh={duzenle ? undefined : reloadAll}
       refreshing={hepsi.some((r) => r.refreshing)}

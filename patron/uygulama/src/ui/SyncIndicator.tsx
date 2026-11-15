@@ -11,8 +11,8 @@ import { space, typography } from "./tokens";
 /** Göreli sürenin yenilenme aralığı: metin dakika çözünürlüğünde. */
 export const SYNC_TICK_MS = 60_000;
 
-/** Dakikada bir yeniden çizdiren saat. */
-function useMinuteClock(): number {
+/** Dakikada bir yeniden çizdiren saat (panodaki "Şimdi güncelle" göstergesi de kullanır). */
+export function useMinuteClock(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), SYNC_TICK_MS);

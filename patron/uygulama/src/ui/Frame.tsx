@@ -122,6 +122,8 @@ export interface ScreenProps {
   readonly subtitle?: ReactNode;
   /** Kaydırmanın altında sabit kalan çubuk (ör. düzenleme kipinin eylemleri). */
   readonly footer?: ReactNode;
+  /** Başlığın yanındaki tazelik öğesi; verilmezse eşitleme göstergesi (pano: "Şimdi güncelle" ile birleşik hâli). */
+  readonly meta?: ReactNode;
 }
 
 /**
@@ -146,7 +148,7 @@ export function useUserPull(refreshing: boolean | undefined, onRefresh: (() => v
   };
 }
 
-export function Screen({ title: titleProp, module, children, back, onRefresh, refreshing, headerRight, subtitle, footer, sticky, onEndReached }: ScreenProps) {
+export function Screen({ title: titleProp, module, children, back, onRefresh, refreshing, headerRight, subtitle, footer, sticky, onEndReached, meta }: ScreenProps) {
   const title = titleProp ?? (module ? moduleTitle(module) : "");
   const t = useTokens();
   const s = useStyles();
@@ -175,7 +177,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         seamless={seamless}
         onBack={showBack ? goBack : undefined}
         action={sorunBildir ? <>{headerRight}<SorunBildirDugmesi /></> : headerRight}
-        meta={<SyncIndicator last={factoryStamp} offline={offline} onPress={onRefresh} />}
+        meta={meta ?? <SyncIndicator last={factoryStamp} offline={offline} onPress={onRefresh} />}
       />
       <Animated.ScrollView
         onScroll={onScroll}

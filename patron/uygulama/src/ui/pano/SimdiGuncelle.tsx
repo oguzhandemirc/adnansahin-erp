@@ -1,90 +1,131 @@
-// "Şimdi güncelle" (2026-11-13): panonun başlık altı satırında, tazelik göstergesinin hemen altında. Basınca fabrikaya
-// eşitleme işareti gider (veri taşımaz); yanıt kısa Türkçe geri bildirime döner. Sunucu ucu beyan etmediyse (eski
-// bulut) eylem HİÇ çizilmez. Kabul edilince fabrika damgası birkaç kez yoklanır; değişince bütün veri tazelenir.
+// "Şimdi güncelle" (2026-11-13; yerleşim 2026-11-16): panoda AYRI satır yok — başlıktaki tazelik etiketi ("↻ 47 saat
+// önce") eylemin kendisidir. Basınca fabrikaya eşitleme işareti gider (veri taşımaz); yanıtın kısa Türkçe geri bildirimi
+// yalnız varken başlığın altında görünür. Sunucu ucu beyan etmediyse (eski bulut) eylem HİÇ çizilmez; başlık bugünkü
+// eşitleme göstergesine döner. Kabul edilince fabrika damgası birkaç kez yoklanır; değişince bütün veri tazelenir.
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import type { SyncNowResponse } from "../../api/wire";
+import { formatSince } from "../../lib/format";
 import { AFTER_SYNC_NOW_MS, syncNowAvailable, syncNowErrorFeedback, syncNowFeedback, type SyncNowFeedback } from "../../lib/simdi-guncelle";
 import { ALL_TAGS, invalidate } from "../../state/changes";
 import { useSession } from "../../state/session";
 import { followDoorbell } from "../../state/useOpenRefresh";
-import { Basilabilir } from "../hareket/Basilabilir";
+import { BASMA } from "../hareket/sabitler";
+import { useMinuteClock } from "../SyncIndicator";
 import { makeStyles, useTokens } from "../theme-context";
-import { space, typography } from "../tokens";
+import { TOUCH, space, typography } from "../tokens";
 
 /** Geri bildirimin ekranda kaldığı süre. */
 export const FEEDBACK_MS = 8_000;
 
-export function SimdiGuncelleSatiri({ sol, gorunur, istek, onKabul, now = Date.now }: {
-  /** Satırın solu (telefonda tesis adı); yoksa eylem sağa yaslı tek başına. */
-  readonly sol?: ReactNode;
-  readonly gorunur: boolean;
-  readonly istek: () => Promise<SyncNowResponse>;
+export interface SyncNowState {
+  /** Sunucu ucu beyan etti mi (değilse eylem çizilmez). */
+  readonly available: boolean;
+  readonly busy: boolean;
+  readonly feedback: SyncNowFeedback | null;
+  readonly trigger: () => void;
+}
+
+/** İstek + geri bildirim durumu (oturumdan bağımsız; test edilebilir çekirdek). */
+export function useSyncNowAction({ available, request, onAccepted, now = Date.now }: {
+  readonly available: boolean;
+  readonly request: () => Promise<SyncNowResponse>;
   /** İşaret açık (yeni ya da bekleyen): çağıran fabrika damgasını izler. */
-  readonly onKabul?: () => void;
+  readonly onAccepted?: () => void;
   readonly now?: () => number;
+}): SyncNowState {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<SyncNowFeedback | null>(null);
+  const alive = useRef(true);
+  useEffect(() => () => void (alive.current = false), []);
+  useEffect(() => {
+    if (!feedback) return;
+    const id = setTimeout(() => setFeedback(null), FEEDBACK_MS);
+    return () => clearTimeout(id);
+  }, [feedback]);
+  const trigger = () => {
+    if (!available || busy) return;
+    setBusy(true);
+    void request()
+      .then((r) => {
+        const f = syncNowFeedback(r, now());
+        if (!alive.current) return;
+        setFeedback(f);
+        if (f.follow) onAccepted?.();
+      })
+      .catch((err: unknown) => alive.current && setFeedback(syncNowErrorFeedback(err)))
+      .finally(() => alive.current && setBusy(false));
+  };
+  return { available, busy, feedback, trigger };
+}
+
+/** Oturuma bağlı hâli: beyan, istek ve kabul sonrası damga takibi (`/oturum` 3…25 sn; damga değişince veri tazelenir). */
+export function useSyncNow(): SyncNowState {
+  const { api, facility, refresh, factoryStamp } = useSession();
+  const live = useRef({ refresh, factoryStamp });
+  live.current = { refresh, factoryStamp };
+  const cancel = useRef<(() => void) | null>(null);
+  useEffect(() => () => cancel.current?.(), []);
+  const follow = () => {
+    cancel.current?.();
+    cancel.current = followDoorbell(live.current.factoryStamp, async () => (await live.current.refresh())?.esitleme?.ufuk ?? null, () => invalidate([ALL_TAGS]), AFTER_SYNC_NOW_MS);
+  };
+  return useSyncNowAction({ available: syncNowAvailable(facility), request: () => api.syncNow(), onAccepted: follow });
+}
+
+/**
+ * Başlıktaki tazelik + eylem: "↻ 47 saat önce" link renginde, dokunma hedefi ≥ 44 pt. Gönderilirken çark döner ve
+ * dokunuş kapalıdır. Çevrimdışıyken simge bulut-yok olur, eylem yine denenebilir (hata cümlesi döner).
+ */
+export function SyncNowIndicator({ last, offline = false, busy, onPress }: {
+  readonly last: string | null | undefined;
+  readonly offline?: boolean;
+  readonly busy: boolean;
+  readonly onPress: () => void;
 }) {
   const t = useTokens();
   const s = useStyles();
-  const [gidiyor, setGidiyor] = useState(false);
-  const [bildirim, setBildirim] = useState<SyncNowFeedback | null>(null);
-  const canli = useRef(true);
-  useEffect(() => () => void (canli.current = false), []);
-  useEffect(() => {
-    if (!bildirim) return;
-    const id = setTimeout(() => setBildirim(null), FEEDBACK_MS);
-    return () => clearTimeout(id);
-  }, [bildirim]);
-  if (!gorunur) return sol ? <>{sol}</> : null;
-  const bas = () => {
-    if (gidiyor) return;
-    setGidiyor(true);
-    void istek()
-      .then((r) => {
-        const f = syncNowFeedback(r, now());
-        if (!canli.current) return;
-        setBildirim(f);
-        if (f.follow) onKabul?.();
-      })
-      .catch((err: unknown) => canli.current && setBildirim(syncNowErrorFeedback(err)))
-      .finally(() => canli.current && setGidiyor(false));
-  };
-  const renk = bildirim?.tone === "error" ? t.color.danger.solid : t.textSecondary;
+  const now = useMinuteClock();
+  const since = last ? formatSince(last, now) : null;
+  const text = busy ? "Gönderiliyor…" : since ?? "Şimdi güncelle";
+  const state = since ? `${offline ? "Çevrimdışı · son eşitleme" : "Son eşitleme"} ${since}` : null;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy}
+      accessibilityRole="button"
+      accessibilityLabel={state ? `Şimdi güncelle. ${state}` : "Şimdi güncelle"}
+      accessibilityState={{ disabled: busy, busy }}
+      style={({ pressed }) => [s.button, pressed && { opacity: BASMA.opaklik }]}
+      testID="simdi-guncelle"
+    >
+      {busy ? (
+        <ActivityIndicator size="small" color={t.color.link} style={s.spinner} testID="simdi-guncelle-cark" />
+      ) : (
+        <Ionicons name={offline ? "cloud-offline-outline" : "refresh-outline"} size={15} color={t.color.link} />
+      )}
+      <Text style={[s.text, { color: t.color.link }]} numberOfLines={1}>{text}</Text>
+    </Pressable>
+  );
+}
+
+/** Yanıtın kısa cümlesi; yokken hiçbir şey çizilmez (başlık altında krom şerit kalmaz). */
+export function SyncNowFeedbackText({ feedback }: { readonly feedback: SyncNowFeedback | null }) {
+  const t = useTokens();
+  const s = useStyles();
+  if (!feedback) return null;
+  const color = feedback.tone === "error" ? t.color.danger.solid : t.textSecondary;
   return (
     <View testID="simdi-guncelle-satiri">
-      <View style={s.satir}>
-        <View style={s.sol}>{sol}</View>
-        <Basilabilir onPress={bas} disabled={gidiyor} style={s.dugme} accessibilityRole="button" accessibilityLabel="Şimdi güncelle" accessibilityState={{ disabled: gidiyor, busy: gidiyor }} hitSlop={8} testID="simdi-guncelle">
-          <Ionicons name="refresh-outline" size={16} color={t.color.link} />
-          <Text style={[s.dugmeYazi, { color: t.color.link }]}>{gidiyor ? "Gönderiliyor…" : "Şimdi güncelle"}</Text>
-        </Basilabilir>
-      </View>
-      {bildirim ? (
-        <Text style={[s.bildirim, { color: renk }]} accessibilityLiveRegion="polite" testID="simdi-guncelle-bildirim">{bildirim.text}</Text>
-      ) : null}
+      <Text style={[s.feedback, { color }]} accessibilityLiveRegion="polite" testID="simdi-guncelle-bildirim">{feedback.text}</Text>
     </View>
   );
 }
 
-/** Oturuma bağlı hâli: beyan, istek ve kabul sonrası damga takibi (`/oturum` 3…25 sn; damga değişince veri tazelenir). */
-export function SimdiGuncelle({ sol }: { readonly sol?: ReactNode }) {
-  const { api, facility, refresh, factoryStamp } = useSession();
-  const live = useRef({ refresh, factoryStamp });
-  live.current = { refresh, factoryStamp };
-  const iptal = useRef<(() => void) | null>(null);
-  useEffect(() => () => iptal.current?.(), []);
-  const izle = () => {
-    iptal.current?.();
-    iptal.current = followDoorbell(live.current.factoryStamp, async () => (await live.current.refresh())?.esitleme?.ufuk ?? null, () => invalidate([ALL_TAGS]), AFTER_SYNC_NOW_MS);
-  };
-  return <SimdiGuncelleSatiri sol={sol} gorunur={syncNowAvailable(facility)} istek={() => api.syncNow()} onKabul={izle} />;
-}
-
 const useStyles = makeStyles(() => ({
-  satir: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
-  sol: { flex: 1, minWidth: 0 },
-  dugme: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, paddingVertical: space.xs },
-  dugmeYazi: { ...typography.footnote },
-  bildirim: { ...typography.footnote, marginTop: space.xs },
+  button: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
+  spinner: { width: 15, height: 15, transform: [{ scale: 0.75 }] },
+  text: { ...typography.footnote, fontWeight: "500" as const },
+  feedback: { ...typography.footnote, paddingTop: space.xs },
 }));
