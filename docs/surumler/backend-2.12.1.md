@@ -1,8 +1,8 @@
 # Backend `2.12.1`
 
-**Paket:** _(paketleme doldurur)_
-**SHA256:** _(paketleme doldurur)_
-**Commit:** _(paketleme doldurur)_
+**Paket:** `tekserp-backend-20261115_150844-c329dfac.zip`
+**SHA256:** `B34BE570F068DC1F90E71C4BD8C6AA8F7A085BBE55F26846F5763AD60A75D8A1`
+**Commit:** `c329dfac`
 **İçerik:** 2.12.0 paketinin (`d29ee21f`) bütün içeriği + sonrasında `main`e gelenler: parola politikası tek helper (`7fb2f37d`) · kısıtlı oturum + `POST /api/auth/change-password` (`ee086a4e`) · PIN/kart yalnız onaylı saha cihazından (`bbd4ebe9`) · süperadmin/admin PIN/kartla giremez (`6d5de827`) · IP kilit kovası düzeltmesi (`aba60bb7`) · `passwordPolicyVersion` (`9d611137`) · eşitleme/gelen kutusu anahtarını yalnız süperadmin çevirir (`9f6f5018`) · `patron:giris` izni + kullanıcı listesi işi (`38cc36a0`, `4a36e2a8`) · gelen kutusu yazar izni reddi (`c73a5a04`) · cihaz donanım özeti (`d5b3bb7e`, `9bdb7d12`) · "Patron (Yalnız Görme)" rol şablonu (`c295aafc`) · sipariş türevleri `toplamMiktar` + `uretim` (`2ac3d898`, `4c82f21f`) · "şimdi güncelle" isteği (`1ffa8792`) · zayıf parola zorlaması anahtarın arkasında, varsayılan KAPALI (`57094683`).
 **2.12.0 hiç kurulmadı:** bu paket doğrudan **2.11.7**'nin üstüne kurulur; 2.12.0'ın 2 migration'ı ve bu sürümün 2 migration'ı aynı kurulumda uygulanır (toplam 4). 2.12.0 zip'leri KULLANILMAZ.
 **Önceki saha sürümü:** **2.11.7** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.11.7 olduğunu ÖLÇER — farklıysa DUR).
@@ -109,15 +109,16 @@ verisi, `GET /api/sessions/active` + `system:sessions`, stok kalem/top listesi u
   - `20261113153958_cihaz_donanim_ozeti` (`devices.hwDigest`, `hwSource` NULL kolon + `devices_hwDigest_key` UNIQUE indeks)
 - **Toplam migration:** **367** (2.11.7: 363). Kuran `[7/9]`da "367 migrations found" + **4** uygulanan migration
   görmelidir; farklı sayı = yanlış paket ya da yanlış DB → DUR.
-- **Ne zaman:** backend DURMUŞKEN (`kur.ps1` sırası bunu sağlar); `rolls`/`roll_movements` dahil 32 tabloya kısa
-  ShareLock (tetikleyici kurulumu), `users` ve `devices`e kısa AccessExclusive (ADD COLUMN / indeks). Reçete:
+- **Ne zaman:** backend DURMUŞKEN (`kur.ps1` sırası bunu sağlar); tetikleyici kurulumu 27 tabloya ShareRowExclusive
+  ve `rolls`/`roll_movements` dahil 32 tabloya Share, `users` ve `devices`e AccessExclusive alır — hepsi
+  milisaniyelik (D11 ölçümü, § Doğrulama). Reçete:
   `docs/ops/PATRON-ESITLEME-KURULUM.md`.
 - **Veri yazan adımlar:** yok (yeni tablolar boş, yeni kolonlar varsayılan/NULL).
 - **Geri alınabilir mi:** migration GERİ ALINMAZ; ama eski paket (2.11.7) yeni şemada çalışır (§6).
 
 ## 5. Kurulum notu
 
-- **Beklenen kesinti:** ölçülen kısım < 5 sn (migration + açılış, § Doğrulama); asıl süre pm2 durdur/başlat ve
+- **Beklenen kesinti:** ölçülen kısım < 5 sn (`migrate deploy` 1,2 sn + açılış ≈ 0,6 sn, D11); asıl süre pm2 durdur/başlat ve
   dosya taşıma — tahmini 1–3 dk (Windows'ta ÖLÇÜLMEDİ).
 - **Sıra:** patron bulutu ayakta → bu backend (eşitleme KAPALI) → panel 1.3.17 / tablet 1.0.17 (isteğe bağlı,
   ayrı onayla) → okuma ayrı bakım işiyle açılır → ≥ 1 hafta sonra yazma.
@@ -153,3 +154,31 @@ geri yüklenir (`docs/kurallar/surum-yayin.md` § Migration).
 - panelde (1.3.15/1.3.16) parolayla giriş + top listesi + müşteri kartı; **tabletten PIN ile giriş** + bir okutma
 - tarayıcı panelinde (yönetici) Sistem → Bağlı Cihazlar açılır, en az kendi oturumunu listeler
 - ölçülen kesinti
+
+**D11 provası (2026-11-15, bugünkü fabrika yedeği `tekserp_yeni_20261115_030002.dump`'ın iki kopyası; eski kod
+`da96f611` = 2.11.7, yeni kod bu paketin commit'i; eşitleme KAPALI) — GEÇTİ:**
+- Migration: "367 migrations found", **4** uygulandı, 1,16 sn (süreç dahil; SQL 70 + 5 + 2 + 3 ms). Kilitler
+  milisaniyelik: tetikleyici kurulumu 27 tabloya ShareRowExclusive + 32 tabloya Share, `users` ve `devices`e
+  AccessExclusive. Yeni kolonlar dışında mevcut 161 tablonun içeriği DEĞİŞMEDİ; kullanıcı 13 → 13, hepsi
+  `passwordPolicyVersion = 0`. `[3/9]` karşılığı yedek 2,84 sn, 31,8 MB.
+- Açılış: eski 0,63 sn · yeni 0,55 sn; açılış yalnız 2 izni (`patron:giris`, `system:sessions`) ve
+  `WEB_BOSS_READONLY` şablonunu ekledi, kimseye izin ATAMADI. Paket zip'inin kendisi de açıldı (0,56 sn).
+- GET: 301/301 HTTP durumu aynı; maskeden sonra 15 fark, hepsi beklenen (yeni izin/rol/ekran ve audit satırları,
+  sürüm numarası, `feature-flags`te iki yeni `false` alan, 2.12.0'ın `kg`/`oldestDays` ek alanı) ya da kod dışı
+  (eşit değerli satırların sırası; depo topu → sipariş satırı karşılama dağılımı kopyadan kopyaya kayıyor — aynı
+  DB'de eski ve yeni kod AYNI değeri verdi, 2.11.7'de de var).
+- Yazma dizisi (müşteri, sipariş, aynı `clientToken`la tekrar, çuval notu, müşteri notu): 201·201·201·200·200,
+  gövdeler ve değişen tablolar iki tarafta aynı; yalnız yenide değişen tablo YOK.
+- Zayıf parolalı kullanıcı, anahtar kapalı: masaüstü (`electron`/`web`) girişi iki sürümde 200, tam izinli token,
+  `passwordChangeRequired` YOK; `/api/auth/me` ve sipariş listesi 200.
+- PIN: onaylı TABLET başlığıyla (1.0.14 başlıkları) iki sürümde 200; yeni sürümde masaüstü clientType ya da cihaz
+  başlıksız PIN → 403 `PIN_FIELD_ONLY`; `admin:` izinli hesabın PIN'i → 401. Canlı veride son 60 günün 61 PIN
+  girişinin 61'i onaylı TABLET kaydından.
+- Eski tablet akışı (1.0.14 başlıkları, `hw` yok): bilinen ve yeni kurulan tablet için announce → status → PIN →
+  top/sevkiyat listesi → `/api/auth/me` iki sürümde aynı (200; yeni kimlik APPROVED/TABLET doğar).
+- Eşitleme: `patron_sync_status()` `0 · 28 · 0`, `sync_marks` 0; yeni sürecin bağlantıları yalnız DB.
+- Giriş medyanı eski 68,6 ms · yeni 69,7 ms; 12 uçta performans farkı gürültü düzeyinde.
+- Geri dönüş: yeni kodun bir kez açıldığı yeni şemada eski kod 0,89 sn'de açıldı, `migrate status` "up to date",
+  katalog dışı 2 izni ve yeni şablonu KORUDU; eski kod (yeni şema) ↔ eski kod (eski şema) 301/301 HTTP durumu aynı.
+- Sınır: `kur.ps1`/pm2 Windows'ta, gerçek panel/tablet ile duman testi yapılmadı; anahtar AÇIK hâli provada
+  ölçülmedi. Ayrıntı: repo dışı `PROVA-D11-SONUC.md`.
