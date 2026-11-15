@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MODULES, moduleNavTitle, moduleTitle, moduleVisible, type ModuleKey } from "../lib/access";
 import { useSession } from "../state/session";
 import { StatusBands } from "./data";
-import { IconTile } from "./ortak";
+import { IconTile, Rozet } from "./ortak";
 import { DOMAIN_TONE } from "./tokens";
 import { MODULE_ICON } from "./icons";
 import { Banner } from "./kit";
@@ -19,6 +19,8 @@ import { RAIL_GROUPS, TABS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
 import { CONTENT_MAX, RAIL_WIDTH, TOUCH, WIDE_MIN, ekranOlugu, space, typography } from "./tokens";
 import { UYGULAMA_ADI } from "../lib/kimlik";
+import { destekRozetMetni, useDestekEtkin, useDestekOkunmamis } from "../destek/gorunurluk";
+import { SorunBildirDugmesi } from "./destek/SorunBildirDugmesi";
 
 export function useWide(): boolean {
   return useWindowDimensions().width >= WIDE_MIN;
@@ -38,6 +40,9 @@ export function SideNav() {
   const s = useStyles();
   const router = useRouter();
   const path = usePathname();
+  const destekEtkin = useDestekEtkin();
+  const destekRozeti = destekRozetMetni(useDestekOkunmamis());
+  const destekAktif = path === "/destek" || path.startsWith("/destek/");
   return (
     <View style={s.rail}>
       <View style={s.railHead}>
@@ -73,6 +78,23 @@ export function SideNav() {
           </View>
         );
       })}
+      {destekEtkin ? (
+        <View>
+          <Text style={s.railSection} accessibilityRole="header">Yardım</Text>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityState={{ selected: destekAktif }}
+            accessibilityLabel={destekRozeti ? `Destek, ${destekRozeti} talepte yeni yanıt` : "Destek"}
+            testID="menu-destek"
+            onPress={() => router.navigate("/destek" as never)}
+            style={({ pressed }) => [s.railItem, destekAktif && { backgroundColor: t.tintContainer }, pressed && !destekAktif && { backgroundColor: t.surfaceAlt }]}
+          >
+            <IconTile icon="help-buoy-outline" tone={DOMAIN_TONE.genel} size="sm" />
+            <Text style={[s.railText, destekAktif && { color: t.tint, fontWeight: "600" }]} numberOfLines={1}>Destek</Text>
+            {destekRozeti ? <Rozet label={destekRozeti} tone="primary" testID="ray-destek-okunmamis" /> : null}
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -133,6 +155,8 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const { scrollY, onScroll } = useHeaderScroll(onEndReached);
   const allowed = module === undefined || moduleVisible(permissions, module);
   const path = usePathname();
+  // "Sorun bildir" yalnız destek AÇIKKEN ve destek ekranlarının dışında (kapalıyken başlık bugünküyle aynı).
+  const sorunBildir = useDestekEtkin() && !path.startsWith("/destek");
   const showBack = !wide && (back ?? !TABS.some((tab) => tab.route === path));
   const pad = ekranOlugu(wide);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/pano"));
@@ -148,7 +172,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         scrollY={scrollY}
         seamless={seamless}
         onBack={showBack ? goBack : undefined}
-        action={headerRight}
+        action={sorunBildir ? <>{headerRight}<SorunBildirDugmesi /></> : headerRight}
         meta={<SyncIndicator last={factoryStamp} offline={offline} onPress={onRefresh} />}
       />
       <Animated.ScrollView

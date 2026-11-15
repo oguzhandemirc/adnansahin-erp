@@ -51,7 +51,8 @@ export interface DownloadedFile {
 
 export interface ApiClient {
   get<T>(path: string, query?: Query): Promise<T>;
-  post<T>(path: string, body: unknown): Promise<T>;
+  /** `timeoutMs`: istek başına zaman aşımı (ör. ekli destek talebi 60 sn); verilmezse istemcinin varsayılanı. */
+  post<T>(path: string, body: unknown, o?: { readonly timeoutMs?: number }): Promise<T>;
   patch<T>(path: string, body: unknown): Promise<T>;
   download(path: string, query?: Query): Promise<DownloadedFile>;
 }
@@ -109,8 +110,8 @@ export function createClient(opts: ClientOptions): ApiClient {
     throw err;
   }
 
-  async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
-    const res = await send(method, path, { body, query, accept: "application/json" });
+  async function request<T>(method: string, path: string, body?: unknown, query?: Query, timeoutMs?: number): Promise<T> {
+    const res = await send(method, path, { body, query, accept: "application/json", timeoutMs });
     let parsed: unknown = null;
     try {
       parsed = await res.json();
@@ -138,7 +139,7 @@ export function createClient(opts: ClientOptions): ApiClient {
 
   return {
     get: (path, query) => request("GET", path, undefined, query),
-    post: (path, body) => request("POST", path, body ?? {}),
+    post: (path, body, o) => request("POST", path, body ?? {}, undefined, o?.timeoutMs),
     patch: (path, body) => request("PATCH", path, body ?? {}),
     download,
   };

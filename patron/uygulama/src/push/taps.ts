@@ -6,7 +6,8 @@
 import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
-import { safeRoute } from "../lib/notification-form";
+import { destekRozetiniTazele } from "../destek/gorunurluk";
+import { isSupportRoute, safeRoute } from "../lib/notification-form";
 import { useSession } from "../state/session";
 import { NATIVE_PUSH_ETKIN } from "./support";
 
@@ -15,6 +16,8 @@ const nativeTaps = (): typeof import("./taps-native") => require("./taps-native"
 export interface TapDeps {
   readonly facilityId: string | null;
   push(route: string): void;
+  /** Destek yanıtı bildirimi açıldı: rozet tazelenir (hata yutulur). */
+  onSupport?(): void;
 }
 
 /** Saf dokunuş akışı: güvenli yol → tesis aynı mı → yol. Açıldıysa true. */
@@ -24,6 +27,7 @@ export async function openNotification(data: unknown, d: TapDeps): Promise<boole
   if (!route) return false;
   if (typeof v.tesisId === "string" && v.tesisId !== "" && v.tesisId !== d.facilityId) return false;
   d.push(route);
+  if (isSupportRoute(route)) d.onSupport?.();
   return true;
 }
 
@@ -41,10 +45,10 @@ export function webTapFromUrl(href: string): { rota: string; tesisId: string } |
 
 export function useNotificationTaps(enabled: boolean): void {
   const router = useRouter();
-  const { facilityId } = useSession();
+  const { facilityId, api } = useSession();
   // Oturum değişince dinleyici yeniden kurulmasın (son bildirim yeniden açılırdı): güncel değerler ref'te.
-  const deps = useRef<TapDeps>({ facilityId, push: (r) => router.push(r as never) });
-  deps.current = { facilityId, push: (r) => router.push(r as never) };
+  const deps = useRef<TapDeps>({ facilityId, push: (r) => router.push(r as never), onSupport: () => void destekRozetiniTazele(api) });
+  deps.current = { facilityId, push: (r) => router.push(r as never), onSupport: () => void destekRozetiniTazele(api) };
   useEffect(() => {
     if (!enabled || Platform.OS !== "web" || typeof window === "undefined") return;
     const tap = webTapFromUrl(window.location.href);

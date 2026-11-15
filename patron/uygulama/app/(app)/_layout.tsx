@@ -2,6 +2,7 @@
 // (≥ 768) solda kalıcı ray. Bildirime dokunma oturum hazırken dinlenir.
 import { Redirect, Stack } from "expo-router";
 import { View } from "react-native";
+import { useDestekYoklama } from "../../src/destek/gorunurluk";
 import { useNotificationTaps } from "../../src/push/taps";
 import { useSession } from "../../src/state/session";
 import { SideNav, useWide } from "../../src/ui/Frame";
@@ -13,11 +14,13 @@ import { useTokens } from "../../src/ui/theme-context";
 export const unstable_settings = { initialRouteName: "(tabs)" };
 
 export default function AppLayout() {
-  const { phase } = useSession();
+  const { phase, api, facility } = useSession();
   const wide = useWide();
   const t = useTokens();
   const g = useGezinme();
   useNotificationTaps(phase === "hazir");
+  // Destek: durum → (açıksa) seyrek rozet yoklaması; kapalı/eski bulut/hata → hiçbir destek girişi yok.
+  useDestekYoklama(api, phase === "hazir" && facility ? `${facility.tesis.id}:${facility.hesap.id}` : null);
   if (phase === "yukleniyor") return <Loading />;
   if (phase !== "hazir") return <Redirect href="/giris" />;
   return (

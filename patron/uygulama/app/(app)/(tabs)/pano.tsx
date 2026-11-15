@@ -9,6 +9,7 @@ import { Text, View } from "react-native";
 import { visibleCards, visibleModules, type ModuleKey } from "../../../src/lib/access";
 import { PERIODS, type PeriodKey } from "../../../src/lib/labels/uretim";
 import { TERIM } from "../../../src/lib/terim";
+import { destekRozetMetni, useDestekOkunmamis } from "../../../src/destek/gorunurluk";
 import { rozetMetni, useOkunmamisRet } from "../../../src/state/okunmamis-ret";
 import { useSession } from "../../../src/state/session";
 import { useOpenRefresh } from "../../../src/state/useOpenRefresh";
@@ -87,6 +88,10 @@ export default function Dashboard() {
   // Okunmamış ret (fabrikanın kabul etmediği gönderim) rozeti burada; kayıt açılınca söner.
   const okunmamis = useOkunmamisRet();
   const retRozeti = rozetMetni(okunmamis);
+  // Destek yanıtı rozeti (destek kapalıyken depo hep sıfır → çizilmez); ret rozeti öncelikli (kırmızı).
+  const destekOkunmamis = useDestekOkunmamis();
+  const destekRozeti = destekRozetMetni(destekOkunmamis);
+  const menuEtiketi = ["Menü", retRozeti ? `${okunmamis} okunmamış hata` : null, destekRozeti ? `${destekOkunmamis.tickets} talepte yeni destek yanıtı` : null].filter(Boolean).join(", ");
   const duzenleDugmesi = ozetVar && !duzenle ? (
     <Basilabilir onPress={() => setDuzenle(true)} style={s.duzenle} accessibilityRole="button" accessibilityLabel="Panoyu düzenle" testID="pano-duzenle">
       <Ionicons name="create-outline" size={18} color={t.color.link} />
@@ -98,13 +103,17 @@ export default function Dashboard() {
       onPress={() => router.push("/diger" as never)}
       style={s.menu}
       accessibilityRole="button"
-      accessibilityLabel={retRozeti ? `Menü, ${okunmamis} okunmamış hata` : "Menü"}
+      accessibilityLabel={menuEtiketi}
       testID="pano-menu"
     >
       <Ionicons name="menu" size={24} color={t.color.link} />
       {retRozeti ? (
         <View style={[s.menuRozet, { backgroundColor: t.color.danger.solid }]} testID="pano-menu-rozet">
           <Text style={[s.menuRozetYazi, { color: t.color.onPrimary }]}>{retRozeti}</Text>
+        </View>
+      ) : destekRozeti ? (
+        <View style={[s.menuRozet, { backgroundColor: t.color.primary }]} testID="pano-menu-destek-rozet">
+          <Text style={[s.menuRozetYazi, { color: t.color.onPrimary }]}>{destekRozeti}</Text>
         </View>
       ) : null}
     </Basilabilir>

@@ -5,6 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import { MODULES, moduleNavTitle, moduleVisible } from "../../src/lib/access";
+import { destekRozetMetni, useDestekEtkin, useDestekOkunmamis } from "../../src/destek/gorunurluk";
 import { rozetMetni, useOkunmamisRet } from "../../src/state/okunmamis-ret";
 import { useSession } from "../../src/state/session";
 import { Avatar } from "../../src/ui/diger/parts";
@@ -26,6 +27,10 @@ export default function More() {
   const hesap = facility?.hesap;
   const okunmamis = useOkunmamisRet();
   const retRozeti = rozetMetni(okunmamis);
+  // Destek bloğu yalnız destek AÇIKKEN (kapalı / eski bulut → menü bugünküyle aynı).
+  const destekEtkin = useDestekEtkin();
+  const destekOkunmamis = useDestekOkunmamis();
+  const destekRozeti = destekRozetMetni(destekOkunmamis);
   const gruplar = MORE_GROUPS.map((g) => ({ ...g, mods: g.modules.filter((k) => moduleVisible(permissions, k)).map((k) => MODULES.find((m) => m.key === k)!) })).filter((g) => g.mods.length > 0);
 
   return (
@@ -66,6 +71,22 @@ export default function More() {
           </ListeBlogu>
         </KademeliGiris>
       ))}
+      {destekEtkin ? (
+        <KademeliGiris sira={gruplar.length + 1}>
+          <ListeBlogu baslik="Yardım" testID="grup-destek">
+            <ListeSatiri
+              birincil="Destek"
+              icon="help-buoy-outline"
+              ton={DOMAIN_TONE.genel}
+              ayrac={false}
+              rozet={destekRozeti ? <Rozet label={destekRozeti} tone="primary" testID="destek-okunmamis" /> : undefined}
+              accessibilityLabel={destekRozeti ? `Destek, ${destekOkunmamis.tickets} talepte yeni yanıt` : "Destek"}
+              onPress={() => router.push("/destek" as never)}
+              testID="menu-destek"
+            />
+          </ListeBlogu>
+        </KademeliGiris>
+      ) : null}
     </Screen>
   );
 }

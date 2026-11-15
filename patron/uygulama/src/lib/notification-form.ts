@@ -79,9 +79,18 @@ export function fromForm(f: NotificationForm): { ok: true; settings: Notificatio
 
 const RECORD_ROUTES = new Set(["/gelen-kutusu", "/raporlar", "/siparisler", "/cariler"]);
 
+/** Destek yanıtı bildirimi (bulut §7): `/destek/<talep UUID>` → talep ayrıntısı. Destek modül tablosunda değildir
+ *  (görünürlüğü `/destek/durum`a bağlı), yol ayrıca tanınır; yalnız UUID biçimli kimlik kabul edilir. */
+const SUPPORT_ROUTE = /^\/destek\/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
+
+export function isSupportRoute(rota: string): boolean {
+  return SUPPORT_ROUTE.test(rota);
+}
+
 /** Bildirimin taşıdığı yol yalnız uygulamanın KENDİ ekranıysa açılır (dış adres, `//`, bilinmeyen bölüm → null). */
 export function safeRoute(rota: unknown): string | null {
   if (typeof rota !== "string" || !/^\/[a-z-]+(\/[A-Za-z0-9-]{1,64})?$/.test(rota)) return null;
+  if (isSupportRoute(rota)) return rota;
   const [, first, second] = rota.split("/");
   const base = `/${first}`;
   if (!MODULES.some((m) => m.route === base)) return null;

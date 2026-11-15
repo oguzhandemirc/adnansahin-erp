@@ -28,6 +28,8 @@ export const BRAND_PRIMARY = "#4F46E5";
 export const BRAND_NAVY = "#161C2B";
 /** Lacivert zemin üstü metin tonları (zemin her temada koyu → değerler sabit; ≥ 11:1). */
 export const ON_NAVY = { text: "#F1F5F9", textSecondary: "#CBD5E1", border: "#2E3440" } as const;
+/** Destek çizim ekranı: ekran görüntüsünün ÜSTÜNE çizilir → her temada aynı sabit tonlar; karartma TAM siyah örtü. */
+export const CIZIM_PALETI = { kirmizi: "#DC2626", sari: "#F59E0B", yesil: "#16A34A", mavi: "#2563EB", karartma: "#000000", tuvalZemini: "#E2E8F0" } as const;
 
 export const DEFAULT_APPEARANCE: Appearance = {
   mode: "sistem",
