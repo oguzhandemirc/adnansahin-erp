@@ -73,6 +73,7 @@ Paket `deploy/` ve `scripts/`yi TAŞIMAZ (`docs/KOD-KURALLARI.md` § deploy) —
 | Animasyon · klavye · sıralama | `react-native-reanimated` 4 + `react-native-worklets` · `react-native-keyboard-controller` · `react-native-sortables` | worklets reanimated 4 peer'ı |
 | Ağ · güncelleme · test | `@react-native-community/netinfo` · `jest-expo` + `@testing-library/react-native` (güncelleme: npm paketi değil, Play uygulama içi güncelleme yerel modülü) | — |
 | Play uygulama içi güncelleme | Maven `com.google.android.play:app-update` 2.1.0 — yerel modül `modules/teks-erp-play-guncelleme` (npm paketi YOK) | reddedilen: `sp-react-native-in-app-updates` (4 ek paket), `expo-in-app-updates` (0.13 SDK 58 ister; 0.12 indirince kendiliğinden yeniden başlatır) · §9 |
+| Destek: ekran yakalama · çizim | `react-native-view-shot` 4.0.3 (yalnız `screens/Destek/`) · `react-native-svg` 15.12.1 (çizim katmanı) | galeri/dosya seçici paketi EKLENMEZ (ek yalnız ekran görüntüsü) · §9 |
 | Şema doğrulama | **YOK** (`zod` bağımlılığı yok, 386 dosyada 0 `z.object`) | §8 açık karar |
 | Web hedefi | **YOK** | `react-native-web` + `react-dom` ölü (§7) |
 

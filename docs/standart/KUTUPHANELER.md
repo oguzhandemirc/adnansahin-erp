@@ -107,6 +107,14 @@ ve sonuç arşivde: `docs/history/CLAUDE-NOT-ARSIVI.md` (2026-09-07) ve
 `Teks-Erp/src/lib/logger.ts` başlığı. Yeni paket eklenince §3'teki blok buraya,
 §2'ye bir satır yazılır.
 
+### react-native-view-shot@4.0.3 + react-native-svg@15.12.1 · mobil · 2026-11-16 (kullanıcı onayı)
+1. Problem      : saha "Sorun bildir" — anlık ekran görüntüsü (view-shot `captureScreen`/`captureRef`) ve üzerine ok/kutu/karartma çizimi (svg) · §2.3 "Destek: ekran yakalama · çizim"
+2. Alternatifler: ekran yakalama için `expo-screen-capture` (yalnız engeller/dinler, yakalamaz → red), elle yerel modül (PixelCopy + JPEG; view-shot'un bakımlı kopyası olurdu → red); çizim için `@shopify/react-native-skia` (~6 MB native → red), elle View tabanlı çizgi (ok/serbest iz eğri çizemez → red); view-shot + svg (SEÇİLDİ, Expo SDK 54 pinli sürümler)
+3. Boyut/biçim  : ikisi de native (autolink, config plugin YOK); svg ~1 MB AAR + JS ayrıştırıcı bağımlılıkları (css-select, css-tree)
+4. Bakım        : Expo pinli tam sürüm (`npx expo install`) — elle değiştirilmez ([KU-12]); SDK ile yükselir
+5. Lisans       : ikisi de MIT
+6. Dağıtım      : yerel modül → `expo prebuild --clean` + yeni APK/AAB (Play) ister; yeni Android izni YOK (yakalama uygulamanın kendi penceresidir, MediaProjection değil)
+
 ### com.google.android.play:app-update@2.1.0 · mobil · 2026-11-12 (kullanıcı onayı)
 1. Problem      : Play dahili testten kurulan saha uygulaması yeni sürümü kendisi bildirsin (Play In-App Updates) · §2.3 "Play uygulama içi güncelleme"
 2. Alternatifler: `sp-react-native-in-app-updates` (+`react-native-device-info`, `semver`, `underscore`, eş `react-native-siren` → red); `expo-in-app-updates` 0.13 (Expo SDK 58 ister), 0.12 (indirme bitince sormadan `completeUpdate` → işin ortasında yeniden başlatma → red); elle: Google kitaplığı üstüne ince yerel Expo modülü (SEÇİLDİ, `mobil/modules/teks-erp-play-guncelleme`)

@@ -16,6 +16,7 @@ import LogoutModals from './LogoutModals';
 import PlaceChip from './session/PlaceChip';
 import { usePlaceActions, MachinePickerModal } from './session/PlaceActions';
 import HeaderSecondRow from './HeaderSecondRow';
+import { DestekMenuOgeleri, DestekRozetNoktasi } from '../screens/Destek/DestekGirisleri';
 import type { MainStackParamList, RootStackParamList } from '../navigation/types';
 
 interface Props {
@@ -179,6 +180,8 @@ export default function ScreenChrome({
                     {operatorName}
                   </Text>
                 )}
+                {/* Okunmamış destek yanıtı — destek kapalıyken render edilmez. */}
+                <DestekRozetNoktasi />
               </View>
             </TouchableRipple>
           }
@@ -211,6 +214,8 @@ export default function ScreenChrome({
             style={styles.menuItem}
             titleStyle={styles.menuItemTitle}
           />
+          {/* Destek: Sorun bildir + Taleplerim — destek kapalıyken hiçbir şey çizmez. */}
+          <DestekMenuOgeleri menuyuKapat={() => setMenuVisible(false)} />
           {/* Tablet: nadir yer-değiştirme işlemleri — Ayarlar'ın ALTINDA.
               Görünürlük kuralları usePlaceActions'ta (tek makine / tek bölüm → gizli). */}
           {(placeActions.showMachine || placeActions.showStation) && (

@@ -8,6 +8,7 @@ import { getOrCreateDeviceId } from '../utils/deviceId';
 // Import yönü güvenli: authStore yalnız utils/storage'a bağımlı (api'yi import etmez).
 import { useAuthStore } from '../store/authStore';
 import { recordNetSample } from './netStats';
+import { sonHataKaydet } from './sonHata';
 import {
   reportServerReachable,
   reportServerUnreachable,
@@ -252,6 +253,13 @@ apiClient.interceptors.response.use(
           ? 'Sunucuya ulaşılamıyor — Wi-Fi/ağ bağlantısını kontrol edin'
           : 'Sunucu hatası';
     const message = error.response?.data?.message || fallback;
+    // Destek talebinin "son hata" bağlamı — yalnız yol + durum + mesaj (bkz. sonHata.ts).
+    sonHataKaydet({
+      method: error.config?.method,
+      url,
+      status: status ?? (error.code === 'ECONNABORTED' ? 'ZAMAN_ASIMI' : 'AG'),
+      message,
+    });
     // Backend AppError.details payload'ı koru — frontend "ITEM_MISMATCH" gibi
     // özel handling için (modal göster, override ile retry) bu yapıya bakar.
     const details = error.response?.data?.details;

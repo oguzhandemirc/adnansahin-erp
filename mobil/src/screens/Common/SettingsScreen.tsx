@@ -26,6 +26,8 @@ import type { RootStackParamList } from '../../navigation/types';
 import { SETTINGS_COLORS as COLORS } from './settings/settingsUi';
 import { scanMenuSummary } from '../../services/hardwareScanner/resolveScanMethod';
 import { useScanMethod } from '../../hooks/useScanMethod';
+import { useDestekEtkin, useDestekOkunmamis } from '../Destek/useDestek';
+import { rozetMetni } from '../Destek/destekGorunurluk';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -35,7 +37,8 @@ interface MenuRow {
   title: string;
   /** Satırın altındaki "şu an ne ayarlı" özeti — menüye bakınca içeri girmeden görünür. */
   value: string;
-  route: keyof RootStackParamList;
+  /** Parametresiz kök rotalar (DestekDetay talep kimliği ister, menüden açılmaz). */
+  route: Exclude<keyof RootStackParamList, 'DestekDetay'>;
 }
 
 export default function SettingsScreen() {
@@ -51,6 +54,9 @@ export default function SettingsScreen() {
   const active = useSessionStore((s) => s.active);
   // Kişisel tercih (2026-08-09) — menü satırında özet göstermek için.
   const { mode: firmMode } = useSubcontractorDefault();
+  // Destek satırı yalnız oturum açıkken VE destek etkinken (useDestekEtkin oturumsuz false).
+  const destekEtkin = useDestekEtkin();
+  const destekRozet = rozetMetni(useDestekOkunmamis());
 
   // Menü satırı sayfanın ÖZETİNİ göstermeli (dosyadaki kural).
   const sonYayin = SURUM_NOTLARI[0];
@@ -124,6 +130,17 @@ export default function SettingsScreen() {
       value: sonYayinOzet,
       route: 'SettingsSurumNotlari',
     },
+    ...(destekEtkin
+      ? [
+          {
+            key: 'destek',
+            icon: 'lifebuoy',
+            title: 'Destek',
+            value: destekRozet ? `Taleplerim · ${destekRozet} yeni yanıt` : 'Taleplerim · sorun bildir',
+            route: 'DestekTaleplerim' as const,
+          },
+        ]
+      : []),
   ];
 
   return (

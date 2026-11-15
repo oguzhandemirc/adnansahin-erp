@@ -16,6 +16,12 @@ export type RootStackParamList = {
   SettingsUpdate: undefined;
   SettingsSurumNotlari: undefined;
   DevicePairing: undefined;
+  // Destek (Etkili Destek talepleri) — modül değil, izinsiz; yalnız `/api/destek/durum`
+  // etkinken giriş görünür. Taslak (ekran görüntüsü) `destekTaslakStore`da taşınır.
+  DestekYeni: undefined;
+  DestekCizim: undefined;
+  DestekTaleplerim: undefined;
+  DestekDetay: { id: string; number?: string };
 };
 
 /**
