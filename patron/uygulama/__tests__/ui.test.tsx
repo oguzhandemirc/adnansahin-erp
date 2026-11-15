@@ -40,14 +40,20 @@ describe("izinli menü", () => {
     expect(screen.getByText("İş")).toBeTruthy();
     expect(screen.getByText("Hesap")).toBeTruthy();
   });
-  it("rol rozeti: hesap yönetimi izni Yönetici, diğerleri Çalışan", () => {
-    mockSession.permissions = ["bulut:hesap:yonet"];
-    const a = render(<SideNav />);
-    expect(screen.getByTestId("rol-rozeti").props.accessibilityLabel).toBe("Rol: Yönetici");
-    a.unmount();
-    mockSession.permissions = ["bulut:siparis:oku"];
-    render(<SideNav />);
-    expect(screen.getByTestId("rol-rozeti").props.accessibilityLabel).toBe("Rol: Çalışan");
+  it("rol rozeti: hesap yönetimi izni Yönetici, yazma izni olan Çalışan, hiç yazma izni olmayan Yalnız Görme", () => {
+    const label = (perms: string[]) => {
+      mockSession.permissions = perms;
+      const r = render(<SideNav />);
+      const v = screen.getByTestId("rol-rozeti").props.accessibilityLabel;
+      r.unmount();
+      return v;
+    };
+    expect(label(["bulut:hesap:yonet"])).toBe("Rol: Yönetici");
+    expect(label(["bulut:siparis:oku", "bulut:siparis:yaz"])).toBe("Rol: Çalışan");
+    expect(label(["bulut:cari:yaz"])).toBe("Rol: Çalışan");
+    // "Patron (Yalnız Görme)": tüm okuma izinleri, hiçbir `bulut:*:yaz` ve `bulut:hesap:yonet` yok.
+    expect(label(["bulut:oturum", "bulut:ozet:oku", "bulut:siparis:oku", "bulut:cari:oku", "bulut:stok:oku", "bulut:rapor:oku"])).toBe("Rol: Yalnız Görme");
+    expect(label([])).toBe("Rol: Yalnız Görme");
   });
   it("izinsiz ekran içerik yerine uyarı gösterir; çevrimdışı bandı çıkar", () => {
     mockSession.permissions = ["bulut:oturum"];

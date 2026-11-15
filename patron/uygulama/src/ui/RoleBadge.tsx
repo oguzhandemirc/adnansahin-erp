@@ -1,17 +1,21 @@
-// Rol rozeti (tasarım dili §1.4): ölçüt `bulut:hesap:yonet` (fabrikada `admin:users`ten türer) → Yönetici, diğerleri
-// Çalışan. Yalnız gösterir; karar sunucudadır. Rol adı TEK kaynak `ROLE_LABEL` (profil kartı da buradan okur).
+// Rol rozeti (tasarım dili §1.4): ölçüt `bulut:hesap:yonet` (fabrikada `admin:users`ten türer) → Yönetici; hiçbir
+// yazma izni (`bulut:*:yaz`) yoksa → Yalnız Görme; diğerleri Çalışan. Rol istemcide izin listesinden türer (sunucu
+// rol adı göndermez). Yalnız gösterir; karar sunucudadır. Rol adı TEK kaynak `ROLE_LABEL` (profil kartı da buradan okur).
 import { Text, View } from "react-native";
 import { can } from "../lib/access";
 import { makeStyles, useTokens } from "./theme-context";
 import { FONT_SCALE, space, typography } from "./tokens";
 
-export type Role = "yonetici" | "ekip";
+export type Role = "yonetici" | "ekip" | "viewer";
+
+const WRITE_PERMISSION = /^bulut:[^:]+:yaz$/;
 
 export function roleOf(perms: readonly string[]): Role {
-  return can(perms, "bulut:hesap:yonet") ? "yonetici" : "ekip";
+  if (can(perms, "bulut:hesap:yonet")) return "yonetici";
+  return perms.some((p) => WRITE_PERMISSION.test(p)) ? "ekip" : "viewer";
 }
 
-export const ROLE_LABEL: Readonly<Record<Role, string>> = { yonetici: "Yönetici", ekip: "Çalışan" };
+export const ROLE_LABEL: Readonly<Record<Role, string>> = { yonetici: "Yönetici", ekip: "Çalışan", viewer: "Yalnız Görme" };
 
 export function RoleBadge({ permissions, testID = "rol-rozeti" }: { readonly permissions: readonly string[]; readonly testID?: string }) {
   const t = useTokens();

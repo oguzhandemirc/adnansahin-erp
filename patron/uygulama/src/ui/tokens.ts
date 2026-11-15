@@ -150,7 +150,7 @@ export interface Theme {
   readonly domain: Readonly<Record<Domain, DomainColor>>;
   readonly status: Readonly<Record<StatusKind, StatusColor>>;
   readonly station: Readonly<Record<StationKind, DomainColor>>;
-  readonly role: { readonly yonetici: Pair; readonly ekip: Pair };
+  readonly role: { readonly yonetici: Pair; readonly ekip: Pair; readonly viewer: Pair };
   readonly cardShadow: ViewStyle;
   readonly floatShadow: ViewStyle;
   /** Karekod gibi her temada beyaz kalması gereken yüzey. */
@@ -438,7 +438,7 @@ function create(scheme: Scheme, a: Appearance): Theme {
       bilgi: { fill: base.textMuted, text: base.text, bg: color.secondary, icon: STATUS_ICON.bilgi },
     },
     station: { ic: { fg: tile.violet.fg, chip: tile.violet.bg }, dis: { fg: tile.orange.fg, chip: tile.orange.bg } },
-    role: { yonetici: { fg: onPrimary, bg: p.primary }, ekip: primaryPair },
+    role: { yonetici: { fg: onPrimary, bg: p.primary }, ekip: primaryPair, viewer: primaryPair },
     cardShadow: shadow.card,
     floatShadow: shadow.float,
     paper: WHITE,
