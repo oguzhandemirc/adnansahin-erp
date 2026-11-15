@@ -215,7 +215,7 @@ export async function classifyOrAskWithTable(
 export const scanSeriesService = {
   /** Tabloyu çek. Bozuk/boş yanıt YEDEĞE düşer — okutma yolu kapanmaz. */
   async get(): Promise<ScanSeriesRow[]> {
-    const res = await apiClient.get<{ success: boolean; data: ScanSeriesRow[] }>('/api/scan/series');
+    const res = await apiClient.get<{ success: boolean; data: ScanSeriesRow[] }>('/scan/series');
     const rows = res.data?.data;
     const taninan = Array.isArray(rows) ? rows.filter(isRow) : [];
     if (taninan.length > 0) return taninan;
@@ -230,7 +230,7 @@ export const scanSeriesService = {
     const code = raw.trim().toUpperCase();
     try {
       const res = await apiClient.get<{ data: { code: string; kind: ScanKind | 'UNKNOWN'; key: string | null } }>(
-        '/api/scan/resolve',
+        '/scan/resolve',
         { params: { code } },
       );
       const d = res.data?.data;
