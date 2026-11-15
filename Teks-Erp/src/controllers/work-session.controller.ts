@@ -38,7 +38,7 @@ const historySchema = z.object({
 function requireDevice(req: Request): { id: string } {
   if (!req.device) {
     throw AppError.badRequest(
-      "Onaylı cihaz gerekli — bu işlem yalnız kayıtlı tablet/telefondan yapılabilir (cihaz yöneticiden onaylanmalı)",
+      "Bu cihaz sunucuda kayıtlı görünmüyor. Uygulamayı kapatıp yeniden açın; sorun sürerse yöneticinizden cihazı onaylamasını isteyin.",
       { code: "DEVICE_REQUIRED" },
     );
   }
