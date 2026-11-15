@@ -96,6 +96,11 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Bulut `POST /v1/kullanicilar` kümesini tek tx'te (ilk ifade 9205 kilidi) uygular: kümede yok → PASİF + parola özeti NULL + oturumlar kapanır; parola özeti değişince (kapanış/yeniden açılış dahil) `kimlik_surumu` +1; özet gövdeyle tutmazsa ya da izin bulut kataloğunda yoksa 400; denetime ve log'a parola özeti ve mühür yazılmaz, log yalnız sayıdır. [bekçi: patron/sunucu test_kullanici_esitleme]
 - Eski bulut (`/v1/kullanicilar` 404) hata değildir: tek satır log + 60 dk geri çekilme; kurulum sırası önce bulut, sonra fabrikadır. [bekçi: test_patron_bulut_kullanicilar]
 
+### Etkili Destek (bulut + patron uygulaması)
+
+- Etkili Destek (bulut, `docs/ops/DESTEK-ENTEGRASYONU-BULUT.md`) varsayılan KAPALI: adres + anahtar sırrı yoksa `/api/destek/*` 403 `MODULE_DISABLED` ve merkeze istek yok, webhook sırrı yoksa webhook 404; kimlik yalnız oturumdan kurulur (gövdedeki `user`/`tenant` 400), webhook ham gövde imzası + ±300 sn + `eventId` tekilliğiyle kabul edilir, talep bulutta saklanmaz (göç yok) ve sır hiçbir çıktıya girmez. [bekçi: test_destek_bulut · test_compose_sirlari]
+- Patron uygulamasında Destek satırı, "Sorun bildir" simgesi ve rozet YALNIZ `/destek/durum` `etkin:true` iken çizilir (404/hata = kapalı, herhangi bir uçtan 403 `MODULE_DISABLED` girişi hemen gizler); rozet 120 sn'de bir ve hatası yutulur, `clientToken` form açılışında bir kez (belirsiz hata/429'da aynı, kesin 4xx'te yeni), `Destek yanıtı` push'u yalnız `/destek/<UUID>` rotasını açar. [bekçi: patron/uygulama __tests__/destek.test.tsx · __tests__/mirror.test.ts]
+
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 
 1. `.env`: `PATRON_CLOUD_URL=https://<bulut kökeni>` ve `PATRON_CLOUD_KEY_FILE=<mutlak yol>` (dosya veri dizininde, repoda değil).
@@ -114,9 +119,9 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 
 Backend: `test_patron_bulut_imza` · `test_patron_bulut_kullanicilar` · `test_patron_cloud_switch_superadmin` · `test_password_policy_version` · `test_patron_bulut_uygunluk` · `test_patron_bulut_esitleme` · `test_patron_bulut_anliklar` · `test_patron_bulut_gelen_kutusu` · `test_patron_bulut_rapor` · `test_patron_bulut_cari_ozeti` · `test_patron_bulut_is_emri` · `test_patron_bulut_siparis_uretim` · `test_patron_bulut_simdi_guncelle` · `test_feature_flag_contract` · `test_token_replay_bogaz` · `test_snapshot_kolonlari` · `test_db_invariants`
 
-Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_giris_fabrika_parolasi` (giriş · TOTP · kaba kuvvet · bayatlık) · `test_hesap_acil_cli` (acil CLI · üyelik sökümü) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` · `test_simdi_guncelle` (şimdi güncelle işareti · uzun yoklama) ve dizindeki diğer `test_*.ts`.
+Bulut (`patron/sunucu/scripts/`, koşucu `npx tsx scripts/run-all-tests.ts`, `_test` DB): `test_giris_fabrika_parolasi` (giriş · TOTP · kaba kuvvet · bayatlık) · `test_hesap_acil_cli` (acil CLI · üyelik sökümü) · `test_cari_ozeti` · `test_disa_aktarma` · `test_patron_kapilari` · `test_rls_sizinti` · `test_simdi_guncelle` (şimdi güncelle işareti · uzun yoklama) · `test_destek_bulut` (Etkili Destek uçları · webhook · push) · `test_compose_sirlari` ve dizindeki diğer `test_*.ts`.
 
-Uygulama (`patron/uygulama`, `npx jest`): `__tests__/iki-adimli-dogrulama.test.tsx` (giriş adımları · hata cümleleri) · `__tests__/mirror.test.ts` (uç tablosu ↔ sunucu rotaları) · `__tests__/siparis-uretim.test.tsx` (sipariş Üretim sütunu · ayrıntıda iş emirleri yalnız `is-emri` üyelik süzgeci beyanlıysa) · `__tests__/simdi-guncelle.test.tsx` (panodaki "Şimdi güncelle" yalnız `simdiGuncelle` beyanlıysa · geri bildirim cümleleri).
+Uygulama (`patron/uygulama`, `npx jest`): `__tests__/iki-adimli-dogrulama.test.tsx` (giriş adımları · hata cümleleri) · `__tests__/mirror.test.ts` (uç tablosu ↔ sunucu rotaları) · `__tests__/siparis-uretim.test.tsx` (sipariş Üretim sütunu · ayrıntıda iş emirleri yalnız `is-emri` üyelik süzgeci beyanlıysa) · `__tests__/simdi-guncelle.test.tsx` (panodaki "Şimdi güncelle" yalnız `simdiGuncelle` beyanlıysa · geri bildirim cümleleri) · `__tests__/destek.test.tsx` (destek görünürlüğü · rozet · clientToken · çizim · bildirim rotası).
 
 Gerçek veri provası bekçi değildir, yalnız yerel prova/test veritabanında koşar: `Teks-Erp/scripts/prova_patron_esitleme.ts` (28 tetikleyicinin kapalı doğması, hata yutma, anahtar davranışı, süreler).
 
