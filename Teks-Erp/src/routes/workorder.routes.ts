@@ -6,6 +6,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { WorkOrderController, orderLineAllocationItem } from "../controllers/workorder.controller";
 import { workOrderLinkService } from "../services/workorder-link.service";
+import { WORK_ORDER_NOTE_MAX, workOrderNoteService } from "../services/workorder-note.service";
 import { verifyToken } from "../middlewares/auth.middleware";
 import { requireProductionEnabled } from "../middlewares/module.middleware";
 import { requirePermission, requireAnyPermission } from "../middlewares/rbac.middleware";
@@ -694,6 +695,54 @@ router.put(
   async (req, res) => {
     const body = allocationsBody.parse(req.body);
     res.json(await workOrderLinkService.setOrderLinkAllocations(req.params.id as string, body.allocations, req.user?.userId));
+  },
+);
+
+/**
+ * @openapi
+ * /api/work-orders/{id}/note:
+ *   get:
+ *     tags: [WorkOrders]
+ *     summary: İş emri planlama notu (yalnız panel; kart/etiket/tablet/bulut görmez)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "{ workOrderId, body (boşsa null), updatedAt, updatedBy { id, fullName } | null }" }
+ *       404: { description: İş emri bulunamadı }
+ *   put:
+ *     tags: [WorkOrders]
+ *     summary: Planlama notunu yaz (≤ 2000 karakter; boş/null = temizle)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [body]
+ *             properties:
+ *               body: { type: string, nullable: true, maxLength: 2000 }
+ *     responses:
+ *       200: { description: Güncel not görünümü (GET ile aynı şekil) }
+ *       400: { description: 2000 karakteri aşan not }
+ */
+const noteBody = z.object({
+  body: z.string().max(WORK_ORDER_NOTE_MAX, `Not en fazla ${WORK_ORDER_NOTE_MAX} karakter olabilir`).nullable(),
+});
+router.get(
+  "/:id/note",
+  verifyToken,
+  requireAnyPermission("workorder:read", "workorder:write"),
+  async (req, res) => {
+    res.json(await workOrderNoteService.get(req.params.id as string));
+  },
+);
+router.put(
+  "/:id/note",
+  verifyToken,
+  requirePermission("workorder:write"),
+  async (req, res) => {
+    const body = noteBody.parse(req.body);
+    res.json(await workOrderNoteService.set(req.params.id as string, body.body ?? "", req.user?.userId));
   },
 );
 

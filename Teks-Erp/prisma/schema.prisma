@@ -3885,6 +3885,7 @@ model WorkOrder {
   splitChildren    WorkOrder[]               @relation("WorkOrderSplitLineage")
   kursunBypasses   KursunBypassAssignment[] // Kurşun bypass atamaları (append-only)
   events           WorkOrderEvent[] // Durum/plan değişim defteri (append-only)
+  planningNote     WorkOrderNote? // Planlama notu (2026-11-16) — yalnız panel `/:id/note`
   closeSnapshots   WorkOrderCloseSnapshot[] // Kapanış künyesi sürümleri (append-only)
 
   /// İPTAL İZİ (2026-08-17). Sebep şimdiye kadar YALNIZ audit'e yazılıyordu ve
@@ -4310,6 +4311,26 @@ model KursunBypassAssignment {
   // Dağıtım/izleme ekranı: "bu kurşun MAKİNESİNE atanmış işler" listesi
   @@index([machineId])
   @@map("kursun_bypass_assignments")
+}
+
+/// İş emri PLANLAMA notu (2026-11-16, kullanıcı kararı) — iş emri başına TEK satır (KATALOG
+/// benzeri durum kaydı, defter değil). Yalnız panel uçları okur/yazar: `GET/PUT /api/work-orders/:id/note`.
+/// Refakat kartı, etiket, fason belgesi, tablet yanıtı ve patron bulutu OKUMAZ — bu yüzden
+/// `WorkOrder`a kolon değil ayrı tablo (kart yükü `WorkOrder.parameters`/adım notlarını basar).
+/// Temizleme satırı SİLMEZ, `body`yi boş yazar. `updatedById` künye, ilişki değil.
+/// `onDelete: Cascade`: iş emri canlıda silinmez; yalnız test/temizlik yolunda notu da götürür.
+model WorkOrderNote {
+  id          String   @id @default(uuid()) @db.Uuid
+  workOrderId String   @unique @db.Uuid
+  body        String   @db.VarChar(2000)
+  updatedById String?  @db.Uuid
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  @@map("work_order_notes")
 }
 
 /// Join table: WorkOrder ↔ OrderLine (N:N)
