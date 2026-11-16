@@ -1,13 +1,14 @@
 // =============================================================================
-// Bekçi: Tambur "İş Emri Siparişleri" modalı paylaştırılan metreyi gösterir
+// Bekçi: Tambur "İş Emri Siparişleri" modalı — sipariş toplamı + planlanan
 // =============================================================================
-// 2026-11-17: paylaştırma belirlenmiş satırda modal siparişin toplam metresini
-// (`orderedQty`) HİÇ göstermez; bu işten planlanan metreyi "Bu işten planlanan"
-// etiketiyle gösterir. Plansız satır ve eski backend (alan yok) bugünkü gibi
-// siparişin metresini etiketsiz gösterir. Karışık siparişte her satır kendi
-// kuralıyla.
-// Negatif sonda: `orderLineDisplayQty` `orderedQty`ye sabitlenince planlı satır
-// beklentileri kırmızıya düşer (ölçüldü).
+// 2026-11-17 (ikinci tur): modal artık sipariş kutusuna BASILI TUTUNCA açılan
+// AYRINTI yüzeyidir; siparişin metresi (`orderedQty`) HER ZAMAN pill'dedir ve
+// sipariş no görünür. Paylaştırma varsa pill "Sipariş toplamı" etiketini alır,
+// altında AYRICA "Bu işten planlanan X m" yazar. Plansız satır ve eski backend
+// (alan yok) etiketsiz siparişin metresi.
+// Negatif sondalar (ölçüldü): (1) pill'i `orderLineDisplayQty(line).qty`ye
+// döndürmek "toplam her zaman" vakalarını kırmızıya düşürür; (2) yardımcıyı
+// `planned:false`a sabitlemek "planlanan satırı" vakalarını kırmızıya düşürür.
 // =============================================================================
 import React from 'react';
 import { screen, within } from '@testing-library/react-native';
@@ -52,26 +53,33 @@ const renderModal = (orders: TamburContextOrder[]) =>
   );
 
 describe('TamburOrdersDetailModal metre', () => {
-  it('paylaştırma varsa planlanan metre + etiket; sipariş toplamı yazılmaz', () => {
+  it('paylaştırma varsa sipariş toplamı pill\'de KALIR + ayrıca planlanan satırı', () => {
     renderModal([order([line('l1', 'Kadife', 1000, { plannedQty: 250 })])]);
-    expect(pillText('l1')).toBe('250.0 m');
-    expect(screen.getByText('Bu işten planlanan')).toBeTruthy();
-    expect(screen.queryByText('1000.0')).toBeNull();
+    expect(pillText('l1')).toBe('1000.0 m');
+    expect(screen.getByText('Sipariş toplamı')).toBeTruthy();
+    expect(screen.getByText(/^Bu işten planlanan\s*250\.0 m$/)).toBeTruthy();
+  });
+
+  it('sipariş no ve müşteri ayrıntıda görünür', () => {
+    renderModal([order([line('l1', 'Kadife', 1000, { plannedQty: 250 })])]);
+    expect(screen.getByText('SP-0001')).toBeTruthy();
+    expect(screen.getByText('Metro Tekstil')).toBeTruthy();
   });
 
   it('plannedQty null → siparişin metresi, etiket yok (bugünkü görünüm)', () => {
     renderModal([order([line('l1', 'Kadife', 1000, { plannedQty: null })])]);
     expect(pillText('l1')).toBe('1000.0 m');
-    expect(screen.queryByText('Bu işten planlanan')).toBeNull();
+    expect(screen.queryByTestId('order-line-planned-l1')).toBeNull();
+    expect(screen.queryByText('Sipariş toplamı')).toBeNull();
   });
 
   it('eski backend 2.12.2 (alan yok) → siparişin metresi, etiket yok', () => {
     renderModal([order([line('l1', 'Kadife', 480)])]);
     expect(pillText('l1')).toBe('480.0 m');
-    expect(screen.queryByText('Bu işten planlanan')).toBeNull();
+    expect(screen.queryByTestId('order-line-planned-l1')).toBeNull();
   });
 
-  it('karışık: planlı satır planı, plansız satır siparişi gösterir', () => {
+  it('karışık: her satır kendi toplamı; yalnız planlı satırda planlanan', () => {
     renderModal([
       order([
         line('l1', 'Kadife', 1000, { plannedQty: 300 }),
@@ -79,10 +87,11 @@ describe('TamburOrdersDetailModal metre', () => {
         line('l3', 'Keten', 200),
       ]),
     ]);
-    expect(pillText('l1')).toBe('300.0 m');
+    expect(pillText('l1')).toBe('1000.0 m');
     expect(pillText('l2')).toBe('600.0 m');
     expect(pillText('l3')).toBe('200.0 m');
-    expect(screen.getAllByText('Bu işten planlanan')).toHaveLength(1);
-    expect(screen.queryByText('1000.0')).toBeNull();
+    expect(screen.getByText(/^Bu işten planlanan\s*300\.0 m$/)).toBeTruthy();
+    expect(screen.queryByTestId('order-line-planned-l2')).toBeNull();
+    expect(screen.queryByTestId('order-line-planned-l3')).toBeNull();
   });
 });

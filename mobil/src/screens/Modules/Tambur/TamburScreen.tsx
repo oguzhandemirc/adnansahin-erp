@@ -69,7 +69,8 @@ import {
 } from '../../../components/filters/rollHistoryFilter';
 import AppModal from '../../../components/AppModal';
 import TamburOrderLinkSheet from './TamburOrderLinkSheet';
-import TamburOrdersDetailModal from './TamburOrdersDetailModal';
+import TamburOrdersHeaderBoxes, { useOrdersBalloon } from './TamburOrdersHeaderBoxes';
+import { HEADER_BOX_RADIUS, ORDERS_BOX_COLOR } from './TamburOrdersBox.styles';
 import { shortCutOverride, shortCutRevert } from './shortCutQuality';
 import { findGradeByRole, gradeColor } from '../../../utils/qualityRole';
 import { resolveShortCutConfig } from './resolveShortCutConfig';
@@ -752,8 +753,6 @@ export default function TamburScreen() {
   // Son kesimden dönen güncel parent — X kapat sırasında etiketi basıma kuyruğa
   // atılır (operatör fiziksel etiketi yenilemeli, eski metraj artık geçersiz).
   const [recutLastParentRoll, setRecutLastParentRoll] = useState<Roll | null>(null);
-  // İş emri siparişleri modal'ı — operatör kalan ihtiyaçları görmek için açar
-  const [ordersModalOpen, setOrdersModalOpen] = useState(false);
   // Hata noktaları detay modal'ı (cetvel + sıralı/filtreli liste) ve
   // Tambur adım notu modal'ı (sticky header kutusundan açılır).
   const [errorsModalOpen, setErrorsModalOpen] = useState(false);
@@ -929,6 +928,8 @@ export default function TamburScreen() {
     () => openJobs.find((j) => j.cardId === activeCardId) ?? null,
     [openJobs, activeCardId]
   );
+  // Sipariş balonu — açık/kapalı hâl karta bağlı; kart değişince kapalı başlar.
+  const ordersBalloon = useOrdersBalloon(activeJob?.cardId);
 
   const selectedRoll: TamburRollSummary | null = useMemo(() => {
     if (!activeJob || !activeJob.selectedRollId) return null;
@@ -4025,7 +4026,12 @@ export default function TamburScreen() {
                 elevation={2}
               >
                 <View
-                  style={[styles.headerTitleCol, !compact && styles.headerTitleFlex]}
+                  style={[
+                    styles.headerTitleCol,
+                    !compact && styles.headerTitleFlex,
+                    // Balon açılınca başlık kutu satırı hizasında kalsın (ortaya kaymasın).
+                    !compact && styles.headerTitleTop,
+                  ]}
                 >
                   {/* Barkod YOKSA satır hiç basılmaz (2026-08-04): barkodsuz açık
                       kumaşta buraya `Açık Kumaş · 4baa35e7` gibi bir UUID parçası
@@ -4057,9 +4063,23 @@ export default function TamburScreen() {
                 </View>
 
                 {/* mt kalan / katlama / sipariş kutu grubu. Telefonda başlığın
-                    ALTINDA tek satır; her kutu eşit pay alıp genişliği doldurur. */}
-                <View
-                  style={[styles.headerBoxes, compact && styles.headerBoxesCompact]}
+                    ALTINDA tek satır; her kutu eşit pay alıp genişliği doldurur.
+                    Sipariş kutusu: dokun → altında balon (müşteri + metre),
+                    basılı tut → ayrıntı modalı. TURUNCU (2026-08-04): koyu
+                    lacivert kutu metre/katlama arasında kayboluyordu. */}
+                <TamburOrdersHeaderBoxes
+                  orders={activeJob?.context?.orders ?? []}
+                  compact={compact}
+                  balloonOpen={ordersBalloon.open}
+                  onToggleBalloon={ordersBalloon.toggle}
+                  rowStyle={[styles.headerBoxes, compact && styles.headerBoxesCompact]}
+                  boxStyle={[
+                    styles.headerBox,
+                    styles.headerBoxOrders,
+                    compact && styles.headerBoxFlex,
+                  ]}
+                  valueStyle={styles.headerBoxValue}
+                  subStyle={styles.headerBoxSub}
                 >
                   {/* Kalan metre — operatörün ana ölçeği */}
                   <View
@@ -4096,31 +4116,7 @@ export default function TamburScreen() {
                     </Text>
                     <Text style={styles.headerBoxSub}>sarım</Text>
                   </View>
-
-                  {/* Siparişler — modal trigger */}
-                  {!!activeJob?.context?.orders &&
-                    activeJob.context.orders.length > 0 && (
-                      <TouchableRipple
-                        onPress={() => setOrdersModalOpen(true)}
-                        borderless
-                        style={[
-                          styles.headerBox,
-                          // TURUNCU (2026-08-04): koyu lacivert kutu metre/katlama
-                          // kutularının arasında kaybolup gidiyordu; sipariş bilgisi
-                          // kesim kararının girdisi, kendini belli etsin.
-                          styles.headerBoxOrders,
-                          compact && styles.headerBoxFlex,
-                        ]}
-                      >
-                        <View style={styles.headerBoxInner}>
-                          <Text style={styles.headerBoxValue}>
-                            {activeJob.context.orders.length}
-                          </Text>
-                          <Text style={styles.headerBoxSub}>sipariş</Text>
-                        </View>
-                      </TouchableRipple>
-                    )}
-                </View>
+                </TamburOrdersHeaderBoxes>
               </Surface>
 
               {/* İş emri Tambur adım notu — sticky şerit (header'ın hemen altında,
@@ -4420,12 +4416,6 @@ export default function TamburScreen() {
         }}
       />
 
-      {/* İş Emri Siparişleri modal'ı — operatör kesim planı için açar */}
-      <TamburOrdersDetailModal
-        visible={ordersModalOpen}
-        orders={activeJob?.context?.orders ?? []}
-        onDismiss={() => setOrdersModalOpen(false)}
-      />
 
       {/* Hata noktaları detay modal'ı — büyük cetvel + sıralı/filtreli liste */}
       <TamburErrorsModal
@@ -8126,6 +8116,9 @@ const styles = StyleSheet.create({
   // ile numberOfLines kırpması doğru çalışır (flex child taşmasın).
   headerTitleCol: { minWidth: 0 },
   headerTitleFlex: { flex: 1 },
+  // Kutu yüksekliği (52) kadar blokta dikey ortalı + üste yaslı: kapalıyken
+  // görünüm aynı, sipariş balonu açılıp bant uzayınca başlık yerinde kalır.
+  headerTitleTop: { alignSelf: 'flex-start', minHeight: 52, justifyContent: 'center' },
   // Kutu grubu — tablette doğal genişlik, telefonda her kutu eşit pay alıp
   // satırı baştan sona doldurur (headerBoxFlex).
   headerBoxes: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -8177,18 +8170,17 @@ const styles = StyleSheet.create({
   headerBox: {
     minWidth: 76,
     minHeight: 52,
-    borderRadius: 10,
+    borderRadius: HEADER_BOX_RADIUS,
     paddingHorizontal: 12,
     paddingVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  headerBoxInner: { alignItems: 'center' },
   headerBoxDark: { backgroundColor: '#1e293b' },
   // Siparişler kutusu — turuncu. Yeşil (metre) / mor (katlama) / kırmızı (uyarı)
   // paletinde boşta olan tek belirgin renk; hiçbiriyle karışmaz.
-  headerBoxOrders: { backgroundColor: '#ea580c' },
+  headerBoxOrders: { backgroundColor: ORDERS_BOX_COLOR },
   headerBoxGreen: { backgroundColor: '#059669' },
   headerBoxDanger: { backgroundColor: '#dc2626' },
   // İş emrinde belirlenen katlama kutusu — yeşil metre / koyu sipariş'ten ayrışsın.

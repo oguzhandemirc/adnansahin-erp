@@ -1,15 +1,15 @@
 import type { TamburContextOrderLine } from '../../../types/models';
 
 /**
- * Tambur sipariş modalında bir sipariş satırı için GÖSTERİLECEK metre — tek kaynak.
+ * Tambur'da bir sipariş satırı için ÖN PLANDA gösterilecek metre — tek kaynak.
  *
  * Paylaştırma belirlenmişse (`plannedQty` sonlu sayı ve > 0) bu iş emrinden o
- * satıra paylaştırılan metre gösterilir; siparişin toplam metresi (`orderedQty`)
- * bu durumda Tambur'da HİÇ gösterilmez (kullanıcı kararı 2026-11-17: "tamburun
- * o siparişin tamamını bilmesine gerek yok").
+ * satıra paylaştırılan metre; `plannedQty` null / 0 / alan yok (eski backend
+ * 2.12.2) → siparişin metresi (`orderedQty`, negatif/boş → 0).
  *
- * `plannedQty` null / 0 / alan yok (eski backend 2.12.2) → bugünkü davranış:
- * siparişin metresi (`orderedQty`, negatif/boş → 0).
+ * Kullanım (2026-11-17): sipariş BALONU yalnız bu metreyi yazar; ayrıntı modalı
+ * siparişin metresini HER ZAMAN yazar ve `planned` ise bunu AYRICA
+ * `PLANNED_QTY_LABEL` etiketiyle ekler.
  */
 export interface OrderLineDisplayQty {
   qty: number;
@@ -18,6 +18,8 @@ export interface OrderLineDisplayQty {
 }
 
 export const PLANNED_QTY_LABEL = 'Bu işten planlanan';
+/** Modalda paylaştırma varken siparişin metresinin etiketi. */
+export const ORDER_TOTAL_LABEL = 'Sipariş toplamı';
 
 export function orderLineDisplayQty(
   line: Pick<TamburContextOrderLine, 'orderedQty' | 'plannedQty'>,

@@ -6,13 +6,18 @@ import { AnimatedEntrance } from '../../../components/motion';
 import { colors } from '../../../theme';
 import { upperTr } from '../../../utils/trCase';
 import type { TamburContextOrder } from '../../../types/models';
-import { orderLineDisplayQty, PLANNED_QTY_LABEL } from './orderLineDisplayQty';
+import {
+  ORDER_TOTAL_LABEL,
+  orderLineDisplayQty,
+  PLANNED_QTY_LABEL,
+} from './orderLineDisplayQty';
 import { ORDERS_ACCENT_DARK, ordersModalStyles } from './TamburOrdersDetailModal.styles';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // İş Emri Siparişleri Detay Modal'ı — operatör kesim planı için referans alır.
-// Her sipariş kalemi: müşteri + ürün + renk + metre. Metre = bu işten planlanan
-// (paylaştırma varsa; sipariş toplamı o zaman gösterilmez) ya da siparişin metresi.
+// Her sipariş kalemi: müşteri + sipariş no + ürün + renk + siparişin metresi
+// (her zaman); paylaştırma varsa ayrıca "Bu işten planlanan X m". Sipariş
+// kutusuna BASILI TUTUNCA açılır (tek dokunuş sade balonu açar, 2026-11-17).
 // ─────────────────────────────────────────────────────────────────────────────
 export default function TamburOrdersDetailModal({
   visible,
@@ -180,23 +185,34 @@ export default function TamburOrdersDetailModal({
                         )}
                       </View>
 
-                      {/* Sağ: gösterilecek metre — kompakt lacivert pill.
-                          Paylaştırma varsa bu işten planlanan metre + etiket;
-                          yoksa siparişin metresi (bugünkü görünüm, etiketsiz). */}
+                      {/* Sağ: siparişin metresi HER ZAMAN (lacivert pill).
+                          Paylaştırma varsa pill "Sipariş toplamı" etiketi alır
+                          ve altında AYRICA "Bu işten planlanan X m" yazar. */}
                       <View style={ordersModalStyles.qtyCol}>
                         <View
                           style={ordersModalStyles.remainingPill}
                           testID={`order-line-qty-${line.lineId}`}
                         >
                           <Text style={ordersModalStyles.remainingValue}>
-                            {shown.qty.toFixed(1)}
+                            {Math.max(0, line.orderedQty || 0).toFixed(1)}
                           </Text>
                           <Text style={ordersModalStyles.remainingUnit}>m</Text>
                         </View>
                         {shown.planned && (
-                          <Text style={ordersModalStyles.plannedLabel}>
-                            {PLANNED_QTY_LABEL}
-                          </Text>
+                          <>
+                            <Text style={ordersModalStyles.totalLabel}>
+                              {ORDER_TOTAL_LABEL}
+                            </Text>
+                            <Text
+                              style={ordersModalStyles.plannedLabel}
+                              testID={`order-line-planned-${line.lineId}`}
+                            >
+                              {PLANNED_QTY_LABEL}{' '}
+                              <Text style={ordersModalStyles.plannedValue}>
+                                {shown.qty.toFixed(1)} m
+                              </Text>
+                            </Text>
+                          </>
                         )}
                       </View>
                     </View>

@@ -159,5 +159,7 @@ export const ordersModalStyles = StyleSheet.create({
   remainingValue: { fontSize: 15, fontWeight: '800', color: '#fff' },
   remainingUnit: { fontSize: 10, fontWeight: '700', color: ORDERS_ACCENT_ON },
   qtyCol: { alignItems: 'flex-end', gap: 2 },
-  plannedLabel: { fontSize: 10, fontWeight: '700', color: ORDERS_ACCENT },
+  totalLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  plannedLabel: { fontSize: 12, fontWeight: '700', color: ORDERS_ACCENT },
+  plannedValue: { fontSize: 14, fontWeight: '800', color: ORDERS_ACCENT },
 });
