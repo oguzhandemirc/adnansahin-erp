@@ -50,6 +50,7 @@ export const NOTIFICATION_KIND: Readonly<Record<NotificationKind, KindLabel>> = 
   "geciken-siparis": { ad: "Geciken sipariş", domain: "siparisler", icon: "time-outline" },
   "gunluk-uretim": { ad: "Günlük üretim", domain: "uretim", icon: "construct-outline" },
   "esitleme-gecikti": { ad: "Eşitleme gecikti", domain: "genel", icon: "sync-outline" },
+  "yeni-siparis": { ad: "Yeni sipariş", domain: "siparisler", icon: "receipt-outline" },
 };
 
 export function notificationKind(tur: unknown): KindLabel {

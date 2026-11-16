@@ -219,6 +219,7 @@ export function ORNEK_BILDIRIM() {
     ["stok-esigi", "Stok eşiği", "Ham ya da bitmiş stok eşiğin altına inince"],
     ["gunluk-uretim", "Günlük üretim", "Günlük üretim eşiğin altında kalırsa"],
     ["esitleme-gecikti", "Fabrikadan veri gelmiyor", "Eşitleme belirlenen süreyi aşınca"],
+    ["yeni-siparis", "Yeni sipariş", "Fabrikada yeni sipariş açılınca"],
   ] as const;
   const etkin = {
     acik: true,
