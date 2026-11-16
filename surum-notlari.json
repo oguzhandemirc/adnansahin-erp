@@ -17,6 +17,20 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-16c",
+      "baslik": "Tamburda top kalitesi",
+      "surumler": {
+        "tablet": "1.0.20"
+      },
+      "maddeler": [
+        {
+          "kapsam": "tablet",
+          "tip": "iyilestirme",
+          "metin": "Tamburda sağdaki çıkan toplar listesinde topun kalitesi görünür: A1 ya da fire ise yanında yazar, 1. kalitede yazmaz. Etiket basılmadan da görünür."
+        }
+      ]
+    },
+    {
       "id": "2026-11-16b",
       "baslik": "Harfli şifreyle giriş",
       "surumler": {
