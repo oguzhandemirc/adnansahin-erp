@@ -16,6 +16,7 @@ import { LinkOrderDialog } from "./LinkOrderDialog";
 import { useChangeTarget, WorkOrderChangeTargetDialog } from "./WorkOrderChangeTarget";
 import { AddBatchButton } from "./AddBatchButton";
 import { UnlinkOrdersButton } from "./UnlinkOrdersButton";
+import { AllocateOrdersButton } from "./AllocateOrderLinksDialog";
 import { FasonReceiveDialog } from "./FasonReceiveDialog";
 import { summarizeLinkedFulfillment } from "./order-fulfillment";
 import { V3Section } from "./detail-v3/V3Section";
@@ -24,6 +25,7 @@ import { RouteStepline } from "./detail-v3/RouteStepline";
 import { ProducedV3 } from "./detail-v3/ProducedV3";
 import { SheetKpis } from "./detail-v3/SheetKpis";
 import { OrderLinksV3 } from "./detail-v3/OrderLinksV3";
+import { PlanningNoteCard } from "./detail-v3/PlanningNoteCard";
 import { useOpenTarget } from "@/components/layout/tabs/use-tab-target";
 import "./detail-v3/work-order-detail-v3.css";
 import type { WorkOrder } from "./types";
@@ -202,6 +204,7 @@ export function WorkOrderDetailSheet({ workOrder, open, onOpenChange, onEdit }: 
                       look="sheet"
                       onSuggestColor={changeTarget.suggestColor}
                     />
+                    <AllocateOrdersButton wo={wo} look="sheet" />
                     <AddBatchButton wo={wo} look="sheet" />
 
                     <button type="button" className="btn" onClick={() => setDocumentsOpen(true)}>
@@ -266,6 +269,10 @@ export function WorkOrderDetailSheet({ workOrder, open, onOpenChange, onEdit }: 
                     <OrderLinksV3 wo={wo} />
                   </V3Section>
                 )}
+
+                <V3Section title="Planlama Notu">
+                  <PlanningNoteCard workOrderId={wo.id} />
+                </V3Section>
               </>
             )}
           </div>
@@ -304,6 +311,7 @@ export function WorkOrderDetailSheet({ workOrder, open, onOpenChange, onEdit }: 
               targetColorId={wo.targetColorId}
               targetColorName={wo.targetColor?.name ?? null}
               targetWidth={wo.width}
+              allocation={wo.allocation}
             />
             <WorkOrderChangeTargetDialog wo={wo} state={changeTarget} />
           </>

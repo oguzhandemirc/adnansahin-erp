@@ -18,6 +18,7 @@ import { KunyeCard } from "./detail-v3/KunyeCard";
 import { RouteStepline } from "./detail-v3/RouteStepline";
 import { ProducedV3 } from "./detail-v3/ProducedV3";
 import { OrderLinksV3 } from "./detail-v3/OrderLinksV3";
+import { PlanningNoteCard } from "./detail-v3/PlanningNoteCard";
 import "./detail-v3/work-order-detail-v3.css";
 
 const LIST_PATH = "/operations/work-orders";
@@ -142,6 +143,10 @@ export function WorkOrderDetailPage() {
                   <OrderLinksV3 wo={wo} />
                 </V3Section>
               )}
+
+              <V3Section title="Planlama Notu">
+                <PlanningNoteCard workOrderId={wo.id} />
+              </V3Section>
             </div>
           )}
         </div>
