@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 import type { CustomerSummary, CustomerSummaryPeriod, CustomerSummaryResponse, UnitQuantity } from "../../api/wire";
-import { formatNumber } from "../../lib/format";
+import { formatDate, formatNumber } from "../../lib/format";
 import { UNIT } from "../../lib/labels/siparis";
 import { useSession } from "../../state/session";
 import { useRemote, type Remote } from "../../state/useRemote";
@@ -37,8 +37,28 @@ export function useCariOzeti(cariKartId: string | null, enabled: boolean): Remot
   return useRemote(enabled && cariKartId ? `anlik:cari-ozeti:${cariKartId}` : null, () => api.customerSummary(String(cariKartId)));
 }
 
-/** Dört kart: sipariş · açık (şu an) · brüt sevk · iade. Sevk brüt; iade ayrı, sevkten düşülmez. */
+/**
+ * Kartlar: sipariş · açık (şu an) · brüt sevk · iade (varsayılan) + sipariş kalemi · sevk kg · son sipariş · son sevk
+ * (2026-11-17, seçicide KAPALI). Sevk brüt; iade ayrı, sevkten düşülmez. Tarihler fabrikanın; gün farkı hesaplanmaz.
+ */
 export function toplamKartlari(ozet: CustomerSummary, d: CustomerSummaryPeriod) {
+  return [...temelKartlar(ozet, d), ...ekKartlar(ozet, d)];
+}
+
+function ekKartlar(ozet: CustomerSummary, d: CustomerSummaryPeriod) {
+  const tarih = (v: string | null): StatDeger[] => (v ? [{ deger: formatDate(v) }] : []);
+  return [
+    { key: "kalem", etiket: "Sipariş kalemi", icon: "list-outline" as const, ton: "violet" as const, degerler: [{ deger: sayi(d.kalemSayisi, 0), birim: "kalem" }], ipucu: `${sayi(d.siparisSayisi, 0)} sipariş` },
+    {
+      key: "sevkKg", etiket: "Sevk (kg)", icon: "scale-outline" as const, ton: "sky" as const, degerler: [{ deger: sayi(d.sevk.kg), birim: "kg" }],
+      ipucu: `${sayi(d.sevk.tartiliCuval, 0)}/${sayi(d.sevk.cuval, 0)} çuval tartılı`,
+    },
+    { key: "sonSiparis", etiket: "Son sipariş", icon: "calendar-outline" as const, ton: "violet" as const, degerler: tarih(ozet.sonSiparisTarihi), bos: "sipariş yok" },
+    { key: "sonSevk", etiket: "Son sevk", icon: "calendar-outline" as const, ton: "sky" as const, degerler: tarih(ozet.sonSevkTarihi), bos: "sevk yok" },
+  ];
+}
+
+function temelKartlar(ozet: CustomerSummary, d: CustomerSummaryPeriod) {
   const sevk: StatDeger[] = [{ deger: sayi(d.sevk.metre), birim: "m" }, { deger: sayi(d.sevk.top, 0), birim: "top" }];
   const acikMiktar = birimDegerleri(ozet.acik.acikMiktar);
   return [
@@ -73,9 +93,16 @@ function HenuzGelmedi({ baslik, neyi, testID }: { baslik: string; neyi: string; 
   );
 }
 
-export function ToplamlarBolumu({ ozet, donem, onDonem }: { ozet: Remote<CustomerSummaryResponse>; donem: Donem; onDonem: (d: Donem) => void }) {
+/**
+ * `kartlar`: görünür toplam kartları (yoksa varsayılan dört). `donemli`: dönem düğmesi çizilsin mi (dönemli bir kart ya da
+ * ürün bloğu görünürse). İkisi de boşsa bölüm hiç çizilmez (sıfır kart serbest).
+ */
+export function ToplamlarBolumu({ ozet, donem, onDonem, kartlar = ["siparis", "acik", "sevk", "iade"], donemli = true }: {
+  ozet: Remote<CustomerSummaryResponse>; donem: Donem; onDonem: (d: Donem) => void; kartlar?: readonly string[]; donemli?: boolean;
+}) {
   const s = useStyles();
   if (ozet.forbidden) return null;
+  if (kartlar.length === 0 && !donemli) return null;
   if (ozet.loading && !ozet.data) return <View style={s.bolum}><Iskelet bicim="kpi" satir={4} testID="cari-toplamlar-yukleniyor" /></View>;
   if (ozet.notFound) return <HenuzGelmedi baslik="Toplamlar" neyi="Fabrika özeti" testID="cari-toplamlar-gelmedi" />;
   if (ozet.error && !ozet.data) return <View style={s.bolum}><HataDurumu mesaj={ozet.error} onTekrar={ozet.reload} testID="cari-toplamlar-hata" /></View>;
@@ -84,12 +111,14 @@ export function ToplamlarBolumu({ ozet, donem, onDonem }: { ozet: Remote<Custome
   if (!veri) return null;
   return (
     <View style={s.bolum} testID="cari-toplamlar">
-      <SegmentedControl items={DONEMLER} value={donem} onChange={onDonem} testIDPrefix="cari-donem-" accessibilityLabel="Dönem" />
-      <View style={s.izgara}>
-        {toplamKartlari(veri, veri[donem]).map((k) => (
-          <StatCard key={k.key} etiket={k.etiket} icon={k.icon} ton={k.ton} degerler={k.degerler} ipucu={k.ipucu} testID={`cari-toplam-${k.key}`} />
-        ))}
-      </View>
+      {donemli ? <SegmentedControl items={DONEMLER} value={donem} onChange={onDonem} testIDPrefix="cari-donem-" accessibilityLabel="Dönem" /> : null}
+      {kartlar.length > 0 ? (
+        <View style={s.izgara}>
+          {toplamKartlari(veri, veri[donem]).filter((k) => kartlar.includes(k.key)).map((k) => (
+            <StatCard key={k.key} etiket={k.etiket} icon={k.icon} ton={k.ton} degerler={k.degerler} ipucu={k.ipucu} bos={"bos" in k ? k.bos : undefined} testID={`cari-toplam-${k.key}`} />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }

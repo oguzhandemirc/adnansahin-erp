@@ -115,7 +115,8 @@ export function TabloUstu({ tablo }: { readonly tablo: VeriTablosu }) {
       <SuzgecSecici
         visible={suzgecAcik} testID={`${ayar.testID}-suzgec-secici`} gruplar={tablo.gruplar} secim={tercih.suzgec}
         onSec={(g, d) => degistir((t) => ({ ...t, suzgec: suzgecSec(t.suzgec, g, d) }))}
-        onTemizle={() => degistir((t) => ({ ...t, suzgec: {} }))}
+        // Yalnız süzgeç grupları silinir; aynı tercihteki kart seçimi (`suzgec.<alan>`) korunur.
+        onTemizle={() => degistir((t) => ({ ...t, suzgec: Object.fromEntries(Object.entries(t.suzgec).filter(([g]) => !tablo.gruplar.some((x) => x.anahtar === g))) }))}
         onClose={() => setSuzgecAcik(false)}
       />
     </View>

@@ -11,6 +11,10 @@ import type { TabloTercihi } from "./model";
 
 export const TERCIH_GECIKME_MS = 800;
 
+// Aynı anahtarı tutan AÇIK kancalar (ör. liste sekmesi altta açık kalırken detaydaki kart seçimi) birbirinin yazdığını
+// anında görür: yoksa alttakinin bayat değeri bir sonraki değişikliğinde ötekinin alanını (kartlar) ezerdi.
+const dinleyiciler = new Map<string, Set<(deger: unknown) => void>>();
+
 interface Yerel {
   readonly deger: unknown;
   readonly kirli: boolean;
@@ -90,6 +94,28 @@ export function useTabloTercihi(anahtar: ViewPrefKey, temizle: (ham: unknown) =>
     };
   }, [api, anahtar, profilde, store, yerelAnahtar, gonder, yereleYaz]);
 
+  // Kardeş kancaların yazımı (aynı yerel anahtar).
+  const dinle = useRef<(deger: unknown) => void>(() => undefined);
+  dinle.current = (deger: unknown) => {
+    sonDeger.current = deger;
+    setHam(deger);
+  };
+  const kendi = useRef<((deger: unknown) => void) | null>(null);
+  useEffect(() => {
+    const f = (deger: unknown) => dinle.current(deger);
+    kendi.current = f;
+    const set = dinleyiciler.get(yerelAnahtar) ?? new Set();
+    set.add(f);
+    dinleyiciler.set(yerelAnahtar, set);
+    return () => {
+      set.delete(f);
+      if (set.size === 0) dinleyiciler.delete(yerelAnahtar);
+    };
+  }, [yerelAnahtar]);
+  const yay = useCallback((deger: unknown) => {
+    for (const f of [...(dinleyiciler.get(yerelAnahtar) ?? [])]) if (f !== kendi.current) f(deger);
+  }, [yerelAnahtar]);
+
   // Bağlantı dönünce bekleyen yazım.
   useEffect(() => {
     if (!offline) gonder();
@@ -105,6 +131,7 @@ export function useTabloTercihi(anahtar: ViewPrefKey, temizle: (ham: unknown) =>
       const yeni = f(temizleRef.current(sonDeger.current));
       sonDeger.current = yeni;
       setHam(yeni);
+      yay(yeni);
       yereleYaz(yeni, profilde);
       if (!profilde) return;
       if (zamanlayici.current) clearTimeout(zamanlayici.current);
@@ -113,7 +140,7 @@ export function useTabloTercihi(anahtar: ViewPrefKey, temizle: (ham: unknown) =>
         if (!offline) gonder();
       }, TERCIH_GECIKME_MS);
     },
-    [gonder, offline, profilde, yereleYaz],
+    [gonder, offline, profilde, yereleYaz, yay],
   );
 
   return { tercih, hazir: ham !== undefined, profilde, degistir };

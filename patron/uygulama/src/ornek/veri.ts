@@ -306,7 +306,10 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
       }),
     ),
   );
-  const cari = CARILER.map((c) => kayit(c.id, { ad: c.ad, kod: c.kod, il: c.il, ulke: "Türkiye", aktif: true, musteriRolu: !c.tedarikci, tedarikciRolu: !!c.tedarikci, fasonRolu: false }));
+  const cari = CARILER.map((c, i) => ({
+    ...kayit(c.id, { ad: c.ad, kod: c.kod, il: c.il, ilce: "Merkez", ulke: "Türkiye", aktif: true, musteriRolu: !c.tedarikci, tedarikciRolu: !!c.tedarikci, fasonRolu: false, varsayilanYon: i === 1 ? "EXPORT" : "DOMESTIC", olusturulma: once(400 - i * 60) }),
+    kisisel: { yetkili: `Örnek Yetkili ${i + 1}`, telefon: `0500 000 00 0${i + 1}` },
+  }));
   const sevkiyat = Array.from({ length: 6 }, (_, i) =>
     kayit(`v${i + 1}`, {
       sevkNo: `SVK-${String(451 - i).padStart(4, "0")}`,
