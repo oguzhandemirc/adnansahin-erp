@@ -17,6 +17,41 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-17",
+      "baslik": "Siparişlere metre paylaştırma ve planlama notu",
+      "surumler": {
+        "panel": "1.3.19",
+        "tablet": "1.0.21"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "İş emrindeki kumaş metresi bağlı siparişlere paylaştırılabilir. Örnek: 1000 metre giren iş emrinde 800 metre bir siparişe, 200 metre diğerine yazılır. Toplam, iş emrine giren metreyi aşamaz."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "İş emrine planlama notu yazılabilir. Notu yalnız paneli kullananlar görür; istasyonlarda, refakat kartında ve etikette çıkmaz."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "duzeltme",
+          "metin": "Sevkiyata eklenip sonra çıkarılmış boş çuval artık silinebilir (önceden \"Geçersiz referans\" hatası veriyordu)."
+        },
+        {
+          "kapsam": "tablet",
+          "tip": "yeni",
+          "metin": "Tamburda sipariş kutusuna dokununca altında küçük bir balon açılır: müşteri adı ve o iş emrinden o müşteriye ayrılan metre yazar. Balon iş emri açıkken açık kalır, kutuya yeniden dokununca kapanır."
+        },
+        {
+          "kapsam": "tablet",
+          "tip": "iyilestirme",
+          "metin": "Sipariş ayrıntı penceresi artık kutuya basılı tutunca açılır; sipariş numarası, siparişin tamamı ve ayrılan metre burada görünür."
+        }
+      ]
+    },
+    {
       "id": "2026-11-16c",
       "baslik": "Tamburda top kalitesi",
       "surumler": {

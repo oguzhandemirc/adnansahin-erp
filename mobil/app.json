@@ -2,7 +2,7 @@
   "expo": {
     "name": "Adnan Şahin TeksERP Saha",
     "slug": "teks-erp-mobil",
-    "version": "1.0.20",
+    "version": "1.0.21",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -21,7 +21,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.etkiliyazilim.adnansahin.saha",
-      "versionCode": 66,
+      "versionCode": 67,
       "usesCleartextTraffic": true,
       "permissions": [
         "android.permission.CAMERA",
