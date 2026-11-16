@@ -13349,3 +13349,13 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Açık.** Push şu an gitmez (`BILDIRIM_KIPI: kapali`); merkezin dakikalık hız sınırı fabrika + bulut ORTAK; cihaz denemesi (tablet, telefon) yapılmadı.
 
 **Bekçi.** Panel `DestekShell.test.tsx` · `ReportIssueDialog.test.tsx` · `screen-ipc-contract.test.ts`; saha `destekGorunurluk.test.ts` · `DestekGirisleri.test.tsx` · `destek.service.test.ts` · `api-prefix.guard.test.ts`; bulut `test_destek_bulut` · `test_compose_sirlari`; uygulama `__tests__/destek.test.tsx` · `__tests__/mirror.test.ts`.
+
+## 2026-11-16 — İş emri metresini siparişlere paylaştırma + planlama notu: backend dilimleri [İŞ-EMRİ + TAMBUR]
+
+**Karar (kullanıcı, 2026-11-16; plan `PLAN-is-emri-paylastirma-not-2026-11-16.md`).** (1) Paylaştırma toplamı tavanı aşarsa REDDEDİLİR (400 `ALLOCATION_OVER_BASIS` + kalan); tavan iş emrine giren ham metre (`computeWoInput`), top yoksa `targetQuantity`, ikisi yoksa tavan yok. (2) Not = PLANLAMA notu: `workorder:read` panel kullanıcıları görür; istasyon, kart, etiket, fason belgesi, tablet ve patron bulutu görmez. (3) Paylaştırma Tambur'un sipariş kutusunda görünür: tambur bağlamı satırına yeni `plannedQty` (yoksa `null`); `orderedQty` aynen (eski tabletler 1.0.12–1.0.20 değişmeden çalışır).
+
+**Uygulama.** Paylaştırma bağ satırının mevcut `allocatedQty` kolonunda durur (migration yok); `PUT /api/work-orders/:id/order-links/allocations` + `POST /:id/order-links`e opsiyonel `allocations`; tek helper `order-link-allocation.helper` (iş emri satır kilidi tx'in ilk ifadesi, satır başına `updateMany WHERE {id, unlinkedAt:null}`, sıralı; defter FIELD_CHANGED `orderAllocation`, tetik `ORDER_ALLOCATION`). Düzenle (replace) miktar gelmezse paylaştırmayı korur (eskiden 0'a eziyordu); klon 0 yazar. Detay `findById` sunucu hesaplı `allocation {basis, basisKind, allocated, remaining}` döner. Not ayrı tablo `work_order_notes` (migration `20261116210125_work_order_notes`, ADDITIVE) ve ayrı uç `GET/PUT /:id/note` (≤ 2000, boş = temizle, satır silinmez).
+
+**Sapma / açık.** Create/replace'in eski `orderLineAllocations[].allocatedQty` yolu tavan kontrolünden GEÇMEZ (hiçbir istemci göndermiyor; `test_order_link_unlink` bu yolla tavan üstü yazıyor). Parti Ekle uyarısı ("Sipariş tahsisi X, toplam Y") artık paylaştırma girildiyse görünür hâle gelir — engel değil. Bağ `updatedAt`i değişince bulut iş emri kaydı kirlenip aynı içerikle yeniden gönderilebilir; içerik değişmez (bekçi §11).
+
+**Bekçiler.** `test_workorder_order_allocation` (28) — sondalar: tavan kapatıldı → 7 kırmızı · replace yeniden 0 yazdı → 6 · tambur `plannedQty` = sipariş metresi → 3 · klon miktarı kopyaladı → 1. `test_work_order_note` (13) — sondalar: `findById` include'una not → 1 · kırpma kaldırıldı → 3.

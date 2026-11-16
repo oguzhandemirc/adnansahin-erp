@@ -498,7 +498,8 @@ export const DEFTER_BEYANI: DefterBeyani[] = [
       "src/services/tambur-undo.service.ts"]),
   // ③a ticari pivot → DEFTER (2026-09-14, WOTOL-BAG-DAMGA-PLAN): bağ silinmez, `unlinkedAt`
   // damgalanır; yeniden bağlama YENİ satır (un-unlink yok) — ters yazan `linkOrderLines`.
-  // `updatedAt` kalır (yarı: `allocatedQty` replace'te yerinde güncellenir). AST kapısı
+  // `updatedAt` kalır (yarı: `allocatedQty` replace'te ve paylaştırma ucunda — 2026-11-16,
+  // `order-link-allocation.helper` — yerinde güncellenir; plan değeridir, defter değil). AST kapısı
   // `test_order_link_unlink` §13 src'de silme ve süzgeçsiz okuru kırmızı yapar.
   D("WorkOrderToOrderLine", "iş emri ↔ sipariş kalemi bağı + `allocatedQty`: `WorkOrder.type` AÇIK bağ sayısının aynası, sipariş karşılaması ve refakat kartı sipariş bloğu açık bağdan okunur; koparma damgası MANUAL_UNLINK · WO_REPLACE · ORDER_LINE_CANCEL · ORDER_DELETE · ORDER_CANCEL",
     { tur: "DAMGA", kolon: "unlinkedAt" },
