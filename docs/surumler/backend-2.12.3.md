@@ -83,9 +83,9 @@ SELECT count(*) FROM work_order_notes;   -- beklenen: 0
 
 ## 5. Kurulum notu
 
-- **Beklenen kesinti:** ≈ 70 sn + iki migration (backfill ≈ 3.700 satır; provada ölçülen süre §7). Kesintiden ÖNCEKİ
-  `[1/9]`–`[3/9]` (paket açma + yedek) ≈ 9 dk; bu sürede fabrika ÇALIŞIR ve ekranda `[1/9]` satırından başka çıktı
-  olmayabilir — kesme.
+- **Beklenen kesinti:** ≈ 1 dk (Windows provasında ölçülen 40,8 ve 56,2 sn; iki migration birlikte ≈ 0,3 sn). Kesintiden
+  ÖNCEKİ `[1/9]`–`[3/9]` (paket açma + yedek) ≈ 5–6 dk, toplam ≈ 7–8 dk; bu sürede fabrika ÇALIŞIR ve ekranda `[1/9]`
+  satırından başka çıktı olmayabilir — kesme.
 - **Sıra:** bu backend → doğrulama (§4 sorguları + §7) → masaüstü panel/tablet sürümleri ayrı onayla.
 - **Kurulum yöntemi:** 2.12.2 ile aynı — paket `C:\TeksERP\guncelleme\`e; paketin kendi `kur.ps1` + `uzaktan-kos.ps1`i
   çıkarılır, `C:\TeksERP\kur.ps1` onunla değiştirilir; SYSTEM görevi:
@@ -131,6 +131,17 @@ yedeğinden restore (`docs/kurallar/surum-yayin.md` § Migration).
   (`sackId` NULL), `shippedQty` aynı.
 - Geri dönüş uyumu: aynı DB'de (bağı kopuk satırlar VARKEN) 2.12.2 kodu (`b276031b`) sipariş ayrıntısı, sipariş
   sevkiyatları, iptal sevkiyat ayrıntısı, son 30 sevkiyat ayrıntısı ve depo panosunu hatasız döndürdü.
-- Sınır: servis katmanında ölçüldü (HTTP değil). **Windows (ThinkPad kopyası) provası yapılamadı** — makine çevrimdışıydı;
-  bu paketle kurulum süresi, kesinti ve `-GeriAl` mekaniği ÖLÇÜLMEDİ (`deploy/` 2.12.2 ile aynı; 2.12.2'de ölçülen
-  kurulum ≈ 11 dk, kesinti ≈ 68–70 sn, geri alma ≈ 25 sn). Ayrıntı ve canlı reçetesi: repo dışı `PROVA-2.12.3-2026-11-17.md`.
+- Sınır: Mac'te servis katmanında ölçüldü; HTTP ve kurulum mekaniği aşağıdaki Windows provasında.
+
+**Windows provası (2026-11-17, ThinkPad'deki fabrika kopyası, 2.12.2 → bu paket; eşitleme ve destek KAPALI) — GEÇTİ:**
+- Kurulum (`uzaktan-kos.ps1` + `kur.ps1 -Zorla`): 414,3 sn, kesinti 40,8 sn; `[7/9]` "369 migrations found" + iki migration
+  uygulandı (`work_order_notes` 154 ms, `sack_allocation_frozen_sack_no` 132 ms); UP/UP 2.12.3, `_prisma_migrations` 369 / 0.
+- Bütün sayılar, tahsis üçlüsü (3.703 · 1.988 · 447.491,8 m), `patron_sync_status()` `0·28·1` ve `.env` SHA256 aynı;
+  `sackNo` boş 0, `sackId` boş 0, iki CHECK doğrulanmış, `work_order_notes` 0; `sack_allocations`ta eşitleme tetikleyicisi yok.
+- HTTP: paylaştırma 800 + 200 → 200 (tavan INPUT 1.263 m); aşım → 400 `ALLOCATION_OVER_BASIS`, DB değişmedi; Tambur bağlamı
+  `plannedQty` 800 / 200; not yaz-oku-temizle 200; `CV1411260009` panel ucuyla silindi (200), 2 geçmiş tahsis satırı `sackNo`
+  ile duruyor, `shippedQty` aynı; sipariş/sevkiyat/çuval okuma uçları 200; eski tablet uçları (cihaz bildirimi, `mobile`
+  girişi, tambur bağlamı, depo panosu, çuval arama) 200.
+- Geri alma (`-GeriAl -Zorla`): 16,5 sn, kesinti 7,5 sn, UP/UP 2.12.2, şema 369 kaldı; 2.12.2 kodu bağı kopuk satırlar
+  varken aynı okuma ve tablet uçlarında 200, hata günlüğünde Prisma/500 yok. Yeniden kurulum: 476,6 sn, kesinti 56,2 sn,
+  "No pending migrations to apply". Ayrıntı ve canlı reçetesi: repo dışı `PROVA-2.12.3-2026-11-17.md`.
