@@ -2,6 +2,7 @@
   "expo": {
     "name": "Adnan Şahin Yönetim",
     "slug": "adnansahin-yonetim",
+    "owner": "demircioguzhan",
     "scheme": "adnansahin-yonetim",
     "version": "1.2.0",
     "orientation": "default",
@@ -15,7 +16,12 @@
     },
     "ios": {
       "bundleIdentifier": "com.etkiliyazilim.adnansahin.yonetim",
-      "supportsTablet": true
+      "buildNumber": "1",
+      "appleTeamId": "Z2348KHLXK",
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.etkiliyazilim.adnansahin.yonetim",
@@ -58,10 +64,16 @@
       "expo-router",
       "expo-secure-store",
       "expo-font",
-      "./plugins/withPatronImza.js"
+      "./plugins/withPatronImza.js",
+      "./plugins/withBildirimBaglantisi.js"
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "722714fd-af55-49d5-9d5e-4df05c632a6a"
+      }
     }
   }
 }

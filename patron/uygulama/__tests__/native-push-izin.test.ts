@@ -24,6 +24,7 @@ const kok = path.join(__dirname, "..");
 const appConfig = require("../app.config.js") as ((a: { config: Record<string, unknown> }) => Record<string, unknown>) & {
   withNativePush: (c: Record<string, unknown>, o: { env: Record<string, string | undefined>; root: string; warn: (m: string) => void }) => Record<string, unknown>;
   NATIVE_PUSH_IZINLERI: string[];
+  ROZET_IZINLERI: string[];
 };
 const appJson = (JSON.parse(readFileSync(path.join(kok, "app.json"), "utf8")) as { expo: Record<string, unknown> }).expo;
 type Android = { blockedPermissions: string[]; googleServicesFile?: string };
@@ -57,11 +58,13 @@ describe("derleme kapısı (app.config.js)", () => {
       const out = appConfig.withNativePush(appJson, { env: { PATRON_NATIVE_PUSH: "1" }, root: d, warn: jest.fn() });
       const once = (appJson.android as Android).blockedPermissions;
       const sonra = (out.android as Android).blockedPermissions;
-      expect(sonra).toEqual(once.filter((p) => !appConfig.NATIVE_PUSH_IZINLERI.includes(p)));
+      // Rozet izinleri bildirimli kipte de engelli kalır (ShortcutBadger; uygulama rozet kullanmaz — ölçüldü 2026-11-17).
+      expect(sonra).toEqual([...once.filter((p) => !appConfig.NATIVE_PUSH_IZINLERI.includes(p)), ...appConfig.ROZET_IZINLERI]);
+      expect(appConfig.ROZET_IZINLERI).toEqual(expect.arrayContaining(["com.sec.android.provider.badge.permission.READ", "android.permission.READ_APP_BADGE"]));
       expect(sonra).toEqual(expect.arrayContaining(["android.permission.SYSTEM_ALERT_WINDOW", "com.google.android.gms.permission.AD_ID"]));
       expect((out.android as Android).googleServicesFile).toBe("./google-services.json");
-      expect(out.plugins).toEqual([...(appJson.plugins as unknown[]), "expo-notifications"]);
-      expect(out.extra).toEqual({ nativePush: true });
+      expect(out.plugins).toEqual([...(appJson.plugins as unknown[]), ["expo-notifications", expect.objectContaining({ mode: "production" })]]);
+      expect(out.extra).toEqual({ ...(appJson.extra as object), nativePush: true });
       expect((appJson.android as Android).googleServicesFile).toBeUndefined();
     } finally {
       rmSync(d, { recursive: true, force: true });

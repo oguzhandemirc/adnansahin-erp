@@ -1,6 +1,7 @@
-// İlk mağaza sürümünde telefonda native push YOK (kullanıcı kararı 2026-10-15): telefon izin istemez, native bildirim
-// modülünü yüklemez, kayıt denemez; web push yolu aynen sürer. Native modül Android'de bağlanmadığı için onu yükleyen
-// her kod yalnız `*-native.ts` dosyalarındadır ve yalnız kapı açıkken `require` edilir.
+// Telefonda native push ana anahtarı AÇIK (kullanıcı kararı 2026-11-17; 2026-10-15 "yok" kararının yerine), ama etkin
+// kapı derleme kapısına da bağlıdır: bildirimsiz derlenen pakette (extra.nativePush yok / native modül bağlı değil)
+// telefon izin istemez, native bildirim modülünü yüklemez, kayıt denemez; web push yolu aynen sürer. Native modülü
+// yükleyen her kod yalnız `*-native.ts` dosyalarındadır ve yalnız etkin kapıyla `require` edilir.
 import { act, render, renderHook, screen } from "@testing-library/react-native";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -32,9 +33,9 @@ const { NotificationDevices } = require("../src/ui/NotificationDevices") as type
 
 const api = { deviceRegister: jest.fn() } as unknown as import("../src/api/endpoints").Api;
 
-describe("telefonda native push kapalı", () => {
-  it("⭐ ilk sürümde kapı kapalı; web her zaman açık", () => {
-    expect(NATIVE_PUSH).toBe(false);
+describe("bildirimsiz derlemede telefonda native push kapalı", () => {
+  it("⭐ ana anahtar açık (2026-11-17); derleme kapısı yokken etkin kapı kapalı; web her zaman açık", () => {
+    expect(NATIVE_PUSH).toBe(true);
     expect(pushAvailable("android")).toBe(false);
     expect(pushAvailable("ios")).toBe(false);
     expect(pushAvailable("web")).toBe(true);
@@ -93,12 +94,18 @@ describe("bildirim ekranı — bu cihaz", () => {
 
 describe("derleme yapılandırması", () => {
   const kok = path.join(__dirname, "..");
-  const pkg = JSON.parse(readFileSync(path.join(kok, "package.json"), "utf8")) as { expo?: { autolinking?: { android?: { exclude?: string[] } } } };
+  const pkg = JSON.parse(readFileSync(path.join(kok, "package.json"), "utf8")) as { expo?: { autolinking?: unknown } };
   const app = JSON.parse(readFileSync(path.join(kok, "app.json"), "utf8")) as { expo: { plugins: unknown[] } };
 
-  it("⭐ expo-notifications Android'de bağlanmaz ve eklentisi prebuild'e girmez (Firebase yok)", () => {
-    expect(pkg.expo?.autolinking?.android?.exclude).toEqual(expect.arrayContaining(["expo-notifications", "expo-application"]));
-    expect(app.expo.plugins.map((p) => (Array.isArray(p) ? p[0] : p))).not.toContain("expo-notifications");
+  it("⭐ bildirimsiz derlemede expo-notifications Android'de bağlanmaz (dışlama eklentide) ve eklentisi prebuild'e girmez", () => {
+    // Dışlama package.json'da DEĞİL (oradan derleme anında geri açılamaz): bağlantı eklentisi bildirimsiz kipte yazar.
+    expect(pkg.expo?.autolinking).toBeUndefined();
+    const adlar = app.expo.plugins.map((p) => (Array.isArray(p) ? p[0] : p));
+    expect(adlar).toContain("./plugins/withBildirimBaglantisi.js");
+    expect(adlar).not.toContain("expo-notifications");
+    const { DISLANAN } = require("../plugins/withBildirimBaglantisi.js") as { DISLANAN: string[] };
+    // Tek öğe: Gradle eklentisi listeyi tek argümana birleştirir, iki öğe hiçbir şeyi dışlamaz (ölçüldü 2026-11-17).
+    expect(DISLANAN).toEqual(["expo-notifications"]);
   });
 
   it("⭐ expo-notifications yalnız *-native.ts dosyalarında içe alınır", () => {

@@ -1,9 +1,9 @@
 {
-  "_aciklama": "ORNEK — gercek dosya Firebase konsolundan indirilir, adi google-services.json olur ve REPOYA GIRMEZ (.gitignore). Ayrinti: docs/ops/PATRON-BILDIRIM-CANLI-DENEME.md § Telefon push (F5).",
+  "_aciklama": "ORNEK — gercek dosya Firebase konsolundan indirilir, adi google-services.json olur ve REPOYA GIRMEZ (.gitignore). Derleme betigi (npm run build:aab:bildirimli) gercek dosyayi depo disindan kopyalar: ~/.tekserp/sirlar/adnansahin-yonetim-google-services.json.",
   "project_info": { "project_number": "000000000000", "project_id": "ornek-proje" },
   "client": [
     {
-      "client_info": { "mobilesdk_app_id": "1:000000000000:android:0000000000000000", "android_client_info": { "package_name": "com.etkiliyazilim.tekserp.yonetim" } },
+      "client_info": { "mobilesdk_app_id": "1:000000000000:android:0000000000000000", "android_client_info": { "package_name": "com.etkiliyazilim.adnansahin.yonetim" } },
       "api_key": [{ "current_key": "<FIREBASE_ISTEMCI_ANAHTARI>" }]
     }
   ],

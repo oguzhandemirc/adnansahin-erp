@@ -12,7 +12,12 @@
     "typecheck:plain": "tsc --noEmit --pretty false",
     "duman": "../sunucu/node_modules/.bin/tsx scripts/duman.ts",
     "build:aab": "node scripts/build-aab.mjs",
+    "build:aab:bildirimli": "node scripts/build-aab.mjs --bildirimli",
     "build:apk:duman": "node scripts/build-aab.mjs --apk",
+    "build:apk:duman:bildirimli": "node scripts/build-aab.mjs --apk --bildirimli",
+    "ios:prebuild": "node scripts/build-ios.mjs",
+    "ios:prebuild:bildirimli": "node scripts/build-ios.mjs --bildirimli",
+    "build:ios:bildirimli": "node scripts/build-ios.mjs --bildirimli --arsiv",
     "gorsel:yer-tutucu": "node scripts/yer-tutucu-gorsel.cjs",
     "android": "expo run:android",
     "ios": "expo run:ios"
@@ -64,15 +69,5 @@
     "modulePaths": [
       "<rootDir>/node_modules"
     ]
-  },
-  "expo": {
-    "autolinking": {
-      "android": {
-        "exclude": [
-          "expo-notifications",
-          "expo-application"
-        ]
-      }
-    }
   }
 }
