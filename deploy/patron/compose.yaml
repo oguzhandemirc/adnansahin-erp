@@ -10,6 +10,8 @@
 #   Etkili Destek (İSTEĞE BAĞLI): destek_api_anahtari · destek_webhook_sirri — `.env`te yol verilmezse /dev/null
 #   (boş) bağlanır → özellik KAPALI, api bugünkü gibi açılır. `.env`: DESTEK_API_URL · DESTEK_API_ANAHTARI_DOSYASI_HOST ·
 #   DESTEK_WEBHOOK_SIRRI_DOSYASI_HOST (yalnız yol/adres; sır değil). Bkz. docs/ops/DESTEK-ENTEGRASYONU-BULUT.md.
+#   Anlık bildirim (İSTEĞE BAĞLI): expo_erisim_belirteci — `.env`te EXPO_ERISIM_BELIRTECI_DOSYASI_HOST yoksa /dev/null
+#   (boş) → telefon push'u KAPALI. `.env`: BILDIRIM_KIPI (varsayılan kapali) · BILDIRIM_VAPID_KONU · BILDIRIM_NATIVE_PUSH.
 #   (Eski `tesis_rol_anahtari` — e-posta özeti anahtarı — üyelik C4'te KALKTI; VDS'teki dosya silinebilir.)
 # TOTP sarma anahtarı `anahtarlar/patron-totp.key` (10001 0600, 32 bayt base64url); birim salt okunur bağlanır — sunucu
 # onu ÜRETEMEZ, ilk açılıştan önce elle konur (README § İlk kurulum 1; yoksa api EROFS ile açılmaz).
@@ -102,10 +104,16 @@ services:
       DB_ADI: ${POSTGRES_DB:?POSTGRES_DB gerekli}
       # Cloudflare yok: Caddy (adnan-ag) iç vekildir; istemci adresi onun X-Forwarded-For son halkasından.
       IC_VEKIL_AGLARI: ${ADNAN_AG_ALT_AGI:?ADNAN_AG_ALT_AGI gerekli (adnan-ag alt ağı)}
-      BILDIRIM_KIPI: kapali
+      # Anlık bildirim (varsayılan KAPALI = bugünkü davranış: iş kurulmaz, kuyruk yok, dış istek yok). `.env`te
+      # BILDIRIM_KIPI=gercek + BILDIRIM_VAPID_KONU (mailto:/https:) ile açılır; VAPID çifti `anahtarlar/patron-vapid.json`
+      # ÖNCEDEN konur (birim salt okunur; README § Anlık bildirim). Telefon push'u ayrıca BILDIRIM_NATIVE_PUSH=acik + Expo
+      # belirteci (sır dosyası `expo_erisim_belirteci`) ister; geri dönüş tek ayar: BILDIRIM_KIPI=kapali.
+      BILDIRIM_KIPI: ${BILDIRIM_KIPI:-kapali}
+      BILDIRIM_VAPID_KONU: ${BILDIRIM_VAPID_KONU:-}
+      BILDIRIM_NATIVE_PUSH: ${BILDIRIM_NATIVE_PUSH:-kapali}
       # Etkili Destek merkez adresi (HTTPS); boş = destek uçları KAPALI (403 MODULE_DISABLED), merkeze istek yok.
       DESTEK_API_URL: ${DESTEK_API_URL:-}
-    secrets: [uygulama_parolasi, esitleme_parolasi, destek_api_anahtari, destek_webhook_sirri]
+    secrets: [uygulama_parolasi, esitleme_parolasi, destek_api_anahtari, destek_webhook_sirri, expo_erisim_belirteci]
     volumes:
       - ./anahtarlar:/anahtarlar:ro
     tmpfs:
@@ -158,6 +166,9 @@ secrets:
     file: ${DESTEK_API_ANAHTARI_DOSYASI_HOST:-/dev/null}
   destek_webhook_sirri:
     file: ${DESTEK_WEBHOOK_SIRRI_DOSYASI_HOST:-/dev/null}
+  # Expo erişim belirteci (telefon push'u) İSTEĞE BAĞLI: yol verilmezse /dev/null (boş) → telefon push'u KAPALI.
+  expo_erisim_belirteci:
+    file: ${EXPO_ERISIM_BELIRTECI_DOSYASI_HOST:-/dev/null}
 
 volumes:
   pgdata:

@@ -18,6 +18,8 @@
 //      yalnız /api /v1 /saglik'i geçirir. Sondalar: read_only düşer · imaj etiketle · db'ye ports: → ❌
 // NEGATİF SONDA (2026-10-09, dosya DIŞI, origin/main'deki patron-baslat.sh yerine konup geri alındı): §1 sondaları ❌.
 // Ana ürünün Traefik compose'u, compose-denetle ⑩ ve duman.sh Adnan reposuna alınmadı (2026-11-12; §2–§4 yeniden).
+// §1/§2 anlık bildirim (2026-11-17): Expo belirteci isteğe bağlı sır; kip/konu/telefon push'u `.env`ten, varsayılan
+//      kapali; VAPID üreticisi imajda. Sondalar: varsayılan gercek · sabit kip · belirteç düz ortamda → ❌.
 // Koşum: npx tsx scripts/test_compose_sirlari.ts   (DB GEREKMEZ)
 // =============================================================================
 import { spawnSync } from "node:child_process";
@@ -48,10 +50,15 @@ function baslat(rol: string | null, sirlar: readonly string[], betik = BASLAT): 
 }
 
 kontrol("§1 betik `S=/run/secrets` satırını taşır (sonda onu geçici dizine çevirir)", /^S=\/run\/secrets$/m.test(BASLAT));
-const SUNUCU = ["uygulama_parolasi", "esitleme_parolasi", "guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id", "destek_api_anahtari", "destek_webhook_sirri"];
+const SUNUCU = ["uygulama_parolasi", "esitleme_parolasi", "guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id", "destek_api_anahtari", "destek_webhook_sirri", "expo_erisim_belirteci"];
 {
   const r = baslat(null, SUNUCU);
-  kontrol("§1 rol verilmezse sunucu: altı sırla açılır, DB + eşitleme URL'i + güvenlik bildirimi + destek yolları kurulur, göç URL'i ve eski tesis anahtarı yolu YOK", r.status === 0 && !!r.env.DATABASE_URL && !!r.env.ESITLEME_DATABASE_URL && !r.env.TESIS_ROL_ANAHTARI_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_BOT_TOKEN_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_CHAT_ID_DOSYASI && !!r.env.DESTEK_API_KEY_DOSYASI && !!r.env.DESTEK_WEBHOOK_SECRET_DOSYASI && !r.env.GOC_DATABASE_URL, r.hata.trim());
+  kontrol("§1 rol verilmezse sunucu: yedi sırla açılır, DB + eşitleme URL'i + güvenlik bildirimi + destek + Expo belirteci yolları kurulur, göç URL'i ve eski tesis anahtarı yolu YOK", r.status === 0 && !!r.env.DATABASE_URL && !!r.env.ESITLEME_DATABASE_URL && !r.env.TESIS_ROL_ANAHTARI_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_BOT_TOKEN_DOSYASI && !!r.env.GUVENLIK_TELEGRAM_CHAT_ID_DOSYASI && !!r.env.DESTEK_API_KEY_DOSYASI && !!r.env.DESTEK_WEBHOOK_SECRET_DOSYASI && !!r.env.EXPO_ERISIM_BELIRTECI_DOSYASI && !r.env.GOC_DATABASE_URL, r.hata.trim());
+  // Anlık bildirim Expo belirteci İSTEĞE BAĞLI: yoksa sunucu açılır, yol kurulmaz (telefon push'u KAPALI), uyarı stderr'e.
+  const e = baslat("sunucu", SUNUCU.slice(0, 6));
+  kontrol("§1 Expo belirteci YOKKEN sunucu açılır, yol kurulmaz, uyarı basılır", e.status === 0 && !!e.env.DATABASE_URL && !e.env.EXPO_ERISIM_BELIRTECI_DOSYASI && /expo_erisim_belirteci okunamıyor[^\n]*KAPALI/.test(e.hata), `${e.status} · ${e.hata.trim()}`);
+  const eg = baslat("goc", ["goc_parolasi", "uygulama_parolasi", "esitleme_parolasi", "expo_erisim_belirteci"]);
+  kontrol("§1 göç rolü Expo belirtecini OKUMAZ", eg.status === 0 && !eg.env.EXPO_ERISIM_BELIRTECI_DOSYASI, eg.hata.trim());
   kontrol("§1 sunucu satıcı iç API belirtecini KURMAZ", !("SATICI_IC_API_BELIRTECI" in r.env));
 }
 {
@@ -78,7 +85,7 @@ kontrol("§1 tanınmayan PATRON_ROL çıkış 1 (eski `hazirla` dahil)", baslat(
 // §2–§3 Adnan compose (deploy/patron/compose.yaml) ↔ rol tablosu. DB'siz ve docker'sız: compose akış listesiyle
 // (`secrets: [a, b]`) yazılır, servis blokları girintiden ayrılır. Ortamda hazır verilen URL sırrın yerine geçer
 // (betikteki `[ -z "${X:-}" ]` dalları) → o sır compose'da GEREKMEZ (göç rolü GOC_DATABASE_URL'i .env'den alır).
-const ISTEGE_BAGLI = new Set(["guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id", "destek_api_anahtari", "destek_webhook_sirri"]);
+const ISTEGE_BAGLI = new Set(["guvenlik_telegram_bot_token", "guvenlik_telegram_chat_id", "destek_api_anahtari", "destek_webhook_sirri", "expo_erisim_belirteci"]);
 const ORTAM_KARSILIGI: Record<string, string> = {
   uygulama_parolasi: "DATABASE_URL",
   esitleme_parolasi: "ESITLEME_DATABASE_URL",
@@ -144,6 +151,19 @@ const COMPOSE = readFileSync(path.join(D, "compose.yaml"), "utf8");
   kontrol("§2 destek sırları yolsuzken /dev/null (KAPALI), DESTEK_API_URL boş varsayılan", destekVarsayilan(COMPOSE));
   const zorunluDestek = COMPOSE.replace("${DESTEK_API_ANAHTARI_DOSYASI_HOST:-/dev/null}", "./sirlar/destek_api_anahtari");
   kontrol("§2 sonda: destek anahtarı zorunlu dosyaya bağlanır → ❌", zorunluDestek !== COMPOSE && !destekVarsayilan(zorunluDestek));
+  // Anlık bildirim (kapatma düğmesi): kip `.env`ten, VARSAYILAN kapali (= bugünkü davranış); konu boş, telefon push'u
+  // kapali; Expo belirteci yolsuzken /dev/null. VAPID üreticisi imajda derlenir (salt okunur birim → elle konur).
+  const bildirimVarsayilan = (c: string): boolean => /^\s+BILDIRIM_KIPI: \$\{BILDIRIM_KIPI:-kapali\}$/m.test(c) && /^\s+BILDIRIM_VAPID_KONU: \$\{BILDIRIM_VAPID_KONU:-\}$/m.test(c)
+    && /^\s+BILDIRIM_NATIVE_PUSH: \$\{BILDIRIM_NATIVE_PUSH:-kapali\}$/m.test(c) && /expo_erisim_belirteci:\n\s+file: \$\{EXPO_ERISIM_BELIRTECI_DOSYASI_HOST:-\/dev\/null\}/.test(c)
+    && !/^\s+EXPO_ERISIM_BELIRTECI:/m.test(c);
+  kontrol("§2 ⭐ bildirim kipi ortamdan, varsayılan kapali · konu boş · telefon push'u kapali · Expo belirteci sır dosyasından (yolsuz /dev/null), düz ortamda YOK", bildirimVarsayilan(COMPOSE));
+  for (const [ad, sonda] of [
+    ["varsayılan kip gercek", COMPOSE.replace("${BILDIRIM_KIPI:-kapali}", "${BILDIRIM_KIPI:-gercek}")],
+    ["kip sabit kapali (ortamdan okunmaz)", COMPOSE.replace("${BILDIRIM_KIPI:-kapali}", "kapali")],
+    ["belirteç düz ortamda", COMPOSE.replace("      BILDIRIM_NATIVE_PUSH:", "      EXPO_ERISIM_BELIRTECI: ${EXPO_ERISIM_BELIRTECI:-}\n      BILDIRIM_NATIVE_PUSH:")],
+  ] as const) kontrol(`§2 sonda: ${ad} → ❌`, sonda !== COMPOSE && !bildirimVarsayilan(sonda));
+  const dockerfile = readFileSync(path.join(D, "Dockerfile"), "utf8");
+  kontrol("§2 VAPID üreticisi imajda derlenir ve varlığı derlemede doğrulanır", /scripts\/vapid-anahtar-uret\.ts/.test(dockerfile) && /test -f dist-cli\/scripts\/vapid-anahtar-uret\.js/.test(dockerfile));
   const api = ss.find((s) => s.ad === "api");
   const kalinti = ["ic_api_belirteci", "KURULUM_KAYNAGI", "SATICI_IC", "tesis-db", "hazirla", "GOC_DATABASE_URL", "POSTGRES_PASSWORD:"].filter((x) => COMPOSE.includes(x)).concat(["tesis_rol_anahtari:", "TESIS_ROL_ANAHTARI"].filter((x) => COMPOSE.includes(x) || BASLAT.includes(x)));
   kontrol("§2 satıcı/çok tesis kalıntısı, sökülen e-posta özeti anahtarı ve ortamda parola YOK (compose + betik)", kalinti.length === 0, kalinti.join(","));

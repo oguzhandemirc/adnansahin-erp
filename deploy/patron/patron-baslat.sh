@@ -2,7 +2,8 @@
 # Patron konteyner girişi: DB URL'lerini ve anahtar yollarını docker SECRET dosyalarından kurar,
 # komutu çalıştırır — sırlar imaj yapılandırmasına ve `docker inspect`e girmez. Rol (PATRON_ROL) hangi sırların
 # okunacağını belirler; her rol YALNIZ kendi sırlarını okur ve hepsini ZORUNLU sayar (en az yetki) — tek istisna
-# güvenlik bildirimi sırları (guvenlik_telegram_*) ve Etkili Destek sırları (destek_api_anahtari, destek_webhook_sirri):
+# güvenlik bildirimi sırları (guvenlik_telegram_*), Etkili Destek sırları (destek_api_anahtari, destek_webhook_sirri) ve
+# anlık bildirimin Expo belirteci (expo_erisim_belirteci):
 # İSTEĞE BAĞLI, okunamazsa (ya da boşsa) o özellik KAPALI:
 #   sunucu  → uygulama + eşitleme parolası
 #   goc     → göç (patron_goc, süper kullanıcı DEĞİL) + uygulama + eşitleme parolası
@@ -16,7 +17,7 @@ DB="${DB_HOST:-patron-db}:5432/${DB_ADI:-patron}?schema=public"
 
 rol_sirlari() {
   case "$1" in
-    sunucu) echo "uygulama_parolasi esitleme_parolasi guvenlik_telegram_bot_token guvenlik_telegram_chat_id destek_api_anahtari destek_webhook_sirri" ;;
+    sunucu) echo "uygulama_parolasi esitleme_parolasi guvenlik_telegram_bot_token guvenlik_telegram_chat_id destek_api_anahtari destek_webhook_sirri expo_erisim_belirteci" ;;
     goc) echo "goc_parolasi uygulama_parolasi esitleme_parolasi" ;;
     *) return 1 ;;
   esac
@@ -93,6 +94,15 @@ for sir in $SIRLAR; do
         if istege_bagli_sir destek_webhook_sirri; then
           DESTEK_WEBHOOK_SECRET_DOSYASI="$S/destek_webhook_sirri"
           export DESTEK_WEBHOOK_SECRET_DOSYASI
+        fi
+      fi ;;
+    expo_erisim_belirteci)
+      # Anlık bildirim telefon push'u İSTEĞE BAĞLI: okunamazsa yol verilmez; boş (/dev/null) ise sunucu belirteci YOK sayar
+      # (telefon push'u KAPALI, web push ve kip aynen).
+      if [ -z "${EXPO_ERISIM_BELIRTECI_DOSYASI:-}" ] && [ -z "${EXPO_ERISIM_BELIRTECI:-}" ]; then
+        if istege_bagli_sir expo_erisim_belirteci; then
+          EXPO_ERISIM_BELIRTECI_DOSYASI="$S/expo_erisim_belirteci"
+          export EXPO_ERISIM_BELIRTECI_DOSYASI
         fi
       fi ;;
     *) echo "[patron] rol tablosunda tanınmayan sır: $sir" >&2; exit 1 ;;

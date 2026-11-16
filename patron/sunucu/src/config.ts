@@ -4,6 +4,7 @@
 import { isIPv4, isIPv6 } from "node:net";
 import path from "node:path";
 import { z } from "zod";
+import { secret } from "./lib/security-events";
 
 const port = z.coerce.number().int().min(0).max(65535);
 const positiveInt = (min: number, max: number) => z.coerce.number().int().min(min).max(max);
@@ -90,8 +91,19 @@ const EnvSchema = z
 
 export type CloudConfig = Readonly<z.infer<typeof EnvSchema>>;
 
+/** Expo belirteci docker sır dosyasından da gelebilir (`EXPO_ERISIM_BELIRTECI_DOSYASI`, `deploy/patron/patron-baslat.sh`):
+ *  boş dosya (compose'un yolsuz bağladığı /dev/null) = verilmedi → telefon push'u KAPALI; değer + dosya birlikte, herkese
+ *  okunur ya da okunamayan dosya açılışı DURDURUR (fail-closed; gerekçede yalnız değişken adı, değer yok). */
+function withExpoTokenFile(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  if (!env.EXPO_ERISIM_BELIRTECI_DOSYASI?.trim()) return env;
+  const s = secret(env, "EXPO_ERISIM_BELIRTECI");
+  if ("value" in s) return { ...env, EXPO_ERISIM_BELIRTECI: s.value, EXPO_ERISIM_BELIRTECI_DOSYASI: undefined };
+  if (/_DOSYASI boş$/.test(s.reason)) return { ...env, EXPO_ERISIM_BELIRTECI: undefined, EXPO_ERISIM_BELIRTECI_DOSYASI: undefined };
+  throw new Error(`Patron bulutu yapılandırması geçersiz — ${s.reason}`);
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd: string = process.cwd()): CloudConfig {
-  const parsed = EnvSchema.safeParse(env);
+  const parsed = EnvSchema.safeParse(withExpoTokenFile(env));
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Patron bulutu yapılandırması geçersiz — ${issues}`);

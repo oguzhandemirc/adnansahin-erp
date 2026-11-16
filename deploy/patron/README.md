@@ -94,6 +94,20 @@ Patron uygulamasının destek talepleri bulut üzerinden Etkili Destek merkezine
 - Webhook adresi (merkez paneline): `https://<alan>/api/destek/webhook`.
 - Kapatmak: `.env`ten üç satırı sil → `docker compose up -d api` (tek ayar; veri yok, geri alınacak bir şey yok).
 
+## Anlık bildirim (isteğe bağlı; varsayılan KAPALI)
+
+Kip `.env`ten okunur; yoksa `kapali` (bildirim işi kurulmaz, kuyruk satırı ve dış istek yok — bugünkü davranış). Göç YOK.
+
+- VAPID çifti (bir kez; birim salt okunur, sunucu üretemez): imajdaki üreticiyle
+  `docker run --rm --entrypoint node --user 10001:10001 -v /opt/adnan/patron/anahtarlar:/anahtarlar <imaj> dist-cli/scripts/vapid-anahtar-uret.js --dizin=/anahtarlar`
+  (dizin o koşum için 10001'e yazılabilir olmalı; var olan dosyanın üstüne yazmaz; gizli anahtarı basmaz). Kaybı = bütün web
+  abonelikleri yenilenir; `yedekle.sh` almaz, kasaya ayrıca kopyala.
+- `.env`: `BILDIRIM_KIPI=gercek` · `BILDIRIM_VAPID_KONU=mailto:<adres>` → `docker compose up -d api` → günlükte `PATRON_BILDIRIM kip=gercek`.
+- Telefon push'u ayrıca: `sirlar/expo_erisim_belirteci` (root:10001 0440) + `.env`te
+  `EXPO_ERISIM_BELIRTECI_DOSYASI_HOST=./sirlar/expo_erisim_belirteci` · `BILDIRIM_NATIVE_PUSH=acik`; eksikse telefon push'u
+  kapalı kalır ve günlükte `PATRON_BILDIRIM native=kapali (<neden>)` görünür.
+- Kapatmak: `.env`te `BILDIRIM_KIPI=kapali` (ya da satırı sil) → `docker compose up -d api` (tek ayar).
+
 ## Güncelleme
 
 1. Commit → `imaj-derle.sh --kaydet=…` → `docker load` (eski imaj SİLİNMEZ; geri alma için kalır).
