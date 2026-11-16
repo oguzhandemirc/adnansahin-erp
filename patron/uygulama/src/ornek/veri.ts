@@ -59,7 +59,10 @@ const fasonDonem = (carpan: number) => ({ acikMiktar: Math.round(4200 * carpan),
 export function ORNEK_ANLIK(): Record<string, unknown> {
   return {
     tesis: { saatDilimi: "Europe/Istanbul" },
-    "ozet.siparis": { acikKalem: 24, acikMiktar: 52300, karsilanmaYuzde: 61.5 },
+    "ozet.siparis": {
+      acikKalem: 24, acikMiktar: 52300, karsilanmaYuzde: 61.5, karsilanmayanMiktar: 20130,
+      enCokCari: [{ etiket: "Örnek Tekstil A.Ş.", miktar: 18400 }, { etiket: "Deneme Kumaş Ltd. Şti.", miktar: 12650 }, { etiket: "Numune Perde San. ve Tic.", miktar: 7300 }],
+    },
     "ozet.sevkiyat": { bugun: donem(0.12), buAy: donem(1), gecenAy: donem(1.4), son30Gun: donem(1.6) },
     "ozet.uretim": {
       bugunTamamlananToplam: 412,
@@ -281,7 +284,10 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         sevkMiktari,
         toplamMiktar,
         kalemSayisi: 1 + (i % 3),
-        tamamlanma: durum === "COMPLETED" ? 100 : durum === "PARTIAL_SHIPPED" ? 45 : 0,
+        // Fabrika telinde `tamamlanma` = completedAt (tarih), `olusturulma` = createdAt.
+        tamamlanma: durum === "COMPLETED" ? once(i, 1) : null,
+        iptalTarihi: durum === "CANCELLED" ? once(i, 1) : null,
+        olusturulma: once(i * 3 + 1, 2),
         uretim: URETIM[i]!,
       },
     );
@@ -311,6 +317,12 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
       toplamMetre: [1800, 434, 2650, 1210, 980, 3120][i],
       cikisTarihi: i === 0 ? null : once(i - 1, 2),
       olusturulma: once(i, 3),
+      // Fabrika türevleri (brüt) ve fatura alanları — sevkiyat ekranının ek alanları için.
+      topSayisi: [15, 4, 22, 10, 8, 26][i],
+      cuvalSayisi: [3, 1, 5, 2, 2, 6][i],
+      toplamKg: [512.4, 121, 880.5, 402, 330.2, 1044][i],
+      disFaturaNo: i === 0 ? null : `FTR-2026-${String(812 - i).padStart(5, "0")}`,
+      faturalanma: i === 0 ? null : once(i - 1, 1),
     }),
   );
   // İş emri: fabrikanın türettiği hâliyle (açık/aşama/aşama sayıları/kimlik dizileri); biri siparişsiz, biri kapanmış.

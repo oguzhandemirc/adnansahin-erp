@@ -1,7 +1,11 @@
 // Siparişler (şartname §4.2): başlık (+ Yeni) → özet şeridi → yapışkan veri tablosu (arama · süzgeç · sütunlar · başlık).
 // Arama, süzgeç ve sıralama SUNUCUDA (`useVeriTablosu`); görünüm tercihi profilde (`tablo.siparis`). Termin/gecikme
-// sütunu ve süzgeci, para sütunu yok (kullanıcı kararı). "Yeni sipariş" yalnız yazma izniyle ve çevrimiçiyken.
+// süzgeci/vurgusu ve para sütunu yok (kullanıcı kararı); termin yalnız düz tarih ek sütunu. "Yeni sipariş" yalnız yazma
+// izniyle ve çevrimiçiyken. 2026-11-17: ek sütunlar ve özet kartları seçicide KAPALI gelir (`src/ui/siparis/gorunum.ts`);
+// kart seçimi aynı `tablo.siparis` tercihinde, hiç kart serbest.
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Text, View } from "react-native";
 import type { ProjectionRecord } from "../../../../src/api/wire";
 import { can } from "../../../../src/lib/access";
@@ -12,13 +16,16 @@ import { useRemote } from "../../../../src/state/useRemote";
 import { Screen } from "../../../../src/ui/Frame";
 import { MODULE_ICON } from "../../../../src/ui/icons";
 import { openRecord } from "../../../../src/ui/nav";
-import { OzetSeridi, rozetRenk } from "../../../../src/ui/ortak";
+import { Basilabilir } from "../../../../src/ui/hareket";
+import { ListeBlogu, ListeSatiri, OzetSeridi, rozetRenk, type SeritOgesi } from "../../../../src/ui/ortak";
+import { SIPARIS_KARTLARI, siparisKartDegistir, siparisKartlari, siparisKartSifirla, type SiparisKartKey } from "../../../../src/ui/siparis/gorunum";
 import { ROZET_TONU, asObj, present, str, uretimMetni } from "../../../../src/ui/siparis/OrderRow";
 import { CapsuleButton, StaleNote } from "../../../../src/ui/siparis/parts";
 import type { SutunTanimi } from "../../../../src/ui/tablo/model";
+import { VisibilityPicker } from "../../../../src/ui/tablo/Seciciler";
 import { TabloListesi, TabloUstu, useVeriTablosu } from "../../../../src/ui/tablo/useVeriTablosu";
 import { useTokens } from "../../../../src/ui/theme-context";
-import { FONT_SCALE, space, typography } from "../../../../src/ui/tokens";
+import { FONT_SCALE, TOUCH, space, typography } from "../../../../src/ui/tokens";
 
 const k = (r: ProjectionRecord) => asObj(r.kayit);
 const sayi = (v: unknown, birim = "") => (present(v) ? `${formatNumber(v, 0)}${birim}` : "—");
@@ -49,6 +56,15 @@ const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
     key: "durum", baslik: "Durum", agirlik: 1.35, hucre: (r) => orderStatus(k(r).durum).label,
     ogeler: (r) => <DurumHucresi durum={k(r).durum} />,
   },
+  // 2026-11-17 ek sütunlar (seçicide KAPALI): telin kendi alanları, biçimlenir — hesap yok. Sevk BRÜT (fabrika).
+  { key: "acik", baslik: "Açık m", ad: "Açık miktar (m)", agirlik: 1.1, sayi: true, sirala: "acikMiktar", hucre: (r) => sayi(k(r).acikMiktar) },
+  { key: "sevk", baslik: "Sevk m", ad: "Sevk edilen (m, brüt)", agirlik: 1.1, sayi: true, sirala: "sevkMiktari", hucre: (r) => sayi(k(r).sevkMiktari) },
+  { key: "toplam", baslik: "Toplam m", ad: "Sipariş toplamı (m)", agirlik: 1.1, sayi: true, hucre: (r) => sayi(k(r).toplamMiktar) },
+  // Termin düz tarih: gecikme vurgusu/rozeti YOK (kullanıcı kararı sürer).
+  { key: "termin", baslik: "Termin", agirlik: 1, hucre: (r) => formatDate(k(r).termin) },
+  { key: "tamam", baslik: "Tamamlanma", ad: "Tamamlanma tarihi", agirlik: 1.1, hucre: (r) => formatDate(k(r).tamamlanma) },
+  { key: "iptal", baslik: "İptal", ad: "İptal tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).iptalTarihi) },
+  { key: "kayit", baslik: "Kayıt", ad: "Kayıt tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).olusturulma) },
 ];
 
 const AYAR = {
@@ -61,17 +77,28 @@ const AYAR = {
   testID: "siparis",
 } as const;
 
-function Ozet({ veri }: { veri: unknown }) {
+/** Özet şeridi + (seçiliyse) "en çok açık siparişi olan müşteriler"; görünür kartlar tanım sırasıyla, hiç kart serbest. */
+function Ozet({ veri, kartlar }: { veri: unknown; kartlar: readonly SiparisKartKey[] }) {
   const v = asObj(veri);
+  const serit: Partial<Record<SiparisKartKey, SeritOgesi>> = {
+    acik: { key: "acik", deger: formatNumber(v.acikKalem, 0), birim: "kalem", etiket: "Açık" },
+    miktar: { key: "miktar", deger: formatNumber(v.acikMiktar, 0), birim: "m", etiket: "Açık miktar" },
+    karsilanma: { key: "karsilanma", deger: v.karsilanmaYuzde == null ? "—" : `%${formatNumber(v.karsilanmaYuzde, 0)}`, etiket: "Karşılanma" },
+    karsilanmayan: { key: "karsilanmayan", deger: present(v.karsilanmayanMiktar) ? formatNumber(v.karsilanmayanMiktar, 0) : "—", birim: "m", etiket: "Karşılanmayan" },
+  };
+  const items = kartlar.flatMap((x) => (serit[x] ? [serit[x]!] : []));
+  const cariler = Array.isArray(v.enCokCari) ? v.enCokCari.map(asObj) : [];
   return (
-    <OzetSeridi
-      testID="siparis-ozet"
-      items={[
-        { key: "acik", deger: formatNumber(v.acikKalem, 0), birim: "kalem", etiket: "Açık" },
-        { key: "miktar", deger: formatNumber(v.acikMiktar, 0), birim: "m", etiket: "Açık miktar" },
-        { key: "karsilanma", deger: v.karsilanmaYuzde == null ? "—" : `%${formatNumber(v.karsilanmaYuzde, 0)}`, etiket: "Karşılanma" },
-      ]}
-    />
+    <View style={{ gap: space.s }}>
+      {items.length > 0 ? <OzetSeridi testID="siparis-ozet" items={items} /> : null}
+      {kartlar.includes("enCokCari") ? (
+        <ListeBlogu baslik="En çok açık siparişi olan" testID="siparis-en-cok-cari">
+          {cariler.length > 0
+            ? cariler.map((c, i) => <ListeSatiri key={`${i}-${str(c.etiket) ?? ""}`} birincil={str(c.etiket) ?? "—"} deger={present(c.miktar) ? `${formatNumber(c.miktar, 0)} m` : "—"} ayrac={i > 0} ok={false} />)
+            : <ListeSatiri birincil="Fabrikadan gelmedi" ayrac={false} ok={false} />}
+        </ListeBlogu>
+      ) : null}
+    </View>
   );
 }
 
@@ -81,7 +108,17 @@ export default function Orders() {
   const tablo = useVeriTablosu(AYAR);
   const { list } = tablo;
   const canWrite = can(permissions, "bulut:siparis:yaz");
-  const summary = useRemote(can(permissions, "bulut:ozet:oku") ? "anlik:ozet.siparis" : null, () => api.snapshot("ozet.siparis"), { tags: ["ozet", "ozet.siparis"] });
+  const t = useTokens();
+  const ozetAcik = can(permissions, "bulut:ozet:oku");
+  const summary = useRemote(ozetAcik ? "anlik:ozet.siparis" : null, () => api.snapshot("ozet.siparis"), { tags: ["ozet", "ozet.siparis"] });
+  const [kartSecici, setKartSecici] = useState(false);
+  const kartlar = siparisKartlari(tablo.tercih);
+  const yeni = canWrite ? <CapsuleButton label="Yeni sipariş" icon="add" disabled={offline} onPress={() => router.push("/siparisler/yeni")} testID="yeni-siparis" /> : null;
+  const kartDugmesi = ozetAcik ? (
+    <Basilabilir onPress={() => setKartSecici(true)} style={{ minWidth: TOUCH, minHeight: TOUCH, alignItems: "center", justifyContent: "center" }} accessibilityRole="button" accessibilityLabel="Kartları seç" testID="siparis-kart-sec">
+      <Ionicons name="options-outline" size={22} color={t.color.link} />
+    </Basilabilir>
+  ) : null;
   const refresh = () => {
     list.reload();
     summary.reload();
@@ -94,13 +131,20 @@ export default function Orders() {
       subtitle={
         <View style={{ gap: space.s }}>
           <StaleNote stale={list.stale} savedAt={list.savedAt} />
-          {summary.data ? <View style={{ marginTop: space.xs }}><Ozet veri={summary.data.veri} /></View> : null}
+          {summary.data && kartlar.length > 0 ? <View style={{ marginTop: space.xs }}><Ozet veri={summary.data.veri} kartlar={kartlar} /></View> : null}
         </View>
       }
-      headerRight={canWrite ? <CapsuleButton label="Yeni sipariş" icon="add" disabled={offline} onPress={() => router.push("/siparisler/yeni")} testID="yeni-siparis" /> : undefined}
+      headerRight={yeni || kartDugmesi ? <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>{kartDugmesi}{yeni}</View> : undefined}
       sticky={<TabloUstu tablo={tablo} />}
     >
       <TabloListesi tablo={tablo} onPress={(r) => openRecord(router, "siparis", r.id)} bos="Henüz sipariş yok" bosSuzgecli="Bu süzgeçte sipariş yok" icon={MODULE_ICON.siparisler.icon} />
+      <VisibilityPicker
+        visible={kartSecici} title="Kartları seç" testID="siparis-kart-secici"
+        items={SIPARIS_KARTLARI} shown={kartlar} enAz={0}
+        onToggle={(x) => tablo.degistir((p) => siparisKartDegistir(p, x as SiparisKartKey))}
+        onDefault={() => tablo.degistir(siparisKartSifirla)}
+        onClose={() => setKartSecici(false)}
+      />
     </Screen>
   );
 }
