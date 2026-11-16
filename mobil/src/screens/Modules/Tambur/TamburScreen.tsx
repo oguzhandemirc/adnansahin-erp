@@ -3214,6 +3214,7 @@ export default function TamburScreen() {
       {activeJob && (
         <WorkOrderOutputPanel
           workOrderId={activeJob.stepSummary.workOrderId}
+          grades={qualityGrades}
           onPrint={(r: Roll) => {
             // Kayıtlı etiket niyetiyle bas — "Kime?" TEKRAR SORULMAZ (kesim
             // akışlarındaki kuralın aynısı; hedef zaten topun üstünde).

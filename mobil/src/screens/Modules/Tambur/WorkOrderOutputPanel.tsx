@@ -29,7 +29,9 @@ import { useQuery } from '@tanstack/react-query';
 
 import { tamburService } from '../../../services/tambur.service';
 import { useDeviceSettingsStore } from '../../../store/deviceSettingsStore';
-import type { Roll } from '../../../types/models';
+import type { QualityGrade, Roll } from '../../../types/models';
+import { nonFirstGradeBadge } from '../../../utils/qualityRole';
+import { palette } from '../../../theme/tokens';
 
 /** "SS:dd" — panelde tarih GEREKMEZ: kapsam zaten tek iş emri. */
 function hhmm(v: string | Date | null | undefined): string {
@@ -44,8 +46,12 @@ export default function WorkOrderOutputPanel({
   workOrderId,
   onPrint,
   onUndo,
+  grades,
 }: {
   workOrderId: string | null;
+  /** Kalite kataloğu (ekranın ZATEN çektiği) — satırdaki A1/fire rozeti için.
+   *  1. kalite (rol FIRST) rozet almaz; rozet etiket durumundan bağımsızdır. */
+  grades: readonly QualityGrade[];
   /** Etiketi yeniden bas — parent'ın yazıcı akışına verir. */
   onPrint: (roll: Roll) => void;
   /** Geri alma önizlemesini aç (yıkıcı-işlem kuralı: onaysız iptal yok). */
@@ -158,7 +164,12 @@ export default function WorkOrderOutputPanel({
         </View>
       ) : (
         <ScrollView ref={listRef} style={s.list} nestedScrollEnabled>
-          {rolls.map((r) => (
+          {rolls.map((r) => {
+            // KALİTE ROZETİ (2026-11-16 saha isteği: "fire veya a1 ise yazsın,
+            // 1. kaliteyse yazmasına gerek yok"). Topun KENDİ kalite kodundan
+            // çözülür, etiket basılmış olması şart DEĞİL — top çıkar çıkmaz görünür.
+            const badge = nonFirstGradeBadge(grades, r.qualityGrade);
+            return (
             // ⚠️ SATIRA DOKUNMAK BASKI DEĞİL (2026-08-12 saha şikâyeti: listeye
             // her dokunuş kâğıt bastırıyordu). Baskı YALNIZ yazıcı tuşundan —
             // satırın kendisi pasif; tuşlar eldiven boyuna büyütüldü.
@@ -168,6 +179,16 @@ export default function WorkOrderOutputPanel({
                 <Text style={s.rowBarcode} numberOfLines={1}>
                   {r.barcode ?? '—'}
                 </Text>
+                {badge && (
+                  <View
+                    testID={`wo-output-grade-${r.id}`}
+                    style={[s.gradePill, { backgroundColor: badge.color ?? palette.slate[200] }]}
+                  >
+                    <Text style={s.gradePillText} numberOfLines={1}>
+                      {badge.code}
+                    </Text>
+                  </View>
+                )}
                 <Text style={s.rowQty}>{Number(r.initialQty ?? 0).toFixed(1)} m</Text>
                 <IconButton
                   icon="printer"
@@ -191,7 +212,8 @@ export default function WorkOrderOutputPanel({
                 />
               </View>
             </View>
-          ))}
+            );
+          })}
         </ScrollView>
       )}
         </>
@@ -268,6 +290,9 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
   },
+  // Çıkanlar modalındaki kalite hapıyla (`qualityPill`) aynı dil — renk katalogdan.
+  gradePill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, maxWidth: 72 },
+  gradePillText: { fontSize: 12, fontWeight: '800', color: palette.slate[900] },
   rowQty: {
     fontSize: 14,
     fontWeight: '700',

@@ -94,5 +94,25 @@ export function gradeColor(
   return grades.find((g) => g.code === code)?.color ?? null;
 }
 
+/**
+ * SUNUM — "bu top 1. kalite DEĞİLSE ne yazayım?" (Tambur "Bu işten çıkanlar"
+ * satırı, 2026-11-16 saha isteği: *"fire veya a1 ise yazsın, 1. kaliteyse
+ * yazmasına gerek yok"*).
+ *
+ * Kural: kodun rolü `FIRST` ise rozet YOK; aksi her kod (A1/fire ve rolsüz bir
+ * dördüncü kademe) rozet alır — renk `gradeColor` ile katalogdan. Katalog henüz
+ * gelmediyse (`grades` boş) `null`: yüklenene kadar her 1. kalite topta yanlış
+ * rozet yanıp sönmesin. Rozet ETİKET DURUMUNDAN BAĞIMSIZDIR — yalnız topun kendi
+ * `qualityGrade` kodunu okur (`labelPrintedAt` / `lastLabelSnapshot` değil).
+ */
+export function nonFirstGradeBadge(
+  grades: readonly QualityGradeLike[],
+  code: string | null | undefined,
+): { code: string; color: string | null } | null {
+  if (!code || grades.length === 0) return null;
+  if (roleOfCode(grades, code) === 'FIRST') return null;
+  return { code, color: gradeColor(grades, code) };
+}
+
 /** Ekranların elindeki tam `QualityGrade` dizisi de bu şekle uyar. */
 export type { QualityGrade };

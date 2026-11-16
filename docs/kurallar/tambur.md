@@ -27,6 +27,7 @@ Topun rotadaki son adımı (finalize, kesim, geri alma), toplar üzerindeki elle
 - `RollOperation` ve `RollMovement` satırı geri alınırken silinmez, `revokedAt`/`revokedById` ile damgalanır; okuyan her yol `ACTIVE_OPERATION` ile süzer. [bekçi: test_roll_operation_revoke, test_roll_movement_revoke]
 - Ölü top kümesi tek kaynak `K18_DEAD_STATUSES`; `SCRAP` bilerek dışındadır (fire partiyi kapatmaz, karneden düşmez); filtrelerde elle statü listesi yazma. [bekçi: test_quality_scorecard]
 - `finalizedAt`/`statusChangedAt` damgasını DB trigger'ı yazar; uygulama kodundan yazma. [bekçi: test_db_invariants]
+- Tablet "Bu işten çıkanlar" satırı 1. kalite DIŞINDAKİ her kaliteyi (A1, fire) katalog renkli rozetle gösterir; karar rolden (`nonFirstGradeBadge`), etiket durumundan bağımsız; 1. kalitede rozet yok. [bekçi: mobil WorkOrderOutputPanel.test.tsx]
 
 ### Top düzeltme, iptal, fire
 - İptal ≠ fire: iptal (CANCELLED) "hiç olmamalıydı" — stok düşmez, açık hareket `qtyOut=0`; fire (SCRAP) "vardı, gitti" — stok düşer, fire oranına girer, uç `POST /rolls/:id/scrap` + `roll:manual-adjust`. [bekçi: test_roll_cancel_undo]
