@@ -65,7 +65,15 @@
       "expo-secure-store",
       "expo-font",
       "./plugins/withPatronImza.js",
-      "./plugins/withBildirimBaglantisi.js"
+      "./plugins/withBildirimBaglantisi.js",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Siparişi sesle girebilmeniz için mikrofon kullanılır. Ses kaydedilmez, yalnız siz mikrofon düğmesine bastığınızda dinlenir.",
+          "speechRecognitionPermission": "Konuşmanız yeni sipariş formunu doldurmak için telefonun ses tanıma hizmetiyle yazıya çevrilir. Sipariş yalnız siz Gönder'e bastığınızda gider.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

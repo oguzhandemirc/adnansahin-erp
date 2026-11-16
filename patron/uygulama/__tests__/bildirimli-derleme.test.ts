@@ -32,7 +32,7 @@ function manifest(izinler: string[], bilesenler: string[] = []): string {
     "</manifest>",
   ].join("\n");
 }
-const TEMEL = ["android.permission.INTERNET", `${PAKET}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`];
+const TEMEL = ["android.permission.INTERNET", `${PAKET}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`, "android.permission.RECORD_AUDIO"];
 const FIREBASE = [...d.ZORUNLU_BILDIRIM_BILESENLERI, "com.google.firebase.components.ComponentDiscoveryService", "expo.modules.notifications.service.NotificationsService"];
 
 describe("manifest denetimi — bayraksız (eski davranış AYNEN)", () => {

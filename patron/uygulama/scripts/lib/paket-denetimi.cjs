@@ -5,9 +5,15 @@
 //     bildirim bileşenleri KABUL ve ZORUNLU (yoksa paket sessizce bildirimsiz çıkmış demektir → RET). Liste dışı izin yine RET.
 "use strict";
 
+/**
+ * Sesle sipariş girişi (2026-11-17, `expo-speech-recognition` eklentisi): mikrofon. Ses telefonun kendi tanıma hizmetiyle
+ * işlenir, kaydedilmez. Her pakette İZİNLİ ve ZORUNLU (yoksa eklenti uygulanmamış, mikrofon düğmesi hep hata verir).
+ */
+const SES_IZNI = "android.permission.RECORD_AUDIO";
+
 /** Bildirimden bağımsız tek izin kümesi. AndroidX'in imza izni paket adını taşır: literal yazılmaz, paketten türer. */
 function temelIzinler(paket) {
-  return ["android.permission.INTERNET", `${paket}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`];
+  return ["android.permission.INTERNET", `${paket}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`, SES_IZNI];
 }
 
 /** Bildirimli pakette ek izinler: bildirim gösterme (Android 13+ istemi), FCM alımı, FCM'in uyandırma kilidi, ağ durumu. */
@@ -45,6 +51,7 @@ function manifestDenetle(m, { paket, kod, surum, bildirimli = false }) {
   const izinli = izinliIzinler(paket, bildirimli);
   const fazla = izinler.filter((i) => !izinli.includes(i));
   if (fazla.length) sorunlar.push(`izinli olmayan izin: ${fazla.join(", ")}`);
+  if (!izinler.includes(SES_IZNI)) sorunlar.push(`ses izni yok (${SES_IZNI}; expo-speech-recognition eklentisi uygulanmamış)`);
 
   const bildirimBilesenleri = [...m.matchAll(/<(?:service|receiver|provider|activity)\b[^>]*?android:name="([^"]+)"/g)]
     .map((x) => x[1])
@@ -87,6 +94,7 @@ function firebasePaketiVarMi(json, paket) {
 }
 
 module.exports = {
+  SES_IZNI,
   temelIzinler,
   izinliIzinler,
   BILDIRIM_IZINLERI,
