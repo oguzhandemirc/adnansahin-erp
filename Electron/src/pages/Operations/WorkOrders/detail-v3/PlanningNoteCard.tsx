@@ -28,6 +28,8 @@ export function PlanningNoteCard({ workOrderId }: { workOrderId: string }) {
   const text = draft ?? serverBody;
   const dirty = draft !== null && draft !== serverBody;
   const tooLong = text.length > PLANNING_NOTE_MAX;
+  // v3 `.btn` kalıbında disabled görünümü yok — kapalı düğme etkin gibi durmasın.
+  const saveDisabled = !dirty || tooLong;
 
   // Başka iş emrine geçilince taslak sıfırlanır.
   useEffect(() => setDraft(null), [workOrderId]);
@@ -76,7 +78,8 @@ export function PlanningNoteCard({ workOrderId }: { workOrderId: string }) {
             <button
               type="button"
               className="btn sm primary"
-              disabled={!dirty || tooLong || save.isPending}
+              disabled={saveDisabled || save.isPending}
+              style={saveDisabled ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
               onClick={() => save.mutate()}
             >
               {save.isPending ? "Kaydediliyor…" : "Kaydet"}

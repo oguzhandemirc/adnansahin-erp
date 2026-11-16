@@ -64,7 +64,7 @@ export function AllocationSummaryBar({ preview }: { preview: AllocationPreview }
         <>
           <span className="text-muted-foreground">·</span>
           {over ? (
-            <span className="flex items-center gap-1 font-medium text-destructive">
+            <span className="flex items-center gap-1 font-semibold text-red-600 dark:text-red-400">
               <AlertTriangle className="h-3.5 w-3.5" /> {fmtM(-remaining)} m fazla
             </span>
           ) : (
