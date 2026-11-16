@@ -13359,3 +13359,15 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Sapma / açık.** Create/replace'in eski `orderLineAllocations[].allocatedQty` yolu tavan kontrolünden GEÇMEZ (hiçbir istemci göndermiyor; `test_order_link_unlink` bu yolla tavan üstü yazıyor). Parti Ekle uyarısı ("Sipariş tahsisi X, toplam Y") artık paylaştırma girildiyse görünür hâle gelir — engel değil. Bağ `updatedAt`i değişince bulut iş emri kaydı kirlenip aynı içerikle yeniden gönderilebilir; içerik değişmez (bekçi §11).
 
 **Bekçiler.** `test_workorder_order_allocation` (28) — sondalar: tavan kapatıldı → 7 kırmızı · replace yeniden 0 yazdı → 6 · tambur `plannedQty` = sipariş metresi → 3 · klon miktarı kopyaladı → 1. `test_work_order_note` (13) — sondalar: `findById` include'una not → 1 · kırpma kaldırıldı → 3.
+
+## 2026-11-17 — Sevkiyata girip çıkmış boş çuval silinemiyordu: tahsis geçmişi donuk numarayla kalır [SEVKİYAT + DEFTER]
+
+**Hata (canlı, salt okuma ile ölçüldü).** Panelde `CV1411260009` için "boşalt ve sil" → "Geçersiz referans: 'sackId'…". Çuvalın 2 damgalı (`clearedAt` dolu) tahsis satırı `sack_allocations_sackId_fkey` (ON DELETE RESTRICT) ile bağlı kaldı; `removeSack` "depodaki çuvalın tahsisi yoktur" varsayımıyla `tx.sack.delete` → P2003. 2.11.7'de de var; fabrika kopyasında (`tekserp_ham_prova1115`) bu durumda 1 çuval.
+
+**Karar.** Geçmiş satır SİLİNMEZ (defter); çuval silinince bağı tek boğazda kopar: `detachSackAllocationHistoryTx` (kilit altında etkin tahsisi sayar → >0 ise 409 `SACK_HAS_ACTIVE_ALLOCATION`; numarasız satıra `sackNo` yazar; `sackId` → NULL). FK `Restrict` KALIR (DB `SET NULL` seçilmedi: başka bir silme yolu geçmişi sessizce bağsız bırakamasın). FK'yı tamamen düşürmek (`SwatchEvent` emsali, `sackId` dangling) seçilmedi: Prisma ilişkisi gider ve tahsisi `sack: {…}` ile süzen bütün Σ okuyucular yeniden yazılırdı. Bedeli: bağsız satırın `sackId`si NULL olur (kimliği numara + audit `DELETE SACK` kaydı taşır); qty · orderLineId · damga değişmez.
+
+**Uygulama.** Migration `20261116211847_sack_allocation_frozen_sack_no`: `sackNo VARCHAR(64)` + `sackId` NULL'a açık + backfill (`sacks`tan) + CHECK `sack_allocations_active_has_sack` (etkin satırın çuvalı var) · `sack_allocations_detached_has_no` (bağsız satır numara taşır); tekrar koşulabilir. Tahsis yazıcısı numarayı DOĞUŞTA yazar. Etkin satırlar hep çuvallı olduğundan sayı okuyucuları (shippedQty · kapsama · raporlar · sevk geçmişi) değişmedi.
+
+**İkinci kusur (bekçi buldu).** `removeSackFromShipment` çuvalın `shipmentId`sini damgadan ÖNCE boşaltıyordu → yeniden hesap (`sack.shipmentId` yüklemi) çıkan çuvalın satırını göremiyor, havuz çuvalında ETKİN hayalet tahsis kalıyordu (sayıya girmez ama silmeyi 409'a düşürür). Düzeltme: `clearSackAllocationsTx` claim'den önce. Fabrika kopyasında hayalet satır 0 (fabrika onaylı-sevk akışı kapalı).
+
+**Bekçi.** `test_sack_allocation_cleared` §7 (35) — sondalar: bağ koparma kaldırıldı → 4 kırmızı (P2003) · çıkarmada damga kaldırıldı → 4 · 409 sayımı kaldırıldı → 1. `test_db_invariants` envanterine iki CHECK.

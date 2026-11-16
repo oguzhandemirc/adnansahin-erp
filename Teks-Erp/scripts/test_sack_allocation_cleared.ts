@@ -16,6 +16,11 @@
 //   §5 SQL ikizi (`consistency-check.sql` + `test_consistency.ts`) her `sack_allocations` başvurusunda
 //      süzgeç taşır (qty ≤ 0 satırı beyanlı istisna)
 //   §6 damgalı satırın ileri kaydı DEĞİŞMEZ: qty/sackId/orderLineId aynı, sadece damga
+//   §7 (2026-11-17) sevkiyata girip çıkmış BOŞ çuval silinir: geçmiş satır kalır, bağı kopar
+//      (sackId NULL), donuk sackNo taşır; shippedQty · kapsama · sevk geçmişi önce = sonra;
+//      etkin tahsisli çuval 409; çıkarılan çuvalda etkin tahsis kalmaz; DB CHECK seddi.
+//      SONDALAR (2026-11-17): bağ koparma kaldırıldı → 4 ❌ (P2003) · `removeSackFromShipment`
+//      damgası kaldırıldı → 4 ❌ · helper'ın 409 sayımı kaldırıldı → §7l ❌.
 //
 // NEGATİF SONDALAR (2026-09-14, cp + sha256): `order-status.helper`ten `...ACTIVE_SACK_ALLOCATION`
 // düşürüldü → §4 ihlal ❌ VE §1 shippedQty şişti (300 → 600) ❌ · `clearShipmentAllocationsTx`
@@ -27,6 +32,8 @@ import { RollStatus, ShipmentStatus } from "@prisma/client";
 import prisma, { pool } from "../src/lib/prisma";
 import { ShippingService } from "../src/services/shipping.service";
 import { ACTIVE_SACK_ALLOCATION } from "../src/services/helpers/sack-allocation.helper";
+import { computeLineLedgerTx } from "../src/services/helpers/order-status.helper";
+import { OrderService } from "../src/services/order.service";
 import { SETTING_KEYS } from "../src/services/system-setting.service";
 import { fixtureWarehouseId } from "./fixture-warehouse";
 import { aktifYuklemTara, sqlEksikSuzgec } from "./revoke-ast-tarama";
@@ -49,6 +56,7 @@ const svc = new ShippingService();
 const sackIds: string[] = [];
 const rollIds: string[] = [];
 const shipmentIds: string[] = [];
+const bagsizTahsisIds: string[] = []; // §7: silinen çuvalın geçmiş satırları (sackId NULL)
 let customerId = "";
 let itemId = "";
 let onayEskiDeger: string | null = null;
@@ -79,7 +87,7 @@ async function kur(sackId: string, orderIds: string[]): Promise<string> {
   return id;
 }
 
-interface Satir { id: string; sackId: string; orderLineId: string; qty: number; clearedAt: Date | null; clearedShipmentId: string | null }
+interface Satir { id: string; sackId: string | null; orderLineId: string; qty: number; clearedAt: Date | null; clearedShipmentId: string | null }
 async function satirlar(sackId: string): Promise<Satir[]> {
   const rows = await prisma.sackAllocation.findMany({
     // `clearedAt` SÜZÜLMEZ: bekçi damgalı satırın DURDUĞUNU ölçüyor
@@ -196,6 +204,77 @@ async function main(): Promise<void> {
     const gercek = eksik.filter((e) => e !== "(alias yok) 0/1");
     check(`§5 ${dosya}: sack_allocations başvuruları süzgeçli (tek beyanlı istisna: alias'sız qty≤0)`, gercek.length === 0 && eksik.length <= 1, gercek.join(", ") || `eksik: ${eksik.join(", ") || "yok"}`);
   }
+
+  await bolum7();
+}
+
+// ── §7 sevkiyata girip çıkmış BOŞ çuval silinir; tahsis geçmişi numarayla kalır (2026-11-17) ──
+// Canlı hata: CV1411260009 — damgalı tahsis FK Restrict'e çarptı, `removeSack` P2003 →
+// "Geçersiz referans". Sayı okuyucuları (shippedQty · kapsama · sipariş sevk geçmişi) silmeden
+// önce ve sonra AYNI olmalı; etkin tahsisli çuval silinmez (409).
+async function bolum7(): Promise<void> {
+  const orderSvc = new OrderService({
+    modelName: "order", tableName: "ORDER", searchFields: [], codeSearchFields: ["orderNumber"],
+    dateFields: ["createdAt", "deadline"], nestedCreateFields: ["lines"],
+  });
+  const orderC = await prisma.order.create({
+    data: { orderNumber: `TEST-SAC-C-${ts}`, customerId, lines: { create: [{ itemId, quantity: 1000 }] } },
+    select: { id: true, lines: { select: { id: true } } },
+  });
+  const lineC = orderC.lines[0]!.id;
+  const sackB = await makeSack("B", 100);
+  const sackC = await makeSack("C", 200);
+  const rollB = rollIds[rollIds.length - 2]!;
+  const rc = await svc.createShipment({ sackIds: [sackB, sackC], customerId, orderIds: [orderC.id] }, undefined);
+  const shC = (rc.data as { id: string }).id;
+  shipmentIds.push(shC);
+  check("§7a fikstür: iki çuval tahsisli (B 100 + C 200)", (await etkinToplam(lineC)) === 300, `${await etkinToplam(lineC)}`);
+  check("§7a2 tahsis numarası DOĞUŞTA yazıldı", (await prisma.sackAllocation.count({ where: { sackId: { in: [sackB, sackC] }, sackNo: null } })) === 0);
+
+  // Etkin tahsisli çuval silinemez (sevkiyattan çıkmamış çuval zaten shipmentId kapısında 409).
+  const yasak = await svc.removeSack(sackB, undefined, true).then(() => "SİLİNDİ", (e: { statusCode?: number }) => String(e.statusCode));
+  check("§7b sevkiyattaki çuval silinemez (409)", yasak === "409", yasak);
+
+  // Sevkiyattan çıkar → tahsis yeniden hesaplanır, B'nin satırları damgalı kalmalı.
+  await svc.removeSackFromShipment(shC, sackB, undefined);
+  const bSatirlari = await satirlar(sackB);
+  check("§7c ⭐ çıkarılan çuvalın ETKİN tahsisi kalmadı (hepsi damgalı, en az 1 geçmiş satır)", bSatirlari.length >= 1 && bSatirlari.every((r) => r.clearedAt !== null), JSON.stringify(bSatirlari.map((r) => ({ c: r.clearedAt !== null }))));
+  await svc.dispatchShipment(shC, {}, undefined);
+  await svc.removeRollFromSack({ rollId: rollB }, undefined);
+
+  const shippedOnce = await shippedOf(lineC);
+  const kapsamaOnce = await prisma.$transaction((tx) => computeLineLedgerTx(tx, [lineC]));
+  const gecmisOnce = JSON.stringify((await orderSvc.getOrderShipments(orderC.id)).data);
+  const bIdler = bSatirlari.map((r) => r.id);
+  bagsizTahsisIds.push(...bIdler);
+
+  // ⭐ ASIL SENARYO: boş çuval silinir.
+  const sil = await svc.removeSack(sackB, undefined, false).then(() => "OK", (e: { message?: string }) => e.message ?? String(e));
+  check("§7d ⭐ sevkiyata girip çıkmış BOŞ çuval silindi (P2003 yok)", sil === "OK", sil);
+  check("§7e çuval satırı gerçekten yok", (await prisma.sack.count({ where: { id: sackB } })) === 0);
+  const sonra = await prisma.sackAllocation.findMany({
+    // `clearedAt` SÜZÜLMEZ: bekçi damgalı geçmişin DURDUĞUNU ölçüyor
+    where: { id: { in: bIdler } },
+    select: { id: true, sackId: true, sackNo: true, qty: true, orderLineId: true, clearedAt: true },
+  });
+  check("§7f ⭐ geçmiş tahsis satırları SİLİNMEDİ, çuval numarasını donuk söylüyor", sonra.length === bIdler.length && sonra.every((r) => r.sackId === null && r.sackNo === `${TAG}-B` && r.clearedAt !== null), JSON.stringify(sonra.map((r) => ({ s: r.sackId, n: r.sackNo }))));
+  const once = new Map(bSatirlari.map((r) => [r.id, r]));
+  check("§7g geçmiş satırın ileri kaydı DEĞİŞMEDİ (qty · satır · damga)", sonra.every((r) => { const o = once.get(r.id); return !!o && o.qty === Number(r.qty) && o.orderLineId === r.orderLineId && o.clearedAt?.getTime() === r.clearedAt?.getTime(); }));
+  const kapsamaSonra = await prisma.$transaction((tx) => computeLineLedgerTx(tx, [lineC]));
+  check("§7h shippedQty önce = sonra (200)", shippedOnce === 200 && (await shippedOf(lineC)) === shippedOnce, `${shippedOnce} → ${await shippedOf(lineC)}`);
+  check("§7i kapsama (defter Σ) önce = sonra", kapsamaOnce.get(lineC)!.shipped.equals(kapsamaSonra.get(lineC)!.shipped) && Number(kapsamaSonra.get(lineC)!.shipped) === 200, `${kapsamaOnce.get(lineC)!.shipped} → ${kapsamaSonra.get(lineC)!.shipped}`);
+  check("§7j sipariş sevk geçmişi ekranı önce = sonra", JSON.stringify((await orderSvc.getOrderShipments(orderC.id)).data) === gecmisOnce);
+
+  // DB seddi: etkin satırın bağı koparılamaz (CHECK sack_allocations_active_has_sack).
+  const etkinSatir = await prisma.sackAllocation.findFirst({ where: { sackId: sackC, ...ACTIVE_SACK_ALLOCATION }, select: { id: true } });
+  const sed = await prisma.$executeRawUnsafe(`UPDATE sack_allocations SET "sackId" = NULL WHERE id = $1::uuid`, etkinSatir?.id ?? "00000000-0000-0000-0000-000000000000").then(() => "GEÇTİ", (e: Error) => (/active_has_sack/.test(e.message) ? "RED" : e.message));
+  check("§7k DB seddi: etkin tahsisin çuval bağı koparılamaz", etkinSatir !== null && sed === "RED", sed);
+
+  // Havuzdaki çuvalda ETKİN tahsis (eski hayalet satır fikstürü) → silme 409, sayı korunur.
+  const sackD = await makeSack("D", 50);
+  await prisma.sackAllocation.create({ data: { sackId: sackD, sackNo: `${TAG}-D`, orderLineId: lineC, qty: 50 } }); // fikstür: hayalet tahsis
+  const red = await svc.removeSack(sackD, undefined, true).then(() => "SİLİNDİ", (e: { statusCode?: number; details?: { code?: string } }) => `${e.statusCode}/${e.details?.code}`);
+  check("§7l ⭐ etkin tahsisli havuz çuvalı silinmez (409 SACK_HAS_ACTIVE_ALLOCATION), çuval duruyor", red === "409/SACK_HAS_ACTIVE_ALLOCATION" && (await prisma.sack.count({ where: { id: sackD } })) === 1, red);
 }
 
 async function cleanup(): Promise<void> {
@@ -206,6 +285,8 @@ async function cleanup(): Promise<void> {
   }
   const sids = [...new Set(shipmentIds)];
   await prisma.sackAllocation.deleteMany({ where: { sackId: { in: sackIds } } }).catch(() => {}); // fikstür temizliği — üretim yolu değil
+  // §7: silinen çuvalın bağsız (sackId NULL) geçmiş satırları sipariş satırına bağlı kalır.
+  if (bagsizTahsisIds.length) await prisma.sackAllocation.deleteMany({ where: { id: { in: bagsizTahsisIds } } }).catch(() => {});
   await prisma.printedDocument.deleteMany({ where: { sourceId: { in: sids } } }).catch(() => {});
   await prisma.shipmentEvent.deleteMany({ where: { shipmentId: { in: sids } } }).catch(() => {});
   await prisma.shipmentOrder.deleteMany({ where: { shipmentId: { in: sids } } }).catch(() => {});

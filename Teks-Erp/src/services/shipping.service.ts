@@ -156,7 +156,7 @@ import type { CursorPaginatedResponse } from "./base.service";
 import type { Request } from "express";
 import { uyari } from "../lib/logger";
 import { PackingGroupService } from "./packing-group.service";
-import { ACTIVE_SACK_ALLOCATION, clearShipmentAllocationsTx } from "./helpers/sack-allocation.helper";
+import { ACTIVE_SACK_ALLOCATION, clearSackAllocationsTx, clearShipmentAllocationsTx, detachSackAllocationHistoryTx } from "./helpers/sack-allocation.helper";
 import {
   parseQueryParams,
   isCursorRequested,
@@ -1700,7 +1700,11 @@ export class ShippingService {
   /**
    * Depodaki çuvalı sil. Sevkiyata atanmış çuval silinemez (önce sevkiyattan çıkar). Boş
    * çuval doğrudan; dolu çuval `withContents=true` ile içerik depoya döner. Depodaki çuvalın
-   * tahsisi yoktur (tahsis yalnız sevkte yazılır) → temizlik gerekmez.
+   * ETKİN tahsisi yoktur ama bir kez sevkiyata girip çıkmışsa DAMGALI tahsis geçmişi vardır
+   * (silinmez): bağı `detachSackAllocationHistoryTx` koparır, satır çuvalı donuk `sackNo`
+   * ile söyler (2026-11-17 canlı hata: bu varsayım yüzünden P2003 "Geçersiz referans").
+   * Sert silme sınıfı: deftere yazmamış çuval kabı — çuvalın kendi defteri yoktur; ona
+   * bağlı defter satırları (tahsis · kartela olayı) numarayı donuk taşır.
    */
   async removeSack(sackId: string, userId?: string, withContents = false): Promise<ApiResponse<unknown>> {
     const sack = await prisma.sack.findUnique({
@@ -1733,6 +1737,8 @@ export class ShippingService {
       await tx.roll.updateMany({ where: { sackId }, data: { sackId: null } });
       // Çuval satırı silinir; olay satırı çuval numarasını donuk taşır.
       await transitionSwatchesTx(tx, SwatchEventType.UNSACKED, { scope: { sackIds: [sackId] }, sack: { id: sackId, sackNo: sack.sackNo }, ctx: { trigger: "SACK_REMOVE", userId } });
+      // Tahsis geçmişi kalır, bağı kopar (etkin tahsis varsa 409) — FK Restrict'e çarpmadan.
+      await detachSackAllocationHistoryTx(tx, { id: sackId, sackNo: sack.sackNo });
       await tx.sack.delete({ where: { id: sackId } });
     });
     await AuditService.log({
@@ -2216,7 +2222,11 @@ export class ShippingService {
 
     const { allocations, lineNeeds } = await this.computeSackAllocations(tx, { sackIds, orderIds, branchId });
     if (allocations.length > 0) {
-      await tx.sackAllocation.createMany({ data: allocations.map((a) => ({ sackId: a.sackId, orderLineId: a.orderLineId, qty: a.qty })) });
+      // Çuval numarası DOĞUŞTA donar: çuval sonra silinse de tahsis geçmişi onu söyler.
+      const sackNoById = new Map(
+        (await tx.sack.findMany({ where: { id: { in: [...new Set(allocations.map((a) => a.sackId))] } }, select: { id: true, sackNo: true } })).map((s) => [s.id, s.sackNo]),
+      );
+      await tx.sackAllocation.createMany({ data: allocations.map((a) => ({ sackId: a.sackId, sackNo: sackNoById.get(a.sackId) ?? null, orderLineId: a.orderLineId, qty: a.qty })) });
     }
 
     // ── SEVK DEFTERİNİN İZİ (2026-08-29 / BULGU-T2-003) ─────────────────────
@@ -3105,6 +3115,9 @@ export class ShippingService {
       // anında işler; çuvalın shipmentId'si önce boşalırsa kartelanınki durum değişmeden
       // boşalır ve durum seddi (swatches_status_shape) reddeder.
       await transitionSwatchesTx(tx, SwatchEventType.SHIPMENT_REMOVED, { scope: { sackIds: [sackId] }, shipment: { id: shipmentId }, ctx: { trigger: "SHIPMENT_REMOVE_SACK", userId } });
+      // Çıkan çuvalın tahsisi shipmentId null'lanmadan ÖNCE damgalanır; aşağıdaki yeniden hesap
+      // ilişki yüklemiyle (`sack.shipmentId`) onu artık göremez (2026-11-17 hayalet tahsis).
+      await clearSackAllocationsTx(tx, sackId, shipmentId, userId);
       const claimed = await tx.sack.updateMany({ where: { id: sackId, shipmentId }, data: { shipmentId: null, seq: null } });
       if (claimed.count !== 1) throw AppError.conflict("Çuval bu sırada çıkarıldı — yenileyin");
       const lot = await readPackingLotSettings(tx);

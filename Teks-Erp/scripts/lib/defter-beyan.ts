@@ -357,7 +357,8 @@ export const DEFTER_BEYANI: DefterBeyani[] = [
   // hüküm 1e, SackTagAssignment deseni). "Kim değiştirdi" artık audit'te değil satırın kendisinde.
   D("SackAllocation", "sipariş karşılama defteri — MALİ ETKİSİ OLAN tek tahsis defteri; damga clearedAt/clearedById, adres clearedShipmentId",
     { tur: "DAMGA", kolon: "clearedAt" },
-    [{ dosya: "src/services/helpers/sack-allocation.helper.ts", sembol: "clearShipmentAllocationsTx" }],
+    [{ dosya: "src/services/helpers/sack-allocation.helper.ts", sembol: "clearShipmentAllocationsTx" },
+     { dosya: "src/services/helpers/sack-allocation.helper.ts", sembol: "clearSackAllocationsTx" }],
     ["src/services/shipping.service.ts"]),
 
   // ⚠️ ESKİ BORÇ KAPANDI (2026-09-13) — ÖNCÜLÜ YANLIŞTI, koşulu sağlandığı için değil.

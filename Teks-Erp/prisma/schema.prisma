@@ -7197,7 +7197,13 @@ model ShipmentOrder {
 /// YOK. "Hangi top" değil "ne kadar metraj".
 model SackAllocation {
   id          String  @id @default(uuid()) @db.Uuid
-  sackId      String  @db.Uuid
+  /// NULL YALNIZ çuval sert silindiyse (boş çuval silme, 2026-11-17): damgalı geçmiş satır
+  /// silinmez, bağı `detachSackAllocationHistoryTx` ile kopar ve çuvalı `sackNo` ile söyler.
+  /// Şema-dışı CHECK'ler: etkin satırın çuvalı vardır · bağsız satır numara taşır.
+  sackId      String? @db.Uuid
+  /// DONUK çuval numarası — doğuşta yazılır (tahsis yazıcısı), eski satırlar migration
+  /// 20261116211847'de `sacks`tan dolduruldu. Çuval silinse de satır o günkü numarayı söyler.
+  sackNo      String? @db.VarChar(64)
   orderLineId String  @db.Uuid
   qty         Decimal @db.Decimal(12, 3) // Bu çuvalın bu satıra düşürdüğü metraj
 
@@ -7212,8 +7218,10 @@ model SackAllocation {
   clearedById String? @db.Uuid
   clearedBy   User?   @relation("SackAllocationClearedBy", fields: [clearedById], references: [id])
 
-  // Restrict: çuval silinmeden önce tahsis rebalance ile temizlenir (defter kaybolmasın).
-  sack      Sack      @relation(fields: [sackId], references: [id], onDelete: Restrict)
+  // Restrict BİLİNÇLİ (SetNull DEĞİL): bağı yalnız çuval silmenin tek boğazı koparır
+  // (`removeSack` → `detachSackAllocationHistoryTx`, etkin tahsis varsa 409); başka bir
+  // silme yolu geçmişi sessizce bağsız bırakamaz.
+  sack      Sack?     @relation(fields: [sackId], references: [id], onDelete: Restrict)
   orderLine OrderLine @relation(fields: [orderLineId], references: [id])
 
   createdAt DateTime @default(now()) @db.Timestamptz

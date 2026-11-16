@@ -519,6 +519,10 @@ const CHECK_CONSTRAINTS: Array<{ table: string; name: string; notValid?: string;
   { table: "warehouse_movements", name: "warehouse_movements_direction_present" },
   { table: "roll_errors", name: "roll_errors_startMeter_nonneg" },
   { table: "sack_allocations", name: "sack_allocations_qty_pos" },
+  // 2026-11-17 (20261116211847): boş çuval silinince geçmiş tahsis bağsız kalır —
+  // etkin satırın çuvalı hep var · bağsız satır donuk çuval numarasını taşır.
+  { table: "sack_allocations", name: "sack_allocations_active_has_sack" },
+  { table: "sack_allocations", name: "sack_allocations_detached_has_no" },
   { table: "subcontractor_direct_ship_allocations", name: "subcontractor_direct_ship_allocations_qty_pos" },
   { table: "work_order_to_order_lines", name: "work_order_to_order_lines_allocatedQty_nonneg" },
   // 2026-09-12 (devere Faz 1a) — migration 20260912120100_devere_warp_spec:

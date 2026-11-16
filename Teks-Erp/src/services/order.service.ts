@@ -1934,8 +1934,8 @@ export class OrderService extends BaseService {
 
     const byShipment = new Map<string, ShipmentAgg>();
     for (const a of sackAllocs) {
-      const s = a.sack.shipment;
-      if (!s) continue;
+      const s = a.sack?.shipment; // etkin satırın çuvalı hep var (CHECK sack_allocations_active_has_sack)
+      if (!s || !a.sackId) continue;
       let agg = byShipment.get(s.id);
       if (!agg) {
         agg = {
