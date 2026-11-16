@@ -1080,6 +1080,12 @@ export interface TamburContextOrderLine {
   colorName: string | null;
   width: number | null;
   orderedQty: number;
+  /**
+   * Bu iş emrinden o satıra paylaştırılan metre (backend 2026-11-17, 85f70259);
+   * paylaştırma yoksa null. Eski backend (≤ 2.12.2) alanı hiç göndermez →
+   * opsiyonel. Gösterim kararı tek kaynak: `Tambur/orderLineDisplayQty`.
+   */
+  plannedQty?: number | null;
   /** Sipariş satırı kesim notu ("Kesim notu") — Tambur operatörüne talimat. */
   cutNote?: string | null;
   /** Eşit-parça kesim önerisi (m). NULL = serbest kesim. */

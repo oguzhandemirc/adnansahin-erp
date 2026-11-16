@@ -69,6 +69,7 @@ import {
 } from '../../../components/filters/rollHistoryFilter';
 import AppModal from '../../../components/AppModal';
 import TamburOrderLinkSheet from './TamburOrderLinkSheet';
+import TamburOrdersDetailModal from './TamburOrdersDetailModal';
 import { shortCutOverride, shortCutRevert } from './shortCutQuality';
 import { findGradeByRole, gradeColor } from '../../../utils/qualityRole';
 import { resolveShortCutConfig } from './resolveShortCutConfig';
@@ -136,7 +137,6 @@ import type {
   TamburFoldType,
   TamburContext,
   TamburBypassSource,
-  TamburContextOrder,
   TamburRollDefect,
   TamburFinalizeRemainingAction,
   DefectType,
@@ -144,7 +144,6 @@ import type {
   Roll,
   Customer,
 } from '../../../types/models';
-import { upperTr } from '../../../utils/trCase';
 
 // =============================================================================
 // Multi-job state — Tambur'da operatör paralel iş yürütebilir (KursunQc paralel).
@@ -4422,7 +4421,7 @@ export default function TamburScreen() {
       />
 
       {/* İş Emri Siparişleri modal'ı — operatör kesim planı için açar */}
-      <OrdersDetailModal
+      <TamburOrdersDetailModal
         visible={ordersModalOpen}
         orders={activeJob?.context?.orders ?? []}
         onDismiss={() => setOrdersModalOpen(false)}
@@ -5334,201 +5333,6 @@ function LabelPrintModal({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// İş Emri Siparişleri Detay Modal'ı — operatör kesim planı için referans alır.
-// Her sipariş kalemi: müşteri + ürün + renk + sipariş - sevk = kalan (mt).
-// ─────────────────────────────────────────────────────────────────────────────
-function OrdersDetailModal({
-  visible,
-  orders,
-  onDismiss,
-}: {
-  visible: boolean;
-  orders: TamburContextOrder[];
-  onDismiss: () => void;
-}) {
-  const { width: winW, height: winH } = useWindowDimensions();
-  const phone = winW < 600;
-
-  // Başlık özeti için toplam kalem sayısı.
-  const lineCount = useMemo(
-    () => orders.reduce((n, o) => n + o.lines.length, 0),
-    [orders],
-  );
-
-  return (
-    <AppModal visible={visible} onDismiss={onDismiss}>
-      <View
-        style={[
-          ordersModalStyles.sheet,
-          {
-            width: phone ? winW * 0.94 : Math.min(720, winW * 0.62),
-            maxHeight: winH * 0.86,
-          },
-        ]}
-      >
-        {/* Başlık — lacivert kimlik; özet (sipariş + kalem) gömülü */}
-        <View style={ordersModalStyles.header}>
-          <View style={ordersModalStyles.headerIcon}>
-            <Icon source="clipboard-list-outline" size={22} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={ordersModalStyles.title}>İş Emri Siparişleri</Text>
-            <Text style={ordersModalStyles.subtitle}>
-              {orders.length} sipariş · {lineCount} kalem
-            </Text>
-          </View>
-          <IconButton
-            icon="close"
-            size={22}
-            iconColor="#fff"
-            onPress={onDismiss}
-            style={{ margin: 0 }}
-          />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={ordersModalStyles.scroll}
-          showsVerticalScrollIndicator={false}
-        >
-          {orders.length === 0 ? (
-            <View style={ordersModalStyles.emptyWrap}>
-              <Icon
-                source="package-variant-closed"
-                size={44}
-                color={colors.borderStrong}
-              />
-              <Text style={ordersModalStyles.empty}>
-                Bu iş emrine bağlı sipariş yok
-              </Text>
-              <Text style={ordersModalStyles.emptyHint}>Stok için üretim</Text>
-            </View>
-          ) : (
-            orders.map((o, oi) => (
-              <AnimatedEntrance
-                key={o.orderId}
-                index={oi}
-                style={ordersModalStyles.orderCard}
-              >
-                {/* Sipariş başlığı — müşteri baş harfi rozeti + ad + sipariş no */}
-                <View style={ordersModalStyles.orderHeaderRow}>
-                  <View style={ordersModalStyles.avatar}>
-                    <Text style={ordersModalStyles.avatarText}>
-                      {upperTr((o.customerName || '?').trim().charAt(0))}
-                    </Text>
-                  </View>
-                  <Text style={ordersModalStyles.customerName} numberOfLines={1}>
-                    {o.customerName}
-                  </Text>
-                  <View style={ordersModalStyles.orderChip}>
-                    <Icon source="pound" size={11} color={ORDERS_ACCENT_DARK} />
-                    <Text style={ordersModalStyles.orderChipText}>
-                      {o.orderNumber}
-                    </Text>
-                  </View>
-                </View>
-
-                {o.lines.map((line) => {
-                  // Loose modelde top→sipariş satırı bağı yok; per-line karşılanma
-                  // türetilemez (backend F133). Sipariş metrajını göster.
-                  const ordered = Math.max(0, line.orderedQty || 0);
-                  const hasMeta =
-                    line.width != null ||
-                    line.requiredProperties.length > 0 ||
-                    line.pieceLengthM != null ||
-                    !!line.cutNote?.trim();
-                  return (
-                    <View key={line.lineId} style={ordersModalStyles.lineRow}>
-                      {/* Sol: ürün + tüm nitelikler tek satır akışında (kompakt) */}
-                      <View style={ordersModalStyles.lineMain}>
-                        <Text style={ordersModalStyles.lineItem} numberOfLines={1}>
-                          {line.itemName}
-                          {line.colorName ? (
-                            <Text style={ordersModalStyles.lineColor}>
-                              {' · '}
-                              {line.colorName}
-                            </Text>
-                          ) : null}
-                        </Text>
-
-                        {hasMeta && (
-                          <View style={ordersModalStyles.metaRow}>
-                            {line.width != null && (
-                              <View style={ordersModalStyles.metaChip}>
-                                <Icon
-                                  source="arrow-expand-horizontal"
-                                  size={11}
-                                  color={colors.textSecondary}
-                                />
-                                <Text style={ordersModalStyles.metaChipText}>
-                                  {line.width} cm
-                                </Text>
-                              </View>
-                            )}
-                            {line.requiredProperties.map((p) => (
-                              <View key={p.id} style={ordersModalStyles.propChip}>
-                                <Text style={ordersModalStyles.propChipText}>
-                                  {p.name}
-                                </Text>
-                              </View>
-                            ))}
-                            {line.pieceLengthM != null && (
-                              <View style={ordersModalStyles.cutChip}>
-                                <Icon
-                                  source="content-cut"
-                                  size={11}
-                                  color={colors.warningDark}
-                                />
-                                <Text style={ordersModalStyles.cutChipText}>
-                                  Her {line.pieceLengthM} m
-                                </Text>
-                              </View>
-                            )}
-                            {!!line.cutNote?.trim() && (
-                              <View style={ordersModalStyles.cutChip}>
-                                <Icon
-                                  source="note-text-outline"
-                                  size={11}
-                                  color={colors.warningDark}
-                                />
-                                <Text
-                                  style={ordersModalStyles.cutChipText}
-                                  numberOfLines={1}
-                                >
-                                  {line.cutNote.trim()}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Sağ: sipariş metrajı — kompakt lacivert pill */}
-                      <View style={ordersModalStyles.remainingPill}>
-                        <Text style={ordersModalStyles.remainingValue}>
-                          {ordered.toFixed(1)}
-                        </Text>
-                        <Text style={ordersModalStyles.remainingUnit}>m</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </AnimatedEntrance>
-            ))
-          )}
-        </ScrollView>
-      </View>
-    </AppModal>
-  );
-}
-
-// Lacivert aksan — tema mavi (blue/info) ailesi; modal header + rozet/chip kimliği.
-const ORDERS_ACCENT = '#1e40af'; // blue-800
-const ORDERS_ACCENT_DARK = '#1e3a8a'; // blue-900 (en koyu — header)
-const ORDERS_ACCENT_SOFT = '#eff6ff'; // blue-50
-const ORDERS_ACCENT_BORDER = '#bfdbfe'; // blue-200
-const ORDERS_ACCENT_ON = '#dbeafe'; // blue-100
-
 const overCutStyles = StyleSheet.create({
   sheet: {
     backgroundColor: colors.surface,
@@ -5570,157 +5374,6 @@ const overCutStyles = StyleSheet.create({
   sendBackBtn: {
     marginBottom: spacing.md,
   },
-});
-
-const ordersModalStyles = StyleSheet.create({
-  sheet: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    overflow: 'hidden',
-    ...shadow.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.sm,
-    paddingVertical: spacing.md,
-    backgroundColor: ORDERS_ACCENT_DARK,
-  },
-  headerIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: { fontSize: 17, fontWeight: '800', color: '#fff' },
-  subtitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: ORDERS_ACCENT_ON,
-    marginTop: 1,
-  },
-
-  scroll: { padding: spacing.md, gap: spacing.sm },
-
-  emptyWrap: { alignItems: 'center', paddingVertical: spacing.xxxl, gap: spacing.sm },
-  empty: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  emptyHint: { textAlign: 'center', color: colors.textMuted, fontSize: 12 },
-
-  orderCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    ...shadow.sm,
-  },
-  orderHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingBottom: spacing.xs,
-  },
-  avatar: {
-    width: 26,
-    height: 26,
-    borderRadius: radius.full,
-    backgroundColor: ORDERS_ACCENT_ON,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontSize: 13, fontWeight: '800', color: ORDERS_ACCENT_DARK },
-  customerName: { flex: 1, fontSize: 14, fontWeight: '800', color: colors.text },
-  orderChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: ORDERS_ACCENT_SOFT,
-    borderWidth: 1,
-    borderColor: ORDERS_ACCENT_BORDER,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-  },
-  orderChipText: { fontSize: 11, fontWeight: '700', color: ORDERS_ACCENT_DARK },
-
-  // Tek satır akışında kompakt kalem satırı — ürün solda, kalan sağda.
-  lineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs + 2,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  lineMain: { flex: 1, gap: spacing.xs },
-  lineItem: { fontSize: 13, fontWeight: '700', color: colors.text },
-  lineColor: { fontWeight: '600', color: colors.textSecondary },
-
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  metaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: colors.surfaceMuted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-  },
-  metaChipText: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
-  propChip: {
-    backgroundColor: ORDERS_ACCENT_ON,
-    borderColor: ORDERS_ACCENT_BORDER,
-    borderWidth: 1,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-  },
-  propChipText: { fontSize: 11, fontWeight: '700', color: ORDERS_ACCENT_DARK },
-  cutChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    maxWidth: '100%',
-    backgroundColor: colors.warningContainer,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-  },
-  cutChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.warningDark,
-    flexShrink: 1,
-  },
-
-  remainingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    minWidth: 56,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: radius.sm,
-    backgroundColor: ORDERS_ACCENT,
-  },
-  remainingValue: { fontSize: 15, fontWeight: '800', color: '#fff' },
-  remainingUnit: { fontSize: 10, fontWeight: '700', color: ORDERS_ACCENT_ON },
 });
 
 // Hata noktaları modal — kırmızı aksan (uyarı ailesi).
