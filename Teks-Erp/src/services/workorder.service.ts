@@ -134,6 +134,7 @@ import {
   repointPendingBypassAssignmentsTx,
 } from "./helpers/kursun-bypass-guard.helper";
 import { computeWoInput } from "./helpers/coverage.helper";
+import { summarizeAllocation } from "./helpers/order-link-allocation.helper";
 import {
   buildHiddenStatusWhere,
   HIDE_CANCELLED_FILTER,
@@ -2540,6 +2541,8 @@ export class WorkOrderService {
     const locks = await computeWorkOrderLocks(prisma, id);
     // Kapanıştaki hâl (künye) — canlı `producedRolls` ile yan yana gösterilir.
     const closeSnapshot = await loadCloseSnapshotView(prisma, id);
+    // Sipariş paylaştırması (2026-11-16) — sunucu hesaplar: tavan · toplam · kalan.
+    const allocation = await summarizeAllocation(prisma, id);
 
     return {
       success: true,
@@ -2551,6 +2554,7 @@ export class WorkOrderService {
         inputRolls,
         locks,
         closeSnapshot,
+        allocation,
       },
     };
   }
@@ -5343,14 +5347,16 @@ export class WorkOrderService {
     await assertRouteRefsActive(finalSteps);
 
     // ── Sipariş bağları + tahsis miktarları ─────────────────────────────────
-    let allocations: { orderLineId: string; allocatedQty: number }[] = [];
+    // `allocatedQty` undefined = "miktar gönderilmedi": kalan bağın paylaştırması KORUNUR
+    // (2026-11-16 — panel Düzenle yalnız `orderLineIds` yollar; eskiden paylaştırmayı 0'a eziyordu).
+    let allocations: { orderLineId: string; allocatedQty: number | undefined }[] = [];
     if (data.orderLineAllocations && data.orderLineAllocations.length > 0) {
       allocations = data.orderLineAllocations.map((a) => ({
         orderLineId: a.orderLineId,
-        allocatedQty: a.allocatedQty ?? 0,
+        allocatedQty: a.allocatedQty,
       }));
     } else if (data.orderLineIds && data.orderLineIds.length > 0) {
-      allocations = data.orderLineIds.map((lid) => ({ orderLineId: lid, allocatedQty: 0 }));
+      allocations = data.orderLineIds.map((lid) => ({ orderLineId: lid, allocatedQty: undefined }));
     }
 
     // TİP = BAĞIN AYNASI (2026-08-21) — create() ile aynı kural: satır geldiyse
@@ -5839,14 +5845,16 @@ export class WorkOrderService {
         });
       }
       for (const l of keptLinks) {
+        const wanted = wantedAlloc.get(l.orderLineId);
+        if (wanted === undefined) continue; // miktar gelmedi → mevcut paylaştırma korunur
         await tx.workOrderToOrderLine.updateMany({
           where: { id: l.id, ...ACTIVE_ORDER_LINK },
-          data: { allocatedQty: wantedAlloc.get(l.orderLineId) ?? 0 },
+          data: { allocatedQty: wanted },
         });
       }
       if (enteringAlloc.length > 0) {
         await tx.workOrderToOrderLine.createMany({
-          data: enteringAlloc.map((a) => ({ workOrderId: id, orderLineId: a.orderLineId, allocatedQty: a.allocatedQty })),
+          data: enteringAlloc.map((a) => ({ workOrderId: id, orderLineId: a.orderLineId, allocatedQty: a.allocatedQty ?? 0 })),
           skipDuplicates: true,
         });
       }

@@ -228,10 +228,16 @@ const updateStepPlanningSchema = z.object({
 });
 
 // ── Sipariş bağlama + hedef düzeltme şemaları (2026-08-17) ───────────────────
+export const orderLineAllocationItem = z.object({
+  orderLineId: z.string().uuid("Geçersiz sipariş satırı ID"),
+  allocatedQty: z.number().finite().nonnegative("Metre negatif olamaz").max(999_999_999, "Metre çok büyük"),
+});
 const linkOrderLinesSchema = z.object({
   orderLineIds: z
     .array(z.string().uuid("Geçersiz sipariş satırı ID"))
     .min(1, "En az bir sipariş satırı seçmelisiniz"),
+  // 2026-11-16: opsiyonel metre paylaştırması (yalnız bu istekteki satırlar için).
+  allocations: z.array(orderLineAllocationItem).max(200).optional(),
 });
 // Uyumsuz sipariş zinciri (Tambur süpervizör) — tek satır + zorunlu sebep.
 const linkOrderLineOverrideSchema = z.object({
@@ -706,6 +712,7 @@ export class WorkOrderController {
         req.params.id as string,
         body.orderLineIds,
         req.user?.userId,
+        body.allocations,
       );
       res.status(200).json(result);
     } catch (error) {

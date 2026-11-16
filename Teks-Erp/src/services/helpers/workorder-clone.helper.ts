@@ -112,7 +112,7 @@ export async function cloneWorkOrderTx(
       targetProperties: { where: ACTIVE_TARGET_PROPERTY, select: { propertyId: true } },
       // Aktif bağ: koparılmış bağ klonlanırsa nested create partial unique'e çarpmaz ama
       // ölü bağı yeni iş emrine taşırdı.
-      orderLinks: { where: ACTIVE_ORDER_LINK, select: { orderLineId: true, allocatedQty: true } },
+      orderLinks: { where: ACTIVE_ORDER_LINK, select: { orderLineId: true } },
     },
   });
   if (!src) throw AppError.notFound("Kaynak iş emri bulunamadı");
@@ -170,7 +170,8 @@ export async function cloneWorkOrderTx(
             orderLinks: {
               create: src.orderLinks.map((l) => ({
                 orderLineId: l.orderLineId,
-                allocatedQty: l.allocatedQty,
+                // Paylaştırma klona TAŞINMAZ (2026-11-16): aynı metre iki iş emrinde sayılmasın.
+                allocatedQty: 0,
               })),
             },
           }

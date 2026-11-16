@@ -3859,6 +3859,9 @@ export class TamburService {
           colorCode: string | null;
           colorName: string | null;
           orderedQty: number;
+          /// Bu iş emrinden bu satıra PAYLAŞTIRILAN metre (2026-11-16); paylaştırma yoksa null.
+          /// Yeni tablet sipariş kutusunda `orderedQty` yerine bunu basar; eskisi alanı yok sayar.
+          plannedQty: number | null;
           /// Sipariş satırı kesim notu + eşit-parça önerisi (Tambur talimatı).
           cutNote: string | null;
           pieceLengthM: number | null;
@@ -3982,6 +3985,7 @@ export class TamburService {
     const links = await prisma.workOrderToOrderLine.findMany({
       where: { workOrderId: card.workOrderId, ...ACTIVE_ORDER_LINK },
       select: {
+        allocatedQty: true,
         orderLine: {
           select: {
             id: true,
@@ -4026,6 +4030,7 @@ export class TamburService {
           colorName: string | null;
           width: number | null;
           orderedQty: number;
+          plannedQty: number | null;
           cutNote: string | null;
           pieceLengthM: number | null;
           requiredProperties: { id: string; name: string }[];
@@ -4055,6 +4060,8 @@ export class TamburService {
         colorName: ol.color?.name ?? null,
         width: ol.width !== null ? Number(ol.width) : null,
         orderedQty: Number(ol.quantity),
+        // Sunucu hesaplar: 0 = paylaştırma yok → null (istemci hesaplamaz).
+        plannedQty: Number(link.allocatedQty) > 0 ? Number(link.allocatedQty) : null,
         cutNote: ol.cutNote ?? null,
         pieceLengthM: ol.pieceLengthM !== null ? Number(ol.pieceLengthM) : null,
         requiredProperties: ol.requiredProperties.map((rp) => ({

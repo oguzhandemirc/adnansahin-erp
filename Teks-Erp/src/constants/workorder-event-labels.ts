@@ -32,6 +32,11 @@ export const WORK_ORDER_FIELD_LABEL: Record<WorkOrderTrackedField, string> = {
   isActive: "Arşiv",
 };
 
+/** İş emri kolonu OLMAYAN FIELD_CHANGED alanları (2026-11-16: sipariş paylaştırması, bağ satırında durur). */
+export const WORK_ORDER_EXTRA_FIELD_LABEL: Record<string, string> = {
+  orderAllocation: "Sipariş paylaştırması",
+};
+
 /** Fason adımı planının alanları (STEP_PLAN_CHANGED; "route" rotanın bütünü). */
 export const WORK_ORDER_STEP_FIELD_LABEL: Record<string, string> = {
   route: "Rota",
@@ -82,6 +87,7 @@ export const WORK_ORDER_TRIGGER_LABEL: Record<string, string> = {
   FASON_RECEIPT_WIDTH: "Fason kabulünde ölçülen en",
   ORDER_LINK: "Sipariş bağla",
   ORDER_UNLINK: "Sipariş bağını kaldır",
+  ORDER_ALLOCATION: "Sipariş paylaştırma",
   ORDER_LINE_CANCEL: "Sipariş kalemi iptali",
   ORDER_DELETE: "Sipariş silme",
   STEP_PLAN: "Adım planlama",

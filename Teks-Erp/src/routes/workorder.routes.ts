@@ -3,7 +3,9 @@
 // =============================================================================
 
 import { Router } from "express";
-import { WorkOrderController } from "../controllers/workorder.controller";
+import { z } from "zod";
+import { WorkOrderController, orderLineAllocationItem } from "../controllers/workorder.controller";
+import { workOrderLinkService } from "../services/workorder-link.service";
 import { verifyToken } from "../middlewares/auth.middleware";
 import { requireProductionEnabled } from "../middlewares/module.middleware";
 import { requirePermission, requireAnyPermission } from "../middlewares/rbac.middleware";
@@ -648,6 +650,51 @@ router.post(
   verifyToken,
   requireAnyPermission("workorder:write", "mobile:hizli-is-emri"),
   controller.linkOrderLines,
+);
+
+/**
+ * @openapi
+ * /api/work-orders/{id}/order-links/allocations:
+ *   put:
+ *     tags: [WorkOrders]
+ *     summary: İş emri metresini AÇIK sipariş bağlarına paylaştır (yalnız plan)
+ *     description: >
+ *       Gönderilmeyen bağın miktarı korunur; 0 = paylaştırma yok. Tavan iş emrine
+ *       giren ham metre (top yoksa hedef metre). Top↔sipariş bağı yaratmaz; sevk,
+ *       sipariş karşılaması ve patron bulutu değişmez.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [allocations]
+ *             properties:
+ *               allocations:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [orderLineId, allocatedQty]
+ *                   properties:
+ *                     orderLineId: { type: string, format: uuid }
+ *                     allocatedQty: { type: number, minimum: 0 }
+ *     responses:
+ *       200: { description: "{ changed, warnings[], allocation: { basis, basisKind, allocated, remaining } }" }
+ *       400: { description: "Tavan aşımı (ALLOCATION_OVER_BASIS) · MT dışı satır (ALLOCATION_UNIT_NOT_MEASURED) · bağlı değil (ORDER_LINK_NOT_ACTIVE)" }
+ *       409: { description: "İptal/devredilmiş iş emri (WO_PLAN_FROZEN) · bağ bu sırada koparıldı (ORDER_LINK_CHANGED)" }
+ */
+const allocationsBody = z.object({
+  allocations: z.array(orderLineAllocationItem).min(1, "En az bir sipariş satırı için metre girin").max(200),
+});
+router.put(
+  "/:id/order-links/allocations",
+  verifyToken,
+  requirePermission("workorder:write"),
+  async (req, res) => {
+    const body = allocationsBody.parse(req.body);
+    res.json(await workOrderLinkService.setOrderLinkAllocations(req.params.id as string, body.allocations, req.user?.userId));
+  },
 );
 
 /**

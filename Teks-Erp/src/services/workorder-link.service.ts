@@ -47,6 +47,12 @@ import { whereRollsOfWorkOrder } from "./helpers/workorder-rolls.helper";
 import { ACTIVE_ROLL_PROPERTY } from "./helpers/property-revoke.helper";
 import { ACTIVE_ORDER_LINK, activeOrderLinkCount, unlinkOrderLinesTx } from "./helpers/order-link.helper";
 import {
+  ORDER_ALLOCATION_TRIGGER,
+  applyOrderLinkAllocationsTx,
+  type AllocationEntry,
+  type AllocationSummary,
+} from "./helpers/order-link-allocation.helper";
+import {
   PLAN_CHANGE_FROZEN_STATUSES,
   assertPlanChangeAllowed,
   assertTargetColorChange,
@@ -335,16 +341,31 @@ export class WorkOrderLinkService {
    *
    * Miras YOK: `targetItemId`, `targetColorId`, `width`, hedef özellikler ve rota
    * OLDUĞU GİBİ kalır. Uyuşmazlık 400 ile reddedilir.
+   *
+   * `allocations` (opsiyonel, 2026-11-16): aynı tx'te bu satırlara metre paylaştırır
+   * (`order-link-allocation.helper`); verilmezse davranış eskisiyle aynıdır.
    */
   async linkOrderLines(
     workOrderId: string,
     orderLineIds: string[],
     userId?: string,
+    allocations?: AllocationEntry[],
   ): Promise<
-    ApiResponse<{ linked: number; alreadyLinked: number; warnings: string[]; typeChanged: boolean }>
+    ApiResponse<{
+      linked: number;
+      alreadyLinked: number;
+      warnings: string[];
+      typeChanged: boolean;
+      allocation?: AllocationSummary;
+    }>
   > {
     const ids = [...new Set(orderLineIds)].filter(Boolean);
     if (ids.length === 0) throw AppError.badRequest("En az bir sipariş satırı seçmelisiniz.");
+    const allocs = allocations ?? [];
+    const outside = allocs.filter((a) => !ids.includes(a.orderLineId));
+    if (outside.length > 0) {
+      throw AppError.badRequest("Paylaştırma yalnız bu istekte bağlanan sipariş satırları için gönderilebilir.");
+    }
 
     const wo = await loadWo(workOrderId);
     assertPlanEditable(wo);
@@ -449,22 +470,35 @@ export class WorkOrderLinkService {
     // `typeChanged` yazılır ve mesajda söylenir. Tersi `unlinkOrderLine`'da:
     // son bağ kalkınca STOK'a döner (simetrik — tip her iki yönde bağı izler).
     let typeChanged = false;
-    if (toCreate.length > 0) {
+    let allocResult: Awaited<ReturnType<typeof applyOrderLinkAllocationsTx>> | null = null;
+    if (toCreate.length > 0 || allocs.length > 0) {
       await prisma.$transaction(async (tx) => {
-        await tx.workOrderToOrderLine.createMany({
+        // Paylaştırma varsa iş emri satırı tx'in İLK ifadesiyle kilitlenir (tavan + toplam
+        // eşzamanlı paylaştırma/top girişiyle yarışmasın). Paylaştırmasız yol eskisi gibi.
+        if (allocs.length > 0) await touchWorkOrderTx(tx, workOrderId);
+        if (toCreate.length > 0) await tx.workOrderToOrderLine.createMany({
           data: toCreate.map((orderLineId) => ({ workOrderId, orderLineId, allocatedQty: 0 })),
           skipDuplicates: true,
         });
-        if (wo.type === WorkOrderType.STOCK_PRODUCTION) {
+        if (toCreate.length > 0 && wo.type === WorkOrderType.STOCK_PRODUCTION) {
           const flipped = await setWorkOrderTypeTx(tx, workOrderId, WorkOrderType.ORDER_PRODUCTION, {
             ctx: { trigger: "ORDER_LINK", userId },
           });
           typeChanged = flipped === "CHANGED";
         }
         // Refakat kartında sipariş bloğu + tip basılı → kâğıt bayatladı.
-        await markTravelerCardDirtyTx(tx, workOrderId);
+        // (Paylaştırma kartta basılmaz — yalnız bağ değişince kirlet.)
+        if (toCreate.length > 0) await markTravelerCardDirtyTx(tx, workOrderId);
+        if (allocs.length > 0) {
+          allocResult = await applyOrderLinkAllocationsTx(tx, workOrderId, allocs, {
+            trigger: ORDER_ALLOCATION_TRIGGER,
+            userId,
+          });
+        }
       });
     }
+    const allocDone = allocResult as Awaited<ReturnType<typeof applyOrderLinkAllocationsTx>> | null;
+    if (allocDone) warnings.push(...allocDone.warnings);
 
     await AuditService.log({
       userId,
@@ -481,17 +515,62 @@ export class WorkOrderLinkService {
         warnings,
         typeChanged,
         ...(typeChanged ? { type: WorkOrderType.ORDER_PRODUCTION } : {}),
+        ...(allocDone ? { allocationChanges: allocDone.changes } : {}),
       },
     });
 
     return {
       success: true,
-      data: { linked: toCreate.length, alreadyLinked: existingSet.size, warnings, typeChanged },
+      data: {
+        linked: toCreate.length,
+        alreadyLinked: existingSet.size,
+        warnings,
+        typeChanged,
+        ...(allocDone ? { allocation: allocDone.summary } : {}),
+      },
       message:
         toCreate.length > 0
           ? `${toCreate.length} sipariş satırı bağlandı.` +
             (typeChanged ? " İş emri artık Siparişe Özel." : "")
           : "Seçilen satırlar zaten bağlıydı.",
+    };
+  }
+
+  /**
+   * İş emri metresini AÇIK bağlara paylaştırır (2026-11-16). Gönderilmeyen bağın
+   * miktarı korunur; 0 = paylaştırma yok. Tavan/kurallar `order-link-allocation.helper`.
+   */
+  async setOrderLinkAllocations(
+    workOrderId: string,
+    allocations: AllocationEntry[],
+    userId?: string,
+  ): Promise<ApiResponse<{ changed: number; warnings: string[]; allocation: AllocationSummary }>> {
+    if (allocations.length === 0) throw AppError.badRequest("En az bir sipariş satırı için metre girin.");
+    const result = await prisma.$transaction(async (tx) => {
+      await touchWorkOrderTx(tx, workOrderId);
+      return applyOrderLinkAllocationsTx(tx, workOrderId, allocations, {
+        trigger: ORDER_ALLOCATION_TRIGGER,
+        userId,
+      });
+    });
+
+    if (result.changes.length > 0) {
+      await AuditService.log({
+        userId,
+        action: "UPDATE",
+        tableName: "WORK_ORDER",
+        recordId: workOrderId,
+        newData: { event: "ORDER_ALLOCATION_SET", changes: result.changes, allocation: result.summary },
+      });
+    }
+
+    return {
+      success: true,
+      data: { changed: result.changes.length, warnings: result.warnings, allocation: result.summary },
+      message:
+        result.changes.length > 0
+          ? `${result.changes.length} sipariş satırının paylaştırması kaydedildi.`
+          : "Paylaştırma değişmedi.",
     };
   }
 
