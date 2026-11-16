@@ -20,6 +20,7 @@ import { LinkOrderDialog } from "./LinkOrderDialog";
 import { useChangeTarget, WorkOrderChangeTargetDialog } from "./WorkOrderChangeTarget";
 import { AddBatchButton } from "./AddBatchButton";
 import { UnlinkOrdersButton } from "./UnlinkOrdersButton";
+import { AllocateOrdersButton } from "./AllocateOrderLinksDialog";
 import { RecordInfoButton } from "@/components/RecordInfoButton";
 import type { WorkOrder } from "./types";
 
@@ -159,6 +160,7 @@ export function WorkOrderDetailHeader({
                 look="header"
                 onSuggestColor={changeTarget.suggestColor}
               />
+              <AllocateOrdersButton wo={wo} look="header" />
               <AddBatchButton wo={wo} look="header" />
               <Button
                 type="button"
@@ -233,6 +235,7 @@ export function WorkOrderDetailHeader({
             targetColorId={wo.targetColorId}
             targetColorName={wo.targetColor?.name ?? null}
             targetWidth={wo.width}
+            allocation={wo.allocation}
           />
           <WorkOrderChangeTargetDialog wo={wo} state={changeTarget} />
         </>

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Link2, Loader2, Plus } from "lucide-react";
+import { Link2, Loader2, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,10 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
+import { Callout } from "@/components/ui/callout";
 import { toast } from "sonner";
-import { safeFormat } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { ReferenceSelect } from "@/components/forms/ReferenceSelect";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -24,6 +22,10 @@ import type { Order } from "@/pages/Operations/Orders/types";
 import { workOrderService } from "./service";
 import { DatePickerInput } from "@/components/forms/DatePickerInput";
 import { showServerWarnings } from "@/lib/serverNotes";
+import { LinkableLinesTable } from "./LinkableLinesTable";
+import { AllocationSummaryBar } from "./AllocationParts";
+import { allocationErrorText, buildLinkAllocations, previewAllocation } from "./order-allocation";
+import type { OrderAllocationSummary } from "./types";
 
 interface Props {
   open: boolean;
@@ -36,9 +38,9 @@ interface Props {
   targetColorId: string | null;
   targetColorName: string | null;
   targetWidth: number | null;
+  /** Detaydaki sunucu özeti (`wo.allocation`) — tavan ve mevcut paylaştırma buradan. */
+  allocation?: OrderAllocationSummary | null;
 }
-
-const fmt = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 0 });
 
 /**
  * "Sipariş Bağla" — üretim başlamış (hatta boyahanedeki) bir iş emrine sonradan
@@ -62,9 +64,19 @@ export function LinkOrderDialog({
   targetColorId,
   targetColorName,
   targetWidth,
+  allocation,
 }: Props) {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** Satır başına paylaştırma metni (boş = paylaştırma yok). */
+  const [qty, setQty] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (open) {
+      setQty({});
+      setError(null);
+    }
+  }, [open]);
   /** Hızlı sipariş formu açık mı (2026-08-17, madde 8). */
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickCustomerId, setQuickCustomerId] = useState<string | null>(null);
@@ -77,9 +89,22 @@ export function LinkOrderDialog({
     enabled: open,
   });
 
+  const lines = useMemo(() => q.data?.data ?? [], [q.data]);
+  const built = useMemo(() => buildLinkAllocations(lines, selected, qty), [lines, selected, qty]);
+  // Önizleme: mevcut bağların paylaştırması değişmez (sunucu özeti) + bu istekte girilenler.
+  const preview = previewAllocation(allocation, allocation?.allocated ?? 0, built.entered);
+
   const mutation = useMutation({
-    mutationFn: (ids: string[]) => workOrderService.linkOrderLines(workOrderId, ids),
+    mutationFn: (ids: string[]) =>
+      workOrderService.linkOrderLines(workOrderId, ids, { allocations: built.allocations, quiet: true }),
+    // Hata diyalogda basılır (istek `quiet` → genel toast yok); tavan sonradan değişmiş
+    // olabilir → detay tazelenir ki önizleme sunucu tavanına otursun.
+    onError: (err) => {
+      setError(allocationErrorText(err, built.entered.reduce((s, n) => s + n, 0)));
+      void qc.invalidateQueries({ queryKey: ["work-order-detail", workOrderId] });
+    },
     onSuccess: (res) => {
+      setError(null);
       toast.success(res.message ?? "Sipariş bağlandı");
       // Uyarılar ayrı basılır: bağ KURULDU ama planlamacının bilmesi gereken
       // bir fark var (bugün: en). Başarı toast'ına gömmek onu görünmez yapardı.
@@ -138,7 +163,11 @@ export function LinkOrderDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const lines = q.data?.data ?? [];
+  // Metre yazmak satırı seçer (paylaştırılan satır bağlanmadan anlamsız).
+  const setLineQty = (id: string, v: string) => {
+    setQty((prev) => ({ ...prev, [id]: v }));
+    if (v.trim() !== "") setSelected((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  };
   const toggle = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -150,7 +179,7 @@ export function LinkOrderDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-4 w-4" /> Sipariş Bağla — {workOrderNumber}
@@ -158,6 +187,7 @@ export function LinkOrderDialog({
           <DialogDescription>
             Yalnız bu iş emrinin ürettiği kumaş ve renkle uyumlu sipariş satırları
             listelenir. Bağlamak iş emrinin hedefini <strong>değiştirmez</strong>.
+            İsterseniz satıra metre yazarak iş emrinin kumaşını siparişlere paylaştırın (boş = paylaştırma yok).
           </DialogDescription>
         </DialogHeader>
 
@@ -171,62 +201,18 @@ export function LinkOrderDialog({
               Uyumlu açık sipariş yok.
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-muted/60 text-xs">
-                <tr>
-                  <th className="w-9 p-2" />
-                  <th className="p-2 text-left font-medium">Sipariş / Müşteri</th>
-                  <th className="p-2 text-left font-medium">Kumaş / Renk</th>
-                  <th className="p-2 text-right font-medium">Açık</th>
-                  <th className="p-2 text-left font-medium">Termin</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((l) => (
-                  <tr
-                    key={l.id}
-                    className="cursor-pointer border-t transition-colors hover:bg-accent/40"
-                    onClick={() => toggle(l.id)}
-                  >
-                    <td className="p-2" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox checked={selected.has(l.id)} onCheckedChange={() => toggle(l.id)} />
-                    </td>
-                    <td className="p-2">
-                      <div className="font-mono text-xs">{l.orderNumber}</div>
-                      <div className="text-xs text-muted-foreground">{l.customerName}</div>
-                    </td>
-                    <td className="p-2">
-                      <div>{l.itemName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {l.colorName ?? "renksiz"}
-                        {l.width != null ? ` · ${l.width} cm` : ""}
-                      </div>
-                      {l.warnings.map((w) => (
-                        <div
-                          key={w}
-                          className="mt-1 flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-300"
-                        >
-                          <AlertTriangle className="h-3 w-3 shrink-0" /> {w}
-                        </div>
-                      ))}
-                    </td>
-                    <td className="p-2 text-right tabular-nums">
-                      <div className="font-medium">
-                        {l.openQty === null ? "ölçülmüyor" : `${fmt(l.openQty)} m`}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {fmt(l.quantity)} istendi
-                      </div>
-                    </td>
-                    <td className="p-2 text-xs">
-                      {l.deadline ? safeFormat(l.deadline, "dd.MM.yyyy") : <Badge variant="muted">—</Badge>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <LinkableLinesTable
+              lines={lines}
+              selected={selected}
+              qty={qty}
+              onToggle={toggle}
+              onQty={setLineQty}
+            />
           )}
         </div>
+
+        {lines.length > 0 && <AllocationSummaryBar preview={preview} />}
+        {error && <Callout tone="danger">{error}</Callout>}
 
         {quickOpen ? (
           <div className="space-y-2 rounded-md border p-3">
@@ -291,7 +277,7 @@ export function LinkOrderDialog({
           </Button>
           <Button
             type="button"
-            disabled={selected.size === 0 || mutation.isPending}
+            disabled={selected.size === 0 || built.invalid || mutation.isPending}
             onClick={() => mutation.mutate([...selected])}
           >
             {mutation.isPending ? "Bağlanıyor…" : `Bağla (${selected.size})`}

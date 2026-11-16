@@ -47,6 +47,40 @@ describe("OrderLinksV3 sipariş navigasyonu", () => {
   });
 });
 
+describe("OrderLinksV3 paylaştırma etiketi + sunucu özeti", () => {
+  it("allocatedQty '800.000' (METİN) → 'Paylaştırılan 800 m'; özet sunucunun allocation'ından", () => {
+    const w = {
+      ...wo([{ ...linkWithOrder, allocatedQty: "800.000" }]),
+      allocation: { basis: 1000, basisKind: "INPUT", allocated: 800, remaining: 200 },
+    } as unknown as WorkOrder;
+    renderWithProviders(<OrderLinksV3 wo={w} />);
+    expect(screen.getAllByText("Paylaştırılan 800 m")).toHaveLength(2);
+    const total = screen.getByTestId("allocation-total");
+    expect(total).toHaveTextContent("Giren 1000 m");
+    expect(total).toHaveTextContent("Kalan 200 m");
+  });
+  it("allocatedQty 0 / '0.000' / yok → etiket ve özet YOK", () => {
+    for (const q of [0, "0.000", undefined]) {
+      const w = {
+        ...wo([{ ...linkWithOrder, allocatedQty: q }]),
+        allocation: { basis: 1000, basisKind: "INPUT", allocated: 0, remaining: 1000 },
+      } as unknown as WorkOrder;
+      const { unmount } = renderWithProviders(<OrderLinksV3 wo={w} />);
+      expect(screen.queryByText(/Paylaştırılan/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("allocation-total")).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+  it("özet istemcide TOPLANMAZ: bağlar 800 dese de sunucu allocated 500 → özet 500", () => {
+    const w = {
+      ...wo([{ ...linkWithOrder, allocatedQty: "800" }]),
+      allocation: { basis: 1000, basisKind: "INPUT", allocated: 500, remaining: 500 },
+    } as unknown as WorkOrder;
+    renderWithProviders(<OrderLinksV3 wo={w} />);
+    expect(screen.getByTestId("allocation-total")).toHaveTextContent("Paylaştırılan 500 m");
+  });
+});
+
 describe("OrderLinksV3 açık metraj (MEASURED_LINE ikizi)", () => {
   it("MT satır → 'Açık <kalan>' (unit yoksa da metre)", () => {
     renderWithProviders(<OrderLinksV3 wo={wo([{ ...linkWithOrder, orderLine: { ...linkWithOrder.orderLine, shippedQty: 40 } }])} />);

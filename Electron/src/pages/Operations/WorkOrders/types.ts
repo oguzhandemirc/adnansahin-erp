@@ -161,9 +161,13 @@ export interface WorkOrder {
   targetColor?: WorkOrderTargetColor | null;
   /** Tambur'da finalize edilen rulolarda olacak özellikler. */
   targetProperties?: WorkOrderTargetPropertyLink[];
+  /** Sadece findById — paylaştırma özeti, SUNUCU hesaplar (istemci toplamaz). */
+  allocation?: OrderAllocationSummary;
   orderLinks?: {
     orderLineId: string;
-    allocatedQty: number;
+    /** Bu iş emrinden o satıra paylaştırılan metre (plan). Decimal → findById'de METİN gelir;
+     *  sayıya `qtyFromServer` ile çevir. 0 = paylaştırma yok. */
+    allocatedQty: number | string;
     orderLine?: {
       quantity: number;
       /** Denormalize sevk toplamı (m) — kalemin TÜM sevkiyatları (spec havuzu),
@@ -374,6 +378,32 @@ export interface LinkableOrderLine {
   measured: boolean;
   deadline: string | null;
   warnings: string[];
+}
+
+/**
+ * İş emri metresinin siparişlere paylaştırma özeti (backend `AllocationSummary`).
+ * INPUT = giren ham metre · TARGET = top yoksa hedef metre · NONE = tavan yok.
+ */
+export interface OrderAllocationSummary {
+  basis: number | null;
+  basisKind: "INPUT" | "TARGET" | "NONE";
+  allocated: number;
+  /** basis − allocated; tavan yoksa null. Negatif olabilir (tavan sonradan düştüyse). */
+  remaining: number | null;
+}
+
+/** `PUT /:id/order-links/allocations` ve `POST /:id/order-links` gövde satırı. */
+export interface OrderLinkAllocationInput {
+  orderLineId: string;
+  allocatedQty: number;
+}
+
+/** Planlama notu — yalnız panel; istasyon/kart/etiket/tablet/patron görmez. */
+export interface WorkOrderNote {
+  workOrderId: string;
+  body: string | null;
+  updatedAt: string | null;
+  updatedBy: { id: string; fullName: string } | null;
 }
 
 /** "Toplara da uygula" adayı — parti başına toplar (2026-08-17, madde 12). */

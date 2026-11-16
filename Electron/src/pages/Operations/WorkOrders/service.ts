@@ -11,6 +11,9 @@ import type {
   LinkableOrderLine,
   RollAttributeTarget,
   FasonQuickPreview,
+  OrderAllocationSummary,
+  OrderLinkAllocationInput,
+  WorkOrderNote,
 } from "./types";
 
 const base = createCrudService<WorkOrder>("/api/work-orders");
@@ -155,13 +158,53 @@ export const workOrderService = {
       .get<ApiResponse<LinkableOrderLine[]>>(`/api/work-orders/${id}/linkable-order-lines`)
       .then((r) => r.data),
 
-  /** Sipariş satırlarını bağla — uyuşmazlıkta backend 400 döner. */
-  linkOrderLines: (id: string, orderLineIds: string[]) =>
+  /**
+   * Sipariş satırlarını bağla — uyuşmazlıkta backend 400 döner. `allocations` (ops.) =
+   * yalnız bu istekte bağlanan satırlara metre paylaştırması; bağ + paylaştırma tek işlem.
+   * `quiet`: hatayı diyalog kendi basar (tavan aşımı cümlesi) — genel toast bastırılır.
+   */
+  linkOrderLines: (
+    id: string,
+    orderLineIds: string[],
+    opts?: { allocations?: OrderLinkAllocationInput[]; quiet?: boolean },
+  ) =>
     apiClient
-      .post<ApiResponse<{ linked: number; alreadyLinked: number; warnings: string[]; typeChanged?: boolean }>>(
+      .post<ApiResponse<{
+        linked: number;
+        alreadyLinked: number;
+        warnings: string[];
+        typeChanged?: boolean;
+        allocation?: OrderAllocationSummary;
+      }>>(
         `/api/work-orders/${id}/order-links`,
-        { orderLineIds },
+        opts?.allocations && opts.allocations.length > 0
+          ? { orderLineIds, allocations: opts.allocations }
+          : { orderLineIds },
+        opts?.quiet ? { suppressErrorToast: true } : undefined,
       )
+      .then((r) => r.data),
+
+  /**
+   * Mevcut bağların paylaştırmasını yaz (`workorder:write`). Gönderilmeyen bağ korunur;
+   * 0 = paylaştırma yok. Hata diyalogda basılır (tavan aşımında kalan metre) → toast bastırılır.
+   */
+  setOrderLinkAllocations: (id: string, allocations: OrderLinkAllocationInput[]) =>
+    apiClient
+      .put<ApiResponse<{ changed: number; warnings: string[]; allocation: OrderAllocationSummary }>>(
+        `/api/work-orders/${id}/order-links/allocations`,
+        { allocations },
+        { suppressErrorToast: true },
+      )
+      .then((r) => r.data),
+
+  /** Planlama notu — yalnız panel (istasyon/kart/etiket görmez). */
+  getNote: (id: string) =>
+    apiClient.get<ApiResponse<WorkOrderNote>>(`/api/work-orders/${id}/note`).then((r) => r.data),
+
+  /** Notu yaz; boş/null = temizle (≤ 2000 karakter, sunucu kırpar). */
+  saveNote: (id: string, body: string | null) =>
+    apiClient
+      .put<ApiResponse<WorkOrderNote>>(`/api/work-orders/${id}/note`, { body })
       .then((r) => r.data),
 
   unlinkOrderLine: (id: string, orderLineId: string) =>
