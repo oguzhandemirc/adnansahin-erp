@@ -1,5 +1,6 @@
 // Çerçeve: telefonda büyük başlık + alt sekmeler; tablet/web'de (≥ 768) solda kalıcı ray + içerik.
 // Menü yalnız izinli bölümleri gösterir (karar yine sunucuda; izinsiz uç 403 döner).
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native";
@@ -18,7 +19,8 @@ import { SyncNowFeedbackText, SyncNowIndicator, useSyncNow } from "./pano/SimdiG
 import { RoleBadge } from "./RoleBadge";
 import { RAIL_GROUPS, TABS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
-import { CONTENT_MAX, RAIL_WIDTH, TOUCH, WIDE_MIN, ekranOlugu, space, typography } from "./tokens";
+import { useAcikKapali } from "./ortak/useAcikKapali";
+import { CONTENT_MAX, RAIL_COLLAPSED_WIDTH, RAIL_WIDTH, TOUCH, WIDE_MIN, ekranOlugu, space, typography } from "./tokens";
 import { UYGULAMA_ADI } from "../lib/kimlik";
 import { destekRozetMetni, useDestekEtkin, useDestekOkunmamis } from "../destek/gorunurluk";
 import { SorunBildirDugmesi } from "./destek/SorunBildirDugmesi";
@@ -34,7 +36,47 @@ export function FacilityName() {
   return <Text style={s.facility} numberOfLines={1}>{facility?.tesis.ad ?? UYGULAMA_ADI}</Text>;
 }
 
-/** Geniş ekran rayı: tesis adı + rol rozeti; sekmelerle aynı sırada ana bölümler, sonra "İş" ve "Hesap" grupları. */
+/** Rayın açık/daraltılmış durumu: YALNIZ cihazda (`useAcikKapali`, tesis + hesap kapsamlı); varsayılan açık (bugünkü). */
+export const RAY_TERCIHI = "yan-ray.acik";
+
+/** Ray öğesi: açıkken simge + ad (+ rozet), daraltılmışken yalnız simge (ad erişilebilirlik etiketinde; rozet nokta). */
+function RayOgesi(p: {
+  readonly acik: boolean;
+  readonly active: boolean;
+  readonly icon: React.ComponentProps<typeof IconTile>["icon"];
+  readonly tone: React.ComponentProps<typeof IconTile>["tone"];
+  readonly title: string;
+  readonly label?: string;
+  readonly rozet?: string | null;
+  readonly rozetTestID?: string;
+  readonly onPress: () => void;
+  readonly testID: string;
+}) {
+  const t = useTokens();
+  const s = useStyles();
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityState={{ selected: p.active }}
+      accessibilityLabel={p.label ?? p.title}
+      testID={p.testID}
+      onPress={p.onPress}
+      style={({ pressed }) => [s.railItem, !p.acik && s.railItemDar, p.active && { backgroundColor: t.tintContainer }, pressed && !p.active && { backgroundColor: t.surfaceAlt }]}
+    >
+      <View>
+        <IconTile icon={p.icon} tone={p.tone} size="sm" />
+        {!p.acik && p.rozet ? <View style={[s.railDot, { backgroundColor: t.tint, borderColor: t.surface }]} testID={p.rozetTestID} /> : null}
+      </View>
+      {p.acik ? <Text style={[s.railText, p.active && { color: t.tint, fontWeight: "600" }]} numberOfLines={1}>{p.title}</Text> : null}
+      {p.acik && p.rozet ? <Rozet label={p.rozet} tone="primary" testID={p.rozetTestID} /> : null}
+    </Pressable>
+  );
+}
+
+/**
+ * Geniş ekran rayı: tesis adı + rol rozeti; sekmelerle aynı sırada ana bölümler, sonra "İş" ve "Hesap" grupları.
+ * Başlıktaki düğme rayı simge şeridine daraltır / geri açar (2026-11-17); grup başlıkları daraltılmışken ince çizgidir.
+ */
 export function SideNav() {
   const { permissions } = useSession();
   const t = useTokens();
@@ -44,13 +86,35 @@ export function SideNav() {
   const destekEtkin = useDestekEtkin();
   const destekRozeti = destekRozetMetni(useDestekOkunmamis());
   const destekAktif = path === "/destek" || path.startsWith("/destek/");
+  const ray = useAcikKapali(RAY_TERCIHI, true);
+  const acik = ray.acik;
   // Ray ekranın tepesine ve sol kenarına oturur: durum çubuğu (saat/tarih) ve yatay çentik payı burada uygulanır.
   const insets = useSafeAreaInsets();
+  const bolum = (baslik: string) =>
+    acik ? <Text style={s.railSection} accessibilityRole="header">{baslik}</Text> : <View style={s.railRule} accessibilityLabel={baslik} />;
   return (
-    <View style={[s.rail, { paddingTop: insets.top + space.l, paddingLeft: insets.left + space.s }]} testID="yan-ray">
-      <View style={s.railHead}>
-        <FacilityName />
-        <RoleBadge permissions={permissions} />
+    <View
+      style={[s.rail, { width: (acik ? RAIL_WIDTH : RAIL_COLLAPSED_WIDTH) + insets.left, paddingTop: insets.top + space.l, paddingLeft: insets.left + space.s }]}
+      testID="yan-ray"
+    >
+      <View style={[s.railHead, !acik && s.railHeadDar]}>
+        {acik ? (
+          <View style={s.railKimlik}>
+            <FacilityName />
+            <RoleBadge permissions={permissions} />
+          </View>
+        ) : null}
+        <Pressable
+          onPress={ray.degistir}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel={acik ? "Menüyü daralt" : "Menüyü genişlet"}
+          accessibilityState={{ expanded: acik }}
+          style={({ pressed }) => [s.railToggle, pressed && { backgroundColor: t.surfaceAlt }]}
+          testID="yan-ray-dugme"
+        >
+          <Ionicons name={acik ? "chevron-back" : "menu"} size={22} color={t.textSecondary} />
+        </Pressable>
       </View>
       {RAIL_GROUPS.map((g, gi) => {
         const items = g.modules.flatMap((k) => {
@@ -60,22 +124,15 @@ export function SideNav() {
         if (items.length === 0) return null;
         return (
           <View key={g.title ?? `grup-${gi}`}>
-            {g.title ? <Text style={s.railSection} accessibilityRole="header">{g.title}</Text> : null}
+            {g.title ? bolum(g.title) : null}
             {items.map((m) => {
-              const active = path === m.route || path.startsWith(`${m.route}/`);
               const icon = MODULE_ICON[m.key];
               return (
-                <Pressable
-                  key={m.key}
-                  accessibilityRole="link"
-                  accessibilityState={{ selected: active }}
-                  testID={`menu-${m.key}`}
-                  onPress={() => router.navigate(m.route as never)}
-                  style={({ pressed }) => [s.railItem, active && { backgroundColor: t.tintContainer }, pressed && !active && { backgroundColor: t.surfaceAlt }]}
-                >
-                  <IconTile icon={icon.icon} tone={DOMAIN_TONE[icon.domain]} size="sm" />
-                  <Text style={[s.railText, active && { color: t.tint, fontWeight: "600" }]} numberOfLines={1}>{moduleNavTitle(m.key)}</Text>
-                </Pressable>
+                <RayOgesi
+                  key={m.key} acik={acik} active={path === m.route || path.startsWith(`${m.route}/`)}
+                  icon={icon.icon} tone={DOMAIN_TONE[icon.domain]} title={moduleNavTitle(m.key)}
+                  onPress={() => router.navigate(m.route as never)} testID={`menu-${m.key}`}
+                />
               );
             })}
           </View>
@@ -83,19 +140,13 @@ export function SideNav() {
       })}
       {destekEtkin ? (
         <View>
-          <Text style={s.railSection} accessibilityRole="header">Yardım</Text>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityState={{ selected: destekAktif }}
-            accessibilityLabel={destekRozeti ? `Destek, ${destekRozeti} talepte yeni yanıt` : "Destek"}
-            testID="menu-destek"
-            onPress={() => router.navigate("/destek" as never)}
-            style={({ pressed }) => [s.railItem, destekAktif && { backgroundColor: t.tintContainer }, pressed && !destekAktif && { backgroundColor: t.surfaceAlt }]}
-          >
-            <IconTile icon="help-buoy-outline" tone={DOMAIN_TONE.genel} size="sm" />
-            <Text style={[s.railText, destekAktif && { color: t.tint, fontWeight: "600" }]} numberOfLines={1}>Destek</Text>
-            {destekRozeti ? <Rozet label={destekRozeti} tone="primary" testID="ray-destek-okunmamis" /> : null}
-          </Pressable>
+          {bolum("Yardım")}
+          <RayOgesi
+            acik={acik} active={destekAktif} icon="help-buoy-outline" tone={DOMAIN_TONE.genel} title="Destek"
+            label={destekRozeti ? `Destek, ${destekRozeti} talepte yeni yanıt` : "Destek"}
+            rozet={destekRozeti} rozetTestID="ray-destek-okunmamis"
+            onPress={() => router.navigate("/destek" as never)} testID="menu-destek"
+          />
         </View>
       ) : null}
     </View>
@@ -236,7 +287,13 @@ const useStyles = makeStyles((t) => ({
   content: { maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },
   rail: { width: RAIL_WIDTH, borderRightWidth: 1, borderColor: t.separator, backgroundColor: t.surface, paddingTop: space.l, paddingHorizontal: space.s },
-  railHead: { paddingHorizontal: space.s, marginBottom: space.m, gap: space.xs },
+  railHead: { flexDirection: "row" as const, alignItems: "flex-start" as const, paddingLeft: space.s, marginBottom: space.m, gap: space.xs },
+  railHeadDar: { paddingLeft: 0, justifyContent: "center" as const },
+  railKimlik: { flex: 1, minWidth: 0, gap: space.xs },
+  railToggle: { width: 44, height: 44, marginTop: -10, alignItems: "center" as const, justifyContent: "center" as const, borderRadius: t.radius.control },
+  railRule: { height: 1, backgroundColor: t.separator, marginVertical: space.s, marginHorizontal: space.s },
+  railItemDar: { justifyContent: "center" as const, paddingHorizontal: 0, gap: 0 },
+  railDot: { position: "absolute" as const, top: -3, right: -3, width: 10, height: 10, borderRadius: 5, borderWidth: 2 },
   railSection: { ...typography.caption, color: t.textMuted, paddingHorizontal: space.s, marginTop: space.m, marginBottom: space.xs },
   railItem: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.s, borderRadius: t.radius.control, marginBottom: 2 },
   railText: { ...typography.callout, color: t.text, flex: 1 },

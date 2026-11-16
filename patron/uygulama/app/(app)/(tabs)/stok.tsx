@@ -3,7 +3,7 @@
 // tablo. Kutular ve ürün tablosu `stok-karnesi`nden (eşitleme aralığında yeniden hesaplanan anlık; tazelik başlıkta).
 // Ürün tablosu tek belgenin içidir (sayfasız, bulut sıralamaz/süzmez) → başlık sıralamasız, süzgeç/arama yok; yalnız sütun
 // seçimi profilde (`tablo.stok`). Yaş dağılımı açılır-kapanır: varsayılan kapalı, durum cihazda (`useAcikKapali`).
-// Kart seçimi (2026-11-16): başlıktaki simge → hangi özet kartları görünsün (aç/kapa, en az bir). Seçim aynı `tablo.stok`
+// Kart seçimi (2026-11-16; sıfır kart 2026-11-17): başlıktaki simge → hangi özet kartları görünsün (aç/kapa; hepsi kapatılabilir). Seçim aynı `tablo.stok`
 // tercihinde (`src/ui/stok/kartlar.ts`); bu yüzden tercih kancası TEK ve burada — ürün tablosu ona prop'la bağlanır.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState, type ReactElement } from "react";
@@ -83,7 +83,7 @@ export default function Stock() {
       </SnapshotGate>
       <VisibilityPicker
         visible={secici} title="Kartları seç" testID="stok-kart-secici"
-        items={STOCK_CARDS} shown={shown}
+        items={STOCK_CARDS} shown={shown} enAz={0}
         onToggle={(k) => pref.degistir((x) => toggleCard(x, k as StockCardKey))}
         onDefault={() => pref.degistir(resetCards)}
         onClose={() => setSecici(false)}

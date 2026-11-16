@@ -26,6 +26,11 @@ export interface Top {
   readonly topNo: string | null;
   readonly kalem: string;
   readonly kalemEtiket: string;
+  /** Topun kaleminden (tel `kalem` anahtarıyla eşlenir; hesap değil): ürün · en · renk · kat. */
+  readonly urun: string | null;
+  readonly en: number | null;
+  readonly renk: string | null;
+  readonly kat: string | null;
   readonly metre: number;
   readonly kg: number | null;
   readonly parti: string | null;
@@ -41,7 +46,7 @@ export interface StokBolumu {
 }
 
 /** Ölçü sayısını gereksiz ondalıksız yazar (330 → "330", 152,5 → "152,5"). */
-function enYazi(en: number): string {
+export function enYazi(en: number): string {
   return Number.isInteger(en) ? String(en) : String(en).replace(".", ",");
 }
 
@@ -60,11 +65,15 @@ export function stokBolumu(veri: unknown, bolum: Bolum): StokBolumu {
       enEskiGun: num(r.enEskiGun), etiket: kalemEtiketi(base),
     };
   });
-  const ad = new Map(kalemler.map((k) => [k.anahtar, k.etiket]));
-  const toplar = arr(b.toplar).map((r): Top => ({
-    id: String(r.id ?? ""), topNo: str(r.topNo), kalem: String(r.kalem ?? ""), kalemEtiket: ad.get(String(r.kalem ?? "")) ?? "—",
-    metre: num(r.metre) ?? 0, kg: num(r.kg), parti: str(r.parti), depo: str(r.depo), gun: num(r.gun),
-  }));
+  const ad = new Map(kalemler.map((k) => [k.anahtar, k]));
+  const toplar = arr(b.toplar).map((r): Top => {
+    const k = ad.get(String(r.kalem ?? ""));
+    return {
+      id: String(r.id ?? ""), topNo: str(r.topNo), kalem: String(r.kalem ?? ""), kalemEtiket: k?.etiket ?? "—",
+      urun: k?.urun ?? null, en: k?.en ?? null, renk: k?.renk ?? null, kat: k?.kat ?? null,
+      metre: num(r.metre) ?? 0, kg: num(r.kg), parti: str(r.parti), depo: str(r.depo), gun: num(r.gun),
+    };
+  });
   return { toplamTop: num(b.toplamTop) ?? 0, toplamMetre: num(b.toplamMetre) ?? 0, kalemler, toplar };
 }
 
@@ -146,9 +155,11 @@ export function sirala<R>(rows: readonly R[], s: Siralama | null, alanlar: Reado
 
 export const KALEM_SIRALAMA: Readonly<Record<string, (k: Kalem) => Deger>> = {
   kalem: (k) => k.etiket, top: (k) => k.top, metre: (k) => k.metre, gun: (k) => k.enEskiGun, kg: (k) => k.kg,
+  urun: (k) => k.urun, en: (k) => k.en, renk: (k) => k.renk, kat: (k) => k.kat,
 };
 export const TOP_SIRALAMA: Readonly<Record<string, (t: Top) => Deger>> = {
   topNo: (t) => t.topNo, kalem: (t) => t.kalemEtiket, metre: (t) => t.metre, gun: (t) => t.gun, kg: (t) => t.kg, parti: (t) => t.parti, depo: (t) => t.depo,
+  urun: (t) => t.urun, en: (t) => t.en, renk: (t) => t.renk, kat: (t) => t.kat,
 };
 
 /** Arama + süzgeç + sıralama → görünen kalemler. */

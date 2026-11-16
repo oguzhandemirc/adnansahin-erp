@@ -58,9 +58,12 @@ describe("§1 model", () => {
     expect(shownCards(T({ kartlar: "olu,ham,ham,xyz" }))).toEqual(["ham", "olu"]);
   });
 
-  it("aç/kapa; son kart kapatılamaz; hepsi açılınca alan silinir; varsayılan yalnız kart alanını siler", () => {
+  it("aç/kapa; son kart da kapatılır ('-' = hiç); hepsi açılınca alan silinir; varsayılan yalnız kart alanını siler", () => {
     const yalnizHam = T({ kartlar: "ham", diger: "x" });
-    expect(toggleCard(yalnizHam, "ham")).toBe(yalnizHam);
+    const hic = toggleCard(yalnizHam, "ham");
+    expect(hic.suzgec).toEqual({ kartlar: "-", diger: "x" });
+    expect(shownCards(hic)).toEqual([]);
+    expect(shownCards(toggleCard(hic, "olu"))).toEqual(["olu"]);
     expect(shownCards(toggleCard(yalnizHam, "olu"))).toEqual(["ham", "olu"]);
     const hepsiEksikBir = T({ kartlar: "ham,yari,bitmis,olu" });
     expect(toggleCard(hepsiEksikBir, "yas").suzgec).toEqual({});
@@ -71,7 +74,7 @@ describe("§1 model", () => {
 });
 
 describe("§2 ekran", () => {
-  it("başlıkta 'Kartları seç' simgesi; kapatılan kart çizilmez, son kart kilitli, varsayılana dön", async () => {
+  it("başlıkta 'Kartları seç' simgesi; kapatılan kart çizilmez, son kart da kapanır, varsayılana dön", async () => {
     render(<Stock />);
     await flush();
     const dugme = screen.getByTestId("stok-kart-sec");
@@ -87,9 +90,10 @@ describe("§2 ekran", () => {
       fireEvent.press(screen.getByTestId(`stok-kart-secici-${k}`));
       await flush();
     }
-    // Hepsi kapatılmaya çalışıldı: son açık kalan (yaş dağılımı) kilitli.
-    expect(screen.getByTestId("stok-kart-secici-yas").props.accessibilityState).toMatchObject({ checked: true, disabled: true });
-    expect(screen.getByTestId("bolum-yas")).toBeTruthy();
+    // Hepsi kapatıldı (2026-11-17): son kart da kapanır, hiçbir kart çizilmez; seçici bunu söyler.
+    expect(screen.getByTestId("stok-kart-secici-yas").props.accessibilityState).toMatchObject({ checked: false, disabled: false });
+    expect(screen.queryByTestId("bolum-yas")).toBeNull();
+    expect(screen.getByText("Hepsi kapatılabilir")).toBeTruthy();
     expect(screen.queryByTestId("olu-stok")).toBeNull();
     fireEvent.press(screen.getByTestId("stok-kart-secici-varsayilan"));
     await flush();

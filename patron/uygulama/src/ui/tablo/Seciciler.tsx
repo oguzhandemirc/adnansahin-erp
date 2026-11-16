@@ -101,7 +101,7 @@ export function SutunSecici<R>(p: {
   );
 }
 
-/** Sade görünürlük seçimi (ör. Stok kartları): aç/kapa, sıra değiştirme YOK; en az bir öğe açık kalır. */
+/** Sade görünürlük seçimi (ör. ekran kartları): aç/kapa, sıra değiştirme YOK; en az `enAz` öğe açık kalır (varsayılan 1; kartlarda 0). */
 export function VisibilityPicker(p: {
   readonly visible: boolean;
   readonly title: string;
@@ -111,15 +111,17 @@ export function VisibilityPicker(p: {
   readonly onDefault: () => void;
   readonly onClose: () => void;
   readonly testID: string;
+  readonly enAz?: number;
 }) {
   const t = useTokens();
   const s = useStyles();
+  const enAz = p.enAz ?? 1;
   return (
     <AltSayfa
       visible={p.visible} title={p.title} onClose={p.onClose} testID={p.testID}
       alt={
         <View style={s.altSatir}>
-          <Text style={s.not}>En az 1 kart açık kalır</Text>
+          <Text style={s.not}>{enAz > 0 ? `En az ${enAz} kart açık kalır` : "Hepsi kapatılabilir"}</Text>
           <Pressable onPress={p.onDefault} hitSlop={8} accessibilityRole="button" testID={`${p.testID}-varsayilan`}>
             <Text style={[s.bittiYazi, { color: t.tint }]}>Varsayılana dön</Text>
           </Pressable>
@@ -128,7 +130,7 @@ export function VisibilityPicker(p: {
     >
       {p.items.map((c, i) => {
         const on = p.shown.includes(c.key);
-        const locked = on && p.shown.length <= 1;
+        const locked = on && p.shown.length <= enAz;
         return (
           <View key={c.key} style={[s.row, i > 0 && s.rowSep]}>
             <Pressable

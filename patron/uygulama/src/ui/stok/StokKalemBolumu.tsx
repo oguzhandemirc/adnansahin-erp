@@ -14,10 +14,10 @@ import { qty } from "../pano/read";
 import { SnapshotGate } from "../pano/SnapshotGate";
 import { useSnapshot } from "../pano/useSnapshot";
 import { SegmentedControl } from "../SegmentedControl";
-import { siganSutun as azamiSutun, etkinSuzgecSayisi, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SutunTanimi } from "../tablo/model";
+import { azamiSutun, etkinSuzgecSayisi, siganSutun, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SutunTanimi } from "../tablo/model";
 import { SuzgecSecici, SutunSecici } from "../tablo/Seciciler";
 import { useTabloTercihi } from "../tablo/useTabloTercihi";
-import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri } from "../tablo/VeriTablosu";
+import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useYatayEksen, type YatayEksen } from "../tablo/VeriTablosu";
 import { makeStyles, useTokens } from "../theme-context";
 import { space, tabularNums, typography } from "../tokens";
 import {
@@ -38,7 +38,10 @@ export function StokKalemBolumu() {
 
 function Icerik({ veri }: { readonly veri: unknown }) {
   const s = useStyles();
-  const azami = azamiSutun(useWindowDimensions().width);
+  const genislik = useWindowDimensions().width;
+  // En çok 10 sütun seçilir; ekrana sığandan fazlası yatay kaydırılır (liste ekranlarıyla aynı kural, `useVeriTablosu`).
+  const azami = azamiSutun(genislik);
+  const eksen = useYatayEksen();
   const gorunum = useTabloTercihi("stok.gorunum", gorunumTemizle);
   const kalemPref = useTabloTercihi("tablo.stok-kalem", useMemo(() => kalemTemizle(azami), [azami]));
   const topPref = useTabloTercihi("tablo.stok-top", useMemo(() => topTemizle(azami), [azami]));
@@ -60,6 +63,7 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   const pref = kip === "kalem" ? kalemPref : topPref;
   const sutunlar = (kip === "kalem" ? KALEM_SUTUNLARI : TOP_SUTUNLARI) as readonly SutunTanimi<unknown>[];
   const gorunur = pref.tercih.sutunlar.flatMap((k) => sutunlar.filter((c) => c.key === k));
+  const yatay = gorunur.length > siganSutun(genislik) ? eksen : null;
   const sec = (k: "bolum" | "gorunum", v: Bolum | Gorunum) => gorunum.degistir((t) => ({ ...t, suzgec: { ...t.suzgec, [k]: v } }));
 
   return (
@@ -89,13 +93,13 @@ function Icerik({ veri }: { readonly veri: unknown }) {
         onSutun={() => setSutunAcik(true)}
       />
       <TabloBasligi
-        testID="stok-kalem" sutunlar={gorunur} siralama={pref.tercih.siralama}
+        testID="stok-kalem" sutunlar={gorunur} siralama={pref.tercih.siralama} yatay={yatay ?? undefined}
         siralanabilir={kip === "kalem" ? KALEM_SIRALANABILIR : TOP_SIRALANABILIR}
         onSirala={(alan) => pref.degistir((t) => ({ ...t, siralama: sonrakiSiralama(t.siralama, alan) }))}
       />
       {kip === "kalem"
-        ? <KalemListesi b={b} kalemler={gorunenKalemler(b, ara, suzgec, kalemPref.tercih.siralama)} sutunlar={gorunur} />
-        : <SayfaliListe satirlar={gorunenToplar(b, ara, suzgec, topPref.tercih.siralama)} sutunlar={gorunur} testID="stok-top" anahtar={(t) => t.id} />}
+        ? <KalemListesi b={b} kalemler={gorunenKalemler(b, ara, suzgec, kalemPref.tercih.siralama)} sutunlar={gorunur} yatay={yatay} />
+        : <SayfaliListe satirlar={gorunenToplar(b, ara, suzgec, topPref.tercih.siralama)} sutunlar={gorunur} yatay={yatay} testID="stok-top" anahtar={(t) => t.id} />}
       {!kgVar(b) ? null : <Text style={s.not}>Kg yalnız tartılı topların toplamıdır; metreyle toplanmaz.</Text>}
       <SutunSecici
         visible={sutunAcik} testID="stok-kalem-sutun-secici" sutunlar={sutunlar} gorunur={pref.tercih.sutunlar} azami={azami}
@@ -114,11 +118,11 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   );
 }
 
-function KalemListesi({ b, kalemler, sutunlar }: { readonly b: StokBolumu; readonly kalemler: readonly Kalem[]; readonly sutunlar: readonly SutunTanimi<unknown>[] }) {
+function KalemListesi({ b, kalemler, sutunlar, yatay }: { readonly b: StokBolumu; readonly kalemler: readonly Kalem[]; readonly sutunlar: readonly SutunTanimi<unknown>[]; readonly yatay: YatayEksen | null }) {
   const [acik, setAcik] = useState<string | null>(null);
   return (
     <SayfaliListe
-      satirlar={kalemler} sutunlar={sutunlar} testID="stok-kalem" anahtar={(k) => k.anahtar}
+      satirlar={kalemler} sutunlar={sutunlar} yatay={yatay} testID="stok-kalem" anahtar={(k) => k.anahtar}
       onPress={(k) => setAcik((a) => (a === k.anahtar ? null : k.anahtar))}
       ek={(k) => (acik === k.anahtar ? <KalemToplari b={b} kalem={k} /> : null)}
     />
@@ -128,6 +132,7 @@ function KalemListesi({ b, kalemler, sutunlar }: { readonly b: StokBolumu; reado
 function SayfaliListe<R>(p: {
   readonly satirlar: readonly R[];
   readonly sutunlar: readonly SutunTanimi<unknown>[];
+  readonly yatay: YatayEksen | null;
   readonly testID: string;
   readonly anahtar: (r: R) => string;
   readonly onPress?: (r: R) => void;
@@ -140,10 +145,10 @@ function SayfaliListe<R>(p: {
   const kalan = p.satirlar.length - adet;
   return (
     <View>
-      <TabloGovdesi testID={`${p.testID}-govde`}>
+      <TabloGovdesi testID={`${p.testID}-govde`} yatay={p.yatay ? { eksen: p.yatay, genislik: toplamGenislik(p.sutunlar) } : undefined}>
         {p.satirlar.slice(0, adet).map((r, i) => (
           <View key={p.anahtar(r)}>
-            <TabloSatiri sutunlar={p.sutunlar} kayit={r} ayrac={i > 0} onPress={p.onPress ? () => p.onPress!(r) : undefined} testID={`${p.testID}-satir-${p.anahtar(r)}`} />
+            <TabloSatiri yatay={!!p.yatay} sutunlar={p.sutunlar} kayit={r} ayrac={i > 0} onPress={p.onPress ? () => p.onPress!(r) : undefined} testID={`${p.testID}-satir-${p.anahtar(r)}`} />
             {p.ek?.(r)}
           </View>
         ))}

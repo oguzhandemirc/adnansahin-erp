@@ -1,11 +1,15 @@
 // Stok kalem/top tablosunun sütunları ve profil tercihleri (`tablo.stok-kalem` · `tablo.stok-top` · `stok.gorunum`).
+// Eklenen sütunlar (2026-11-17: ürün · en · renk · kat ayrı; topta kalemin alanları) seçicide KAPALI gelir — varsayılan
+// görünüm değişmez. Hepsi telin kendi alanıdır (`stok-kalem` anlığı); burada hesaplanan sayı yok.
 // Bölüm (Ham | Bitmiş) ve görünüm (Kalem | Top) seçimi `stok.gorunum` tercihinin seçim alanında durur (aynı sürümlü şekil).
-import type { Bolum, Gorunum, Kalem, Top } from "../../lib/stok-kalem";
+import { enYazi, type Bolum, type Gorunum, type Kalem, type Top } from "../../lib/stok-kalem";
 import { num } from "../pano/read";
 import { qty } from "../pano/read";
 import { tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../tablo/model";
 
 const sayi = (v: number | null) => (num(v) === null ? "—" : qty(v));
+const en = (v: number | null) => (v === null ? "—" : enYazi(v));
+const metin = (v: string | null) => v ?? "—";
 
 export const KALEM_SUTUNLARI: readonly SutunTanimi<Kalem>[] = [
   { key: "kalem", baslik: "Kalem", ad: "Kalem (ürün · en · renk)", agirlik: 2.6, sirala: "kalem", satir: 3, hucre: (k) => k.etiket },
@@ -13,6 +17,10 @@ export const KALEM_SUTUNLARI: readonly SutunTanimi<Kalem>[] = [
   { key: "metre", baslik: "Metre", ad: "Toplam metre", agirlik: 1.1, sayi: true, sirala: "metre", hucre: (k) => sayi(k.metre) },
   { key: "gun", baslik: "Yaş", ad: "En eski top (gün)", agirlik: 0.7, sayi: true, sirala: "gun", hucre: (k) => sayi(k.enEskiGun) },
   { key: "kg", baslik: "Kg", ad: "Toplam kg (tartılı toplar)", agirlik: 0.9, sayi: true, sirala: "kg", hucre: (k) => sayi(k.kg) },
+  { key: "urun", baslik: "Ürün", agirlik: 1.8, sirala: "urun", satir: 2, hucre: (k) => k.urun },
+  { key: "en", baslik: "En", ad: "En (cm)", agirlik: 0.7, sayi: true, sirala: "en", hucre: (k) => en(k.en) },
+  { key: "renk", baslik: "Renk", agirlik: 1.3, sirala: "renk", satir: 2, hucre: (k) => metin(k.renk) },
+  { key: "kat", baslik: "Kat", agirlik: 0.9, sirala: "kat", hucre: (k) => metin(k.kat) },
 ];
 
 export const TOP_SUTUNLARI: readonly SutunTanimi<Top>[] = [
@@ -23,6 +31,10 @@ export const TOP_SUTUNLARI: readonly SutunTanimi<Top>[] = [
   { key: "parti", baslik: "Parti", agirlik: 0.8, sirala: "parti", hucre: (t) => t.parti ?? "—" },
   { key: "depo", baslik: "Depo", agirlik: 1.2, sirala: "depo", hucre: (t) => t.depo ?? "—" },
   { key: "kg", baslik: "Kg", agirlik: 0.8, sayi: true, sirala: "kg", hucre: (t) => sayi(t.kg) },
+  { key: "urun", baslik: "Ürün", agirlik: 1.8, sirala: "urun", satir: 2, hucre: (t) => metin(t.urun) },
+  { key: "en", baslik: "En", ad: "En (cm)", agirlik: 0.7, sayi: true, sirala: "en", hucre: (t) => en(t.en) },
+  { key: "renk", baslik: "Renk", agirlik: 1.3, sirala: "renk", satir: 2, hucre: (t) => metin(t.renk) },
+  { key: "kat", baslik: "Kat", agirlik: 0.9, sirala: "kat", hucre: (t) => metin(t.kat) },
 ];
 
 export const KALEM_SIRALANABILIR = KALEM_SUTUNLARI.flatMap((c) => (c.sirala ? [c.sirala] : []));
