@@ -1,8 +1,8 @@
 # Backend `2.12.3`
 
-**Paket:** `(paketleme yazar)`
-**SHA256:** `(paketleme yazar)`
-**Commit:** `(paketleme yazar)`
+**Paket:** `tekserp-backend-20261117_003907-2bdae04a.zip`
+**SHA256:** `3F02ECAC169C237784FEFC252BE6CFCA9C4EE2573388B3A9BBACF1ACF226FE79`
+**Commit:** `2bdae04a`
 **İçerik:** 2.12.2 paketinin (`b276031b`) bütün içeriği + sonrasında `main`e gelenler: iş emri metresini bağlı sipariş satırlarına paylaştırma (`85f70259`; migration yok) ve Tambur bağlamında `plannedQty` · iş emri planlama notu (`8aabc697`; yeni tablo) · sevkiyata girip çıkmış boş çuvalın silinememesi düzeltmesi (`ae8b9979`; `sack_allocations`a donuk `sackNo`) · panel tarafında paylaştırma ve not kartı (`9799084b`, `91259765`, `a86e060f`; tarayıcı paneli bu paketle gelir).
 **Önceki saha sürümü:** **2.12.2** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.12.2 olduğunu ÖLÇER — farklıysa DUR).
 
@@ -121,3 +121,16 @@ yedeğinden restore (`docs/kurallar/surum-yayin.md` § Migration).
 - oturumla bir iş emrinde `GET /api/work-orders/:id` → 200 + `allocation`; `GET …/note` → 200 `body: null`
 - panelde parolayla giriş + sipariş listesi; tabletten PIN ile giriş + bir okutma
 - ölçülen kesinti
+
+**Prova (2026-11-17, Mac, fabrikanın 16-11 03:00 gece yedeği — canlı 2.12.2 kurulumundan sonra, 367 migration) — GEÇTİ:**
+- Paket: `PAKET.json` `2.12.3 · 2bdae04a · 369 · prova false · temiz ağaç`; etiket atılmadı.
+- İki migration güncel veride: `work_order_notes` 4 ms, `sack_allocation_frozen_sack_no` 30 ms (backfill 3.703 satır,
+  1.988'i damgalı); 369 / 0; `sackNo` boş 0, `sackId` boş 0, numara uyuşmayan 0; iki CHECK doğrulanmış; FK RESTRICT
+  kaldı; `work_order_notes` 0; etkin sevk metresi (= `shippedQty` toplamı) aynı.
+- 2.12.3 koduyla sevkiyata girip çıkmış boş çuval (`CV1411260009`) silindi; 2 geçmiş tahsis satırı `sackNo` ile duruyor
+  (`sackId` NULL), `shippedQty` aynı.
+- Geri dönüş uyumu: aynı DB'de (bağı kopuk satırlar VARKEN) 2.12.2 kodu (`b276031b`) sipariş ayrıntısı, sipariş
+  sevkiyatları, iptal sevkiyat ayrıntısı, son 30 sevkiyat ayrıntısı ve depo panosunu hatasız döndürdü.
+- Sınır: servis katmanında ölçüldü (HTTP değil). **Windows (ThinkPad kopyası) provası yapılamadı** — makine çevrimdışıydı;
+  bu paketle kurulum süresi, kesinti ve `-GeriAl` mekaniği ÖLÇÜLMEDİ (`deploy/` 2.12.2 ile aynı; 2.12.2'de ölçülen
+  kurulum ≈ 11 dk, kesinti ≈ 68–70 sn, geri alma ≈ 25 sn). Ayrıntı ve canlı reçetesi: repo dışı `PROVA-2.12.3-2026-11-17.md`.
