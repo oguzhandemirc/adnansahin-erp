@@ -46,6 +46,12 @@ export const KIND_RULES: Readonly<Record<NotificationKind, KindRule>> = {
     source: null,
     permissions: ["bulut:ozet:oku"],
   },
+  "yeni-siparis": {
+    label: "Yeni sipariş",
+    description: "Fabrikada yeni sipariş açıldı (telefondan kendi açtığınız sipariş için gelmez)",
+    source: "siparis",
+    permissions: ["bulut:siparis:oku"],
+  },
 };
 
 /** Katalog ölçümü — hata listesi (boşsa tutarlı). Açılışta ve bekçide koşar. */
