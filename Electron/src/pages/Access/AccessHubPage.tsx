@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageShell, PageBody } from "@/components/layout/PageShell";
-import { accessTiles, accessGroups, type AccessTile, type AccessTileGroup } from "./tile-config";
+import { visibleAccessTiles, accessGroups, type AccessTile, type AccessTileGroup } from "./tile-config";
 import { HubCard, HubGrid } from "@/components/hub/HubCard";
 import { useRoleAccess } from "@/hooks/useRoleAccess";
 
@@ -8,9 +8,7 @@ export function AccessHubPage() {
   // Grup → tile (kullanıcı erişimi / cihaz erişimi). Tanımlar hub'ıyla aynı desen.
   const { hasPermission } = useRoleAccess();
   const tilesByGroup = new Map<AccessTileGroup, AccessTile[]>();
-  for (const tile of accessTiles) {
-    // İzinli karo (Bildirim Atamaları) yalnız o izinle çizilir — route kapısıyla aynı.
-    if (tile.permission && !hasPermission(tile.permission)) continue;
+  for (const tile of visibleAccessTiles(hasPermission)) {
     const list = tilesByGroup.get(tile.group) ?? [];
     list.push(tile);
     tilesByGroup.set(tile.group, list);

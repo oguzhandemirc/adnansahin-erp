@@ -8,7 +8,7 @@ import {
   Calculator,
   type LucideIcon,
 } from "lucide-react";
-import { SYSTEM_HUB_ACCESS } from "@/lib/permissions";
+import { ACCESS_HUB_ACCESS, SYSTEM_HUB_ACCESS } from "@/lib/permissions";
 
 export interface NavItem {
   label: string;
@@ -81,7 +81,8 @@ export const navGroups: NavGroup[] = [
         label: "Yetkilendirme",
         to: "/access",
         icon: ShieldCheck,
-        adminOnly: true,
+        // Route'un `requireAnyPermission`ıyla AYNI küme (bildirim yetkilisi de girer).
+        permissionAny: ACCESS_HUB_ACCESS,
       },
       {
         // Karolarından birini açabilen herkes (ekran başına ayar izni taşıyan

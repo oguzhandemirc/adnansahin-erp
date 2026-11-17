@@ -75,6 +75,15 @@ export const SYSTEM_BACKUPS_ACCESS = ["admin:settings", "system:backups"];
 export const SYSTEM_ROLL_ARCHIVE_ACCESS = ["admin:settings", "roll:read"];
 
 /**
+ * Yetkilendirme hub'ı (ve kenar çubuğundaki "Yetkilendirme") — karolarından
+ * BİRİNİ açabilen girer. Yalnız `bildirim:yonet` taşıyan kişi hub'da yalnız
+ * Bildirim Atamaları karosunu görür; diğer karolar `ACCESS_TILE_DEFAULT_PERMISSION`
+ * ister (backend `screen-catalog.ts` `access` girdisinin aynası).
+ */
+export const ACCESS_TILE_DEFAULT_PERMISSION = "admin:users";
+export const ACCESS_HUB_ACCESS = [ACCESS_TILE_DEFAULT_PERMISSION, "bildirim:yonet"];
+
+/**
  * Sistem hub'ı (ve kenar çubuğundaki "Sistem") — karolarından BİRİNİ açabilen
  * herkes. `roll:read` BİLEREK yok: Top Arşivi'ni hub'a giren görür, ama her
  * operatörün menüsüne "Sistem" koymak için yeterli sebep değildir.

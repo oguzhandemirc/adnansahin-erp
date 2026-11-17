@@ -1,4 +1,5 @@
 import { Users2, Layers, BookOpen, Tablet, ShieldCheck, Cpu, BellRing, type LucideIcon } from "lucide-react";
+import { ACCESS_TILE_DEFAULT_PERMISSION } from "@/lib/permissions";
 
 /** Yetkilendirme = "sisteme kim/ne girebilir": insanlar (kullanıcı erişimi) +
  *  saha tabletleri (cihaz erişimi). İki grup ayrı başlık altında sunulur. */
@@ -11,7 +12,7 @@ export interface AccessTile {
   icon: LucideIcon;
   to: string;
   group: AccessTileGroup;
-  /** Verilirse karo yalnız bu izinle görünür (route kapısıyla BİREBİR). Verilmezse hub kapısı (`admin:users`). */
+  /** Verilirse karo yalnız bu izinle görünür (route kapısıyla BİREBİR). Verilmezse `ACCESS_TILE_DEFAULT_PERMISSION` (`admin:users`) ister. */
   permission?: string;
 }
 
@@ -82,3 +83,11 @@ export const accessTiles: AccessTile[] = [
     group: "device",
   },
 ];
+
+/**
+ * Hub'da çizilecek karolar. Hub `ACCESS_HUB_ACCESS` ile açılır; izinsiz karo
+ * `admin:users` ister — yalnız `bildirim:yonet` taşıyan kişi tek karo görür.
+ */
+export function visibleAccessTiles(hasPermission: (code: string) => boolean): AccessTile[] {
+  return accessTiles.filter((tile) => hasPermission(tile.permission ?? ACCESS_TILE_DEFAULT_PERMISSION));
+}

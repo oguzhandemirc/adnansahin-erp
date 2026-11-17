@@ -209,7 +209,9 @@ const desktop: Array<Omit<ScreenEntry, "capabilities"> & { capabilities: string[
   { key: "definitions/station-capabilities", app: "desktop", modul: "productionEnabled", title: "İstasyon Yetenekleri", requires: ["station:read"], capabilities: [] },
   { key: "definitions/label-templates", app: "desktop", modul: "cekirdek:sistem-kimlik-belge", title: "Etiket Tasarımı", requires: ["label-template:read"], capabilities: ["label-template:write"] },
   { key: "access/devices", app: "desktop", modul: "cekirdek:sistem-kimlik-belge", title: "Tabletler", requires: ["admin:settings"], capabilities: [] },
-  { key: "access", app: "desktop", modul: "cekirdek:sistem-kimlik-belge", title: "Yetkilendirme", requires: ["admin:users"], capabilities: [] },
+  // Yetkilendirme hub'ı: karolarından BİRİNİ açabilen girer (Electron `ACCESS_HUB_ACCESS` aynası);
+  // yalnız `bildirim:yonet` taşıyan kişi hub'da yalnız Bildirim Atamaları karosunu görür.
+  { key: "access", app: "desktop", modul: "cekirdek:sistem-kimlik-belge", title: "Yetkilendirme", requires: ["admin:users", "bildirim:yonet"], capabilities: [] },
   { key: "access/users", app: "desktop", modul: "cekirdek:sistem-kimlik-belge", title: "Kullanıcılar", requires: ["admin:users"], capabilities: [] },
   { key: "access/templates", app: "desktop", modul: "cekirdek:sistem-kimlik-belge", title: "Yetki Şablonları", requires: ["admin:users"], capabilities: [] },
   { key: "access/permissions", app: "desktop", modul: "cekirdek:sistem-kimlik-belge", title: "Yetki Kataloğu", requires: ["admin:users"], capabilities: [] },
@@ -458,7 +460,7 @@ export const SCREENLESS_PERMISSIONS: ReadonlyArray<{ code: string; reason: strin
   { code: "loom:doff", reason: "Panel doff yüzeyi yok; tablet `mobile:dokuma` ile kaydeder — web kodu API/entegrasyon için." },
   { code: "loom:doff-revoke", reason: "Panel geri alma yüzeyi yok; tablet `mobile:dokuma-geri-al` ile — web kodu API/entegrasyon için." },
   // Tezgah künyesi + gölge mod (B3, 2026-09-14): "Devreye Alma" ekranı AYRI dilim (Faz 2 ingest ile, `tezgah.enabled`).
-  { code: "bildirim:tercih", reason: "Kendi tercih ekranı D3 panel zili ile doğar (2.13.0); atama Bildirim Atamaları ekranındaki \"Kendi tercihini değiştirebilir\" anahtarından." },
+  { code: "bildirim:tercih", reason: "Route'lu ekranı yok: kişinin tercihi Kullanıcı Tercihleri sayfasındaki Bildirimlerim kartında (route `settings`, oturum yeter, katalogda girdisi yok); izin yoksa satırlar kilitli. Atama Bildirim Atamaları ekranındaki \"Kendi tercihini değiştirebilir\" anahtarından." },
   { code: "patron:giris", reason: "Panel ekranı yok: patron telefon uygulamasına giriş izni (2026-11-13); atama Kullanıcılar ekranındaki izin listesinden." },
   { code: "loom:spec-manage", reason: "Devreye Alma ekranı ayrı dilim (Faz 2 ingest ile doğar); künye/gölge mod uçları API için." },
 ];

@@ -11,6 +11,7 @@ import {
   SYSTEM_CLIENTS_ACCESS,
   SYSTEM_SESSIONS_ACCESS,
   SYSTEM_HUB_ACCESS,
+  ACCESS_HUB_ACCESS,
   SYSTEM_ROLL_ARCHIVE_ACCESS,
   SYSTEM_SERVER_STATUS_ACCESS,
   SYSTEM_WORK_SESSIONS_ACCESS,
@@ -637,11 +638,11 @@ export const contentRoutes: RouteObject[] = [
     ),
   },
 
-  // Yetkilendirme (Admin)
+  // Yetkilendirme (Admin) — hub, karolarından birini açabilen herkese (karo süzgeci hub'da).
   {
     path: "access",
     element: (
-      <ProtectedRoute requirePermission="admin:users">
+      <ProtectedRoute requireAnyPermission={ACCESS_HUB_ACCESS}>
         <AccessHubPage />
       </ProtectedRoute>
     ),
