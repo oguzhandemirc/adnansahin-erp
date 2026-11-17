@@ -611,6 +611,12 @@ async function main() {
       file: "docs/kurallar/genel.md",
       needle: "notifications.enabled",
     },
+    // Gün sonu özeti saati (2.13.0, D6a): panel satırı yok; ham ayar ucu.
+    NOTIFICATIONS_DAILY_SUMMARY_TIME: {
+      why: "Gün sonu özeti bildirim saati — ham ayar ucu (PUT /api/admin/settings/:key), kural docs/kurallar/genel.md",
+      file: "docs/kurallar/genel.md",
+      needle: "notifications.dailySummaryTime",
+    },
     PATRON_CLOUD_REPORT_INTERVAL_SECONDS: {
       why: "Rapor isteği yoklama aralığı (20–600 sn) — ham ayar ucu, reçete docs/kurallar/patron-bulutu.md",
       file: "docs/kurallar/patron-bulutu.md",

@@ -18,6 +18,7 @@ import { startExchangeRateScheduler } from './jobs/exchange-rate.job';
 import { startShiftCalendarScheduler } from './jobs/shift-calendar.job';
 import { startShiftCloseScheduler } from './jobs/machine-shift-close.job';
 import { startPatronCloudJobs, stopPatronCloudJobs } from './jobs/patron-cloud.jobs';
+import { startDailySummaryScheduler, stopDailySummaryScheduler } from './jobs/daily-summary.job';
 import { AuditService } from './services/audit.service';
 import { flushLatencyNow } from './services/latency-persist.service';
 import { assertBaseServiceGuards } from './services/base.service';
@@ -220,6 +221,8 @@ const server = app.listen(Number(PORT), HOST, () => {
     // Patron bulutu: ön koşul (adres ∧ anahtar ∧ kimlik ∧ ayar) AÇIKSA tetikleyiciler açılır ve
     // eşitleme işi kurulur; kapalıysa zamanlayıcı kurulmaz (açık kalmış tetikleyici kapatılır).
     startPatronCloudJobs();
+    // Gün sonu özeti bildirimi (2.13.0, D6a): `notifications.enabled` KAPALIYKEN (süreç önbelleği) sıfır sorgu, sıfır yazım.
+    startDailySummaryScheduler();
 
     void AuditService.logEvent({
         category: "SYSTEM",
@@ -264,6 +267,7 @@ function gracefulShutdown(signal: string, exitCode = 0): void {
     if (shuttingDown) return;
     shuttingDown = true;
     stopPatronCloudJobs();
+    stopDailySummaryScheduler();
     satir("");
     bilgi("shutdown", `${signal} alındı — sunucu kapatılıyor (uçuştaki istekler bitiriliyor)...`);
     // ⚠️ TEŞHİS (2026-09-10): zorla-çıkış eskiden TEK cümle basıyordu ve sebep

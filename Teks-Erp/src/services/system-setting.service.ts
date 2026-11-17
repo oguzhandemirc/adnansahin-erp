@@ -770,6 +770,9 @@ export const SETTING_KEYS = {
   /** Bildirim üretimi şalteri (2.13.0) — kayıt yoksa KAPALI: olay/teslim satırı doğmaz (bugünkü davranış).
    *  Okuyucu `readNotificationsEnabled`; istek yolundaki önbellek `services/notifications/notification-switch.ts`. */
   NOTIFICATIONS_ENABLED: "notifications.enabled",
+  /** Gün sonu özeti bildiriminin saati ("SS:DD", fabrika günü; varsayılan 18:30) — D6a. Okuyucu
+   *  `readNotificationDailySummaryMinute`; geçersiz değer varsayılana düşer. Üretim şalteri ayrı (`notifications.enabled`). */
+  NOTIFICATIONS_DAILY_SUMMARY_TIME: "notifications.dailySummaryTime",
 } as const;
 
 const DEFAULT_DEADLINE_DAYS = 7;
@@ -6687,6 +6690,25 @@ export async function readNotificationsEnabled(
     select: { value: true },
   });
   return asBoolean(setting?.value);
+}
+
+/** Gün sonu özeti varsayılan saati: 18:30 (fabrika günü dakikası). */
+export const DEFAULT_NOTIFICATION_DAILY_SUMMARY_MINUTE = 18 * 60 + 30;
+
+/** "SS:DD" → gün dakikası; geçersizse null (saf — bekçi de çağırır). */
+export function parseDailySummaryTime(v: unknown): number | null {
+  if (typeof v !== "string") return null;
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(v.trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+/** Gün sonu özetinin saati (fabrika günü dakikası). Kayıt yok / geçersiz → 18:30. */
+export async function readNotificationDailySummaryMinute(): Promise<number> {
+  const setting = await prisma.systemSetting.findUnique({
+    where: { key: SETTING_KEYS.NOTIFICATIONS_DAILY_SUMMARY_TIME },
+    select: { value: true },
+  });
+  return parseDailySummaryTime(setting?.value) ?? DEFAULT_NOTIFICATION_DAILY_SUMMARY_MINUTE;
 }
 
 export const DEFAULT_PATRON_CLOUD_REPORT_INTERVAL_SECONDS = 30;

@@ -38,6 +38,8 @@ import { PERMISSION_CATALOG } from "../src/constants/permission-catalog";
 import { ensureTestAdmin } from "./fixture-test-user";
 import { cleanupTestCustomers } from "./fixture-customer-cleanup";
 import { fixtureWarehouseId } from "./fixture-warehouse";
+import { dailySummaryEntityId, runDailySummaryOnce } from "../src/jobs/daily-summary.job";
+import { parseDailySummaryTime } from "../src/services/system-setting.service";
 
 let pass = 0, fail = 0;
 function check(l: string, ok: boolean, x = ""): void {
@@ -55,7 +57,7 @@ const shipmentIds: string[] = [];
 const receiptIds: string[] = [];
 const customerIds: string[] = [];
 const itemIds: string[] = [];
-export const extraEntityIds: string[] = [];
+const extraEntityIds: string[] = [];
 
 interface TestUser { id: string; fullName: string }
 
@@ -97,6 +99,7 @@ const SOURCE_FILES: Readonly<Record<string, string>> = {
 
 async function main(): Promise<void> {
   const settingBefore = await prisma.systemSetting.findUnique({ where: { key: SETTING_KEYS.NOTIFICATIONS_ENABLED } });
+  const timeBefore = await prisma.systemSetting.findUnique({ where: { key: SETTING_KEYS.NOTIFICATIONS_DAILY_SUMMARY_TIME } });
   try {
     // ── §0 katalog ↔ çağrı yeri ──────────────────────────────────────────────
     console.log("\n§0 katalog: D6a türlerinin her kaynağı src'de bir denetim çağrısı; etiket süzgeci; veri izni");
@@ -231,6 +234,30 @@ async function main(): Promise<void> {
     check("⭐ tek olay; başlık + 0 top; rota /stok", eg1.length === 1 && eg1[0]?.title === "Mal kabul girişi yapıldı" && !!eg1[0]?.body.includes("0 top") && eg1[0]?.route === "/stok", `${eg1.length} ${eg1[0]?.body}`);
     check("alıcı alır, yazar (ataması olmasa da) yok", !!eg1[0]?.deliveries.some((d) => d.userId === recv.id) && !eg1[0]?.deliveries.some((d) => d.userId === actor.id));
 
+    // ── §g gün sonu özeti ────────────────────────────────────────────────────
+    console.log("\n§g gün sonu özeti: saatten önce doğmaz · sonra günde BİR kez · yazarsız, izinli atanmış alır");
+    check("saat ayrıştırma: '18:30' → 1110, '24:00'/'abc' → null", parseDailySummaryTime("18:30") === 1110 && parseDailySummaryTime("24:00") === null && parseDailySummaryTime("abc") === null);
+    await prisma.systemSetting.deleteMany({ where: { key: SETTING_KEYS.NOTIFICATIONS_DAILY_SUMMARY_TIME } });
+    // Geçmiş bir fabrika günü (İstanbul UTC+3): gerçek "bugün"ün olayına dokunulmaz.
+    const day = "2020-01-15";
+    const dayId = dailySummaryEntityId(day);
+    extraEntityIds.push(dayId);
+    check("gün kimliği deterministik UUID", dayId === dailySummaryEntityId(day) && /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(dayId), dayId);
+    const at = (hhmm: string): Date => new Date(`${day}T${hhmm}:00+03:00`);
+    const early = await runDailySummaryOnce({ now: at("18:29") });
+    check("⭐ varsayılan 18:30'dan önce doğmaz", early === "ERKEN" && (await events("gun-sonu-ozeti", dayId)).length === 0, early);
+    const first = await runDailySummaryOnce({ now: at("18:31") });
+    const second = await runDailySummaryOnce({ now: at("21:00") });
+    const eg = await events("gun-sonu-ozeti", dayId);
+    check("⭐ günde bir kez (ikinci tur VAR, tek olay)", first === "URETILDI" && second === "VAR" && eg.length === 1, `${first} ${second} ${eg.length}`);
+    check("metin: gün + üç sayı", eg[0]?.title === `Gün sonu özeti · ${day}` && /Açılan sipariş \d+ · Üretim \d+ top · .* · Sevk \d+ top · /.test(eg[0]?.body ?? ""), eg[0]?.body);
+    check("yazarsız; alıcı (report:sales + atanmış) alır, izinsiz/atamasız almaz", eg[0]?.authorUserId === null && !!eg[0]?.deliveries.some((d) => d.userId === recv.id) && !eg[0]?.deliveries.some((d) => d.userId === actor.id || d.userId === noPerm.id));
+    await systemSettingService.set(SETTING_KEYS.NOTIFICATIONS_DAILY_SUMMARY_TIME, "20:00", "bekçi", admin.id);
+    const day2Id = dailySummaryEntityId("2020-01-16");
+    extraEntityIds.push(day2Id);
+    const e2 = await runDailySummaryOnce({ now: new Date("2020-01-16T19:00:00+03:00") });
+    check("ayar 20:00: 19:00'da ERKEN", e2 === "ERKEN", e2);
+
     // ── §f şalter kapalı ─────────────────────────────────────────────────────
     console.log("\n§f şalter KAPALI: aynı çağrı olay doğurmaz");
     await prisma.systemSetting.deleteMany({ where: { key: SETTING_KEYS.NOTIFICATIONS_ENABLED } });
@@ -239,11 +266,15 @@ async function main(): Promise<void> {
     await AuditService.log({ userId: actor.id, action: "UPDATE", tableName: "SHIPMENT", recordId: s6, newData: { kind: "CANCEL" } });
     await flushNotificationHook();
     check("⭐ kapalı: sıfır olay", (await events("sevkiyat-iptal", s6)).length === 0);
+    const off = await runDailySummaryOnce({ now: new Date("2020-01-16T21:00:00+03:00") });
+    check("⭐ kapalı: gün sonu özeti doğmaz", off === "KAPALI" && (await events("gun-sonu-ozeti", day2Id)).length === 0, off);
   } finally {
     await flushNotificationHook().catch(() => undefined);
     await temizlik();
     if (settingBefore) await prisma.systemSetting.upsert({ where: { key: settingBefore.key }, update: { value: settingBefore.value as never }, create: { key: settingBefore.key, value: settingBefore.value as never } });
     else await prisma.systemSetting.deleteMany({ where: { key: SETTING_KEYS.NOTIFICATIONS_ENABLED } });
+    if (timeBefore) await prisma.systemSetting.upsert({ where: { key: timeBefore.key }, update: { value: timeBefore.value as never }, create: { key: timeBefore.key, value: timeBefore.value as never } });
+    else await prisma.systemSetting.deleteMany({ where: { key: SETTING_KEYS.NOTIFICATIONS_DAILY_SUMMARY_TIME } });
     invalidateNotificationSwitch();
   }
 }
