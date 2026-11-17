@@ -648,6 +648,20 @@ export interface NotificationItem {
   readonly atlamaNedeni: string | null;
   readonly olusturulma: string;
   readonly gonderilme: string | null;
+  /** Okundu anı (telefonda ya da fabrika panelinde; köprü iki yönde eşitler). null = okunmadı. Eski bulut göndermez. */
+  readonly okunma?: string | null;
+}
+
+/** `GET /bildirimler` — sayfa + hesabın okunmamış sayısı (atlanan satırlar sayılmaz). Eski bulutta `okunmamis` yok. */
+export interface NotificationPage extends Page<NotificationItem> {
+  readonly okunmamis?: number;
+}
+
+/** `POST /bildirimler/:id/okundu` · `POST /bildirimler/okundu-tumu` — yalnız boş `okunma` yazılır (tekrar etkisiz). */
+export interface NotificationReadResult {
+  /** Bu çağrıyla okunmuş sayılan satır sayısı (zaten okunmuşsa 0). */
+  readonly guncellenen: number;
+  readonly okunmamis: number;
 }
 
 // ---------------------------------------------------------------- rapor sunumu (Raporlar v2, R1-BULUT)

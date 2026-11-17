@@ -6,9 +6,9 @@ import type { SessionContext } from "../auth/session.service";
 import { DEFAULT_SETTINGS, KIND_RULES, kindPermitted, parseStored } from "../catalog/notifications";
 import { accountActor, recordAudit } from "../lib/audit";
 import type { Tx } from "../lib/db";
-import { forbidden } from "../lib/errors";
+import { forbidden, notFound } from "../lib/errors";
 import { withTesis } from "../lib/tenant";
-import { NOTIFICATION_KINDS, type NotificationItem, type NotificationSettings, type NotificationSettingsView, type Page } from "../wire/api";
+import { NOTIFICATION_KINDS, type NotificationPage, type NotificationReadResult, type NotificationSettings, type NotificationSettingsView } from "../wire/api";
 import type { CloudContext } from "./context";
 
 export interface ResolvedSettings {
@@ -75,21 +75,51 @@ export async function setFacilityDefaults(ctx: CloudContext, s: SessionContext, 
 }
 
 /** Hesabın kendi bildirim geçmişi (yeni önce, imleç = son satırın id'si). */
-export async function listOwnNotifications(ctx: CloudContext, s: SessionContext, g: { cursor?: string; limit: number }): Promise<Page<NotificationItem>> {
-  const rows = await withTesis(ctx.app, { tesisId: s.tesisId }, (tx) =>
-    tx.notification.findMany({
+export async function listOwnNotifications(ctx: CloudContext, s: SessionContext, g: { cursor?: string; limit: number }): Promise<NotificationPage> {
+  const { rows, okunmamis } = await withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => ({
+    rows: await tx.notification.findMany({
       where: { tesisId: s.tesisId, accountId: s.accountId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: g.limit + 1,
       ...(g.cursor ? { cursor: { id: g.cursor }, skip: 1 } : {}),
     }),
-  );
+    okunmamis: await tx.notification.count({ where: unreadWhere(s) }),
+  }));
   const page = rows.slice(0, g.limit);
   return {
     kayitlar: page.map((n) => ({
       id: n.id, tur: n.kind, baslik: n.title, metin: n.body, rota: n.route, durum: n.status, atlamaNedeni: n.skipReason,
-      olusturulma: n.createdAt.toISOString(), gonderilme: n.sentAt?.toISOString() ?? null,
+      olusturulma: n.createdAt.toISOString(), gonderilme: n.sentAt?.toISOString() ?? null, okunma: n.readAt?.toISOString() ?? null,
     })),
     sonraki: rows.length > g.limit ? (page[page.length - 1]?.id ?? null) : null,
+    okunmamis,
   };
+}
+
+// ---- OKUNDU (D5) — kişinin KENDİ satırı; yalnız boş `read_at` yazılır (atomik claim, tekrar etkisiz). Fabrika
+// teslimine bağlı satırın okundusu köprü yanıtıyla fabrikaya döner (`factory-notifications.service`); burada yalnız an.
+
+/** Okunmamış = okunma anı boş ∧ atlanmamış (atlanan satır kullanıcıya hiç ulaşmadı). Liste ve sayaç TEK koşul. */
+function unreadWhere(s: SessionContext) {
+  return { tesisId: s.tesisId, accountId: s.accountId, readAt: null, status: { not: "ATLANDI" as const } };
+}
+
+/** Tek bildirimi okundu sayar. Başkasının ya da olmayan satır 404 (varlık sızdırılmaz). */
+export async function markNotificationRead(ctx: CloudContext, s: SessionContext, id: string, nowMs: number): Promise<NotificationReadResult> {
+  return withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => {
+    const claim = await tx.notification.updateMany({ where: { id, tesisId: s.tesisId, accountId: s.accountId, readAt: null }, data: { readAt: new Date(nowMs) } });
+    if (claim.count === 0) {
+      const own = await tx.notification.count({ where: { id, tesisId: s.tesisId, accountId: s.accountId } });
+      if (own === 0) throw notFound("Bildirim");
+    }
+    return { guncellenen: claim.count, okunmamis: await tx.notification.count({ where: unreadWhere(s) }) };
+  });
+}
+
+/** Hesabın bütün okunmamışlarını okundu sayar (sayaçla aynı koşul: atlananlara dokunulmaz). */
+export async function markAllNotificationsRead(ctx: CloudContext, s: SessionContext, nowMs: number): Promise<NotificationReadResult> {
+  return withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => {
+    const claim = await tx.notification.updateMany({ where: unreadWhere(s), data: { readAt: new Date(nowMs) } });
+    return { guncellenen: claim.count, okunmamis: await tx.notification.count({ where: unreadWhere(s) }) };
+  });
 }

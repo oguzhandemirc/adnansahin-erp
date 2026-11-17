@@ -1,9 +1,9 @@
 // Bildirim ayarları ve geçmişi rotaları (B5) — hesap API'si tablosunun parçası (`API_ROUTES`e yayılır).
 import { z } from "zod";
 import { IncomingSettingsSchema } from "../catalog/notifications";
-import { getSettingsView, listOwnNotifications, setFacilityDefaults, setOwnSettings } from "../services/notification-settings.service";
+import { getSettingsView, listOwnNotifications, markAllNotificationsRead, markNotificationRead, setFacilityDefaults, setOwnSettings } from "../services/notification-settings.service";
 import { sendTestNotification } from "../services/notification-test.service";
-import { body, page, s, uuidCursor, webPushKey, type ApiRouteDef } from "./api-route-kit";
+import { body, page, param, s, uuidCursor, webPushKey, type ApiRouteDef } from "./api-route-kit";
 
 export const NOTIFICATION_ROUTES: readonly ApiRouteDef[] = [
   { method: "get", path: "/bildirim/ayarlar", auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await getSettingsView(c.ctx, s(c), webPushKey(c)) }) },
@@ -37,5 +37,19 @@ export const NOTIFICATION_ROUTES: readonly ApiRouteDef[] = [
       const { cursor, limit } = page(c);
       return { data: await listOwnNotifications(c.ctx, s(c), { cursor: uuidCursor(cursor), limit }) };
     },
+  },
+  {
+    method: "post",
+    path: "/bildirimler/okundu-tumu",
+    auth: "OTURUM",
+    kimlik: { muaf: "yalnız boş okunma anı yazılır; tekrarı etkisiz (0 güncellenen)" },
+    handler: async (c) => ({ data: await markAllNotificationsRead(c.ctx, s(c), c.ctx.now()) }),
+  },
+  {
+    method: "post",
+    path: "/bildirimler/:id/okundu",
+    auth: "OTURUM",
+    kimlik: { muaf: "yalnız boş okunma anı yazılır; tekrarı etkisiz (0 güncellenen)" },
+    handler: async (c) => ({ data: await markNotificationRead(c.ctx, s(c), param(c, "id"), c.ctx.now()) }),
   },
 ];
