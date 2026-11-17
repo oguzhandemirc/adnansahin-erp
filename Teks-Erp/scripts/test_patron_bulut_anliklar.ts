@@ -2,7 +2,7 @@
 // BEKÇİ — PATRON BULUTU ANLIK PROJEKSİYONLARI (D3b): sözleşme · finans/termin yok · doğruluk · kapalı · sıklık
 // =============================================================================
 // ÖLÇTÜĞÜ:
-//  §1 Katalog (DB'siz): 9 anlık (`ozet` 5 bölümlü; + `stok-kalem`) — tel adları = katı şema anahtarları ⊂ bulut kataloğunun
+//  §1 Katalog (DB'siz): 10 anlık (`ozet` 5 bölümlü; + `stok-kalem`; + `cuval-deposu`) — tel adları = katı şema anahtarları ⊂ bulut kataloğunun
 //     ANLIK adları; izinler bulut okuma izinleri; şemalarda hiçbir alan adı finans (fiyat · tutar · bakiye ·
 //     döviz …) ya da termin (geciken · zamanında · gecikme · termin) sözcüğü taşımaz; finans/emanet/sağlık
 //     anlıkları katalogda YOK.
@@ -28,6 +28,11 @@
 //   · `ozet` bölümleri tek try içinde kuruldu (eski davranış) → §2 "ozet bölüm yalıtımı" ✗
 // NEGATİF SONDA (2026-11-13, stok-kalem): şemaya `tutar` eklendi → §1 finans adı ✗; bitmiş
 //   top listesinden ilk top düşürüldü → §3 "stok-kalem: bitmiş top listesi" + "kalem top sayısı ≠ topları" ✗.
+// §3b Çuval deposu (2.12.4, `cuval-deposu`): havuz + PLANNED çuval görünür, DISPATCHED gelmez, hayalet top sayılmaz;
+//   çuval top/metre = panel `searchSacks`, cari çuval sayısı = panel `listSackCustomers`, özet = satırlar = bağımsız SQL.
+// NEGATİF SONDA (2026-11-17, cuval-deposu): içerik sorgusundan `PRESENT_ROLL_WHERE` düşürüldü + kapsam `resolveScopeOr(
+//   undefined, true)` (sevk edilmiş dahil) → §3b 6 satır ✗; `etiketFarkli: labelCustomerId !== cari` (boş etiket de işaretli)
+//   → §3b "etiket ≠ çuval carisi" ✗. Geri alınınca yeşil.
 // NEGATİF SONDA (2026-11-17, stok-kalem kime/nerede): `etiketMusteri` ← çuval carisi → §3 "raf topu: etiket müşterisi"
 //   + "çuvaldaki top: …" ✗ (2 kırmızı, geri alındı). Çuval sorgusuna SHIPPED eklemek yeşil kaldı: `getSackedFinishedRolls`
 //   ayrıca `isFinishedCell` ile süzer (çift sed, bilinçli).
@@ -54,6 +59,8 @@ import { generateKeyFile, loadKeyFile } from "../src/lib/cloud-signing/key-file"
 import { DashboardService } from "../src/services/dashboard.service";
 import { __configureCloudSyncForTests, getCloudSyncStatus, runCloudSyncTick } from "../src/jobs/cloud-sync.job";
 import { accuracyRows, rowOk } from "./lib/anlik-bagimsiz";
+import type { SackDepotData } from "../src/cloud-sync/snapshot-cuval-deposu";
+import { sackSearchService } from "../src/services/sack-search.service";
 import { ensureTestDyeHouse, ensureTestSander } from "./fixture-subcontractor";
 
 let pass = 0, fail = 0;
@@ -67,10 +74,10 @@ const DEADLINE = /gecik|zamaninda|termin|vade/i;
 /** Bulut kataloğunun ANLIK adları (`patron/sunucu/src/catalog/projections.ts`, sözleşme SABİT). */
 const CLOUD_SNAPSHOT_NAMES = new Set([
   "ozet.stok", "ozet.siparis", "ozet.uretim", "ozet.sevkiyat", "ozet.fason", "ozet-finans", "ozet-masraf", "karlilik-ozet",
-  "emanet-bakiye", "fason-acik", "hizmet-geliri", "stok-karnesi", "stok-kalem", "acik-siparis-karsilama", "rapor-katalogu", "uretim-akisi", "saglik", "tesis", "cari-ozeti",
+  "emanet-bakiye", "fason-acik", "hizmet-geliri", "stok-karnesi", "stok-kalem", "cuval-deposu", "acik-siparis-karsilama", "rapor-katalogu", "uretim-akisi", "saglik", "tesis", "cari-ozeti",
 ]);
 const STAMP = `TEST-D3B-${Date.now()}-`;
-const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[], wos: [] as string[], dispatches: [] as string[], sacks: [] as string[] };
+const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[], wos: [] as string[], dispatches: [] as string[], sacks: [] as string[], shipments: [] as string[] };
 const NOT_IN_ADNAN =["ozet-finans", "ozet-masraf", "karlilik-ozet", "hizmet-geliri", "emanet-bakiye", "saglik"];
 
 function keysOf(v: unknown, out: Set<string> = new Set()): Set<string> {
@@ -98,7 +105,7 @@ function wireNames(): string[] {
 
 async function main(): Promise<void> {
   console.log("\n§1 Katalog ve tel şemaları");
-  check("9 anlık projeksiyon (M2a: + cari-ozeti; + stok-kalem)", SNAPSHOT_PROJECTIONS.length === 9, SNAPSHOT_PROJECTIONS.map((p) => p.name).join(","));
+  check("10 anlık projeksiyon (M2a: + cari-ozeti; + stok-kalem; 2.12.4: + cuval-deposu)", SNAPSHOT_PROJECTIONS.length === 10, SNAPSHOT_PROJECTIONS.map((p) => p.name).join(","));
   const names = wireNames();
   const schemaNames = Object.keys(SNAPSHOT_WIRE_SCHEMAS);
   check("tel adları = katı şema anahtarları", names.length === schemaNames.length && names.every((n) => schemaNames.includes(n)), names.join(","));
@@ -225,6 +232,73 @@ async function main(): Promise<void> {
     `${kNow.cuvaldaTop - kBase.cuvaldaTop} · ${kNow.cuvaldaMetre - kBase.cuvaldaMetre}`);
   check("çuvalda sayısı = dizi uzunluğu", kNow.cuvaldaTop === kNow.cuvaldakiToplar.length);
 
+  // Çuval deposu (2.12.4): panelin Paketleme/Çuvallar kapsamı (havuz + PLANNED) ve sayıları; DISPATCHED gelmez, hayalet
+  // top (kartelaya gitmiş) sayılmaz. Ek fixture stok-kalem ölçüsünden SONRA kurulur (yukarıdaki farkları bozmaz).
+  console.log("\n§3b Çuval deposu (anlık ↔ panel servisi ↔ bağımsız SQL)");
+  const planned = await prisma.shipment.create({ data: { shipmentNo: `${STAMP}SHP`, customerId: customer.id, status: "PLANNED" }, select: { id: true } });
+  const gone = await prisma.shipment.create({ data: { shipmentNo: `${STAMP}SHD`, customerId: customer.id, status: "DISPATCHED", dispatchedAt: new Date() }, select: { id: true } });
+  fx.shipments.push(planned.id, gone.id);
+  const sackP = await prisma.sack.create({ data: { sackNo: `${STAMP}SP`, customerId: customer.id, shipmentId: planned.id, weightKg: 41.5 }, select: { id: true } });
+  const sackD = await prisma.sack.create({ data: { sackNo: `${STAMP}SD`, customerId: customer.id, shipmentId: gone.id }, select: { id: true } });
+  fx.sacks.push(sackP.id, sackD.id);
+  for (const [code, qty, status, sackId, label] of [
+    ["P0", 15, "WAREHOUSE", sackP.id, customer.id], ["D0", 12, "SHIPPED", sackD.id, null], ["G0", 99, "AT_KARTELA", sack.id, null],
+  ] as const) {
+    const r = await prisma.roll.create({
+      data: { itemId: item.id, initialQty: qty, currentQty: qty, status, entrySource: "SUPPLIER_RECEIPT", barcode: `${STAMP}${code}`, sackId, labelCustomerId: label },
+      select: { id: true },
+    });
+    fx.rolls.push(r.id);
+  }
+  const depoBuild = await buildSnapshots({ now, productionOn: true, only: new Set(["cuval-deposu"]) });
+  check("cuval-deposu kuruldu", depoBuild.errors.length === 0 && depoBuild.snapshots.length === 1, JSON.stringify(depoBuild.errors));
+  const depo = depoBuild.snapshots[0]!.data as unknown as SackDepotData;
+  const dSack = (no: string) => depo.cuvallar.find((c) => c.cuvalNo === no);
+  const pool = dSack(`${STAMP}S`);
+  const panelPool = (await sackSearchService.searchSacks({ customerId: sackCustomer.id })).data as Array<{ id: string; rollCount: number; totalQty: number }>;
+  const panelPoolRow = panelPool.find((r) => r.id === sack.id);
+  check("havuz çuvalı: DEPODA, carisi, top/metre = panel listesi (hayalet sayılmaz)",
+    pool?.durum === "DEPODA" && pool.cari === `${STAMP}Çuval Carisi` && pool.top === panelPoolRow?.rollCount && pool.metre === panelPoolRow?.totalQty && pool.toplar.length === pool.top,
+    `anlık ${pool?.top}/${pool?.metre} · panel ${panelPoolRow?.rollCount}/${panelPoolRow?.totalQty}`);
+  check("hayalet top (kartelada) içerikte yok", !pool?.toplar.some((t) => t.topNo === `${STAMP}G0`));
+  const s0d = pool?.toplar.find((t) => t.topNo === `${STAMP}S0`);
+  const s1d = pool?.toplar.find((t) => t.topNo === `${STAMP}S1`);
+  check("etiket ≠ çuval carisi işaretli; stok etiketi işaretsiz",
+    s0d?.etiketFarkli === true && s0d.etiketMusteri === `${STAMP}Müşteri` && s0d.urun === `${STAMP}Kumaş` && s1d?.etiketFarkli === false && s1d.etiketMusteri === null,
+    JSON.stringify([s0d, s1d]));
+  const pSack = dSack(`${STAMP}SP`);
+  check("sevke atanmış çuval görünür: SEVKE_ATANDI + sevkiyat no + kg, etiket = cari → işaretsiz",
+    pSack?.durum === "SEVKE_ATANDI" && pSack.sevkiyatNo === `${STAMP}SHP` && pSack.kg === 41.5 && pSack.top === 1 && pSack.toplar[0]?.etiketFarkli === false,
+    JSON.stringify(pSack));
+  check("sevk edilmiş (DISPATCHED) çuval gelmez", dSack(`${STAMP}SD`) === undefined);
+  const panelCust = (await sackSearchService.searchSacks({ customerId: customer.id })).data as Array<{ id: string }>;
+  check("müşterinin çuvalları = panel listesi (havuz + PLANNED)", panelCust.length === depo.cuvallar.filter((c) => c.cariKartId === customer.id).length && panelCust.some((r) => r.id === sackP.id) && !panelCust.some((r) => r.id === sackD.id),
+    `panel ${panelCust.length}`);
+  const sumOf = <T,>(xs: readonly T[], f: (x: T) => number) => Math.round(xs.reduce((a, x) => a + f(x), 0) * 1000) / 1000;
+  check("özet = çuval satırları (fabrika toplar)", depo.ozet.cuval === depo.cuvallar.length && depo.ozet.top === sumOf(depo.cuvallar, (c) => c.top)
+    && Math.abs(depo.ozet.metre - sumOf(depo.cuvallar, (c) => c.metre)) < 0.001 && depo.ozet.sevkeAtanan === depo.cuvallar.filter((c) => c.durum === "SEVKE_ATANDI").length);
+  check("cari dökümü = özet", sumOf(depo.cariler, (c) => c.cuval) === depo.ozet.cuval && sumOf(depo.cariler, (c) => c.top) === depo.ozet.top);
+  const custRow = depo.cariler.find((c) => c.cariKartId === customer.id);
+  const sackCustRow = depo.cariler.find((c) => c.cariKartId === sackCustomer.id);
+  // Panelin cari kapısı (`listSackCustomers`, aynı kapsam): çuval sayısı aynı.
+  const gate = new Map<string | null, number>();
+  for (let cursor: string | undefined, guard = 0; guard < 100; guard++) {
+    const page = await sackSearchService.listSackCustomers({ withSacksOnly: true, limit: 200, cursor });
+    for (const it of page.data!.items) gate.set(it.customerId, it.sackCount);
+    if (!page.data!.nextCursor) break;
+    cursor = page.data!.nextCursor;
+  }
+  check("cari satırı çuval sayısı = panel cari kapısı", custRow?.cuval === 1 && gate.get(customer.id) === 1 && sackCustRow?.cuval === gate.get(sackCustomer.id) && custRow.kg === 41.5,
+    `anlık ${custRow?.cuval}/${sackCustRow?.cuval} · panel ${gate.get(customer.id)}/${gate.get(sackCustomer.id)}`);
+  const [depoSql] = await prisma.$queryRaw<Array<{ sacks: number; rolls: number; qty: number }>>(Prisma.sql`
+    SELECT (SELECT COUNT(*)::int FROM sacks s LEFT JOIN shipments sh ON sh.id = s."shipmentId" WHERE s."shipmentId" IS NULL OR sh.status::text = 'PLANNED') AS sacks,
+           COUNT(r.id)::int AS rolls, COALESCE(SUM(r."currentQty"), 0)::float AS qty
+    FROM rolls r JOIN sacks s ON s.id = r."sackId" LEFT JOIN shipments sh ON sh.id = s."shipmentId"
+    WHERE (s."shipmentId" IS NULL OR sh.status::text = 'PLANNED')
+      AND r.status::text NOT IN ('CANCELLED','SCRAP','IN_PRODUCTION','AT_SUBCONTRACTOR','SUBCONTRACTOR_CONSUMED','AT_KARTELA','KARTELA_CONSUMED','TAMBUR_CONSUMED')`);
+  check("bağımsız SQL: çuval · top · metre", depo.ozet.cuval === depoSql?.sacks && depo.ozet.top === depoSql.rolls && Math.abs(depo.ozet.metre - depoSql.qty) < 0.01,
+    `anlık ${depo.ozet.cuval}/${depo.ozet.top}/${depo.ozet.metre} · SQL ${depoSql?.sacks}/${depoSql?.rolls}/${depoSql?.qty}`);
+
   // §4–§5 ortak: geçerli anahtar, sahte bulut.
   const dir = mkdtempSync(path.join(tmpdir(), "tst-patron-anlik-"));
   const keyPath = path.join(dir, "kurulum.key");
@@ -302,6 +376,7 @@ main()
     if (fx.orders.length) await prisma.order.deleteMany({ where: { id: { in: fx.orders } } });
     if (fx.rolls.length) await prisma.roll.deleteMany({ where: { id: { in: fx.rolls } } });
     if (fx.sacks.length) await prisma.sack.deleteMany({ where: { id: { in: fx.sacks } } });
+    if (fx.shipments.length) await prisma.shipment.deleteMany({ where: { id: { in: fx.shipments } } });
     if (fx.wos.length) await prisma.workOrderStep.deleteMany({ where: { workOrderId: { in: fx.wos } } });
     if (fx.wos.length) await prisma.workOrder.deleteMany({ where: { id: { in: fx.wos } } });
     if (fx.items.length) await prisma.item.deleteMany({ where: { id: { in: fx.items } } });

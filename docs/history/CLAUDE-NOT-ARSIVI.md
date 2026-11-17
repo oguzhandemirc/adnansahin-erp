@@ -13384,3 +13384,17 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Bulut.** Anlıklar opak saklanır (alan sınıfı denetimi yalnız KAYIT projeksiyonlarında); bulut kodu ve `wire.ts` değişmedi. Eski fabrika (2.12.3) alan göndermez → sütun "—", süzgeç ve kart çizilmez.
 
 **Bekçi.** `test_patron_bulut_anliklar` §3 (çuval fixture'ı + bağımsız SQL satırı; sonda: `etiketMusteri` ← çuval carisi → 2 kırmızı) · uygulama `__tests__/stok-kime-nerede.test.tsx` (sondalar: fark satırı kaldırıldı → 1 · kart koşulu kaldırıldı → 3).
+
+## 2026-11-17 — Patron "Çuvallar" ekranı: yeni `cuval-deposu` anlığı (backend 2.12.4'e ek) [PATRON-BULUTU + PATRON-UYGULAMA + SEVKİYAT]
+
+**Karar (kullanıcı).** Patron uygulamasına SALT İZLEME "Çuvallar" ekranı: kimin kaç çuvalı var, çuvalda ne var. Menüde Operasyon grubunda Sevkiyat'ın yanında, izin `bulut:sevkiyat:oku`. Yeni sürüm numarası açılmaz; fabrika 2.12.4'e eklenir.
+
+**Ölçüm → yol.** Bulutta `cuval` OLGU zaten vardı ama sevk edilmiş çuvalları da taşır, sevk durumu, top içeriği ve cari özeti yoktu; `stok-kalem.bitmis.cuvaldakiToplar` çuval kimliği taşımaz ve "bitmiş" yüklemlidir. Seçilen yol: yeni ANLIK `cuval-deposu`. Kapsam panelin varsayılanı `resolveScopeOr()` (havuz + PLANNED; DISPATCHED gelmez, sevk rakamı bu anlıkta yok), çuval başına top/metre `loadSackContentTotals` (panel listesi + `cuval` OLGU ile aynı tek kaynak), içerik `PRESENT_ROLL_WHERE`. Özet ve cari dökümü fabrikada toplanır. `etiketFarkli` = etiket müşterisi ve çuval carisi ikisi de dolu ve kimlikle farklı.
+
+**Uygulama.** Tercih (kart/sütun/süzgeç) yalnız cihazda (`tablo.cuval`); bulut tercih anahtar listesi ve `wire.ts` değişmedi (bayt eşitliği korunur). Eski fabrikada (anlık yok, 404) ekran "Çuval listesi fabrika güncellemesinden sonra görünür" der.
+
+**Kurulum sırası.** Önce bulut kataloğu (`patron/sunucu/src/catalog/projections.ts`), sonra fabrika; tersinde eski bulut girdiyi reddeder (tur KISMI, düşmez).
+
+**Açık (kullanıcıya).** Çuval top sayısı panel listesinin hayaletsiz tanımıdır; panel cari kapısı (`listSackCustomers.rollCount`) hayalet topu da sayar — hayalet varken iki panel rakamı ayrışır, telefon liste tanımını izler. Kartela parçası sayısı gönderilmez.
+
+**Bekçi.** `test_patron_bulut_anliklar` §3b (panel `searchSacks`/`listSackCustomers` eşitliği, DISPATCHED dışlanır, PLANNED görünür, hayalet sayılmaz, etiket farkı, bağımsız SQL) · bulut `test_katalog_ozeti` · uygulama `__tests__/cuvallar.test.tsx` (sondalar: cari süzgeç satırı kaldırıldı → 2 kırmızı · rozet koşulu `!!etiketMusteri` → 1 kırmızı).

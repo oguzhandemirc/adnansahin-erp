@@ -16,6 +16,7 @@ import { SNAPSHOT_WIRE_SCHEMAS, type SnapshotWireName } from "./snapshot-schemas
 import { buildSubcontractOpenData } from "./snapshot-fason";
 import { buildCustomerSummaryData } from "./snapshot-cari-ozeti";
 import { buildStockKalemData } from "./snapshot-stok-kalem";
+import { buildSackDepotData } from "./snapshot-cuval-deposu";
 import { remoteReportCatalog } from "./remote-reports";
 import { snapshotDigest } from "./digest";
 import { toWireValue } from "./wire";
@@ -212,6 +213,7 @@ export async function buildSnapshots(ctx: SnapshotContext): Promise<SnapshotBuil
           break;
         case "stok-karnesi": out.push(await buildStock(src)); break;
         case "stok-kalem": out.push(seal("stok-kalem", await buildStockKalemData(ctx.now))); break;
+        case "cuval-deposu": out.push(seal("cuval-deposu", await buildSackDepotData())); break;
         case "acik-siparis-karsilama": out.push(await buildCoverage(src)); break;
         case "uretim-akisi": out.push(await buildProductionFlow(src)); break;
         case "fason-acik": out.push(seal("fason-acik", await buildSubcontractOpenData())); break;

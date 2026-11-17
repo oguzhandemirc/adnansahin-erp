@@ -292,8 +292,9 @@ function resolveScopeSql(scope?: SackSearchScope): Prisma.Sql {
  * "sevk edilmemiş çuvallar". Liste (`searchSacks`) ile cari kapısı
  * (`listSackCustomers`) AYNI yüklemden beslenmek ZORUNDA: ayrışırsa kapı "3 çuval"
  * der, liste 5 satır basar ve operatör hangisinin doğru olduğunu bilemez.
+ * Patron bulutunun `cuval-deposu` anlığı da varsayılanı (argümansız) buradan alır.
  */
-function resolveScopeOr(scope?: SackSearchScope, includeDispatched?: boolean): Prisma.SackWhereInput[] {
+export function resolveScopeOr(scope?: SackSearchScope, includeDispatched?: boolean): Prisma.SackWhereInput[] {
   if (scope) return scopeWhere(scope);
   if (includeDispatched) return scopeWhere("ALL");
   return [{ shipmentId: null }, { shipment: { status: { in: PLANNED_STATUSES } } }];

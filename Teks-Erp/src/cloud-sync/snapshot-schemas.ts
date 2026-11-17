@@ -53,7 +53,25 @@ const StockKalemFinishedSection = z.strictObject({
   cuvaldakiToplar: z.array(z.strictObject({ ...TopFields, urun: Str, en: Num.nullable(), renk: Str.nullable(), kat: Str.nullable() })),
 });
 
+// Çuval deposu (2.12.4): sevk edilmemiş çuvallar (havuz + sevke atanmış), fabrikanın saydığı özet ve cari dökümü,
+// çuval başına içerik. Kg çuvalın brüt tartısıdır (tartısız çuval toplanmaz; hiç tartılı yoksa null).
+const SackCounts = { cuval: Num, top: Num, metre: Num, kg: Num.nullable() };
+const SackDepot = z.strictObject({
+  ozet: z.strictObject({ ...SackCounts, tartiliCuval: Num, sevkeAtanan: Num }),
+  cariler: z.array(z.strictObject({ cariKartId: z.string().uuid().nullable(), ad: Str, ...SackCounts })),
+  cuvallar: z.array(z.strictObject({
+    id: z.string().uuid(), cuvalNo: Str, cariKartId: z.string().uuid().nullable(), cari: Str.nullable(), sube: Str.nullable(),
+    durum: z.enum(["DEPODA", "SEVKE_ATANDI"]), sevkiyatNo: Str.nullable(), kg: Num.nullable(), top: Num, metre: Num,
+    olusturulma: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    toplar: z.array(z.strictObject({
+      id: z.string().uuid(), topNo: Str.nullable(), urun: Str, renk: Str.nullable(), en: Num.nullable(), kat: Str.nullable(), kalite: Str.nullable(),
+      metre: Num, kg: Num.nullable(), etiketMusteri: Str.nullable(), etiketFarkli: z.boolean(),
+    })),
+  })),
+});
+
 export const SNAPSHOT_WIRE_SCHEMAS = {
+  "cuval-deposu": SackDepot,
   "ozet.stok": z.strictObject({ hamMiktar: Num, yariMamulMiktar: Num, bitmisMiktar: Num, oluMiktar: Num, oluStokGun: Num, enCokUrun: z.array(Label) }),
   "ozet.siparis": z.strictObject({ acikKalem: Num, acikMiktar: Num, karsilanmayanMiktar: Num, karsilanmaYuzde: Num, enCokCari: z.array(Label) }),
   "ozet.uretim": z.strictObject({

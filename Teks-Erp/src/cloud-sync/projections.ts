@@ -82,6 +82,12 @@ export const SNAPSHOT_PROJECTIONS: readonly SnapshotProjection[] = [
   },
   { name: "stok-karnesi", kind: "ANLIK", source: "reports/stock-scorecard.report.service getStockScorecard", permission: "bulut:stok:oku" },
   { name: "stok-kalem", kind: "ANLIK", source: "reports/stock-kalem.report.service getStockKalem + getStockKalemRolls (tek raf okuması) + getSackedFinishedRolls (çuvaldaki bitmiş, ayrı dizi)", permission: "bulut:stok:oku" },
+  // 2.12.4 (Adnan'a özgü): sevk edilmemiş çuvallar + içerik + fabrikanın saydığı cari dökümü; patron "Çuvallar" ekranı.
+  {
+    name: "cuval-deposu", kind: "ANLIK",
+    source: "cloud-sync/snapshot-cuval-deposu: sack-search resolveScopeOr (havuz + PLANNED) + sack-content-totals loadSackContentTotals/PRESENT_ROLL_WHERE",
+    permission: "bulut:sevkiyat:oku",
+  },
   { name: "acik-siparis-karsilama", kind: "ANLIK", source: "reports/open-order-coverage.report.service getOpenOrderCoverage", permission: "bulut:siparis:oku" },
   {
     name: "uretim-akisi", kind: "ANLIK", source: "inventory.service getProductionFlow + DashboardService.getStationsLiveState",
