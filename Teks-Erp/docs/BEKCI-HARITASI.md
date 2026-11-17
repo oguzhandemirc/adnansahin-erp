@@ -122,6 +122,7 @@ Kalan atlamalar üç biçimde ve strict hiçbirini görmez:
 
 | Dosya | Ne ölçüyor | DB | Negatif sonda | |
 |---|---|---|---|---|
+| `Teks-Erp/scripts/test_bildirim_atama.ts` | Bildirim atama yönetimi (2.13.0, D2): `/api/bildirim-atamalari/*` `bildirim:yonet` yoksa 403; yalnız-saha/pasif/teknik kişi listelenmez ve atanamaz; veri izni olmayan tür 409 BILDIRIM_VERI_IZNI_YOK ve yarım yazım yok; atama tokenVersion artırmaz; şablon seti kişiye kopyalanır (replace/merge), veri izinsiz tür atlanır, şablon sonradan değişince kişi etkilenmez; kendi tercihi `bildirim:tercih` yoksa 403, atanmamış tür 409; mute edilen tür D1 alıcı helper'ında teslim almaz | ✓ | ✓ 3 sonda (dosya başlığı) | 2026-11-17 |
 | `Electron/src/components/admin/PermissionGrid.scope.test.ts` | Yetki sekmesi saf kuralları: mobile→mobil, web/admin→masaüstü, bilinmeyen kategori masaüstüne düşer (yetki kaybolmaz); sekme başına sayaç/arama isabet |  |  | ⚠️ yok |
 | `Electron/src/components/admin/screen-view.test.ts` | 'Ekrana göre' yetki görünümü: giriş izni AÇIK/KAPALI/UYARIR üç durumu, çok girişli ekranda herhangi biri yeter; ortak yetki tespiti giriş+yetenek teki |  |  | ⚠️ yok |
 | `Electron/src/components/auth/ChangePasswordForm.test.tsx` | Kendi parola formu (zorunlu adım + hesap menüsü): kısıtlı token isteğe taşınır, başarıda yeni token çağırana; kısa parola/eşleşmeyen tekrar ağa çıkmaz; PASSWORD_POLICY cümlesi yeni, CURRENT_PASSWORD_INVALID mevcut parola alanının altında; 401 onSessionExpired |  | ✓B1 (`f9c3f620`) kısıtlı token isteğe taşınmadı → 1/4 ❌ |  |

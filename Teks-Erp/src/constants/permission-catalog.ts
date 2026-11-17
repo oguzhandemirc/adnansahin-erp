@@ -189,6 +189,10 @@ export const PERMISSION_CATALOG = [
   // girer; telefon izinleri fabrika izinlerinden TÜRETİLİR (`cloud-sync/user-permission-map.ts`). Birebir açık
   // atamayla geçer: `*` (süperadmin) ve "Admin (Tam Yetki)" şablonu bu kodu TAŞIMAZ (`ALL_MODE_EXCLUDED`).
   { code: "patron:giris", module: "ADMIN", category: "web", description: "Patron telefon uygulamasına giriş (Electron kullanıcı adı + şifresiyle; telefon izinleri fabrika izinlerinden türetilir)" },
+  // 2026-11-17 (2.13.0): BİLDİRİM. Atama izin kodu DEĞİLDİR (ayrı tablo; değişimi oturumu düşürmez) — bu iki kod
+  // yalnız atamayı YÖNETMEK ve kişinin atanmış türleri KAPATABİLMESİ içindir. Tercih izni yoksa atanan tür zorunlu.
+  { code: "bildirim:yonet", module: "ADMIN", category: "web", description: "Bildirim atamaları: kişilere ve rol şablonlarına hangi bildirimleri alacağını ata" },
+  { code: "bildirim:tercih", module: "ADMIN", category: "web", description: "Kendisine atanan bildirimleri kapatabilir (yoksa atanan bildirimler zorunlu)" },
   // 2026-08-05: "Bu Bilgisayar" (yerel donanım) ayarları — etiket yazıcısı,
   // kantar, barkod tabancası, sunucu adresi. `admin:settings`ten AYRI olması
   // ürün kararıdır: bu ayarların HİÇBİRİ sunucuya yazılmaz, yalnız o makinenin

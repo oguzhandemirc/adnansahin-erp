@@ -13414,3 +13414,13 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Bekçi.** `test_bildirim_cekirdek` (sondalar dosya başlığında: mute tercih izninden bağımsız · kanca beklenip hata yutulmadı · şalter yok sayıldı · telefon yazarı teknik kullanıcıya düştü) · `test_patron_cloud_switch_superadmin` §1/§2'ye üçüncü anahtar (sonda: kümeden çıkarıldı → 5 kırmızı).
 
 **Açık.** `test_audit_muafiyeti` §7 (33 > 32) bu işten ÖNCE kırmızı: `helpers/order-link-allocation.helper.ts` (`85f70259`, 2026-11-16); tavan güncellenmedi. `test_backend_surum` §2 paket sürümü etiketin (`backend-v2.12.3`) önüne geçtiğinde kırmızı — 2.12.4'te de öyleydi; etiket paketlemede atılır.
+
+## 2026-11-17 — Platformlar arası bildirim D2: atama yönetimi (backend 2.13.0 + panel) [YETKİ-İZİN + GENEL]
+
+**Karar (kullanıcı, plan 2026-11-17).** `bildirim:yonet` sahibi her kişinin ve rol şablonunun bildirim türlerini atar; `bildirim:tercih` atanmışsa kişi atananlardan kapatabilir, yoksa hepsi zorunlu. Şablon seti kişiye KOPYALANIR (izinlerle aynı, canlı bağ yok). Veri izni olmayan tür atanamaz; ataması olmayan hiçbir şey almaz.
+
+**Tasarım.** Atama izin kodu olarak modellenmedi (izin değişimi `tokenVersion` artırıp oturumu düşürür). Kopya `applyTemplate`te izinler yazıldıktan SONRA koşar, veri izni kişinin yeni efektif izinlerinden okunur; izinsiz tür atlanır, yalnız-saha/teknik/pasif kişiye hiç yazılmaz. Ret (409 `BILDIRIM_VERI_IZNI_YOK`) bütün kümeyi reddeder — panel kilitli satırı göndermez, böylece izni sonradan düşen tür kaydetmede temizlenir. Audit tablo adları (`NOTIFICATION_ASSIGNMENT` · `NOTIFICATION_TEMPLATE` · `NOTIFICATION_PREFERENCE`) kancanın türlerine eşlenmez. Rotada izin kodu literal (statik çözüm); servisler `test_permission_catalog`ta `test_bildirim_atama`ya devredildi. Kimliksiz-izin taban 20 → 22 (katalog + kendi tercih okuması).
+
+**Panel.** Yetkilendirme › "Bildirim Atamaları" (`/access/bildirimler`, `bildirim:yonet`). "Kendi tercihini değiştirebilir" anahtarı `bildirim:tercih` iznini mevcut izin yolundan verir/alır (oturumu düşürür; uyarı gösterilir) ve `admin:users` ister.
+
+**Bekçi.** `test_bildirim_atama` (sondalar başlıkta: kişide veri izni denetimi · şablon kopyası · tercih kapısı kaldırıldı → her biri 2 kırmızı).

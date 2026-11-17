@@ -142,6 +142,11 @@ const DINAMIK_IZIN_KAYNAKLARI: Record<string, readonly string[]> = {
   // bildirim tür kataloğu (`constants/notification-catalog.ts`, 2.13.0). Her türün veri izninin katalogda
   // olduğunu `test_bildirim_cekirdek.ts` §0 MEKANİK doğrular; tercih izni D2'de kataloğa girer.
   "src/services/notifications/recipients.ts": [`${DELEGE}scripts/test_bildirim_cekirdek.ts`],
+  // Aynı katalog, D2 (2.13.0): atama ve tercih servisleri `kindLockedReason` / tercih izni için
+  // `matchesPermission` çağırır. `NOTIFICATION_MANAGE_PERMISSION`/`NOTIFICATION_PREFERENCE_PERMISSION`in
+  // katalogda olduğunu `test_bildirim_atama.ts` §0 MEKANİK doğrular.
+  "src/services/notifications/notification-assignment.service.ts": [`${DELEGE}scripts/test_bildirim_atama.ts`],
+  "src/services/notifications/notification-preference.service.ts": [`${DELEGE}scripts/test_bildirim_atama.ts`],
   // GERİ SARMA (2026-09-12): `assertEntityPermission` ikinci kapıyı yine
   // `adapter.writePermission`den çözüyor — varlık KOŞUMUN KENDİSİNDEN
   // (`ImportRun.entity`) bulunuyor, `:entity` parametresinden değil. Desen ve

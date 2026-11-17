@@ -16,6 +16,7 @@ import { SessionRegistryService } from "./session-registry.service";
 import { foldNameForCompare } from "./helpers/name-normalize.helper";
 import { readPatronCloudUserId } from "./helpers/patron-cloud-user.helper";
 import { newPasswordFields } from "./helpers/password-policy.helper";
+import { copyTemplateNotificationsToUser } from "./notifications/notification-assignment.service";
 
 /** Yetki (son-admin) guard'ı advisory lock namespace'i (F-KIM-GUV-003). Tek anahtar:
  *  guard sistem geneli tek bir seri kapıdır, kullanıcı başına DEĞİL. */
@@ -1063,6 +1064,8 @@ export class PermissionManagementService {
   // Şablonu kullanıcıya uygula — UserPermission'a kopyalar (link kalmaz).
   // mode="merge"   : mevcut yetkilere ekler (varsa atlar)
   // mode="replace" : kullanıcının tüm yetkilerini şablon ile değiştirir
+  // Bildirim seti de AYNI kipte kopyalanır (2.13.0, D2) — izinler yazıldıktan SONRA, çünkü veri izni
+  // olmayan tür kişinin yeni efektif izinlerine göre atlanır. Bildirim kopyası tokenVersion ARTIRMAZ.
   // ---------------------------------------------------------------------------
   static async applyTemplate(
     userId: string,
@@ -1091,7 +1094,9 @@ export class PermissionManagementService {
     const templatePermIds = template.permissions.map((p) => p.permissionId);
 
     if (mode === "replace") {
-      return this.setUserPermissions(userId, templatePermIds, actorUserId);
+      await this.setUserPermissions(userId, templatePermIds, actorUserId);
+      await copyTemplateNotificationsToUser(templateId, userId, mode, actorUserId);
+      return this.getUserPermissions(userId);
     }
 
     // merge: eksik olanları ekle
@@ -1131,6 +1136,7 @@ export class PermissionManagementService {
       recordId: userId,
       newData: { appliedTemplateId: templateId, mode, addedPermissionIds: toAdd },
     });
+    await copyTemplateNotificationsToUser(templateId, userId, mode, actorUserId);
 
     return this.getUserPermissions(userId);
   }

@@ -2,6 +2,7 @@
 // TeksERP - Bildirim kutusu uçları (2.13.0, D1) — /api/bildirimler
 // =============================================================================
 // Oturumlu kullanıcının KENDİ teslimleri: liste + okunmamış sayısı · tek teslimi okundu · tümünü okundu.
+// D2: tür kataloğu (konu başlıklı) · kişinin KENDİ tercihi (yazma yalnız `bildirim:tercih`).
 // İzin kodu YOK: kutu kişinin kendisidir; kimin ne alacağına atama + veri izni ÜRETİMDE karar verir.
 // İnce handler: Zod parse → servis → res.json. Prisma import edilmez.
 // =============================================================================
@@ -16,6 +17,12 @@ import {
   markNotificationRead,
   NOTIFICATION_LIST_MAX_LIMIT,
 } from "../services/notifications/notification-inbox.service";
+import { requirePermission } from "../middlewares/rbac.middleware";
+import { notificationCatalog } from "../services/notifications/notification-assignment.service";
+import {
+  getMyNotificationPreferences,
+  setMyNotificationPreferences,
+} from "../services/notifications/notification-preference.service";
 
 const router = Router();
 
@@ -106,5 +113,71 @@ router.post("/:id/okundu", async (req: Request, res: Response, next: NextFunctio
     next(error);
   }
 });
+
+const preferenceBody = z.object({
+  items: z
+    .array(z.object({ kind: z.string().min(1).max(64), muted: z.boolean() }))
+    .min(1, { message: "En az bir tercih gönderilmeli." })
+    .max(100),
+});
+
+function actorPermissions(req: Request): string[] {
+  return req.user?.permissions ?? [];
+}
+
+/**
+ * @openapi
+ * /api/bildirimler/katalog:
+ *   get:
+ *     tags: [Bildirim]
+ *     summary: Bildirim türü kataloğu (konu başlıklı)
+ *     description: >
+ *       `data.topics[]` (key, label, kinds[] — kind, label, dataPermission, missingPermissionText). Sıra = ekran sırası;
+ *       türü olmayan başlık da döner (istemci boş başlığı çizmez).
+ *     security: [{ bearerAuth: [] }]
+ */
+router.get("/katalog", (_req: Request, res: Response): void => {
+  res.status(200).json(notificationCatalog());
+});
+
+/**
+ * @openapi
+ * /api/bildirimler/tercihler:
+ *   get:
+ *     tags: [Bildirim]
+ *     summary: Kendi bildirim tercihlerim (yalnız atanmış türler)
+ *     description: >
+ *       `data.canChange` (`bildirim:tercih` var mı), `data.topics[]` (key, label), `data.items[]` (kind, topic, label,
+ *       mutedByUser, required — tercih izni yoksa true: tür zorunlu).
+ *     security: [{ bearerAuth: [] }]
+ *   put:
+ *     tags: [Bildirim]
+ *     summary: Kendi bildirim tercihimi değiştir
+ *     description: >
+ *       İzin `bildirim:tercih` (yoksa 403). Gövde `{ items: [{ kind, muted }] }`. Atanmamış tür 409 BILDIRIM_ATANMAMIS
+ *       (hiçbiri yazılmaz); tanınmayan tür 400 BILDIRIM_TURU_GECERSIZ. Yanıt GET ile aynı.
+ *     security: [{ bearerAuth: [] }]
+ */
+router.get("/tercihler", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    res.status(200).json(await getMyNotificationPreferences(actor(req), actorPermissions(req)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put(
+  "/tercihler",
+  // Literal (statik çözüm); `NOTIFICATION_PREFERENCE_PERMISSION` ile aynı değer.
+  requirePermission("bildirim:tercih"),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { items } = preferenceBody.parse(req.body);
+      res.status(200).json(await setMyNotificationPreferences(actor(req), actorPermissions(req), items));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 export default router;

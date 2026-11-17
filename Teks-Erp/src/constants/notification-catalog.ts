@@ -17,7 +17,7 @@ export const NOTIFICATION_TOPICS = [
 ] as const;
 export type NotificationTopic = (typeof NOTIFICATION_TOPICS)[number]["key"];
 
-/** D2 izinleri (katalog satırları D2'de eklenir). Tercih izni yoksa atanan tür ZORUNLUDUR. */
+/** D2 izinleri (`permission-catalog.ts`). Tercih izni yoksa atanan tür ZORUNLUDUR. */
 export const NOTIFICATION_PREFERENCE_PERMISSION = "bildirim:tercih";
 export const NOTIFICATION_MANAGE_PERMISSION = "bildirim:yonet";
 
@@ -41,6 +41,8 @@ export interface NotificationKindDef {
   readonly label: string;
   /** Türü alabilmek (ve atanabilmek) için gereken veri izni; `matchesPermission` ile denetlenir. */
   readonly dataPermission: string;
+  /** Veri izni yokken ayar ekranındaki kilit nedeni (Türkçe). */
+  readonly missingPermissionText: string;
   /** Üretim noktası: bu `AuditService.log` çağrısı (eylem + tablo) türü doğurur. */
   readonly source: { readonly action: "CREATE" | "UPDATE" | "DELETE"; readonly tableName: string };
   /**
@@ -60,6 +62,7 @@ export const NOTIFICATION_KINDS = {
     topic: "siparisler",
     label: "Yeni sipariş",
     dataPermission: "order:read",
+    missingPermissionText: "Siparişleri görme izni yok",
     source: { action: "CREATE", tableName: "ORDER" },
     author: "call",
     text: (f, a) => ({ title: "Yeni sipariş açıldı", body: join([a, f.customerName, `Sipariş ${f.number}`]) }),
@@ -69,6 +72,7 @@ export const NOTIFICATION_KINDS = {
     topic: "uretim",
     label: "Yeni iş emri",
     dataPermission: "workorder:read",
+    missingPermissionText: "İş emirlerini görme izni yok",
     source: { action: "CREATE", tableName: "WORK_ORDER" },
     author: "record",
     text: (f, a) => ({ title: "Yeni iş emri açıldı", body: join([a, `İş emri ${f.number}`]) }),
@@ -78,6 +82,7 @@ export const NOTIFICATION_KINDS = {
     topic: "sevkiyat",
     label: "Yeni sevk",
     dataPermission: "shipping:read",
+    missingPermissionText: "Sevkiyatları görme izni yok",
     source: { action: "CREATE", tableName: "SHIPMENT" },
     author: "record",
     text: (f, a) => ({ title: "Yeni sevkiyat oluşturuldu", body: join([a, f.customerName, `Sevk ${f.number}`]) }),

@@ -726,6 +726,10 @@ export const ROLE_COVERAGE_EXEMPT: Readonly<Record<string, string>> = {
     "Ekran değil, Hızlı İş Emri içi yetenek (hareket defteri D5): açılmış iş emrinin rengini/enini/sipariş bağını değiştirir ve kartı yeniden basar. İş emri açmaktan ayrı sorumluluk → varsayılan operatör paketine GİRMEZ, panelden seçili kişiye verilir.",
   "patron:giris":
     "Telefon girişi (2026-11-13): parola özeti buluta gider — hiçbir pakete girmez, panelden kişi kişi açık atamayla verilir; 'Admin (Tam Yetki)' de taşımaz (`ALL_MODE_EXCLUDED`).",
+  "bildirim:yonet":
+    "Yönetim yetkisi (2.13.0): kimin hangi bildirimi alacağını belirler — dar bir pakete girmez, panelden seçili yöneticiye verilir; 'Admin (Tam Yetki)' taşır.",
+  "bildirim:tercih":
+    "Kişi kişi verilen yetenek (2.13.0): atanan bildirimleri kapatabilme. Varsayılan pakete girmez — yoksa atanan bildirim zorunludur (kullanıcı kararı 2026-11-17).",
   "mobile:kk1-yari-mamul":
     "Ekran değil, KK1-içi yetenek (2026-08-17): dışarıdan alınan yarı mamul kabulü. Renkli mal kabulü açar; yanlışlıkla kullanılırsa top ham stoğa 'boyalı' düşer → varsayılan operatör paketine GİRMEZ, panelden seçili kişiye verilir.",
   // 2026-08-14: goods-receipt:* muafları KALDIRILDI — artık dar bir rol

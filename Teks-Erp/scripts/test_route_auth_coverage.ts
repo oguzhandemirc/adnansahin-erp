@@ -202,8 +202,13 @@ const EXEMPT: Record<string, string> = {
  * daraltılır, başkasının teslimi 404). Kimin ne alacağı izinle ÜRETİMDE çözülür
  * (atama + veri izni); kutunun kendisine izin kodu yeni bir izin yüzeyi olurdu.
  * Bekçi: `test_bildirim_cekirdek` §h.
+ *
+ * ⚠️ 20 → 22 (2026-11-17, BİLİNÇLİ, D2): `GET /api/bildirimler/katalog` (tür kataloğu — kişisel veri yok,
+ * yalnız sabit tablo) ve `GET /api/bildirimler/tercihler` (kişinin KENDİ atanmış türleri; `/auth/preferences`
+ * emsali). Tercih YAZIMI `bildirim:tercih` ister, atama yönetimi `bildirim:yonet` (toplu kapı).
+ * Bekçi: `test_bildirim_atama` §e/§f.
  */
-const BARE_CHAIN_BASELINE = 20;
+const BARE_CHAIN_BASELINE = 22;
 
 /** Körlük zemini: tarayıcı boşa düşerse "ihlal yok" ile "hiçbir şeye bakılmadı" aynı yeşile çıkmasın. */
 const MIN_ROUTE_LAYERS = 400;

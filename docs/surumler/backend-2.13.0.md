@@ -26,7 +26,7 @@ davranır.
 - Şalter `notifications.enabled` YALNIZ süperadmin tarafından değiştirilir (`patronCloud.*` şalterleriyle aynı sınıf).
 
 Ölçüm (git, 2.12.4 `..` bu commit): yeni migration **1** (`20261117132248_bildirim_cekirdek`, toplam **370**) ·
-yeni HTTP ucu: `/api/bildirimler` altında 3 (D1) + atama yönetimi uçları (D2, §2) · yeni izin kodu: D2'de 2
+yeni HTTP ucu **11** (`/api/bildirimler` altında 3 + 3, `/api/bildirim-atamalari` altında 5; §2) · yeni izin kodu **2**
 (`bildirim:yonet`, `bildirim:tercih`; migration'sız, boot uzlaştırması getirir, kimseye ATANMAZ) · yeni rol şablonu
 **0** · yeni ayar anahtarı **1** (`notifications.enabled`) · yeni ortam değişkeni **0** · yeni npm paketi **0** ·
 `client-version-policy.ts` değişmedi · `deploy/` altında backend kurulum betikleri değişmedi.
@@ -40,6 +40,11 @@ yeni HTTP ucu: `/api/bildirimler` altında 3 (D1) + atama yönetimi uçları (D2
   hesap almaz), şalter önbelleği, gelen kutusu servisi.
 - **Uçlar** (`routes/notification.routes.ts`): `GET /api/bildirimler` · `POST /api/bildirimler/:id/okundu` ·
   `POST /api/bildirimler/tumu/okundu`.
+- **Atama yönetimi (D2)** (`routes/notification-admin.routes.ts`, toplu kapı `bildirim:yonet`):
+  `GET /api/bildirim-atamalari/kullanicilar` · `GET|PUT /api/bildirim-atamalari/kullanicilar/:userId` ·
+  `GET /api/bildirim-atamalari/sablonlar` · `GET|PUT /api/bildirim-atamalari/sablonlar/:templateId`. Kişinin kendisi:
+  `GET /api/bildirimler/katalog` · `GET /api/bildirimler/tercihler` · `PUT /api/bildirimler/tercihler` (`bildirim:tercih`).
+  Şablon uygulaması (`PermissionManagementService.applyTemplate`) bildirim setini de kopyalar; atama oturum düşürmez.
 - **Ayar** (`services/system-setting.service.ts`): `SETTING_KEYS.NOTIFICATIONS_ENABLED` + `readNotificationsEnabled`;
   `constants/reserved-settings.ts` `SUPERADMIN_WRITE_SETTING_KEYS` kümesine eklendi.
 

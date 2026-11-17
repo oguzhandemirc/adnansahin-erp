@@ -132,6 +132,7 @@ import clientPolicyRoutes from "./routes/client-policy.routes";
 import bossRoutes from "./routes/boss.routes";
 import destekRoutes from "./routes/destek.routes";
 import notificationRoutes from "./routes/notification.routes";
+import notificationAdminRoutes from "./routes/notification-admin.routes";
 import { NIGHTLY_PREFIX } from "./services/helpers/backup-naming.helper";
 import { seriesExhaustionWarnings } from "./services/helpers/series-exhaustion.helper";
 import { masterDataArchiveHealthSnapshot } from "./services/helpers/master-data-health.helper";
@@ -1014,6 +1015,8 @@ app.use("/api/boss", bossRoutes);
 app.use("/api/destek", destekRoutes);
 // Bildirim kutusu (2.13.0) — oturumlu kullanıcının kendi teslimleri; üretim `notifications.enabled` şalterinde.
 app.use("/api/bildirimler", notificationRoutes);
+// Bildirim atama yönetimi (2.13.0, D2) — kişi + rol şablonu; toplu kapı `bildirim:yonet`.
+app.use("/api/bildirim-atamalari", notificationAdminRoutes);
 
 // =============================================================================
 // JSON 404 — tanımsız /api/* route'lar için
