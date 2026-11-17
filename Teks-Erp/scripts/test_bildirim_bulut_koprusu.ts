@@ -18,7 +18,7 @@
 //
 // NEGATİF SONDA (2026-11-17, dosya DIŞI, geri alındı; md5 denetimli): turdaki `notificationsEnabled` sorusu kaldırıldı →
 // §1b ❌ · `applyBridgeResult`ta okundu claim'inden `readAt: null` koşulu kaldırıldı → §4d ❌ · pencere süzgeci
-// kaldırıldı → §2e ❌. Geri yüklenince yeşil.
+// kaldırıldı → §2e ❌ · (D6a) tür kümesi süzgeci kaldırıldı → §7a ❌. Geri yüklenince yeşil.
 // =============================================================================
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -32,7 +32,7 @@ import { generateKeyFile, loadKeyFile } from "../src/lib/cloud-signing/key-file"
 import { REQUEST_HEADER } from "../src/lib/cloud-signing/istek";
 import { PASSWORD_POLICY_VERSION } from "../src/services/helpers/password-policy.helper";
 import { markNotificationRead } from "../src/services/notifications/notification-inbox.service";
-import { CLOUD_NOTIFY_WINDOW_MS } from "../src/services/notifications/cloud-bridge.service";
+import { CLOUD_NOTIFY_WINDOW_MS, readCloudSupportedKinds } from "../src/services/notifications/cloud-bridge.service";
 import { reconcilePatronCloud, type ReconcileDeps } from "../src/jobs/patron-cloud.jobs";
 import {
   __cloudNotifyTimerArmedForTests,
@@ -59,7 +59,7 @@ const eventIds: string[] = [];
 
 interface Read { teslimId: string; okundu: string }
 interface Body { v: number; teslimler: Array<{ teslimId: string; hesapId: string; tur: string; tekilAnahtar: string; baslik: string; metin: string; rota: string | null; yazar: string; olusturulma: string }>; okunanlar: Read[] }
-interface FakeCloud { readonly transport: CloudTransport; readonly seen: CloudHttpRequest[]; status: number; reads: Read[] }
+interface FakeCloud { readonly transport: CloudTransport; readonly seen: CloudHttpRequest[]; status: number; reads: Read[]; kinds?: string[] }
 function fakeCloud(): FakeCloud {
   const fc: FakeCloud = {
     seen: [],
@@ -69,7 +69,7 @@ function fakeCloud(): FakeCloud {
       fc.seen.push(req);
       if (fc.status !== 200) return Promise.resolve({ status: fc.status, body: Buffer.from(JSON.stringify({ success: false, message: "x", details: { code: fc.status === 404 ? "BULUNAMADI" : "SUNUCU_HATASI" } })) });
       const b = JSON.parse(req.body.toString("utf8")) as Body;
-      return Promise.resolve({ status: 200, body: Buffer.from(JSON.stringify({ v: 1, alinan: b.teslimler.length, bagli: 0, atlanan: 0, okunanlar: fc.reads, tercihler: [] })) });
+      return Promise.resolve({ status: 200, body: Buffer.from(JSON.stringify({ v: 1, alinan: b.teslimler.length, bagli: 0, atlanan: 0, okunanlar: fc.reads, tercihler: [], ...(fc.kinds ? { turler: fc.kinds } : {}) })) });
     },
   };
   return fc;
@@ -260,6 +260,24 @@ async function s6(open: Open, a: string): Promise<void> {
   check("§6b durdurunca zamanlayıcı yok", !__cloudNotifyTimerArmedForTests());
 }
 
+/** D6a tür kümesi koruması: bulutun tanımadığı tür gönderilmez ve damgalanmaz (bulut atlar, fabrika damgalarsa kaybolurdu). */
+async function s7(open: Open, a: string): Promise<void> {
+  console.log("\n§7 tür kümesi: eski bulut yalnız D1 türlerini alır; 'turler' bildiren bulut yenileri de alır");
+  const known = await mkDelivery(a, "yeni-siparis");
+  const fresh = await mkDelivery(a, "sevkiyat-cikti");
+  const fc = fakeCloud();
+  __configureCloudNotifyForTests({ reset: true });
+  __configureCloudNotifyForTests({ transport: fc.transport, eligibility: async () => open, enabled: async () => true });
+  await runCloudNotifyOnce();
+  check("§7a ⭐ eski bulut: D1 türü gitti, yeni tür GİTMEDİ ve damgasız (kayıp yok)", sentIds(fc).has(known.id) && !sentIds(fc).has(fresh.id) && !(await row(fresh.id)).cloudSentAt);
+  fc.kinds = ["yeni-siparis", "yeni-is-emri", "yeni-sevk", "sevkiyat-cikti"];
+  await runCloudNotifyOnce();
+  const n = fc.seen.length;
+  await runCloudNotifyOnce();
+  check("§7b 'turler' bildiren bulut: bekleyen yeni tür sonraki turda gitti ve damgalandı", sentIds(fc, n).has(fresh.id) && !!(await row(fresh.id)).cloudSentAt);
+  check("§7c bozuk 'turler' yok sayılır (eski küme)", readCloudSupportedKinds({ turler: ["Gecersiz Tur"] }) === null && readCloudSupportedKinds({}) === null && readCloudSupportedKinds({ turler: ["a-b"] })?.has("a-b") === true);
+}
+
 async function main(): Promise<void> {
   const dir = mkdtempSync(path.join(tmpdir(), "tst-bkp-"));
   try {
@@ -277,6 +295,7 @@ async function main(): Promise<void> {
     await s4b(open, a);
     await s5(open, a);
     await s6(open, a);
+    await s7(open, a);
   } finally {
     stopCloudNotify();
     __configureCloudNotifyForTests({ reset: true });

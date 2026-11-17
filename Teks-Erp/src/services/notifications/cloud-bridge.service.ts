@@ -7,12 +7,32 @@
 //    okumasının TEYİDİ). Alıcının bulut hesabı yoksa da gider; bulut sayar ve atlar (fabrika küme hesabı tutmaz).
 //  · `applyBridgeResult`: 2xx'ten sonra damgalar (yalnız NULL → an, atomik) ve bulutta okunanları `readAt`e yazar
 //    (yalnız `readAt` NULL iken — ilk okuma kazanır); yazılan okundu bir SONRAKİ istekte buluta teyit olarak döner.
+//  · TÜR KÜMESİ KORUMASI (D6a): bulut tanımadığı türü 400'lemez, sayıp ATLAR — fabrika ise 2xx'te teslimi damgalar ve
+//    o bildirim telefona hiç gitmez. Bu yüzden yalnız bulutun TANIDIĞI türler toplanır: bulut yanıtta `turler` (desteklenen
+//    tür listesi) bildirirse o küme, bildirmezse (D4 bulutu) D1 türleri. Küme dışı teslim gönderilmez ve damgalanmaz;
+//    bulut `CLOUD_NOTIFY_WINDOW_MS` içinde yükselirse gider, yoksa panelde kalır. Sorgu kümeyle süzülür: bekleyen tanınmaz
+//    teslimler sayfayı doldurup tanınanları aç bırakmaz.
 // Denetim satırı yok (`AUDIT_EXEMPT_MODELS` NotificationDelivery: kişinin kendi kutusu + köprü damgaları).
 // =============================================================================
 
 import prisma from "../../lib/prisma";
 import type { FactoryNotification, NotificationRead } from "../../cloud-sync/wire";
 import { NOTIFICATION_PUSH_MAX, NOTIFICATION_READS_MAX } from "../../cloud-sync/wire";
+import { NOTIFICATION_KINDS_D1 } from "../../constants/notification-catalog";
+
+/** Bulut desteklediği türleri bildirmezse varsayılan küme (D4 bulutunun tanıdığı fabrika türleri). */
+export const CLOUD_LEGACY_NOTIFICATION_KINDS: ReadonlySet<string> = new Set(NOTIFICATION_KINDS_D1);
+
+/**
+ * Bulut yanıtındaki desteklenen tür listesi (`turler: string[]`, D6b ekler). Alan tel şemasında henüz yok (bayt-eş ayna
+ * `patron/` ile birlikte değişir) → ham yanıttan savunmacı okunur; yok/bozuksa null (çağıran eski kümeyi kullanır).
+ */
+export function readCloudSupportedKinds(json: unknown): ReadonlySet<string> | null {
+  if (!json || typeof json !== "object") return null;
+  const v = (json as { turler?: unknown }).turler;
+  if (!Array.isArray(v) || v.length > 200 || !v.every((x) => typeof x === "string" && /^[a-z][a-z0-9-]{1,39}$/.test(x))) return null;
+  return new Set(v as string[]);
+}
 
 /** Yeni teslim penceresi: bundan eski, gönderilmemiş teslim buluta gitmez (kapalı geçen süreden sonra sel olmasın). */
 export const CLOUD_NOTIFY_WINDOW_MS = 2 * 60 * 60 * 1000;
@@ -25,9 +45,9 @@ export interface BridgeBatch {
   readonly okunanlar: NotificationRead[];
 }
 
-export async function collectBridgeBatch(nowMs: number): Promise<BridgeBatch> {
+export async function collectBridgeBatch(nowMs: number, cloudKinds: ReadonlySet<string> = CLOUD_LEGACY_NOTIFICATION_KINDS): Promise<BridgeBatch> {
   const fresh = await prisma.notificationDelivery.findMany({
-    where: { cloudSentAt: null, createdAt: { gte: new Date(nowMs - CLOUD_NOTIFY_WINDOW_MS) } },
+    where: { cloudSentAt: null, createdAt: { gte: new Date(nowMs - CLOUD_NOTIFY_WINDOW_MS) }, event: { kind: { in: [...cloudKinds] } } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     take: NOTIFICATION_PUSH_MAX,
     select: {

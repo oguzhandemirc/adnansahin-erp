@@ -20,7 +20,13 @@ import {
   SYNC_PATHS,
 } from "../cloud-sync/wire";
 import { notificationsEnabled } from "../services/notifications/notification-switch";
-import { applyBridgeResult, collectBridgeBatch, type BridgeBatch } from "../services/notifications/cloud-bridge.service";
+import {
+  CLOUD_LEGACY_NOTIFICATION_KINDS,
+  applyBridgeResult,
+  collectBridgeBatch,
+  readCloudSupportedKinds,
+  type BridgeBatch,
+} from "../services/notifications/cloud-bridge.service";
 import { MirrorState, applyCloudPreferenceRequests } from "../services/notifications/cloud-mirror.service";
 
 export const NOTIFY_TICK_MS = 30 * 1000;
@@ -52,6 +58,8 @@ let nowFn: () => number = Date.now;
 let failures = 0;
 /** D5 atama aynası + tercih teyidi (süreç içi; iş durunca sıfırlanır). */
 let mirror = new MirrorState();
+/** Bulutun tanıdığı bildirim türleri (son yanıttan; süreç içi). Açılışta eski küme — ilk yanıt günceller. */
+let cloudKinds: ReadonlySet<string> = CLOUD_LEGACY_NOTIFICATION_KINDS;
 let lastWarn: string | null = null;
 
 function warnOnce(text: string): void {
@@ -76,7 +84,7 @@ export async function runCloudNotifyOnce(): Promise<NotifyRunResult> {
     const ctx = cloudContext(e, transport);
     for (let i = 0; i < MAX_BATCHES_PER_RUN; i++) {
       const now = nowFn();
-      const batch = await collectBridgeBatch(now);
+      const batch = await collectBridgeBatch(now, cloudKinds);
       const extra = await mirror.collect(now);
       const body = NotificationsPushRequestSchema.safeParse({ v: ENVELOPE_VERSION, teslimler: batch.teslimler, okunanlar: batch.okunanlar, ...extra });
       if (!body.success) return result("BASARISIZ", "GOVDE_GECERSIZ", sent, requests);
@@ -84,6 +92,7 @@ export async function runCloudNotifyOnce(): Promise<NotifyRunResult> {
       requests++;
       if (!res.ok) return res.status === 404 ? result("ESKI_BULUT", res.code, sent, requests) : result("BASARISIZ", res.code, sent, requests);
       const read = NotificationsPushResponseSchema.safeParse(res.json);
+      cloudKinds = readCloudSupportedKinds(res.json) ?? CLOUD_LEGACY_NOTIFICATION_KINDS;
       const applied = await applyBridgeResult(batch, read.success ? read.data.okunanlar : [], now);
       mirror.sent(extra, read.success && read.data.ayna);
       const prefs = read.success && read.data.tercihler.length > 0 ? await applyCloudPreferenceRequests(read.data.tercihler) : null;
@@ -201,6 +210,7 @@ export function __configureCloudNotifyForTests(p: {
     backingOff = false;
     lastWarn = null;
     mirror = new MirrorState();
+    cloudKinds = CLOUD_LEGACY_NOTIFICATION_KINDS;
   }
   if (p.transport) transport = p.transport;
   if (p.eligibility) eligibilityFn = p.eligibility;
