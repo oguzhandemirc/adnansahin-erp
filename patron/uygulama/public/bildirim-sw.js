@@ -12,7 +12,8 @@ self.addEventListener("push", (event) => {
   const body = typeof d.metin === "string" ? d.metin : "";
   const rota = typeof d.rota === "string" && /^\/[a-z-]+(\/[A-Za-z0-9-]{1,64})?$/.test(d.rota) ? d.rota : "/pano";
   const tesisId = typeof d.tesisId === "string" && /^[0-9A-Fa-f-]{36}$/.test(d.tesisId) ? d.tesisId : null;
-  event.waitUntil(self.registration.showNotification(title, { body, data: { rota, tesisId }, tag: typeof d.bildirimId === "string" ? d.bildirimId : undefined }));
+  const bildirimId = typeof d.bildirimId === "string" && /^[0-9A-Fa-f-]{36}$/.test(d.bildirimId) ? d.bildirimId : null;
+  event.waitUntil(self.registration.showNotification(title, { body, data: { rota, tesisId, bildirimId }, tag: typeof d.bildirimId === "string" ? d.bildirimId : undefined }));
 });
 
 self.addEventListener("notificationclick", (event) => {
@@ -20,6 +21,8 @@ self.addEventListener("notificationclick", (event) => {
   const data = event.notification.data || {};
   const u = new URL(data.rota || "/pano", self.location.origin);
   if (data.tesisId) u.searchParams.set("tesis", data.tesisId);
+  // Dokunuş okundu sayılsın: uygulama kimliği adresten alır (`webTapFromUrl`), tesis aynıysa okundu ucunu çağırır.
+  if (data.tesisId && data.bildirimId) u.searchParams.set("bildirim", data.bildirimId);
   const url = u.href;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {

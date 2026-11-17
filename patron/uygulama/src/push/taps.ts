@@ -38,7 +38,7 @@ export async function openNotification(data: unknown, d: TapDeps): Promise<boole
 }
 
 /** Web: service worker'ın açtığı adresten dokunuş (`?tesis=` yoksa null). Yol `openNotification`da süzülür. */
-export function webTapFromUrl(href: string): { rota: string; tesisId: string } | null {
+export function webTapFromUrl(href: string): { rota: string; tesisId: string; bildirimId?: string } | null {
   let u: URL;
   try {
     u = new URL(href);
@@ -46,7 +46,10 @@ export function webTapFromUrl(href: string): { rota: string; tesisId: string } |
     return null;
   }
   const tesisId = u.searchParams.get("tesis");
-  return tesisId ? { rota: u.pathname, tesisId } : null;
+  const bildirimId = u.searchParams.get("bildirim");
+  if (!tesisId) return null;
+  // `bildirim` kimliği okundu sayılır; biçimi `openNotification`da UUID ile süzülür.
+  return bildirimId ? { rota: u.pathname, tesisId, bildirimId } : { rota: u.pathname, tesisId };
 }
 
 export function useNotificationTaps(enabled: boolean): void {

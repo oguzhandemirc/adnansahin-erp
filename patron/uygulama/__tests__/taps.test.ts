@@ -82,6 +82,21 @@ describe("web bildirimi: service worker → adres → tesis denetimi", () => {
       expect(webTapFromUrl(url)).toBeNull();
     }
   });
+  it("web dokunuşu da okundu sayılır: bildirimId adrese taşınır, aynı tesiste okundu ucu çağrılır", async () => {
+    const ID = "00000000-0000-4000-8000-0000000000b1";
+    const url = await swAc({ baslik: "x", rota: "/siparisler", tesisId: T2, bildirimId: ID });
+    expect(url).toBe(`https://patron.ornek/siparisler?tesis=${T2}&bildirim=${ID}`);
+    const tap = webTapFromUrl(url);
+    expect(tap).toEqual({ rota: "/siparisler", tesisId: T2, bildirimId: ID });
+    const onRead = jest.fn();
+    await expect(openNotification(tap, { ...deps(T2).d, onRead })).resolves.toBe(true);
+    expect(onRead).toHaveBeenCalledWith(ID);
+    // Başka tesisin bildirimi okundu sayılmaz; biçimsiz kimlik adrese hiç taşınmaz.
+    const baska = jest.fn();
+    await openNotification(tap, { ...deps("t1").d, onRead: baska });
+    expect(baska).not.toHaveBeenCalled();
+    expect(await swAc({ rota: "/stok", tesisId: T2, bildirimId: "../kotu" })).toBe(`https://patron.ornek/stok?tesis=${T2}`);
+  });
   it("güvensiz yol adresten gelse de açılmaz", async () => {
     const { order, d } = deps("t1");
     await expect(openNotification(webTapFromUrl(`https://patron.ornek/bilinmeyen?tesis=${T2}`), d)).resolves.toBe(false);
