@@ -36,9 +36,9 @@ describe("sekme yolları sabit", () => {
     expect(TABS.map((t) => t.route)).toEqual(["/pano", "/siparisler", "/uretim", "/stok", "/cariler"]);
     expect(TABS.map((t) => t.title)).toEqual(["Pano", "Siparişler", "Üretim", "Stok", "Cariler"]);
   });
-  it("☰ menü grupları: Operasyon (Sevkiyat) · İş (Raporlar) · Hesap", () => {
+  it("☰ menü grupları: Operasyon (Sevkiyat, Çuvallar) · İş (Raporlar) · Hesap", () => {
     expect(NAV_GROUPS.map((g) => g.title)).toEqual(["Operasyon", "İş", "Hesap"]);
-    expect(NAV_GROUPS[0]!.modules).toEqual(["sevkiyat"]);
+    expect(NAV_GROUPS[0]!.modules).toEqual(["sevkiyat", "cuvallar"]);
     expect(NAV_GROUPS[1]!.modules).toEqual(["raporlar"]);
     const hepsi = [...TABS.flatMap((t) => (t.module ? [t.module] : [])), ...NAV_GROUPS.flatMap((g) => g.modules)];
     expect(new Set(hepsi).size).toBe(hepsi.length);

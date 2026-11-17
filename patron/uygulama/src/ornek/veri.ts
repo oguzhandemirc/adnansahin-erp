@@ -145,6 +145,7 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
       ],
     },
     "stok-kalem": ORNEK_STOK_KALEM(),
+    "cuval-deposu": ORNEK_CUVAL_DEPOSU(),
     "acik-siparis-karsilama": { ozet: { karsilanmaYuzde: 61.5, acikKalem: 24, gecikenKalem: 0 } },
     "rapor-katalogu": {
       raporlar: [
@@ -174,20 +175,101 @@ function stokKalemBolumu(kalemler: OrnekKalem[], onEk: string) {
   return { toplamTop: toplar.length, toplamMetre: Math.round(toplar.reduce((a, x) => a + x.metre, 0) * 10) / 10, kalemler: satirlar, toplar };
 }
 
+// Çuval deposu (örnek, fabrika 2.12.4 `cuval-deposu`): sevk edilmemiş çuvallar; özet ve cari dökümü çuvallardan
+// toplanır ki ekranla aynı sayıyı versin (gerçekte bu sayıları fabrika verir). Bitmiş toplar stok kalem anlığının
+// `cuvaldakiToplar` dizisiyle aynı kümedir.
+const ORNEK_CARI = {
+  numune: { id: "00000000-0000-4000-8000-0000000000c3", ad: "Numune Perde San. ve Tic." },
+  taslak: { id: "00000000-0000-4000-8000-0000000000c4", ad: "Taslak Konfeksiyon" },
+} as const;
+type OrnekCuvalTopu = { urun: string; en: number; renk: string; kat: string | null; metre: number; etiket: keyof typeof ORNEK_CARI | null; gun: number };
+type OrnekCuval = { no: string; cari: keyof typeof ORNEK_CARI | null; sevkiyat: string | null; kg: number | null; gun: number; toplar: OrnekCuvalTopu[] };
+const ORNEK_CUVALLAR: OrnekCuval[] = [
+  { no: "CV1711260004", cari: "numune", sevkiyat: "SVK-2026-0318", kg: 48.6, gun: 0, toplar: [
+    { urun: "NUMUNE TÜL", en: 320, renk: "EKRU", kat: "4 Kat", metre: 52.5, etiket: "numune", gun: 3 },
+    { urun: "NUMUNE TÜL", en: 320, renk: "EKRU", kat: "4 Kat", metre: 49, etiket: "numune", gun: 3 },
+  ] },
+  { no: "CV1611260011", cari: "numune", sevkiyat: null, kg: 61.2, gun: 1, toplar: [
+    { urun: "ÖRNEK SATEN", en: 280, renk: "KREM", kat: null, metre: 44.5, etiket: "numune", gun: 2 },
+    { urun: "ÖRNEK SATEN", en: 280, renk: "KREM", kat: null, metre: 46, etiket: "taslak", gun: 2 },
+    { urun: "ÖRNEK SATEN", en: 280, renk: "KREM", kat: null, metre: 41.5, etiket: null, gun: 5 },
+  ] },
+  { no: "CV1511260007", cari: "taslak", sevkiyat: null, kg: null, gun: 2, toplar: [
+    { urun: "TASLAK KADİFE", en: 140, renk: "BORDO", kat: null, metre: 60, etiket: "taslak", gun: 6 },
+  ] },
+  { no: "CV1411260002", cari: null, sevkiyat: null, kg: null, gun: 3, toplar: [
+    { urun: "DENEME KETEN", en: 150, renk: "GRİ", kat: null, metre: 55.5, etiket: null, gun: 8 },
+    { urun: "DENEME KETEN", en: 150, renk: "GRİ", kat: null, metre: 50, etiket: null, gun: 8 },
+  ] },
+];
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+function ornekCuvalTopKimligi(c: number, t: number): string {
+  return `00000000-0000-4000-8000-0000000c${String(c).padStart(2, "0")}${String(t).padStart(2, "0")}`;
+}
+
+export function ORNEK_CUVAL_DEPOSU() {
+  const cuvallar = ORNEK_CUVALLAR.map((c, ci) => {
+    const cari = c.cari ? ORNEK_CARI[c.cari] : null;
+    const toplar = c.toplar.map((x, ti) => {
+      const etiket = x.etiket ? ORNEK_CARI[x.etiket] : null;
+      return {
+        id: ornekCuvalTopKimligi(ci, ti), topNo: `${c.no}-${ti + 1}`, urun: x.urun, renk: x.renk, en: x.en, kat: x.kat, kalite: "1. Kalite",
+        metre: x.metre, kg: null, etiketMusteri: etiket?.ad ?? null, etiketFarkli: !!etiket && !!cari && etiket.id !== cari.id,
+      };
+    });
+    return {
+      id: `00000000-0000-4000-8000-00000000c${String(ci).padStart(3, "0")}`, cuvalNo: c.no, cariKartId: cari?.id ?? null, cari: cari?.ad ?? null, sube: null,
+      durum: c.sevkiyat ? "SEVKE_ATANDI" : "DEPODA", sevkiyatNo: c.sevkiyat, kg: c.kg, top: toplar.length, metre: r1(toplar.reduce((a, x) => a + x.metre, 0)),
+      olusturulma: once(c.gun).slice(0, 10), toplar,
+    };
+  });
+  const say = (xs: typeof cuvallar) => {
+    const tartili = xs.filter((c) => c.kg !== null);
+    return { cuval: xs.length, top: xs.reduce((a, c) => a + c.top, 0), metre: r1(xs.reduce((a, c) => a + c.metre, 0)), kg: tartili.length ? r1(tartili.reduce((a, c) => a + (c.kg ?? 0), 0)) : null, tartiliCuval: tartili.length };
+  };
+  const kimlikler = [null, ORNEK_CARI.numune.id, ORNEK_CARI.taslak.id];
+  const cariler = kimlikler.flatMap((id) => {
+    const xs = cuvallar.filter((c) => c.cariKartId === id);
+    if (xs.length === 0) return [];
+    const { tartiliCuval: _t, ...sayi } = say(xs);
+    return [{ cariKartId: id, ad: xs[0]!.cari ?? "Müşterisiz (genel stok)", ...sayi }];
+  });
+  return { ozet: { ...say(cuvallar), sevkeAtanan: cuvallar.filter((c) => c.durum === "SEVKE_ATANDI").length }, cariler, cuvallar };
+}
+
+/** Stok kalem anlığının çuvaldaki bitmiş topları (2.12.4) — çuval deposuyla aynı küme. */
+function ornekCuvaldakiToplar() {
+  return ORNEK_CUVALLAR.flatMap((c, ci) => c.toplar.map((x, ti) => ({
+    id: ornekCuvalTopKimligi(ci, ti), topNo: `${c.no}-${ti + 1}`, kalem: `cv-${x.urun}-${x.en}-${x.renk}`, metre: x.metre, kg: null, parti: null, depo: "Ana depo", gun: x.gun,
+    etiketMusteri: x.etiket ? ORNEK_CARI[x.etiket].ad : null, cuvalNo: c.no, cuvalCari: c.cari ? ORNEK_CARI[c.cari].ad : null,
+    urun: x.urun, en: x.en, renk: x.renk, kat: x.kat,
+  })));
+}
+
 export function ORNEK_STOK_KALEM() {
+  const bitmis = stokKalemBolumu([
+    { anahtar: "b1", urun: "ÖRNEK SATEN", en: 280, renk: "KREM", kat: null, gunler: [2, 4, 9, 9, 15], boy: 46 },
+    { anahtar: "b2", urun: "ÖRNEK SATEN", en: 280, renk: "BEYAZ", kat: "2 Kat", gunler: [6, 31], boy: 38 },
+    { anahtar: "b3", urun: "DENEME KETEN", en: 150, renk: "GRİ", kat: null, gunler: [1, 3, 3], boy: 52 },
+    { anahtar: "b4", urun: "NUMUNE TÜL", en: 320, renk: "EKRU", kat: "4 Kat", gunler: [64, 120], boy: 27 },
+    { anahtar: "b5", urun: "TASLAK KADİFE", en: 140, renk: "BORDO", kat: null, gunler: [11], boy: 61.5 },
+  ], "b");
+  const cuvalda = ornekCuvaldakiToplar();
   return {
     ham: stokKalemBolumu([
       { anahtar: "h1", urun: "ÖRNEK HAM SATEN", en: null, renk: null, kat: null, gunler: [3, 12, 12, 40], boy: 118 },
       { anahtar: "h2", urun: "DENEME HAM KETEN", en: null, renk: null, kat: null, gunler: [1, 5, 95], boy: 132 },
       { anahtar: "h3", urun: "NUMUNE HAM TÜL", en: null, renk: null, kat: null, gunler: [21, 33], boy: 104 },
     ], "h"),
-    bitmis: stokKalemBolumu([
-      { anahtar: "b1", urun: "ÖRNEK SATEN", en: 280, renk: "KREM", kat: null, gunler: [2, 4, 9, 9, 15], boy: 46 },
-      { anahtar: "b2", urun: "ÖRNEK SATEN", en: 280, renk: "BEYAZ", kat: "2 Kat", gunler: [6, 31], boy: 38 },
-      { anahtar: "b3", urun: "DENEME KETEN", en: 150, renk: "GRİ", kat: null, gunler: [1, 3, 3], boy: 52 },
-      { anahtar: "b4", urun: "NUMUNE TÜL", en: 320, renk: "EKRU", kat: "4 Kat", gunler: [64, 120], boy: 27 },
-      { anahtar: "b5", urun: "TASLAK KADİFE", en: 140, renk: "BORDO", kat: null, gunler: [11], boy: 61.5 },
-    ], "b"),
+    bitmis: {
+      ...bitmis,
+      // Raftaki (açıktaki) topun etiketi: ilk iki top müşteri adına basılmış, ötekiler stok etiketi.
+      toplar: bitmis.toplar.map((x, i) => ({ ...x, etiketMusteri: i < 2 ? ORNEK_CARI.taslak.ad : null, cuvalNo: null, cuvalCari: null })),
+      cuvaldaTop: cuvalda.length,
+      cuvaldaMetre: r1(cuvalda.reduce((a, x) => a + x.metre, 0)),
+      cuvaldakiToplar: cuvalda,
+    },
   };
 }
 

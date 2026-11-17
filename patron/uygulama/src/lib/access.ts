@@ -8,6 +8,7 @@ export type ModuleKey =
   | "siparisler"
   | "cariler"
   | "sevkiyat"
+  | "cuvallar"
   | "uretim"
   | "stok"
   | "gelen-kutusu"
@@ -35,6 +36,7 @@ export const MODULES: readonly ModuleDef[] = [
   { key: "siparisler", title: "Siparişler", route: "/siparisler", anyOf: ["bulut:siparis:oku"] },
   { key: "cariler", title: "Cariler", hint: "Müşteri ve tedarikçiler", route: "/cariler", anyOf: ["bulut:cari:oku", "bulut:cari:yaz"] },
   { key: "sevkiyat", title: "Sevkiyat", hint: "Sevk edilen ve bekleyen", route: "/sevkiyat", anyOf: ["bulut:sevkiyat:oku"] },
+  { key: "cuvallar", title: "Çuvallar", hint: "Depoda bekleyen çuvallar ve içleri", route: "/cuvallar", anyOf: ["bulut:sevkiyat:oku"] },
   { key: "uretim", title: "Üretim", hint: "İstasyonlar ve üretim kuyruğu", route: "/uretim", anyOf: ["bulut:uretim:oku"] },
   { key: "stok", title: "Stok", hint: "Ham ve bitmiş stok", route: "/stok", anyOf: ["bulut:stok:oku"] },
   { key: "raporlar", title: "Raporlar", hint: "Fabrikadan rapor isteyin", route: "/raporlar", anyOf: ["bulut:rapor:oku"] },

@@ -38,7 +38,7 @@ export function visibleTabs(perms: readonly string[]): TabDef[] {
 /** Sekmeye sığmayan bölümlerin TEK grup tablosu (UX-4 P2): dar ekranda ☰ menü (`/diger`), geniş ekranda rayın
  *  sekme bölümlerinden sonraki grupları AYNI başlık ve sırayla bundan çizer. */
 export const NAV_GROUPS: readonly { readonly title: string; readonly modules: readonly ModuleKey[] }[] = [
-  { title: "Operasyon", modules: ["sevkiyat"] },
+  { title: "Operasyon", modules: ["sevkiyat", "cuvallar"] },
   { title: "İş", modules: ["raporlar"] },
   // Gönderdiklerim ikincil denetim listesidir (kayıt onay beklemez): hesap grubunda, öne çıkmaz.
   { title: "Hesap", modules: ["bildirimler", "gelen-kutusu", "disa-aktar", "profil"] },
