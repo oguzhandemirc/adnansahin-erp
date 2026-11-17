@@ -45,7 +45,7 @@ export function DailySummaryTimeField() {
         title={query.data ? `Varsayılan ${query.data.data.defaultTime}` : undefined}
       />
       <Button size="sm" variant="outline" disabled={!dirty || !valid || save.isPending} onClick={() => save.mutate(value)}>
-        Kaydet
+        Saati kaydet
       </Button>
     </div>
   );

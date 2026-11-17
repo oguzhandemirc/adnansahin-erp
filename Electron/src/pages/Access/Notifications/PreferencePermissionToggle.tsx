@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Lock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Callout } from "@/components/ui/callout";
 import { useRoleAccess } from "@/hooks/useRoleAccess";
@@ -60,11 +61,19 @@ export function PreferencePermissionToggle({ userId, canChangePreference, onChan
           aria-label="Kendi tercihini değiştirebilir"
         />
       </div>
-      <Callout tone="warning">
-        {canEdit
-          ? "Bu bir yetki değişikliğidir: kişinin açık oturumu kapanır ve yeniden giriş yapması gerekir."
-          : "Bu ayar bir yetkidir; değiştirmek için kullanıcı yönetimi (admin:users) yetkisi gerekir."}
-      </Callout>
+      {/* Düzenleyebilen için yan etki uyarısı (anahtar Kaydet beklemeden uygulanır); düzenleyemeyen için yalnız sakin
+          bir bilgi satırı — turuncu uyarı ve ham izin kodu orada gürültüydü. */}
+      {canEdit ? (
+        <Callout tone="warning">
+          Hemen uygulanır (Kaydet beklenmez) ve bir yetki değişikliğidir: kişinin açık oturumu kapanır, yeniden giriş yapması
+          gerekir.
+        </Callout>
+      ) : (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          Bu ayarı yalnız kullanıcı yönetimi yetkisi olanlar değiştirebilir.
+        </p>
+      )}
     </div>
   );
 }

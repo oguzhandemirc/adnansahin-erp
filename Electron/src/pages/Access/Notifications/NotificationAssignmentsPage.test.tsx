@@ -110,6 +110,7 @@ describe("NotificationAssignmentsPage", () => {
     perms = ["bildirim:yonet"];
     await openUser();
     expect(screen.getByRole("switch", { name: "Kendi tercihini değiştirebilir" })).toBeDisabled();
-    expect(screen.getByText(/admin:users/)).toBeInTheDocument();
+    expect(screen.getByText(/kullanıcı yönetimi yetkisi/)).toBeInTheDocument();
+    expect(screen.queryByText(/oturumu kapanır/)).toBeNull();
   });
 });

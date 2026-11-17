@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DESKTOP_SUMMARY_THRESHOLD,
   badgeText,
+  bodyWithoutAuthor,
   deliveryIdFromTag,
   desktopTag,
   groupByDay,
@@ -127,5 +128,16 @@ describe("tercih kilidi", () => {
   it("konu başlıkları katalog sırasında, boş konu çizilmez", () => {
     const topics = [{ key: "siparisler", label: "Siparişler" }, { key: "uretim", label: "Üretim" }];
     expect(groupPreferences(topics, [item]).map((g) => g.key)).toEqual(["siparisler"]);
+  });
+});
+
+describe("bodyWithoutAuthor", () => {
+  it("metin yazarla başlıyorsa baştaki 'yazar · ' düşer", () => {
+    expect(bodyWithoutAuthor("Ayşe Yılmaz · ACME · Sipariş S1", "Ayşe Yılmaz")).toBe("ACME · Sipariş S1");
+  });
+  it("yazarla başlamayan ya da yalnız adı içeren metin aynen kalır", () => {
+    expect(bodyWithoutAuthor("Bugün 12 sipariş", "Sistem")).toBe("Bugün 12 sipariş");
+    expect(bodyWithoutAuthor("Ayşe Yılmazoğlu · X", "Ayşe Yılmaz")).toBe("Ayşe Yılmazoğlu · X");
+    expect(bodyWithoutAuthor("· X", "")).toBe("· X");
   });
 });

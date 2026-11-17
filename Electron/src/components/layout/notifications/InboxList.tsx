@@ -3,7 +3,7 @@ import { tr } from "date-fns/locale";
 import { AutoLoadMore } from "@/components/data-table/AutoLoadMore";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { cn } from "@/lib/utils";
-import { groupByDay } from "./inbox-model";
+import { bodyWithoutAuthor, groupByDay } from "./inbox-model";
 import type { InboxItem } from "./types";
 
 interface Props {
@@ -36,7 +36,7 @@ export function InboxList({ items, hasMore, isFetchingMore, onLoadMore, onOpen }
                     onClick={() => onOpen(it)}
                     data-unread={unread || undefined}
                     className={cn(
-                      "flex w-full gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none",
+                      "flex w-full gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                       unread && "bg-primary/5",
                     )}
                   >
@@ -48,7 +48,10 @@ export function InboxList({ items, hasMore, isFetchingMore, onLoadMore, onOpen }
                       <span className={cn("block truncate text-sm", unread ? "font-semibold" : "font-medium text-foreground/90")}>
                         {it.title}
                       </span>
-                      <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">{it.body}</span>
+                      {/* `block` YOK: line-clamp kendi display'ini kurar; `block` onu ezip kırpmayı bozuyordu. */}
+                      <span className="mt-0.5 line-clamp-2 break-words text-xs text-muted-foreground" title={it.body}>
+                        {bodyWithoutAuthor(it.body, it.authorName)}
+                      </span>
                       <span className="mt-1 block text-[11px] text-muted-foreground/80">
                         {it.authorName} · {formatDistanceToNow(new Date(it.createdAt), { addSuffix: true, locale: tr })}
                       </span>

@@ -108,11 +108,11 @@ export function NotificationInboxBell() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96 p-0">
-        <div className="flex items-center justify-between border-b px-3 py-2">
+        <div className="flex min-h-11 items-center justify-between border-b px-3 py-2">
           <p className="text-sm font-semibold">Bildirimler</p>
           {showList && inbox.unreadCount > 0 && (
             <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" disabled={inbox.markingAll} onClick={inbox.markAllRead}>
-              <CheckCheck className="h-3.5 w-3.5" /> Tümünü okundu say
+              <CheckCheck className="h-3.5 w-3.5" /> Tümünü okundu işaretle
             </Button>
           )}
         </div>

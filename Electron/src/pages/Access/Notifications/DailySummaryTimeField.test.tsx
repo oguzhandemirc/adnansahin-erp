@@ -30,7 +30,7 @@ describe("DailySummaryTimeField", () => {
     const input = await screen.findByLabelText("Gün sonu özeti saati");
     await waitFor(() => expect(input).toHaveValue("18:30"));
     expect(get).toHaveBeenCalledWith(URL);
-    expect(screen.getByRole("button", { name: "Kaydet" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Saati kaydet" })).toBeDisabled();
   });
 
   it("⭐ yeni saat Kaydet ile yalnız { time } gövdesiyle yazılır", async () => {
@@ -38,11 +38,11 @@ describe("DailySummaryTimeField", () => {
     const input = await screen.findByLabelText("Gün sonu özeti saati");
     await waitFor(() => expect(input).toHaveValue("18:30"));
     fireEvent.change(input, { target: { value: "19:05" } });
-    const save = screen.getByRole("button", { name: "Kaydet" });
+    const save = screen.getByRole("button", { name: "Saati kaydet" });
     expect(save).toBeEnabled();
     await userEvent.click(save);
     await waitFor(() => expect(put).toHaveBeenCalledWith(URL, { time: "19:05" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Kaydet" })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Saati kaydet" })).toBeDisabled());
   });
 
   it("boş saat (temizlenmiş alan) kaydedilemez", async () => {
@@ -50,7 +50,7 @@ describe("DailySummaryTimeField", () => {
     const input = await screen.findByLabelText("Gün sonu özeti saati");
     await waitFor(() => expect(input).toHaveValue("18:30"));
     fireEvent.change(input, { target: { value: "" } });
-    expect(screen.getByRole("button", { name: "Kaydet" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Saati kaydet" })).toBeDisabled();
     expect(put).not.toHaveBeenCalled();
   });
 });

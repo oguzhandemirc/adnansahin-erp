@@ -1,7 +1,7 @@
 // Panel zili: rozet, tıklayınca okundu + gezinme, tümünü okundu, şalter kapalı / atamasız boş durum,
 // köşe bildirimi yalnız YENİ gelende ve bir kez (window.api IPC köprüsü mock'lu).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook, screen, waitFor } from "@testing-library/react";
+import { renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/render";
 import type { InboxItem, InboxPage } from "./types";
@@ -79,6 +79,17 @@ describe("NotificationInboxBell", () => {
     await waitFor(() => expect(screen.getByTestId("bildirim-rozeti")).toHaveTextContent("1"));
   });
 
+  it("satırda yazar bir kez yazılır (gövdedeki 'yazar · ' öneki düşer), gövde 2 satırda kırpılır", async () => {
+    renderWithProviders(<NotificationInboxBell />);
+    await screen.findByTestId("bildirim-rozeti");
+    await userEvent.click(screen.getByRole("button", { name: /Bildirimler/ }));
+    const row = screen.getByRole("button", { name: /Yeni sipariş açıldı a/ });
+    expect(row.textContent?.match(/Ayşe Yılmaz/g)).toHaveLength(1);
+    const body = within(row).getByText("Sipariş a");
+    expect(body).toHaveClass("line-clamp-2");
+    expect(body).not.toHaveClass("block");
+  });
+
   it("okunmuş satıra tıklamak okundu çağırmaz ama kaydı açar", async () => {
     renderWithProviders(<NotificationInboxBell />);
     await screen.findByTestId("bildirim-rozeti");
@@ -88,11 +99,11 @@ describe("NotificationInboxBell", () => {
     expect(openTab).toHaveBeenCalledWith("/operations/orders?focus=ord-c");
   });
 
-  it("tümünü okundu say → uç çağrılır, rozet kalkar", async () => {
+  it("tümünü okundu işaretle → uç çağrılır, rozet kalkar", async () => {
     renderWithProviders(<NotificationInboxBell />);
     await screen.findByTestId("bildirim-rozeti");
     await userEvent.click(screen.getByRole("button", { name: /Bildirimler/ }));
-    await userEvent.click(screen.getByRole("button", { name: /Tümünü okundu say/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Tümünü okundu işaretle/ }));
     expect(post).toHaveBeenCalledWith("/api/bildirimler/tumu/okundu");
     await waitFor(() => expect(screen.queryByTestId("bildirim-rozeti")).toBeNull());
   });

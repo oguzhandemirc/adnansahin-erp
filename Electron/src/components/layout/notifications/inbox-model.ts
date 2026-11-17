@@ -95,6 +95,16 @@ export function deliveryIdFromTag(tag: string): string | null {
   return tag.startsWith("teslim:") ? tag.slice("teslim:".length) || null : null;
 }
 
+/**
+ * Satırın gövde metni: sunucu metni çoğu türde yazarla başlar ("Ayşe · Müşteri · Sipariş …"); panel yazarı
+ * zaman satırında ayrıca gösterdiği için baştaki "yazar · " düşer (aynı ad iki kez okunmasın).
+ * Yazarla başlamayan metin aynen kalır. Köşe bildirimi metni değişmez (orada yazar satırı yok).
+ */
+export function bodyWithoutAuthor(body: string, authorName: string): string {
+  const prefix = `${authorName} · `;
+  return authorName && body.startsWith(prefix) ? body.slice(prefix.length) : body;
+}
+
 function sameLocalDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
