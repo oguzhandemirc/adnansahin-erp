@@ -3,7 +3,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native";
+import { LayoutAnimation, Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MODULES, moduleNavTitle, moduleTitle, moduleVisible, type ModuleKey } from "../lib/access";
@@ -38,6 +38,8 @@ export function FacilityName() {
 
 /** Rayın açık/daraltılmış durumu: YALNIZ cihazda (`useAcikKapali`, tesis + hesap kapsamlı); varsayılan açık (bugünkü). */
 export const RAY_TERCIHI = "yan-ray.acik";
+/** Ray daralırken/açılırken genişlik ve içerik yumuşak geçer (kullanıcı isteği 2026-11-17). */
+const RAY_GECISI = LayoutAnimation.create(280, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity);
 
 /** Ray öğesi: açıkken simge + ad (+ rozet), daraltılmışken yalnız simge (ad erişilebilirlik etiketinde; rozet nokta). */
 function RayOgesi(p: {
@@ -105,7 +107,7 @@ export function SideNav() {
           </View>
         ) : null}
         <Pressable
-          onPress={ray.degistir}
+          onPress={() => { LayoutAnimation.configureNext(RAY_GECISI); ray.degistir(); }}
           hitSlop={4}
           accessibilityRole="button"
           accessibilityLabel={acik ? "Menüyü daralt" : "Menüyü genişlet"}

@@ -23,8 +23,6 @@ import { useWrite } from "../../../../src/ui/useWrite";
 
 interface Line { urun: Picked | null; renk: Picked | null; miktar: string; birimFiyat: string }
 const EMPTY: Line = { urun: null, renk: null, miktar: "", birimFiyat: "" };
-type Currency = "TRY" | "USD" | "EUR";
-const CURRENCIES = [{ key: "TRY" as const, label: "TL ₺" }, { key: "USD" as const, label: "USD $" }, { key: "EUR" as const, label: "EUR €" }];
 /** Hızlı termin: fabrika gününden ileri sayılan takvim günü (metin alanını doldurur; elle de yazılır). */
 const QUICK = [{ key: "0", label: "Bugün", days: 0 }, { key: "7", label: "+7 gün", days: 7 }, { key: "30", label: "+30 gün", days: 30 }] as const;
 type QuickKey = (typeof QUICK)[number]["key"] | "elle";
@@ -41,7 +39,7 @@ export default function NewOrder() {
   const t = useTokens();
   const s = useStyles();
   const [cari, setCari] = useState<Picked | null>(null);
-  const [doviz, setDoviz] = useState<Currency>("TRY");
+  const doviz = "TRY"; // Adnan Şahin’de fiyatlandırma kapalı: para birimi ve birim fiyat sorulmaz (panelle aynı); sözleşme alanı sabit gider.
   const [termin, setTermin] = useState("");
   const [quick, setQuick] = useState<QuickKey>("elle");
   const [aciklama, setAciklama] = useState("");
@@ -86,7 +84,6 @@ export default function NewOrder() {
 
   const ileri = () => setAdim((a) => Math.min(3, a + 1));
   const geri = () => setAdim((a) => Math.max(1, a - 1));
-  const dovizEtiketi = CURRENCIES.find((c) => c.key === doviz)?.label ?? doviz;
 
   return (
     <Screen
@@ -113,10 +110,6 @@ export default function NewOrder() {
       {adim === 1 ? (
         <FormKarti>
           <Picker label="Cari" projection="cari-kart" value={cari} onChange={setCari} testID="cari-sec" />
-          <AlanEtiketi>Para birimi</AlanEtiketi>
-          <View style={s.cipler}>
-            {CURRENCIES.map((c) => <SecimCipi key={c.key} label={c.label} on={doviz === c.key} rol="radio" onPress={() => setDoviz(c.key)} testID={`doviz-${c.key}`} />)}
-          </View>
         </FormKarti>
       ) : null}
 
@@ -137,7 +130,6 @@ export default function NewOrder() {
               <Picker label="Renk" projection="renk" value={l.renk} onChange={(v) => setLine(i, { renk: v })} optional />
               <View style={s.pair}>
                 <View style={s.flex}><Field label="Miktar" value={l.miktar} onChangeText={(v) => setLine(i, { miktar: v })} keyboardType="decimal-pad" placeholder="0" /></View>
-                <View style={s.flex}><Field label={`Birim fiyat (${dovizEtiketi})`} value={l.birimFiyat} onChangeText={(v) => setLine(i, { birimFiyat: v })} keyboardType="decimal-pad" placeholder="İsteğe bağlı" /></View>
               </View>
             </FormKarti>
           ))}
@@ -157,7 +149,7 @@ export default function NewOrder() {
           </FormKarti>
           <FormKarti testID="siparis-ozet">
             <AlanEtiketi>Özet</AlanEtiketi>
-            <Text style={s.ozet}>{[cari?.title ?? "Cari seçilmedi", dovizEtiketi, `${lines.length} kalem`].join(" · ")}</Text>
+            <Text style={s.ozet}>{[cari?.title ?? "Cari seçilmedi", `${lines.length} kalem`].join(" · ")}</Text>
           </FormKarti>
           <GonderimNotu metin="Kayıt fabrikaya gönderilir; fabrikada işlenince listede görünür. Bir hata olursa bildirilir." />
           {formError || w.error ? <Banner tone="error" text={formError ?? w.error ?? ""} /> : null}
