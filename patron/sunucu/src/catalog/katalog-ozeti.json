@@ -238,6 +238,13 @@
       ]
     },
     {
+      "name": "cuval-deposu",
+      "kind": "ANLIK",
+      "permissions": [
+        "bulut:sevkiyat:oku"
+      ]
+    },
+    {
       "name": "acik-siparis-karsilama",
       "kind": "ANLIK",
       "permissions": [
@@ -348,6 +355,9 @@
     ],
     "stok-kalem": [
       "bulut:stok:oku"
+    ],
+    "cuval-deposu": [
+      "bulut:sevkiyat:oku"
     ],
     "acik-siparis-karsilama": [
       "bulut:siparis:oku"

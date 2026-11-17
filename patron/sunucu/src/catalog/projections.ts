@@ -82,6 +82,8 @@ export const ROOT_PROJECTIONS: readonly RootProjection[] = [
   { name: "stok-karnesi", kind: "ANLIK", permissions: ["bulut:stok:oku"] },
   // Adnan'a özgü: stok kalem listesi + raftaki toplar (ham · bitmiş); uygulama Stok ekranında okur.
   { name: "stok-kalem", kind: "ANLIK", permissions: ["bulut:stok:oku"] },
+  // Adnan'a özgü (fabrika 2.12.4): sevk edilmemiş çuvallar + içerik + fabrikanın saydığı cari dökümü; uygulama "Çuvallar".
+  { name: "cuval-deposu", kind: "ANLIK", permissions: ["bulut:sevkiyat:oku"] },
   { name: "acik-siparis-karsilama", kind: "ANLIK", permissions: ["bulut:siparis:oku"] },
   { name: "rapor-katalogu", kind: "ANLIK", permissions: OTURUM },
   { name: "uretim-akisi", kind: "ANLIK", permissions: ["bulut:uretim:oku"] },
