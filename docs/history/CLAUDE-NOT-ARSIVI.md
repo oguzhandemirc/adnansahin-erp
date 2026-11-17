@@ -13474,4 +13474,20 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 
 **Bekçi.** `test_bildirim_turler` 77/0 (4 sonda) · `test_bildirim_bulut_koprusu` 29/0 (+1 sonda) · panel vitest 3819/3819. Commit'ler `0359831b` `18321332` `74cf9864` `ec3522bd`.
 
-**Açık.** Kapsanmayan "tamamlandı" yolları: iade/storno sonrası yeniden hesap. Aynı varlıkta ikinci olay doğmaz (ör. geri alınıp yeniden iptal). Fason türlerinin servis yolu bekçisi yok (başlık CHECK'i iş emri adımı fikstürü ister). `gun-sonu-ozeti` veri izni `report:sales` kullanıcı onayı bekler.
+**Açık.** Kapsanmayan "tamamlandı" yolları: iade/storno sonrası yeniden hesap. Aynı varlıkta ikinci olay doğmaz (ör. geri alınıp yeniden iptal). Fason türlerinin servis yolu bekçisi yok (başlık CHECK'i iş emri adımı fikstürü ister). `gun-sonu-ozeti` veri izni `report:sales` kullanıcı onayı bekler (D6b: ana oturum KABUL etti).
+
+## 2026-11-17 — Platformlar arası bildirim D6b: dokuz tür buluta ve telefona + `turler` + gün sonu saati panelde (backend 2.13.0, migration yok) [PATRON-BULUTU + GENEL]
+
+**Karar.** D6a'nın dokuz türü bulut `NOTIFICATION_KINDS` + `FACTORY_NOTIFICATION_KINDS` ve kataloğa girer (anahtar ve etiket fabrika kataloğundan birebir); bulut onları TÜRETMEZ, yalnız `/v1/bildirimler` ile alır. Hepsi `nativeBody` (kilit ekranında içerik). Bulut izinleri: sipariş → `bulut:siparis:oku`, sevkiyat → `bulut:sevkiyat:oku`, top fire/iptal ve fason → `bulut:uretim:oku` (fason ekranı `fason-acik` da bu izinle), mal kabul → `bulut:stok:oku`, gün sonu → `bulut:ozet:oku` (kaynak projeksiyon yok). `gun-sonu-ozeti` fabrika veri izni `report:sales` kalır (ana oturum kararı).
+
+**Tel.** `/v1/bildirimler` yanıtına isteğe bağlı `turler: string[]` (bulutun `NOTIFICATION_KINDS`). Yanıt gevşek olduğu için bozuk liste `.catch(undefined)` ile düşer, yanıtın geri kalanı (okunanlar, tercihler) korunur. Fabrika artık ham JSON'dan değil tipli şemadan okur (`cloudSupportedKinds`); alan yoksa D1 kümesi. `wire/esitleme.ts` iki uçta bayt-eşit, mühür yenilendi.
+
+**Uygulama.** Ölçüm: `/fason` `safeRoute`tan GEÇMİYORDU (modül tablosunda yok) — kimliksiz ekran yolu olarak açıkça eklendi; `/pano`, `/stok`, `/siparisler/<id>`, `/sevkiyat/<id>`, `/is-emirleri/<id>` zaten açılıyordu. Sözlük ve konu eşlemesi fabrika kataloğuyla birebir (jest `labels` §5 fabrika dosyasını okur).
+
+**Gün sonu saati.** Ham ayar ucu `admin:settings` + ayar şifresi ister ve biçim doğrulamaz (geçersiz değer sessizce 18:30'a düşerdi) → `/api/bildirim-atamalari/gun-sonu-saati` GET/PUT (`bildirim:yonet`, SS:DD sunucuda, 400 `GECERSIZ_SAAT`), yazım `systemSettingService.set` boğazından. Panelde Bildirim Atamaları başlığında tek saat alanı.
+
+**Teşhis — `test_order_cancellation` "katalog etiketi kullanıldı — FIYAT".** Bildirim işinden DEĞİL: rapor etiketi DB `reason_presets` tablosundan okunur; tabloyu sunucu açılışındaki `reason-preset-catalog.job` doldurur. Oturumun `_test` DB'sinde hiç sunucu açılmadığından tablo boş (ölçüldü: 0 satır) → etiket kodla aynı ("FIYAT"). D6a commit'leri rapor servisine ve sebep kataloğuna dokunmadı. Dokunulmadı.
+
+**Bekçi.** Bulut `test_bildirim_koprusu` 36/0, tam bulut paketi 37/37; fabrika `test_bildirim_bulut_koprusu` 33/0 (yeni §8 fabrika kataloğu ↔ bulut listesi/küme/etiket), `test_bildirim_atama` 55/0 (§g); uygulama jest 802/802; panel vitest 3822/3822. Sondalar: buluttan `fason-dondu` çıkar → §8a kırmızı; tipli okuma kaldır → §7b; bulut `turler` kaldır → §2c'; `/fason` kaldır → taps 2; konu satırı kaldır → labels §5; saat doğrulaması kaldır → §g 6; uç izin kapısından önce → 2. Commit'ler `38e5a6e1` `19ebb002` `b41bfe4b`.
+
+**Açık.** `test_permission_catalog` `cloud-mirror.service.ts` için "BEYANSIZ dinamik izin" kırmızısı D5'ten (`4b4b8220`) kalma, bu dilimde dokunulmadı. Panel saat alanı ekranda gözle denetlenmedi (dev sunucusu açılmadı).

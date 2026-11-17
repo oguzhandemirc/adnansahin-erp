@@ -154,6 +154,32 @@ Yeni türler (hepsi şalter `notifications.enabled` arkasında; kapalıyken sıf
 - Mal kabul fişi iptali ve içe aktarım geri alma alt çağrıları bastırılır (top/satır başına yağmur yok).
 - Bulut köprüsü yalnız bulutun TANIDIĞI türleri gönderir (yanıtta `turler` yoksa D1 türleri); diğerleri damgalanmadan
   bekler. Bulut D6b ile yükseltilmeden yeni türler telefona GİTMEZ, panelde görünür.
-- Yeni ayar anahtarı `notifications.dailySummaryTime` ("SS:DD"; ham ayar ucu, panel satırı yok).
+- Yeni ayar anahtarı `notifications.dailySummaryTime` ("SS:DD"; ham ayar ucu; D6b ile Bildirim Atamaları sayfasında da).
 
 Doğrulama ekleri: şalter kapalıyken `SELECT count(*) FROM notification_events WHERE kind = 'gun-sonu-ozeti'` → 0.
+
+## Ek — D6b: dokuz tür buluta ve telefona; gün sonu saati panelde (sürüm 2.13.0 kalır, migration YOK)
+
+- **KURULUM SIRASI: bulut ÖNCE**, sonra bu backend, sonra panel ve patron uygulaması. Bulut yeni türleri (`NOTIFICATION_KINDS`) ve
+  yanıtta `turler` alanını getirir; göç yok. Backend bulut yanıtındaki `turler`ı tipli şemadan okur ve YALNIZ o kümedeki
+  türleri yollar; alan yoksa (eski bulut) D1 türleri — yeni türler damgalanmadan bekler, bulut 2 saat içinde yükselirse gider.
+- Bulut izin eşlemesi (telefonun bildirimi alması için gereken bulut izni; fabrika ayrıca kendi veri iznini ister):
+
+| Tür | Bulut izni | Kaynak projeksiyon |
+|---|---|---|
+| `siparis-iptal` · `siparis-tamamlandi` | `bulut:siparis:oku` | `siparis` |
+| `fire-top-iptal` | `bulut:uretim:oku` | `is-emri` |
+| `sevkiyat-cikti` · `sevkiyat-iptal` | `bulut:sevkiyat:oku` | `sevkiyat` |
+| `ham-giris` | `bulut:stok:oku` | `stok-kalem` |
+| `fason-gitti` · `fason-dondu` | `bulut:uretim:oku` | `fason-acik` |
+| `gun-sonu-ozeti` | `bulut:ozet:oku` | — |
+
+- Dokuzu da kilit ekranında içerik taşır (`nativeBody`, kullanıcı kararı 2026-11-17); bulutun kendi eşik türleri içeriksiz kalır.
+- Fabrika aynası varken (`BILDIRIM_KAYNAGI=fabrika`) bu türler telefonda fabrika tercihinde yönetilir, kişisel bulut formunda görünmez.
+- Telefon rotaları: `/siparisler/<id>` · `/sevkiyat/<id>` · `/is-emirleri/<id>` · `/stok` · `/fason` (yeni, kimliksiz) · `/pano`.
+- `gun-sonu-ozeti` fabrika veri izni `report:sales` kalır (ana oturum kararı 2026-11-17).
+- Gün sonu saati artık panelde: Yetkilendirme › Bildirim Atamaları başlığındaki saat alanı
+  (`GET/PUT /api/bildirim-atamalari/gun-sonu-saati`, `bildirim:yonet`; biçim dışı saat 400 `GECERSIZ_SAAT`). Ham ayar ucu da yazmaya devam eder.
+
+Doğrulama ekleri: bulut kurulduktan sonra backend log'unda bildirim köprüsü satırı; bulut günlüğünde `atlanan` sayısının yeni türler için
+artmaması (tür bulutta tanınıyor).
