@@ -17,6 +17,40 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-18",
+      "baslik": "Panelde kişisel bildirimler",
+      "surumler": {
+        "panel": "1.3.20"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Üst çubukta yeni bir bildirim zili var: yeni sipariş, yeni iş emri gibi size atanmış olaylar burada listelenir, okunmamışların sayısı zilin üstünde görünür. Zile basınca geçmiş bildirimler açılır. Zil, yöneticiniz bildirimleri açtığında dolmaya başlar; o zamana kadar boş durur."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Panel açıkken yeni bir bildirim gelince Windows ekranın köşesinde kısa bir uyarı gösterir."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Yetkilendirme menüsünde \"Bildirim Atamaları\" sayfası: hangi kişinin hangi bildirimleri alacağı buradan seçilir; gün sonu özetinin saati de burada ayarlanır. Sayfayı yalnız bildirimleri yönetme yetkisi olanlar görür."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Kullanıcı Tercihleri'nde \"Bildirimlerim\" bölümü: size atanmış bildirimler listelenir; yöneticiniz izin verdiyse istemediklerinizi kapatabilirsiniz."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "Yöneticilerin gördüğü eski zil düğmesinin adı artık \"Son aktivite\": sistemde son yapılan işlemleri göstermeye devam eder; yeni bildirim zili ondan ayrıdır."
+        }
+      ]
+    },
+    {
       "id": "2026-11-17b",
       "baslik": "Tambur sipariş balonu ekranı kaydırmıyor",
       "surumler": {
