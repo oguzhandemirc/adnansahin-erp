@@ -315,6 +315,18 @@ export function ORNEK_BILDIRIM() {
   return { etkin, kaynak: "TESIS", hesap: null, tesis: etkin, turler: turler.map(([tur, ad, aciklama]) => ({ tur, ad, aciklama, izinli: true })), gonderim: "gercek", webPushAnahtari: null };
 }
 
+/** Örnek bildirim listesi (D5): fabrika kaynaklı türler, yazar adı metnin başında (fabrika böyle kurar); ikisi okunmamış. */
+export function ORNEK_BILDIRIMLER() {
+  const n = (id: string, tur: string, baslik: string, metin: string, rota: string | null, saat: number, okundu: boolean) => ({
+    id, tur, baslik, metin, rota, durum: "GONDERILDI" as const, atlamaNedeni: null, olusturulma: once(0, saat), gonderilme: once(0, saat), okunma: okundu ? once(0, saat / 2) : null,
+  });
+  return [
+    n("00000000-0000-4000-8000-0000000000b1", "yeni-is-emri", "Yeni iş emri açıldı", "Mehmet Yılmaz · İş emri İE-2026-0412", null, 0.3, false),
+    n("00000000-0000-4000-8000-0000000000b2", "yeni-sevk", "Yeni sevkiyat oluşturuldu", "Ayşe Demir · Örnek Tekstil A.Ş. · Sevk SV-2026-0188", null, 1.5, false),
+    n("00000000-0000-4000-8000-0000000000b3", "yeni-siparis", "Yeni sipariş açıldı", "Ali Kaya · Deneme Kumaş Ltd. Şti. · Sipariş S-2026-0907", null, 5, true),
+  ];
+}
+
 const kayit = (id: string, k: Record<string, unknown>): ProjectionRecord => ({ id, kayit: k, surum: once(0, 0.05) });
 
 const CARILER = [

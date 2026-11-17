@@ -1,17 +1,19 @@
 // Bildirim Ayarları ekranının alt bölümleri: Cihazlar (bu cihazın izin durumu + kaydet — izin isteme akışı — + kayıtlı
 // cihazlar + deneme; ekranın EN ÜSTÜNDE ki izin akışı bulunsun) ve
-// Geçmiş (son bildirimler; dokununca yalnız uygulamanın kendi ekranı açılır — `safeRoute`).
+// Bildirimler (son 20; okunmamış vurgulu + nokta; dokununca okundu sayılır ve yalnız uygulamanın kendi ekranı açılır —
+// `safeRoute`; "Tümünü okundu say"). Okundu kişi başına tek kayıttır, panel ile köprüyle eşitlenir.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Linking, Platform, Pressable, Text, View } from "react-native";
-import type { Device, TestNotificationResult } from "../api/wire";
+import type { Device, NotificationItem, TestNotificationResult } from "../api/wire";
 import { formatAgo } from "../lib/format";
 import { devicePlatform, NOTIFICATION_SKIP, notificationKind } from "../lib/labels/diger";
 import { safeRoute } from "../lib/notification-form";
 import { permissionView, readPermission, type PermissionState } from "../push/permission";
 import { registerThisDevice } from "../push/register";
 import { NATIVE_PUSH_SOON, pushAvailable } from "../push/support";
+import { BILDIRIM_ETIKETI, okunduSonucu, okunmamisAyarla, useBildirimOkunmamis } from "../state/bildirim-okunmamis";
 import { useSession } from "../state/session";
 import { useRemote } from "../state/useRemote";
 import { GroupNote } from "./diger/parts";
@@ -157,28 +159,69 @@ export function NotificationDevices({ vapidKey, pushHere = pushAvailable(Platfor
   );
 }
 
+/** Okunmamış mı? Eski bulut `okunma` göndermez → alan yoksa okunmuş sayılır (vurgu yok, bugünkü liste). */
+export function isUnread(n: NotificationItem): boolean {
+  return n.okunma === null && n.durum !== "ATLANDI";
+}
+
 export function NotificationHistory() {
   const { api } = useSession();
   const router = useRouter();
   const t = useTokens();
   const s = useStyles();
-  const list = useRemote("bildirimler", () => api.notificationHistory({ limit: 20 }));
+  const list = useRemote("bildirimler", () => api.notificationHistory({ limit: 20 }), { tags: [BILDIRIM_ETIKETI] });
+  // Dokunulan satır sunucu yanıtı gelmeden okunmuş görünür (yanıt sayacı düzeltir); liste yeniden çekilince sıfırlanır.
+  const [readHere, setReadHere] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    if (list.data) {
+      okunmamisAyarla(list.data.okunmamis, { listeyiTazele: false });
+      setReadHere(new Set());
+    }
+  }, [list.data]);
+  const readAll = useWrite(useCallback(() => api.notificationReadAll(), [api]));
   const items = list.data?.kayitlar ?? [];
+  const unread = (n: NotificationItem) => isUnread(n) && !readHere.has(n.id);
+  const unreadCount = useBildirimOkunmamis();
+  const anyUnread = items.some(unread) || (unreadCount ?? 0) > 0;
+  const open = (n: NotificationItem, route: string | null) => {
+    if (unread(n)) {
+      setReadHere((x) => new Set([...x, n.id]));
+      void api.notificationRead(n.id).then(okunduSonucu, () => undefined);
+    }
+    if (route) router.push(route as never);
+  };
+  const markAll = async () => {
+    const r = await readAll.run("tumu");
+    if (r) {
+      okunduSonucu(r);
+      setReadHere(new Set(items.map((n) => n.id)));
+    }
+  };
+  const allButton = anyUnread && list.data?.okunmamis !== undefined ? (
+    <Pressable onPress={() => void markAll()} disabled={readAll.busy} accessibilityRole="button" style={s.allRead} testID="bildirim-tumu-okundu">
+      <Text style={[s.allReadText, { color: t.color.link }]}>Tümünü okundu say</Text>
+    </Pressable>
+  ) : undefined;
   return (
     <View>
-      {list.data && items.length === 0 ? <><BlokBasligi baslik="Geçmiş" /><BosDurum icon={EMPTY_ICON.bildirim} baslik="Henüz bildirim yok" /></> : null}
+      {list.data && items.length === 0 ? <><BlokBasligi baslik="Bildirimler" /><BosDurum icon={EMPTY_ICON.bildirim} baslik="Henüz bildirim yok" /></> : null}
       {items.length > 0 ? (
-        <ListeBlogu baslik="Geçmiş" ayracli testID="bildirim-gecmisi">
+        <ListeBlogu baslik="Bildirimler" sag={allButton} ayracli testID="bildirim-gecmisi">
           {items.map((n) => {
             const route = safeRoute(n.rota);
             const look = notificationKind(n.tur);
             const why = n.atlamaNedeni ? NOTIFICATION_SKIP[n.atlamaNedeni] ?? n.atlamaNedeni : null;
+            const yeni = unread(n);
             return (
-              <Pressable key={n.id} disabled={!route} onPress={() => route && router.push(route as never)} accessibilityRole={route ? "link" : undefined}
-                style={({ pressed }) => [s.hist, pressed && route ? { backgroundColor: t.color.pressed } : null]}>
+              <Pressable key={n.id} disabled={!route && !yeni} onPress={() => open(n, route)} accessibilityRole={route ? "link" : "button"}
+                accessibilityLabel={[yeni ? "Okunmadı" : null, n.baslik, n.metin].filter(Boolean).join(", ")} testID={`bildirim-${n.id}`}
+                style={({ pressed }) => [s.hist, yeni ? { backgroundColor: t.color.primarySoft } : null, pressed ? { backgroundColor: t.color.pressed } : null]}>
                 <IconTile icon={look.icon} tone={DOMAIN_TONE[look.domain]} size="md" />
                 <View style={s.flex}>
-                  <Text style={s.histTitle}>{n.baslik}</Text>
+                  <View style={s.histHead}>
+                    {yeni ? <View style={[s.dot, { backgroundColor: t.color.primary }]} testID={`bildirim-yeni-${n.id}`} /> : null}
+                    <Text style={[s.histTitle, yeni ? s.unreadTitle : null]}>{n.baslik}</Text>
+                  </View>
                   <Text style={s.histBody}>{n.metin}</Text>
                   <View style={s.histMeta}>
                     <Rozet label={statusEntry(n.durum).label} tone={STATUS_ROZET_TONU[statusEntry(n.durum).tone]} accessibilityLabel={`Durum: ${statusEntry(n.durum).label}`} />
@@ -191,6 +234,7 @@ export function NotificationHistory() {
           })}
         </ListeBlogu>
       ) : null}
+      {readAll.error ? <Banner tone="error" text={readAll.error} testID="bildirim-tumu-hata" /> : null}
     </View>
   );
 }
@@ -211,7 +255,12 @@ const useStyles = makeStyles((t) => ({
   remove: { minHeight: TOUCH, justifyContent: "center" as const, paddingHorizontal: space.xs },
   removeText: { ...typography.subhead, fontWeight: "600" as const },
   hist: { flexDirection: "row" as const, alignItems: "flex-start" as const, gap: space.m, paddingHorizontal: space.l, paddingVertical: space.m },
-  histTitle: { ...typography.headline, color: t.color.text },
+  histHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  histTitle: { ...typography.headline, color: t.color.text, flexShrink: 1 },
+  unreadTitle: { fontWeight: "700" as const },
+  allRead: { minHeight: TOUCH, justifyContent: "center" as const, paddingHorizontal: space.xs },
+  allReadText: { ...typography.subhead, fontWeight: "600" as const },
   histBody: { ...typography.subhead, color: t.color.textMuted, marginTop: 2 },
   histMeta: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginTop: space.s, flexWrap: "wrap" as const },
   histTime: { ...typography.footnote, color: t.textMuted },

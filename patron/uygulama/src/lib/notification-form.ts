@@ -87,12 +87,22 @@ export function isSupportRoute(rota: string): boolean {
   return SUPPORT_ROUTE.test(rota);
 }
 
+/** Fabrika kaynaklı bildirim rotaları (D5): kayıt ayrıntısı modül tablosunda olmayan ekranda açılır. Yalnız UUID
+ *  kimlik; ekranın kendisi izni yine sunucudan süzer (izinsizse "kayıt yok"). */
+const RECORD_ALIASES: Readonly<Record<string, (id: string) => string>> = {
+  "/is-emirleri": (id) => `/is-emirleri/${id}`,
+  "/sevkiyat": (id) => `/kayit/sevkiyat/${id}`,
+};
+const UUID = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
+
 /** Bildirimin taşıdığı yol yalnız uygulamanın KENDİ ekranıysa açılır (dış adres, `//`, bilinmeyen bölüm → null). */
 export function safeRoute(rota: unknown): string | null {
   if (typeof rota !== "string" || !/^\/[a-z-]+(\/[A-Za-z0-9-]{1,64})?$/.test(rota)) return null;
   if (isSupportRoute(rota)) return rota;
   const [, first, second] = rota.split("/");
   const base = `/${first}`;
+  const alias = RECORD_ALIASES[base];
+  if (alias && second !== undefined) return UUID.test(second) ? alias(second) : null;
   if (!MODULES.some((m) => m.route === base)) return null;
   if (second !== undefined && !RECORD_ROUTES.has(base)) return null;
   return rota;

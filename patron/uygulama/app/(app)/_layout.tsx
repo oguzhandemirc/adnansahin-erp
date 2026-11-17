@@ -4,6 +4,7 @@ import { Redirect, Stack } from "expo-router";
 import { View } from "react-native";
 import { useDestekYoklama } from "../../src/destek/gorunurluk";
 import { useNotificationTaps } from "../../src/push/taps";
+import { useBildirimYoklama } from "../../src/state/bildirim-okunmamis";
 import { useSession } from "../../src/state/session";
 import { SideNav, useWide } from "../../src/ui/Frame";
 import { Loading } from "../../src/ui/kit";
@@ -20,7 +21,10 @@ export default function AppLayout() {
   const g = useGezinme();
   useNotificationTaps(phase === "hazir");
   // Destek: durum → (açıksa) seyrek rozet yoklaması; kapalı/eski bulut/hata → hiçbir destek girişi yok.
-  useDestekYoklama(api, phase === "hazir" && facility ? `${facility.tesis.id}:${facility.hesap.id}` : null);
+  const oturumAnahtari = phase === "hazir" && facility ? `${facility.tesis.id}:${facility.hesap.id}` : null;
+  useDestekYoklama(api, oturumAnahtari);
+  // Okunmamış bildirim sayısı (Menü rozeti): öndeyken kısa aralıklı tek satırlık çekim.
+  useBildirimYoklama(api, oturumAnahtari);
   if (phase === "yukleniyor") return <Loading />;
   if (phase !== "hazir") return <Redirect href="/giris" />;
   return (

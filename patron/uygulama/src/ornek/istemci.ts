@@ -3,7 +3,7 @@
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
 import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, type SyncNowResponse } from "../api/wire";
 import { SYNC_NOW_GAP_MS } from "../lib/simdi-guncelle";
-import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
+import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_BILDIRIMLER, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
 
 const GECIKME_MS = 350;
 
@@ -19,7 +19,6 @@ const bekle = <T,>(v: () => T): Promise<T> =>
   );
 
 const yok = () => new ApiError(404, "ORNEK_YOK", "Örnek veride bu kayıt yok");
-const BOS_SAYFA = { kayitlar: [], sonraki: null };
 
 function listele(projeksiyon: string, q: Query | undefined) {
   const hepsi = ORNEK_LISTE()[projeksiyon] ?? [];
@@ -107,7 +106,7 @@ function oku(path: string, q: Query | undefined): unknown {
     if (!m) throw yok();
     return m;
   }
-  if (path === "/bildirimler") return BOS_SAYFA;
+  if (path === "/bildirimler") return ornekBildirimler();
   if (path === "/bildirim/ayarlar") return ORNEK_BILDIRIM();
   if (path === "/cihazlar") return [];
   throw yok();
@@ -123,12 +122,28 @@ export function ornekSimdiGuncelle(nowMs: number): SyncNowResponse {
   return { durum: "YAKIN_ZAMANDA", sonrakiMumkun: new Date(ornekSonKabul + SYNC_NOW_GAP_MS).toISOString() };
 }
 
+/** Örnek bildirimlerin okundusu yalnız bu oturumun belleğinde (fabrikaya/buluta gitmez). */
+const ornekOkunan = new Set<string>();
+function ornekBildirimler() {
+  const kayitlar = ORNEK_BILDIRIMLER().map((b) => (b.okunma === null && ornekOkunan.has(b.id) ? { ...b, okunma: new Date().toISOString() } : b));
+  return { kayitlar, sonraki: null, okunmamis: kayitlar.filter((b) => b.okunma === null).length };
+}
+function ornekOkundu(ids: readonly string[]) {
+  const once = ornekBildirimler().okunmamis;
+  ids.forEach((id) => ornekOkunan.add(id));
+  const okunmamis = ornekBildirimler().okunmamis;
+  return { guncellenen: once - okunmamis, okunmamis };
+}
+
 function yaz(path: string): unknown {
   if (path === "/oturum/ac") return ornekGiris();
   if (path === "/oturum/kapat") return null;
   // Kurulum adımı gösterilebilsin diye örnek anahtar (RFC 6238 örneği; gerçek bir hesaba bağlı değil); onay yazılmaz.
   if (path === "/oturum/dogrulama/baslat") return { totpSirri: "JBSWY3DPEHPK3PXP", otpauth: "otpauth://totp/Adnan%20%C5%9Eahin%20Y%C3%B6netim:ornek.patron?secret=JBSWY3DPEHPK3PXP&issuer=Adnan%20%C5%9Eahin%20Y%C3%B6netim&algorithm=SHA1&digits=6&period=30" };
   if (path === "/tazele") return { zil: false, sonrakiMs: 60_000 };
+  if (path === "/bildirimler/okundu-tumu") return ornekOkundu(ORNEK_BILDIRIMLER().map((b) => b.id));
+  const okundu = /^\/bildirimler\/([0-9a-f-]{36})\/okundu$/.exec(path);
+  if (okundu) return ornekOkundu([okundu[1]!]);
   if (path === "/esitleme/simdi") return ornekSimdiGuncelle(Date.now());
   throw new ApiError(403, "ORNEK_VERI", "Örnek veri kipinde fabrikaya yazılmaz");
 }
