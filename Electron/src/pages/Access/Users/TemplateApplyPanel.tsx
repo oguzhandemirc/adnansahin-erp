@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 type Mode = "merge" | "replace";
 
 interface Props {
-  onApply: (permissionIds: string[], mode: Mode) => void;
+  /** `templateId`: kayıtta şablonun bildirim seti de aynı kipte kopyalansın diye (backend 2.13.0). */
+  onApply: (permissionIds: string[], mode: Mode, templateId: string) => void;
   disabled?: boolean;
 }
 
@@ -79,7 +80,7 @@ export function TemplateApplyPanel({ onApply, disabled }: Props) {
                 key={t.id}
                 type="button"
                 disabled={disabled}
-                onClick={() => onApply(t.permissions.map((p) => p.permissionId), mode)}
+                onClick={() => onApply(t.permissions.map((p) => p.permissionId), mode, t.id)}
                 className="w-full rounded-md border p-2 text-left transition-colors hover:border-foreground/20 hover:bg-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <div className="flex items-start gap-2">

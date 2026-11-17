@@ -131,7 +131,8 @@ export const commandSections: CommandSection[] = [
       description: tile.description,
       icon: tile.icon,
       to: tile.to,
-      adminOnly: true,
+      // İzinli karo kendi iznini taşır (route ile birebir); gerisi Yetkilendirme hub'ı gibi yöneticiye.
+      ...(tile.permission ? { permission: tile.permission } : { adminOnly: true }),
     })),
   },
   {

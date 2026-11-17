@@ -38,6 +38,12 @@ export interface PermissionSetItem {
 }
 
 /** `GET /api/admin/users/:id/totp` yanıtı. */
+/** Panelde istemcide uygulanan şablon — kayıtta bildirim seti de kopyalanır (backend 2.13.0). */
+export interface AppliedTemplate {
+  templateId: string;
+  mode: "merge" | "replace";
+}
+
 export interface TotpStatus {
   enabled: boolean;
   enabledAt: string | null;
@@ -101,10 +107,12 @@ export const adminUserService = {
   setPermissions: (
     userId: string,
     permissions: PermissionSetItem[],
+    appliedTemplate?: AppliedTemplate,
   ): Promise<ApiResponse<UserPermissionGrant[]>> =>
     apiClient
       .put<ApiResponse<UserPermissionGrant[]>>(`/api/admin/users/${userId}/permissions`, {
         permissions,
+        ...(appliedTemplate ? { appliedTemplate } : {}),
       })
       .then((r) => r.data),
 

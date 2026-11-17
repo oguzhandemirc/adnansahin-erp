@@ -1,4 +1,4 @@
-import { Users2, Layers, BookOpen, Tablet, ShieldCheck, Cpu, type LucideIcon } from "lucide-react";
+import { Users2, Layers, BookOpen, Tablet, ShieldCheck, Cpu, BellRing, type LucideIcon } from "lucide-react";
 
 /** Yetkilendirme = "sisteme kim/ne girebilir": insanlar (kullanıcı erişimi) +
  *  saha tabletleri (cihaz erişimi). İki grup ayrı başlık altında sunulur. */
@@ -11,6 +11,8 @@ export interface AccessTile {
   icon: LucideIcon;
   to: string;
   group: AccessTileGroup;
+  /** Verilirse karo yalnız bu izinle görünür (route kapısıyla BİREBİR). Verilmezse hub kapısı (`admin:users`). */
+  permission?: string;
 }
 
 export interface AccessGroup {
@@ -59,6 +61,15 @@ export const accessTiles: AccessTile[] = [
     icon: BookOpen,
     to: "/access/permissions",
     group: "user",
+  },
+  {
+    key: "notifications",
+    title: "Bildirim Atamaları",
+    description: "Kişiye ve rol şablonuna hangi bildirimlerin gideceği",
+    icon: BellRing,
+    to: "/access/bildirimler",
+    group: "user",
+    permission: "bildirim:yonet",
   },
   {
     // Saha tabletleri: announce → onay → makineye atama. "Cihaz Kaydı" (Donanım:

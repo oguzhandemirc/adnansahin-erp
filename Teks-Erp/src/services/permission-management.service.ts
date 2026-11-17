@@ -286,7 +286,9 @@ export class PermissionManagementService {
   static async setUserPermissions(
     userId: string,
     permissions: Array<string | GrantInput>,
-    actorUserId: string | undefined
+    actorUserId: string | undefined,
+    // Panelin istemci-tarafı şablon uygulaması (2.13.0): izinler yazıldıktan SONRA bildirim seti kopyalanır.
+    appliedTemplate?: { templateId: string; mode: "merge" | "replace" },
   ) {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!user) throw AppError.notFound("Kullanıcı bulunamadı");
@@ -394,6 +396,9 @@ export class PermissionManagementService {
         })),
       },
     });
+    if (appliedTemplate) {
+      await copyTemplateNotificationsToUser(appliedTemplate.templateId, userId, appliedTemplate.mode, actorUserId);
+    }
 
     return this.getUserPermissions(userId);
   }

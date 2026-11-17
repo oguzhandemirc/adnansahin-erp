@@ -44,7 +44,9 @@ yeni HTTP ucu **11** (`/api/bildirimler` altında 3 + 3, `/api/bildirim-atamalar
   `GET /api/bildirim-atamalari/kullanicilar` · `GET|PUT /api/bildirim-atamalari/kullanicilar/:userId` ·
   `GET /api/bildirim-atamalari/sablonlar` · `GET|PUT /api/bildirim-atamalari/sablonlar/:templateId`. Kişinin kendisi:
   `GET /api/bildirimler/katalog` · `GET /api/bildirimler/tercihler` · `PUT /api/bildirimler/tercihler` (`bildirim:tercih`).
-  Şablon uygulaması (`PermissionManagementService.applyTemplate`) bildirim setini de kopyalar; atama oturum düşürmez.
+  Şablon uygulaması (`PermissionManagementService.applyTemplate` ve `PUT /api/admin/users/:id/permissions` gövdesindeki
+  isteğe bağlı `appliedTemplate {templateId, mode}`) bildirim setini de kopyalar; atama oturum düşürmez. Alan verilmezse
+  izin ucu bugünkü gibi davranır (eski panel etkilenmez).
 - **Ayar** (`services/system-setting.service.ts`): `SETTING_KEYS.NOTIFICATIONS_ENABLED` + `readNotificationsEnabled`;
   `constants/reserved-settings.ts` `SUPERADMIN_WRITE_SETTING_KEYS` kümesine eklendi.
 

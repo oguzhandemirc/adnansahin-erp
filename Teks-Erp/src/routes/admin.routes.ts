@@ -636,6 +636,11 @@ const setSchema = z
   .object({
     permissions: z.array(permissionSetItemSchema).optional(),
     permissionIds: z.array(z.string().min(1)).optional(),
+    // 2.13.0 (D2): panel şablonu istemcide seçip bu uçla kaydeder; şablonun BİLDİRİM seti de aynı kipte
+    // kopyalansın diye hangi şablonun uygulandığı bildirilir. Verilmezse bugünkü davranış (bildirime dokunulmaz).
+    appliedTemplate: z
+      .object({ templateId: z.uuid({ message: "Geçersiz şablon kimliği." }), mode: z.enum(["merge", "replace"]) })
+      .optional(),
   })
   .refine((v) => v.permissions !== undefined || v.permissionIds !== undefined, {
     message: "permissions veya permissionIds gerekli",
@@ -663,7 +668,8 @@ router.put(
       const data = await PermissionManagementService.setUserPermissions(
         req.params.id as string,
         payload,
-        req.user?.userId
+        req.user?.userId,
+        parsed.appliedTemplate,
       );
       res.status(200).json({ success: true, data });
     } catch (error) {

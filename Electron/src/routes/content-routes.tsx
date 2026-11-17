@@ -29,6 +29,7 @@ import { AccessUsersPage } from "@/pages/Access/Users/AccessUsersPage";
 import { UserFootprintPage } from "@/pages/Access/Users/footprint/UserFootprintPage";
 import { TemplatesPage } from "@/pages/Access/Templates/TemplatesPage";
 import { PermissionsCatalogPage } from "@/pages/Access/Permissions/PermissionsCatalogPage";
+import { NotificationAssignmentsPage } from "@/pages/Access/Notifications/NotificationAssignmentsPage";
 import { ItemsPage } from "@/pages/Items/ItemsPage";
 import { CustomersPage } from "@/pages/Customers/CustomersPage";
 import { ProductionStationsPage } from "@/pages/Stations/ProductionStationsPage";
@@ -674,6 +675,15 @@ export const contentRoutes: RouteObject[] = [
     element: (
       <ProtectedRoute requirePermission="admin:users">
         <PermissionsCatalogPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    // Bildirim atamaları (2.13.0) — karo `tile-config.ts` `notifications` ile AYNI izin.
+    path: "access/bildirimler",
+    element: (
+      <ProtectedRoute requirePermission="bildirim:yonet">
+        <NotificationAssignmentsPage />
       </ProtectedRoute>
     ),
   },

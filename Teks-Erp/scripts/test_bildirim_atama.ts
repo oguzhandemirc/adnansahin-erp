@@ -193,6 +193,17 @@ async function main(): Promise<void> {
     await call("PUT", `/api/bildirim-atamalari/sablonlar/${tpl}`, mToken, { kinds: ["yeni-siparis"] });
     check("⭐ şablon sonradan değişti → kişi ETKİLENMEDİ", (await kindsOf(target.id)).join() === "yeni-sevk,yeni-siparis");
     check("şablon değişimi kişinin tokenVersion'ını artırmaz", (await tokenVersion(target.id)) === tvTarget);
+    // Panel yolu: şablon istemcide seçilir, `PUT /api/admin/users/:id/permissions` + `appliedTemplate` ile kaydedilir.
+    const viaPanel = await mkUser("panelden", []);
+    const tplPerms = await prisma.permissionTemplateItem.findMany({ where: { templateId: narrowTpl }, select: { permissionId: true } });
+    const aToken = (await AuthService.login(admin.username, admin.password, { clientType: "electron" })).token;
+    const panelPut = await call("PUT", `/api/admin/users/${viaPanel.id}/permissions`, aToken, {
+      permissions: tplPerms.map((p) => ({ permissionId: p.permissionId })),
+      appliedTemplate: { templateId: narrowTpl, mode: "replace" },
+    });
+    check("⭐ panel yolu (PUT permissions + appliedTemplate) seti kopyalar, izinsiz tür atlanır", panelPut.status === 200 && (await kindsOf(viaPanel.id)).join() === "yeni-siparis", `${panelPut.status} ${(await kindsOf(viaPanel.id)).join()}`);
+    const plainPut = await call("PUT", `/api/admin/users/${viaPanel.id}/permissions`, aToken, { permissions: tplPerms.map((p) => ({ permissionId: p.permissionId })) });
+    check("appliedTemplate yoksa bildirim setine dokunulmaz", plainPut.status === 200 && (await kindsOf(viaPanel.id)).join() === "yeni-siparis");
     // Saha şablonu yalnız `mobile:*` taşır ⇒ kişi uygulamadan sonra da yalnız-saha kalır (satır doğrudan yazıldı).
     const fieldTpl = await mkTemplate(["mobile:siparis"]);
     await prisma.permissionTemplateNotification.create({ data: { templateId: fieldTpl, kind: "yeni-siparis" } });

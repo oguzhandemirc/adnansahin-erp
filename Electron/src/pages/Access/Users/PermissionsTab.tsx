@@ -8,7 +8,7 @@ import { PermissionGrid } from "@/components/admin/PermissionGrid";
 import { ByScreenView } from "./ByScreenView";
 import { screenCatalogService } from "@/services/screenCatalogService";
 import { permissionCatalogService } from "@/services/permissionCatalogService";
-import { adminUserService, type PermissionSetItem } from "@/services/adminUserService";
+import { adminUserService, type PermissionSetItem, type AppliedTemplate } from "@/services/adminUserService";
 import { TemplateApplyPanel } from "./TemplateApplyPanel";
 
 interface Props {
@@ -58,6 +58,8 @@ export function PermissionsTab({ userId }: Props) {
   for (const g of grants) if (g.validUntil) initialDates[g.permissionId] = g.validUntil.slice(0, 10);
 
   const [selected, setSelected] = useState<string[]>(initialIds);
+  // Son uygulanan şablon: kayıtta backend bildirim setini de kopyalar (izinlerle aynı kip).
+  const [appliedTemplate, setAppliedTemplate] = useState<AppliedTemplate | undefined>(undefined);
   const [dates, setDates] = useState<Record<string, string>>(initialDates);
 
   useEffect(() => {
@@ -105,7 +107,8 @@ export function PermissionsTab({ userId }: Props) {
     setDates({});
   };
 
-  const applyTemplate = (permissionIds: string[], mode: "merge" | "replace") => {
+  const applyTemplate = (permissionIds: string[], mode: "merge" | "replace", templateId: string) => {
+    setAppliedTemplate({ templateId, mode });
     if (mode === "replace") {
       setSelected(permissionIds);
       setDates((prev) => {
@@ -121,8 +124,9 @@ export function PermissionsTab({ userId }: Props) {
   };
 
   const mutation = useMutation({
-    mutationFn: (items: PermissionSetItem[]) => adminUserService.setPermissions(userId, items),
+    mutationFn: (items: PermissionSetItem[]) => adminUserService.setPermissions(userId, items, appliedTemplate),
     onSuccess: () => {
+      setAppliedTemplate(undefined);
       // Yetki/süre değişimi backend'de tokenVersion++ tetikler → hedef kullanıcının açık
       // oturumu bir sonraki istekte 401 alıp sonlanır (yeniden giriş gerekir). Süreli
       // izinlerde yeni token'ın ömrü en yakın bitiş tarihine çekilir → tarih dolunca
