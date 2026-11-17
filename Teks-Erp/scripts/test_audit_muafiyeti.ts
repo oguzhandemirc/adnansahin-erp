@@ -150,7 +150,7 @@ function main(): void {
   // düzeyinde. Ölçüldü: `roll-step.helper` WorkOrderStep/RollMovement/Roll yazdığı için listede
   // KALDI (yalnız WorkOrder düştü) ⇒ net +1. Dürüstlük notu: otomatik geçişlerin audit izi
   // taşımadan ÖNCE de yoktu; artık WorkOrderEvent defterinde izleri var (audit eklemek ayrı borç).
-  // 32 → 33 (2026-11-17): `helpers/order-link-allocation.helper.ts` (85f70259, sipariş
+  // 32 → 33 (2026-11-17): `helpers/order-link-allocation.helper.ts` (`85f70259`, sipariş
   // paylaştırma) — `WorkOrderToOrderLine.allocatedQty`nin TEK YAZARI (`applyOrderLinkAllocationsTx`,
   // tx İÇİNDE, atomik claim) + iş emri hareket defterine alan değişimi satırı; audit'i çağıran
   // eylem tx DIŞINDA basar (`workorder-link.service` bağ ekleme `ORDER_LINK_ADDED` ·

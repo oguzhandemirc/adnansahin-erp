@@ -147,6 +147,9 @@ const DINAMIK_IZIN_KAYNAKLARI: Record<string, readonly string[]> = {
   // katalogda olduğunu `test_bildirim_atama.ts` §0 MEKANİK doğrular.
   "src/services/notifications/notification-assignment.service.ts": [`${DELEGE}scripts/test_bildirim_atama.ts`],
   "src/services/notifications/notification-preference.service.ts": [`${DELEGE}scripts/test_bildirim_atama.ts`],
+  // D5 (2.13.0): telefon tercih aynası `matchesPermission(perms, NOTIFICATION_PREFERENCE_PERMISSION)` ile
+  // "değiştirebilir mi" sorusunu sorar — aynı tercih izni; katalogda olduğunu `test_bildirim_atama.ts` §0 doğrular.
+  "src/services/notifications/cloud-mirror.service.ts": [`${DELEGE}scripts/test_bildirim_atama.ts`],
   // GERİ SARMA (2026-09-12): `assertEntityPermission` ikinci kapıyı yine
   // `adapter.writePermission`den çözüyor — varlık KOŞUMUN KENDİSİNDEN
   // (`ImportRun.entity`) bulunuyor, `:entity` parametresinden değil. Desen ve
