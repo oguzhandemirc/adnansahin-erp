@@ -312,7 +312,23 @@ export function ORNEK_BILDIRIM() {
     sessiz: { acik: true, baslangic: "22:00", bitis: "07:00" },
     esikler: { hamStokAlt: 50000, bitmisStokAlt: null, gecikenKalemUst: null, gunlukUretimAlt: null, gunlukUretimSaati: 17, esitlemeGecikmeDk: 60 },
   };
-  return { etkin, kaynak: "TESIS", hesap: null, tesis: etkin, turler: turler.map(([tur, ad, aciklama]) => ({ tur, ad, aciklama, izinli: true })), gonderim: "gercek", webPushAnahtari: null };
+  return {
+    etkin, kaynak: "TESIS", hesap: null, tesis: etkin, turler: turler.map(([tur, ad, aciklama]) => ({ tur, ad, aciklama, izinli: true })), gonderim: "gercek", webPushAnahtari: null,
+    fabrika: ORNEK_FABRIKA_TERCIH(),
+  };
+}
+
+/**
+ * Fabrika ayar aynası (örnek, D5): fabrikada atanmış üç tür, biri kapatılmış. Zorunluluk hesap düzeyindedir
+ * (`tercihYetkisi`); örnekte yetki var. Değişiklik bellekte uygulanır (`ornekFabrikaTercih`), fabrikaya gitmez.
+ */
+export function ORNEK_FABRIKA_TERCIH(kapali: Readonly<Record<string, boolean>> = {}) {
+  const atanmis: readonly [string, boolean][] = [["yeni-siparis", false], ["yeni-is-emri", false], ["yeni-sevk", true]];
+  return {
+    tercihYetkisi: true,
+    turler: atanmis.map(([tur, k]) => ({ tur, kapali: kapali[tur] ?? k, bekliyor: false })),
+    guncelleme: new Date(Date.now() - 5 * 60_000).toISOString(),
+  };
 }
 
 /** Örnek bildirim listesi (D5): fabrika kaynaklı türler, yazar adı metnin başında (fabrika böyle kurar); ikisi okunmamış. */

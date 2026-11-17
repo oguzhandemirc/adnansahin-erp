@@ -3,7 +3,7 @@
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
 import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, type SyncNowResponse } from "../api/wire";
 import { SYNC_NOW_GAP_MS } from "../lib/simdi-guncelle";
-import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_BILDIRIMLER, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
+import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_BILDIRIMLER, ORNEK_FABRIKA_TERCIH, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
 
 const GECIKME_MS = 350;
 
@@ -107,7 +107,7 @@ function oku(path: string, q: Query | undefined): unknown {
     return m;
   }
   if (path === "/bildirimler") return ornekBildirimler();
-  if (path === "/bildirim/ayarlar") return ORNEK_BILDIRIM();
+  if (path === "/bildirim/ayarlar") return ornekBildirimAyarlari();
   if (path === "/cihazlar") return [];
   throw yok();
 }
@@ -135,7 +135,23 @@ function ornekOkundu(ids: readonly string[]) {
   return { guncellenen: once - okunmamis, okunmamis };
 }
 
-function yaz(path: string): unknown {
+/** Örnek fabrika tercihi yalnız bu oturumun belleğinde; "fabrika" anında onaylar (bekliyor görünmez). */
+const ornekFabrikaKapali: Record<string, boolean> = {};
+function ornekBildirimAyarlari() {
+  return { ...ORNEK_BILDIRIM(), fabrika: ORNEK_FABRIKA_TERCIH(ornekFabrikaKapali) };
+}
+function ornekFabrikaTercih(body: unknown) {
+  const list = (body as { degisiklikler?: unknown } | undefined)?.degisiklikler;
+  const atanmis = new Set(ORNEK_FABRIKA_TERCIH().turler.map((t) => t.tur));
+  for (const c of Array.isArray(list) ? list : []) {
+    const { tur, kapali } = (c ?? {}) as { tur?: unknown; kapali?: unknown };
+    if (typeof tur === "string" && atanmis.has(tur) && typeof kapali === "boolean") ornekFabrikaKapali[tur] = kapali;
+  }
+  return ornekBildirimAyarlari();
+}
+
+function yaz(path: string, body?: unknown): unknown {
+  if (path === "/bildirim/fabrika-tercih") return ornekFabrikaTercih(body);
   if (path === "/oturum/ac") return ornekGiris();
   if (path === "/oturum/kapat") return null;
   // Kurulum adımı gösterilebilsin diye örnek anahtar (RFC 6238 örneği; gerçek bir hesaba bağlı değil); onay yazılmaz.
@@ -151,7 +167,7 @@ function yaz(path: string): unknown {
 export function createOrnekClient(): ApiClient {
   return {
     get: <T,>(path: string, query?: Query) => bekle(() => oku(path, query) as T),
-    post: <T,>(path: string) => bekle(() => yaz(path) as T),
+    post: <T,>(path: string, body?: unknown) => bekle(() => yaz(path, body) as T),
     patch: <T,>() => bekle<T>(() => {
       throw new ApiError(403, "ORNEK_VERI", "Örnek veri kipinde fabrikaya yazılmaz");
     }),

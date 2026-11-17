@@ -1,6 +1,6 @@
 // Bildirim Ayarları — bölümler: Cihazlar (bu cihazın izni, EN ÜSTTE) · Bildirimler (okunmamış vurgulu liste) · Ayarlar
 // (ana anahtar · tür · sessiz saat) · Eşikler; tesis varsayılanı (yönetici). Karar sunucudadır: ayar katı şemadan geçer, izni yetmeyen türe ayar açık olsa da gönderilmez.
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import type { NotificationSettingsView } from "../../src/api/wire";
 import { can } from "../../src/lib/access";
@@ -16,6 +16,7 @@ import { NotificationSettingsForm } from "../../src/ui/NotificationSettingsForm"
 import { BlokBasligi, BosDurum, HataDurumu, Iskelet } from "../../src/ui/ortak";
 import { space } from "../../src/ui/tokens";
 import { useWrite } from "../../src/ui/useWrite";
+import { useFactoryPrefs } from "../../src/ui/useFactoryPrefs";
 import { EMPTY_ICON } from "../../src/ui/icons";
 
 const SOURCE: Readonly<Record<NotificationSettingsView["kaynak"], string>> = {
@@ -34,18 +35,23 @@ export default function Notifications() {
   const [form, setForm] = useState<NotificationForm | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  // Kaydedilmemiş form düzenlemesi: yeniden okuma (fabrika tercihi yoklaması dahil) yalnız görünümü tazeler, formu ezmez.
+  const dirty = useRef(false);
   useEffect(() => {
     if (remote.data) {
       setView(remote.data);
-      setForm(toForm(remote.data.etkin));
+      if (!dirty.current) setForm(toForm(remote.data.etkin));
     }
   }, [remote.data]);
   const adopt = (v: NotificationSettingsView | null, message: string) => {
     if (!v) return;
+    dirty.current = false;
     setView(v);
     setForm(toForm(v.etkin));
     setSaved(message);
   };
+  // Fabrika tercihi: yanıt yalnız görünüme alınır (form sıfırlanmaz).
+  const prefs = useFactoryPrefs(view, setView, remote.reload);
   const parsed = form ? fromForm(form) : null;
   const saveOwn = useWrite(useCallback(() => (parsed?.ok ? api.notificationSettingsSet(parsed.settings) : Promise.reject(new Error("Form geçersiz"))), [api, parsed]));
   const reset = useWrite(useCallback(() => api.notificationSettingsSet(null), [api]));
@@ -66,7 +72,7 @@ export default function Notifications() {
   if (remote.loading && !view) return shell(<Iskelet bicim="liste" satir={5} />);
   if (remote.error && !view) return shell(<HataDurumu mesaj={remote.error} onTekrar={remote.reload} />);
   if (!view || !form) return shell(<BosDurum icon={EMPTY_ICON.bildirim} baslik="Ayarlar okunamadı" eylem="Tekrar dene" onEylem={remote.reload} />);
-  const error = formError ?? saveOwn.error ?? reset.error ?? saveFacility.error;
+  const error = formError ?? saveOwn.error ?? reset.error ?? saveFacility.error ?? prefs.error;
   return shell(
     <>
       {view.gonderim === "kapali" ? <Banner tone="warn" text="Bildirim gönderimi sunucuda henüz açık değil; ayarlarınız saklanır ve açıldığında geçerli olur." testID="gonderim-kapali" /> : null}
@@ -74,7 +80,8 @@ export default function Notifications() {
       <NotificationHistory />
       <BlokBasligi baslik="Ayarlar" />
       <GroupNote>{SOURCE[view.kaynak]}</GroupNote>
-      <NotificationSettingsForm form={form} kinds={view.turler} dueDates={dueDates} onChange={(f) => { setForm(f); setSaved(null); }} />
+      <NotificationSettingsForm form={form} kinds={view.turler} dueDates={dueDates} onChange={(f) => { dirty.current = true; setForm(f); setSaved(null); }}
+        factory={prefs.factory} onFactoryChange={(c) => void prefs.change(c)} factoryBusy={prefs.busy} />
       {error ? <Banner tone="error" text={error} testID="bildirim-hata" /> : null}
       {saved ? <Banner tone="off" icon="checkmark-circle" text={saved} /> : null}
       <Button label="Kaydet" icon="checkmark" busy={saveOwn.busy} disabled={saveOwn.disabled} onPress={() => void submit(saveOwn, "Ayarlarınız kaydedildi")} testID="bildirim-kaydet" />
