@@ -21,13 +21,15 @@ export function useRecordPage(projection: string, enabled = true): Remote<Page<P
   return useRemote<Page<ProjectionRecord>>(enabled ? `veri:${projection}:ilk` : null, () => api.list(projection, { limit: PAGE_SIZE }), { tags: [projection] });
 }
 
-export function RemoteList({ projection, remote, renderRow, empty, baslik, emptyIcon, testID }: {
+export function RemoteList({ projection, remote, renderRow, empty, baslik, sag, emptyIcon, testID }: {
   readonly projection: string;
   readonly remote: Remote<Page<ProjectionRecord>>;
   readonly renderRow: (r: ProjectionRecord, i: number) => ReactNode;
   readonly empty: string;
   /** Liste bloğunun başlığı (yükleniyor/boşken de çizilir). */
   readonly baslik?: string;
+  /** Başlığın sağındaki öğe (ör. alan seçici düğmesi); başlıkla birlikte her durumda çizilir. */
+  readonly sag?: ReactNode;
   /** Eski çağıranlar için; kullanılmaz. */
   readonly domain?: Domain;
   readonly emptyIcon?: IconName;
@@ -64,7 +66,7 @@ export function RemoteList({ projection, remote, renderRow, empty, baslik, empty
     }
   };
 
-  const bas = baslik ? <BlokBasligi baslik={baslik} /> : null;
+  const bas = baslik ? <BlokBasligi baslik={baslik} sag={sag} /> : null;
   if (!first) {
     if (remote.loading) return <View>{bas}<Iskelet bicim="liste" satir={4} testID={testID ? `${testID}-yukleniyor` : undefined} /></View>;
     if (remote.error) return <View>{bas}<HataDurumu mesaj={remote.error} onTekrar={remote.reload} testID={testID ? `${testID}-hata` : undefined} /></View>;
@@ -74,7 +76,7 @@ export function RemoteList({ projection, remote, renderRow, empty, baslik, empty
   if (rows.length === 0) return <View>{bas}<BosDurum baslik={empty} icon={emptyIcon} testID={testID ? `${testID}-bos` : undefined} /></View>;
   return (
     <View>
-      <ListeBlogu baslik={baslik} sayi={next ? undefined : rows.length} testID={testID}>
+      <ListeBlogu baslik={baslik} sayi={next ? undefined : rows.length} sag={sag} testID={testID}>
         {rows.map((r, i) => <View key={r.id}>{renderRow(r, i)}</View>)}
       </ListeBlogu>
       {moreError ? <HataDurumu mesaj={moreError} onTekrar={() => void loadMore()} /> : null}
