@@ -47,7 +47,7 @@ const IADE = rec("i1", { iadeNo: "IA-1", metre: "62.50", iptalTarihi: null });
 const ACIK = rec("s1", { siparisNo: "SP-0101", durum: "APPROVED", acik: true, cariKartId: ID });
 const TEMEL = ["cari-toplam-siparis", "cari-toplam-acik", "cari-toplam-sevk", "cari-toplam-iade", "cari-acik", "cari-urunler", "cari-iade"];
 const YENI = ["cari-toplam-kalem", "cari-toplam-sevkKg", "cari-toplam-sonSiparis", "cari-toplam-sonSevk"];
-const tercih = (suzgec: Record<string, string>, sutunlar: readonly string[] = ["ad", "il", "rol"]) => ({ surum: 1, sutunlar, siralama: null, suzgec });
+const tercih = (suzgec: Record<string, string>, sutunlar: readonly string[] = ["ad", "il", "rol"]) => ({ surum: 1 as const, sutunlar, siralama: null, suzgec });
 
 async function settle() {
   for (let i = 0; i < 4; i++) await act(async () => undefined);

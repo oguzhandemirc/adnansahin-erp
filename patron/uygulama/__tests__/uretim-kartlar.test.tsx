@@ -26,7 +26,7 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 const Production = (require("../app/(app)/(tabs)/uretim") as { default: () => ReactElement }).default;
 const { LIST_ID_FILTERS, LIST_SEARCH, LIST_SORT } = require("../src/api/wire") as typeof import("../src/api/wire");
 const { IS_EMRI_SUTUNLARI, IS_EMRI_VARSAYILAN_SUTUN } = require("../src/ui/is-emri/sutunlar") as typeof import("../src/ui/is-emri/sutunlar");
-const { ISTASYON_VARSAYILAN, istasyonSutunYaz, istasyonSutunlari } = require("../src/ui/uretim/kartlar") as typeof import("../src/ui/uretim/kartlar");
+const { ISTASYON_SUTUNLARI, ISTASYON_VARSAYILAN, istasyonSutunYaz, istasyonSutunlari } = require("../src/ui/uretim/kartlar") as typeof import("../src/ui/uretim/kartlar");
 
 const FACILITY = {
   tesis: { id: "t1" }, hesap: { id: "h1" },
@@ -50,7 +50,7 @@ const FASON = {
 };
 const VARSAYILAN_BLOK = ["bolum-nerede", "kpi-bugun-tamamlanan", "kpi-ham-giris", "bolum-is-emirleri"];
 const YENI_BLOK = ["bolum-akis", "bolum-istasyonlar", "bolum-fason-ozet", "bolum-fason-kategori"];
-const tercih = (suzgec: Record<string, string>, sutunlar: readonly string[] = IS_EMRI_VARSAYILAN_SUTUN) => ({ surum: 1, sutunlar, siralama: null, suzgec });
+const tercih = (suzgec: Record<string, string>, sutunlar: readonly string[] = IS_EMRI_VARSAYILAN_SUTUN) => ({ surum: 1 as const, sutunlar, siralama: null, suzgec });
 
 async function settle() {
   for (let i = 0; i < 4; i++) await act(async () => undefined);
@@ -156,6 +156,13 @@ describe("§5 istasyon sütunları", () => {
     expect(istasyonSutunlari(t)).toEqual(["ad", "sevk", "kod"]);
     expect(istasyonSutunYaz(t, ISTASYON_VARSAYILAN).suzgec).toEqual({});
     expect(istasyonSutunlari(T({ istasyonSutunlar: "yok,ad" }))).toEqual(["ad"]);
+  });
+
+  it("tür hücresi fabrikanın Station.type'ını (INTERNAL/EXTERNAL) okur", () => {
+    const tur = ISTASYON_SUTUNLARI.find((c) => c.key === "tur")!.hucre;
+    expect(tur({ tur: "EXTERNAL" })).toBe("Dış (fason)");
+    expect(tur({ tur: "INTERNAL" })).toBe("İç");
+    expect(tur({ tur: "BILINMEYEN" })).toBe("BILINMEYEN");
   });
 });
 

@@ -60,11 +60,12 @@ export const ISTASYON_SUTUNLARI: readonly SutunTanimi<Istasyon>[] = [
   { key: "kuyruk", baslik: "Kuyruk", ad: "Kuyrukta bekleyen", agirlik: 0.8, sayi: true, hucre: (r) => sayiHucre(r.kuyruk) },
   { key: "aktif", baslik: "Aktif", ad: "Şu an işlenen", agirlik: 0.7, sayi: true, hucre: (r) => sayiHucre(r.aktif) },
   { key: "bugun", baslik: "Bugün", ad: "Bugün tamamlanan", agirlik: 0.8, sayi: true, hucre: (r) => sayiHucre(r.bugunTamamlanan) },
-  { key: "sevk", baslik: "Bugün sevk", ad: "Bugün sevk edilen", agirlik: 0.9, sayi: true, hucre: (r) => sayiHucre(r.bugunSevk) },
+  { key: "sevk", baslik: "Bugün sevk", ad: "Bugün fasona sevk (dış istasyon)", agirlik: 0.9, sayi: true, hucre: (r) => sayiHucre(r.bugunSevk) },
   { key: "kod", baslik: "Kod", agirlik: 0.8, hucre: (r) => str(r.kod) ?? "—" },
   { key: "tur", baslik: "Tür", ad: "İstasyon türü", agirlik: 1.1, hucre: (r) => ISTASYON_TURU[str(r.tur) ?? ""] ?? str(r.tur) ?? "—" },
 ];
-const ISTASYON_TURU: Readonly<Record<string, string>> = { RAW_QC: "Giriş kalite", PROCESS_QC: "Proses kalite", TAMBUR: "Tambur", SUBCONTRACTOR: "Fason" };
+/** Telin `tur`u fabrikanın `Station.type`ıdır (iç/dış); örnek verideki tür kodları da okunur. */
+const ISTASYON_TURU: Readonly<Record<string, string>> = { INTERNAL: "İç", EXTERNAL: "Dış (fason)", RAW_QC: "Giriş kalite", PROCESS_QC: "Proses kalite", TAMBUR: "Tambur", SUBCONTRACTOR: "Fason" };
 export const ISTASYON_VARSAYILAN: readonly string[] = ["ad", "kuyruk", "aktif", "bugun"];
 const ISTASYON_ALANI = "istasyonSutunlar";
 const ISTASYON_ANAHTARLARI = ISTASYON_SUTUNLARI.map((c) => c.key);
