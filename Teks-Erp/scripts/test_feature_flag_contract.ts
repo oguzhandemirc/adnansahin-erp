@@ -611,9 +611,9 @@ async function main() {
       file: "docs/kurallar/genel.md",
       needle: "notifications.enabled",
     },
-    // Gün sonu özeti saati (2.13.0, D6a): panel satırı yok; ham ayar ucu.
+    // Gün sonu özeti saati (2.13.0, D6a; D6b panel alanı): Genel Ayarlar satırı yok; Bildirim Atamaları sayfası.
     NOTIFICATIONS_DAILY_SUMMARY_TIME: {
-      why: "Gün sonu özeti bildirim saati — ham ayar ucu (PUT /api/admin/settings/:key), kural docs/kurallar/genel.md",
+      why: "Gün sonu özeti bildirim saati — Bildirim Atamaları sayfası (GET/PUT /api/bildirim-atamalari/gun-sonu-saati, bildirim:yonet, SS:DD sunucuda), kural docs/kurallar/genel.md",
       file: "docs/kurallar/genel.md",
       needle: "notifications.dailySummaryTime",
     },

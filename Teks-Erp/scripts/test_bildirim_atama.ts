@@ -12,6 +12,8 @@
 //  §e kendi tercihi: tercih izni yoksa PUT 403, GET `required:true` · izinliyken mute yazılır · atanmamış tür 409 ·
 //     mute edilen tür D1 alıcı helper'ında teslim ALMAZ; tercih izni yokken mute yok sayılır (uçtan uca).
 //  §f katalog: konu başlıkları sırasıyla, türlerin veri izni + kilit metni.
+//  §g gün sonu özeti saati (D6b): `/gun-sonu-saati` GET/PUT yalnız `bildirim:yonet` · biçim dışı saat 400 GECERSIZ_SAAT ve
+//     yazılmaz (doğrulama sunucuda) · geçerli saat işin okuduğu dakikaya yansır · eski değer `finally`de geri yazılır.
 //
 // DB: oturumun `_test` veritabanı (koşucu kapısı). Fixture `TEST-BLA` damgalı; `finally`de silinir.
 //
@@ -39,6 +41,7 @@ import {
   type NotificationKind,
 } from "../src/constants/notification-catalog";
 import { PERMISSION_CATALOG } from "../src/constants/permission-catalog";
+import { SETTING_KEYS, readNotificationDailySummaryMinute } from "../src/services/system-setting.service";
 import { ensureTestAdmin } from "./fixture-test-user";
 
 let pass = 0, fail = 0;
@@ -123,6 +126,8 @@ async function main(): Promise<void> {
 
     // ── §a kapı ────────────────────────────────────────────────────────────────
     console.log("\n§a kapı: `bildirim:yonet` yoksa 403");
+    const timeRow = async (): Promise<string> => JSON.stringify(await prisma.systemSetting.findUnique({ where: { key: SETTING_KEYS.NOTIFICATIONS_DAILY_SUMMARY_TIME }, select: { value: true, updatedAt: true } }));
+    const timeBefore = await timeRow();
     const tplProbe = randomUUID();
     const gated: Array<[string, string, unknown?]> = [
       ["GET", "/api/bildirim-atamalari/kullanicilar"],
@@ -131,12 +136,15 @@ async function main(): Promise<void> {
       ["GET", "/api/bildirim-atamalari/sablonlar"],
       ["GET", `/api/bildirim-atamalari/sablonlar/${tplProbe}`],
       ["PUT", `/api/bildirim-atamalari/sablonlar/${tplProbe}`, { kinds: [] }],
+      ["GET", "/api/bildirim-atamalari/gun-sonu-saati"],
+      ["PUT", "/api/bildirim-atamalari/gun-sonu-saati", { time: "19:00" }],
     ];
     for (const [m, p, b] of gated) {
       const r = await call(m, p, pToken, b);
       check(`⭐ ${m} ${p.replace(/[0-9a-f-]{36}/, ":id")} → 403 PERMISSION_DENIED`, r.status === 403 && code(r.json) === "PERMISSION_DENIED", String(r.status));
     }
     check("izinsiz PUT hiçbir şey yazmadı", (await kindsOf(orderOnly.id)).length === 0);
+    check("izinsiz PUT gün sonu saatini yazmadı", (await timeRow()) === timeBefore);
     check("kimliksiz 401", (await call("GET", "/api/bildirim-atamalari/kullanicilar", null)).status === 401);
 
     // ── §b liste ───────────────────────────────────────────────────────────────
@@ -241,6 +249,27 @@ async function main(): Promise<void> {
     check("konu başlıkları katalog sırasıyla", cat.status === 200 && topics.map((t) => t.key).join() === NOTIFICATION_TOPICS.map((t) => t.key).join());
     const ord = topics.find((t) => t.key === "siparisler")?.kinds.find((k) => k.kind === "yeni-siparis");
     check("tür veri izni + kilit metni taşır", ord?.dataPermission === "order:read" && ord.missingPermissionText === "Siparişleri görme izni yok");
+
+    // ── §g gün sonu özeti saati (D6b) ─────────────────────────────────────────
+    console.log("\n§g gün sonu özeti saati");
+    const key = SETTING_KEYS.NOTIFICATIONS_DAILY_SUMMARY_TIME;
+    const prior = await prisma.systemSetting.findUnique({ where: { key }, select: { value: true } });
+    try {
+      const minuteBefore = await readNotificationDailySummaryMinute();
+      const g = await call("GET", "/api/bildirim-atamalari/gun-sonu-saati", mToken);
+      const gd = g.json.data as { time: string; defaultTime: string } | undefined;
+      check("GET 200: etkin saat + varsayılan 18:30", g.status === 200 && /^\d\d:\d\d$/.test(gd?.time ?? "") && gd?.defaultTime === "18:30", JSON.stringify(gd));
+      for (const badTime of ["25:00", "18:60", "7:30", "18.30", ""]) {
+        const r = await call("PUT", "/api/bildirim-atamalari/gun-sonu-saati", mToken, { time: badTime });
+        check(`⭐ biçim dışı "${badTime}" → 400 GECERSIZ_SAAT (sunucu doğrular)`, r.status === 400 && code(r.json) === "GECERSIZ_SAAT", `${r.status} ${code(r.json)}`);
+      }
+      check("⭐ reddedilen yazım saati değiştirmedi", (await readNotificationDailySummaryMinute()) === minuteBefore);
+      const ok = await call("PUT", "/api/bildirim-atamalari/gun-sonu-saati", mToken, { time: "19:05" });
+      check("⭐ geçerli saat 200 ve işin okuduğu dakika = 19:05", ok.status === 200 && (ok.json.data as { time: string }).time === "19:05" && (await readNotificationDailySummaryMinute()) === 19 * 60 + 5, String(ok.status));
+    } finally {
+      if (prior) await prisma.systemSetting.update({ where: { key }, data: { value: prior.value as never } });
+      else await prisma.systemSetting.delete({ where: { key } }).catch(() => undefined);
+    }
   } finally {
     await prisma.notificationAssignment.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.permissionTemplateNotification.deleteMany({ where: { templateId: { in: templateIds } } });

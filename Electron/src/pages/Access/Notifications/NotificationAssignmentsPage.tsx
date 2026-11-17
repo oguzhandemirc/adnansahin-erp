@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SubjectList } from "./SubjectList";
 import { KindTopicList } from "./KindTopicList";
 import { PreferencePermissionToggle } from "./PreferencePermissionToggle";
+import { DailySummaryTimeField } from "./DailySummaryTimeField";
 import { useNotificationAssignments } from "./useNotificationAssignments";
 
 /** Yetkilendirme › Bildirim Atamaları: solda kişi/şablon, sağda konu başlıklı tür listesi (`bildirim:yonet`). */
@@ -16,7 +17,11 @@ export function NotificationAssignmentsPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Bildirim Atamaları" description="Kim hangi bildirimi alır — kişiye ya da rol şablonuna atanır." />
+      <PageHeader
+        title="Bildirim Atamaları"
+        description="Kim hangi bildirimi alır — kişiye ya da rol şablonuna atanır."
+        actions={<DailySummaryTimeField />}
+      />
       <PageBody className="grid min-h-0 grid-cols-[minmax(240px,320px)_1fr] gap-6 p-6">
         <SubjectList
           users={m.users.data?.data.items}

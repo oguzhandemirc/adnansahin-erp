@@ -1,13 +1,14 @@
 import apiClient from "@/services/apiClient";
 import type { ApiResponse } from "@/types/api";
 import type {
+  DailySummaryTime,
   NotificationCatalog,
   NotificationTemplate,
   NotificationUser,
   TemplateAssignments,
   UserAssignments,
 } from "./types";
-import { kindsPayloadSchema } from "./schema";
+import { dailySummaryTimePayloadSchema, kindsPayloadSchema } from "./schema";
 
 const BASE = "/api/bildirim-atamalari";
 
@@ -36,5 +37,13 @@ export const notificationAssignmentService = {
   setTemplateAssignments: (templateId: string, kinds: string[]): Promise<ApiResponse<TemplateAssignments>> =>
     apiClient
       .put<ApiResponse<TemplateAssignments>>(`${BASE}/sablonlar/${templateId}`, kindsPayloadSchema.parse({ kinds }))
+      .then((r) => r.data),
+
+  dailySummaryTime: (): Promise<ApiResponse<DailySummaryTime>> =>
+    apiClient.get<ApiResponse<DailySummaryTime>>(`${BASE}/gun-sonu-saati`).then((r) => r.data),
+
+  setDailySummaryTime: (time: string): Promise<ApiResponse<DailySummaryTime>> =>
+    apiClient
+      .put<ApiResponse<DailySummaryTime>>(`${BASE}/gun-sonu-saati`, dailySummaryTimePayloadSchema.parse({ time }))
       .then((r) => r.data),
 };

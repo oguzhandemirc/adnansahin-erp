@@ -17,6 +17,7 @@ import {
   setTemplateNotificationAssignments,
   setUserNotificationAssignments,
 } from "../services/notifications/notification-assignment.service";
+import { getDailySummaryTime, setDailySummaryTime } from "../services/notifications/daily-summary-time.service";
 
 const router = Router();
 
@@ -155,6 +156,40 @@ router.put("/sablonlar/:templateId", async (req: Request, res: Response, next: N
     const { templateId } = templateParam.parse(req.params);
     const { kinds } = kindsBody.parse(req.body);
     res.status(200).json(await setTemplateNotificationAssignments(templateId, kinds, req.user?.userId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Biçim (SS:DD) serviste doğrulanır (tek yer); burada yalnız tip.
+const timeBody = z.object({ time: z.string({ message: "Saat gerekli." }).max(10) });
+
+/**
+ * @openapi
+ * /api/bildirim-atamalari/gun-sonu-saati:
+ *   get:
+ *     tags: [Bildirim]
+ *     summary: Gün sonu özeti bildiriminin saati
+ *     description: "`data.time` (etkin, SS:DD) · `data.defaultTime` (18:30). İzin `bildirim:yonet`."
+ *     security: [{ bearerAuth: [] }]
+ *   put:
+ *     tags: [Bildirim]
+ *     summary: Gün sonu özeti saatini değiştir
+ *     description: "Gövde `{ time: \"SS:DD\" }`; biçim dışı 400 GECERSIZ_SAAT. Fabrika günü (İstanbul). İzin `bildirim:yonet`."
+ *     security: [{ bearerAuth: [] }]
+ */
+router.get("/gun-sonu-saati", async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    res.status(200).json(await getDailySummaryTime());
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/gun-sonu-saati", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { time } = timeBody.parse(req.body);
+    res.status(200).json(await setDailySummaryTime(time, req.user?.userId));
   } catch (error) {
     next(error);
   }

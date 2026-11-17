@@ -57,3 +57,9 @@ export interface TemplateAssignments {
 
 /** Sol listede seçili özne: kişi ya da şablon. */
 export type Subject = { type: "user"; id: string } | { type: "template"; id: string };
+
+/** Gün sonu özeti bildiriminin saati (`notifications.dailySummaryTime`, fabrika günü). */
+export interface DailySummaryTime {
+  time: string;
+  defaultTime: string;
+}

@@ -53,6 +53,7 @@ function route(url: string) {
     return { data: { success: true, data: { items: [{ id: UID, username: "ayse", fullName: "Ayşe Yılmaz", isSystemAccount: false, assignedCount: 1, canChangePreference: false }] } } };
   if (url === "/api/bildirim-atamalari/sablonlar") return { data: { success: true, data: { items: [] } } };
   if (url === `/api/bildirim-atamalari/kullanicilar/${UID}`) return { data: { success: true, data: detail } };
+  if (url === "/api/bildirim-atamalari/gun-sonu-saati") return { data: { success: true, data: { time: "18:30", defaultTime: "18:30" } } };
   if (url === "/api/admin/permissions") return { data: { success: true, data: [{ id: "perm-tercih", code: "bildirim:tercih" }] } };
   throw new Error(`beklenmeyen GET ${url}`);
 }
