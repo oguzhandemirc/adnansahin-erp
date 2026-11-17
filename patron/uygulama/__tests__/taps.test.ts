@@ -32,6 +32,22 @@ describe("bildirim dokunuşu (tek tesis; geçiş yok)", () => {
       expect(order).toEqual(["rota:/stok"]);
     }
   });
+  it("⭐ D6b fabrika rotaları dokunuşta açılır (fason ve pano dahil)", async () => {
+    const id = "0b9a3c1e-2f4d-4a5b-8c6d-7e8f9a0b1c2d";
+    const cases: [string, string][] = [
+      [`/siparisler/${id}`, `/siparisler/${id}`],
+      [`/sevkiyat/${id}`, `/kayit/sevkiyat/${id}`],
+      [`/is-emirleri/${id}`, `/is-emirleri/${id}`],
+      ["/stok", "/stok"],
+      ["/fason", "/fason"],
+      ["/pano", "/pano"],
+    ];
+    for (const [rota, hedef] of cases) {
+      const { order, d } = deps("t1");
+      await expect(openNotification({ rota, tesisId: "t1" }, d)).resolves.toBe(true);
+      expect(order).toEqual([`rota:${hedef}`]);
+    }
+  });
   it("güvensiz rota → rota yok", async () => {
     const { order, d } = deps("t1");
     await expect(openNotification({ rota: "https://kotu.ornek", tesisId: "t2" }, d)).resolves.toBe(false);

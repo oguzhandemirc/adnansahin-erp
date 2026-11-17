@@ -130,4 +130,14 @@ describe("push dokunuşu ve fabrika rotaları", () => {
     expect(safeRoute("/is-emirleri")).toBeNull();
     expect(safeRoute("/sevkiyat")).toBe("/sevkiyat");
   });
+  it("⭐ D6b fabrika rotaları açılır: /siparisler/<id> · /sevkiyat/<id> · /is-emirleri/<id> · /stok · /fason · /pano", () => {
+    expect(safeRoute(`/siparisler/${IE}`)).toBe(`/siparisler/${IE}`);
+    expect(safeRoute(`/sevkiyat/${IE}`)).toBe(`/kayit/sevkiyat/${IE}`);
+    expect(safeRoute(`/is-emirleri/${IE}`)).toBe(`/is-emirleri/${IE}`);
+    expect(safeRoute("/stok")).toBe("/stok");
+    expect(safeRoute("/fason")).toBe("/fason");
+    expect(safeRoute("/pano")).toBe("/pano");
+    // Kimlikli fason yolu bildirimden açılmaz (firma ekranı ad parametresi ister; fabrika böyle rota üretmez).
+    expect(safeRoute(`/fason/${IE}`)).toBeNull();
+  });
 });

@@ -319,11 +319,11 @@ export function ORNEK_BILDIRIM() {
 }
 
 /**
- * Fabrika ayar aynası (örnek, D5): fabrikada atanmış üç tür, biri kapatılmış. Zorunluluk hesap düzeyindedir
+ * Fabrika ayar aynası (örnek, D5/D6b): fabrikada atanmış yedi tür, biri kapatılmış. Zorunluluk hesap düzeyindedir
  * (`tercihYetkisi`); örnekte yetki var. Değişiklik bellekte uygulanır (`ornekFabrikaTercih`), fabrikaya gitmez.
  */
 export function ORNEK_FABRIKA_TERCIH(kapali: Readonly<Record<string, boolean>> = {}) {
-  const atanmis: readonly [string, boolean][] = [["yeni-siparis", false], ["yeni-is-emri", false], ["yeni-sevk", true]];
+  const atanmis: readonly [string, boolean][] = [["yeni-siparis", false], ["siparis-iptal", false], ["yeni-is-emri", false], ["yeni-sevk", true], ["sevkiyat-cikti", false], ["fason-gitti", false], ["gun-sonu-ozeti", false]];
   return {
     tercihYetkisi: true,
     turler: atanmis.map(([tur, k]) => ({ tur, kapali: kapali[tur] ?? k, bekliyor: false })),
@@ -340,6 +340,8 @@ export function ORNEK_BILDIRIMLER() {
     n("00000000-0000-4000-8000-0000000000b1", "yeni-is-emri", "Yeni iş emri açıldı", "Mehmet Yılmaz · İş emri İE-2026-0412", null, 0.3, false),
     n("00000000-0000-4000-8000-0000000000b2", "yeni-sevk", "Yeni sevkiyat oluşturuldu", "Ayşe Demir · Örnek Tekstil A.Ş. · Sevk SV-2026-0188", null, 1.5, false),
     n("00000000-0000-4000-8000-0000000000b3", "yeni-siparis", "Yeni sipariş açıldı", "Ali Kaya · Deneme Kumaş Ltd. Şti. · Sipariş S-2026-0907", null, 5, true),
+    n("00000000-0000-4000-8000-0000000000b4", "sevkiyat-cikti", "Sevkiyat çıktı", "Ayşe Demir · Örnek Tekstil A.Ş. · 12 top · 1.240 m · Sevk SV-2026-0187", null, 7, true),
+    n("00000000-0000-4000-8000-0000000000b5", "gun-sonu-ozeti", "Gün sonu özeti · 2026-11-16", "Açılan sipariş 4 · Üretim 38 top · 3.910 m · Sevk 21 top · 2.180 m", null, 20, true),
   ];
 }
 

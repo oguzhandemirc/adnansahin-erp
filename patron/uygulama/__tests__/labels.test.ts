@@ -2,7 +2,8 @@
 // kodu izin sözlüğünde · §2 teldeki (`wire.ts`) durum/tür değerlerinin hepsi sözlükte · §3 bilinmeyen değer ham döner.
 import { readFileSync } from "fs";
 import { join } from "path";
-import { INBOX_STATUSES, NOTIFICATION_KINDS, NOTIFICATION_STATUSES, REPORT_STATUSES } from "../src/api/wire";
+import { FACTORY_NOTIFICATION_KINDS, INBOX_STATUSES, NOTIFICATION_KINDS, NOTIFICATION_STATUSES, REPORT_STATUSES } from "../src/api/wire";
+import { topicOf } from "../src/lib/notification-topics";
 import { STATUS_DICT, lookup, statusEntry } from "../src/lib/labels";
 import { ACCOUNT_TEMPLATE, ACCOUNT_TEMPLATES, EXPORT_DATASET_LABEL, INBOX_KIND, NOTIFICATION_KIND, devicePlatform, inboxKind, notificationKind } from "../src/lib/labels/diger";
 import { PERMISSION_GROUPS, PERMISSION_LABEL, groupPermissions, permissionLabel } from "../src/lib/labels/izin";
@@ -82,5 +83,18 @@ describe("§4 dışa aktarma küme adları sözlükte", () => {
     expect(OZET.ROOT_PROJECTIONS.length).toBeGreaterThan(20);
     expect(names.filter((n) => !EXPORT_DATASET_LABEL[n])).toEqual([]);
     expect(Object.keys(EXPORT_DATASET_LABEL).filter((n) => !names.includes(n))).toEqual([]);
+  });
+});
+
+/** D6b: fabrika kataloğu (`Teks-Erp/src/constants/notification-catalog.ts`) tek kaynak — her türün adı ve konusu uygulamada
+ *  birebir; fabrika türü uygulama tel listesinde ve fabrika kaynaklı kümede. */
+describe("§5 bildirim türleri ↔ fabrika kataloğu", () => {
+  const SRC = readFileSync(join(ROOT, "..", "..", "Teks-Erp", "src", "constants", "notification-catalog.ts"), "utf8");
+  const factory = [...SRC.matchAll(/\n  "([a-z-]+)": \{\n    topic: "([a-z-]+)",\n    label: "([^"]+)",/g)].map((m) => ({ tur: m[1]!, topic: m[2]!, label: m[3]! }));
+  it("desen körleşmedi (en az 12 tür)", () => expect(factory.length).toBeGreaterThanOrEqual(12));
+  it("⭐ her fabrika türü telde, fabrika kaynaklı kümede; adı ve konusu fabrikayla aynı", () => {
+    const bad = factory.filter((f) => !(NOTIFICATION_KINDS as readonly string[]).includes(f.tur) || !FACTORY_NOTIFICATION_KINDS.includes(f.tur)
+      || notificationKind(f.tur).ad !== f.label || topicOf(f.tur) !== f.topic);
+    expect(bad).toEqual([]);
   });
 });

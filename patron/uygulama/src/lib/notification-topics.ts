@@ -15,13 +15,22 @@ export type NotificationTopicKey = (typeof NOTIFICATION_TOPICS)[number]["key"];
 
 const KIND_TOPIC: Readonly<Record<string, NotificationTopicKey>> = {
   "yeni-siparis": "siparisler",
+  "siparis-iptal": "siparisler",
+  "siparis-tamamlandi": "siparisler",
   "geciken-siparis": "siparisler",
   "yeni-is-emri": "uretim",
+  "fire-top-iptal": "uretim",
   "gunluk-uretim": "uretim",
   "yeni-sevk": "sevkiyat",
+  "sevkiyat-cikti": "sevkiyat",
+  "sevkiyat-iptal": "sevkiyat",
   "stok-esigi": "stok-fason",
+  "ham-giris": "stok-fason",
+  "fason-gitti": "stok-fason",
+  "fason-dondu": "stok-fason",
   "gelen-kutusu-sonucu": "genel",
   "esitleme-gecikti": "genel",
+  "gun-sonu-ozeti": "genel",
 };
 
 /** Bilinmeyen (yeni) tür "Genel"e düşer — uygulama güncellenmeden de görünür. */

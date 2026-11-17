@@ -53,6 +53,16 @@ export const NOTIFICATION_KIND: Readonly<Record<NotificationKind, KindLabel>> = 
   "yeni-siparis": { ad: "Yeni sipariş", domain: "siparisler", icon: "receipt-outline" },
   "yeni-is-emri": { ad: "Yeni iş emri", domain: "uretim", icon: "construct-outline" },
   "yeni-sevk": { ad: "Yeni sevk", domain: "sevkiyat", icon: "car-outline" },
+  // D6b — fabrika kaynaklı; ad fabrika kataloğuyla birebir.
+  "siparis-iptal": { ad: "Sipariş iptali", domain: "siparisler", icon: "close-circle-outline" },
+  "siparis-tamamlandi": { ad: "Sipariş tamamlandı", domain: "siparisler", icon: "checkmark-done-outline" },
+  "fire-top-iptal": { ad: "Top fire / iptal", domain: "uretim", icon: "trash-outline" },
+  "sevkiyat-cikti": { ad: "Sevkiyat çıktı", domain: "sevkiyat", icon: "exit-outline" },
+  "sevkiyat-iptal": { ad: "Sevkiyat iptali", domain: "sevkiyat", icon: "arrow-undo-outline" },
+  "ham-giris": { ad: "Mal kabul girişi", domain: "stok", icon: "download-outline" },
+  "fason-gitti": { ad: "Fasona gönderildi", domain: "fason", icon: "arrow-forward-circle-outline" },
+  "fason-dondu": { ad: "Fasondan döndü", domain: "fason", icon: "arrow-back-circle-outline" },
+  "gun-sonu-ozeti": { ad: "Gün sonu özeti", domain: "genel", icon: "stats-chart-outline" },
 };
 
 export function notificationKind(tur: unknown): KindLabel {

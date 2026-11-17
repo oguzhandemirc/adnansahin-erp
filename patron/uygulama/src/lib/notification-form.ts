@@ -94,6 +94,9 @@ const RECORD_ALIASES: Readonly<Record<string, (id: string) => string>> = {
   "/sevkiyat": (id) => `/kayit/sevkiyat/${id}`,
 };
 const UUID = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
+/** Modül tablosunda olmayan ama bildirimin kimliksiz açabildiği ekranlar (D6b: fason iş emri bağı yoksa `/fason`).
+ *  Ekran izni yine kendisi süzer (`fason-acik` ← `bulut:uretim:oku`). */
+const SCREEN_ROUTES: ReadonlySet<string> = new Set(["/fason"]);
 
 /** Bildirimin taşıdığı yol yalnız uygulamanın KENDİ ekranıysa açılır (dış adres, `//`, bilinmeyen bölüm → null). */
 export function safeRoute(rota: unknown): string | null {
@@ -103,6 +106,7 @@ export function safeRoute(rota: unknown): string | null {
   const base = `/${first}`;
   const alias = RECORD_ALIASES[base];
   if (alias && second !== undefined) return UUID.test(second) ? alias(second) : null;
+  if (SCREEN_ROUTES.has(base)) return second === undefined ? rota : null;
   if (!MODULES.some((m) => m.route === base)) return null;
   if (second !== undefined && !RECORD_ROUTES.has(base)) return null;
   return rota;
