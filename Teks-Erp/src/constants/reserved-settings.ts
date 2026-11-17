@@ -92,8 +92,11 @@ export function isReservedSettingKey(key: string): boolean {
  * kimse değiştiremez (bilinçli — ayar şifresi emsali); okuyucular satır yoksa KAPALI.
  * Değerler `SETTING_KEYS.PATRON_CLOUD_SYNC_ENABLED` / `PATRON_CLOUD_INBOX_ENABLED`
  * ile aynıdır (bekçi `test_patron_cloud_switch_superadmin` eşitliği ölçer).
+ * Bildirim üretimi şalteri `notifications.enabled` (2.13.0) aynı sınıftadır
+ * (`SETTING_KEYS.NOTIFICATIONS_ENABLED`; ana oturum kararı 2026-11-17).
  */
 export const SUPERADMIN_WRITE_SETTING_KEYS: ReadonlySet<string> = new Set([
   "patronCloud.syncEnabled",
   "patronCloud.inboxEnabled",
+  "notifications.enabled",
 ]);

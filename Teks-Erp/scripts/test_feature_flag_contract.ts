@@ -604,6 +604,13 @@ async function main() {
       file: "docs/kurallar/patron-bulutu.md",
       needle: "patronCloud.inboxIntervalSeconds",
     },
+    // Bildirim üretimi şalteri (2.13.0, D1): panel satırı D3 ile gelir; o güne dek yüzey ham ayar ucudur.
+    // İstemci şalteri feature-flag yükünden değil `/api/bildirimler` yanıtındaki `enabled`dan okur.
+    NOTIFICATIONS_ENABLED: {
+      why: "Bildirim üretimi şalteri — ham ayar ucu (PUT /api/admin/settings/:key), kural docs/kurallar/genel.md",
+      file: "docs/kurallar/genel.md",
+      needle: "notifications.enabled",
+    },
     PATRON_CLOUD_REPORT_INTERVAL_SECONDS: {
       why: "Rapor isteği yoklama aralığı (20–600 sn) — ham ayar ucu, reçete docs/kurallar/patron-bulutu.md",
       file: "docs/kurallar/patron-bulutu.md",

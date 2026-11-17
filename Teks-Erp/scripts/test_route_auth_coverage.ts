@@ -195,8 +195,15 @@ const EXEMPT: Record<string, string> = {
  * mı); iş verisi, DB okuması ve dış istek yoktur. Destek kapısının ÖNÜNDE olmak
  * zorundadır (kapalıyken de cevap vermeli) ve kullanıcı kararıyla destek uçlarına
  * izin kodu açılmadı (giriş yapmış herkes). Bekçi: `test_destek_entegrasyonu` §2.
+ *
+ * ⚠️ 17 → 20 (2026-11-17, BİLİNÇLİ): `/api/bildirimler` üç ucu (liste · tek okundu ·
+ * tümü okundu) yalnız `verifyToken` taşır — `/auth/preferences` emsali: kullanıcı
+ * YALNIZ KENDİ teslimlerini okur/işaretler (kimlik token'dan; sorgu `userId` ile
+ * daraltılır, başkasının teslimi 404). Kimin ne alacağı izinle ÜRETİMDE çözülür
+ * (atama + veri izni); kutunun kendisine izin kodu yeni bir izin yüzeyi olurdu.
+ * Bekçi: `test_bildirim_cekirdek` §h.
  */
-const BARE_CHAIN_BASELINE = 17;
+const BARE_CHAIN_BASELINE = 20;
 
 /** Körlük zemini: tarayıcı boşa düşerse "ihlal yok" ile "hiçbir şeye bakılmadı" aynı yeşile çıkmasın. */
 const MIN_ROUTE_LAYERS = 400;

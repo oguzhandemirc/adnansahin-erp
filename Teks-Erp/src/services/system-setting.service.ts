@@ -767,6 +767,9 @@ export const SETTING_KEYS = {
   PATRON_CLOUD_INBOX_INTERVAL_SECONDS: "patronCloud.inboxIntervalSeconds",
   /** Rapor isteği yoklama aralığı (saniye, 20–600; varsayılan 30) — ayrı düğme YOK, eşitleme açıkken çalışır. */
   PATRON_CLOUD_REPORT_INTERVAL_SECONDS: "patronCloud.reportIntervalSeconds",
+  /** Bildirim üretimi şalteri (2.13.0) — kayıt yoksa KAPALI: olay/teslim satırı doğmaz (bugünkü davranış).
+   *  Okuyucu `readNotificationsEnabled`; istek yolundaki önbellek `services/notifications/notification-switch.ts`. */
+  NOTIFICATIONS_ENABLED: "notifications.enabled",
 } as const;
 
 const DEFAULT_DEADLINE_DAYS = 7;
@@ -6672,6 +6675,18 @@ export async function readPatronCloudInboxIntervalSeconds(
     return DEFAULT_PATRON_CLOUD_INBOX_INTERVAL_SECONDS;
   }
   return n;
+}
+
+/** Bildirim üretimi açık mı? Default FALSE (kayıt yok = bugünkü davranış: hiç bildirim satırı yok). */
+export async function readNotificationsEnabled(
+  tx?: Pick<typeof prisma, "systemSetting">,
+): Promise<boolean> {
+  const client = tx ?? prisma;
+  const setting = await client.systemSetting.findUnique({
+    where: { key: SETTING_KEYS.NOTIFICATIONS_ENABLED },
+    select: { value: true },
+  });
+  return asBoolean(setting?.value);
 }
 
 export const DEFAULT_PATRON_CLOUD_REPORT_INTERVAL_SECONDS = 30;

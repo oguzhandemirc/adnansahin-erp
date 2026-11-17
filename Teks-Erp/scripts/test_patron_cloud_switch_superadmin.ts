@@ -7,7 +7,7 @@
 // "önce okuma, ≥ 1 hafta izle, sonra yazma" kararı tek istekle atlanabiliyordu.
 //
 // Kilitlenen sözleşme:
-//   §1 küme = { syncEnabled, inboxEnabled } ve `SETTING_KEYS` değerleriyle birebir.
+//   §1 küme = { syncEnabled, inboxEnabled, notifications.enabled (2.13.0) } ve `SETTING_KEYS` değerleriyle birebir.
 //   §2 zincir (süreç içi, son handler KOŞMAZ → global ayar yazılmaz):
 //      `admin:settings` / `*` izinli ama sistem hesabı olmayan → 403 SUPERADMIN_ONLY
 //      (ayar şifresinden ÖNCE, şifre denemesi yakmaz); sistem hesabı → kapıyı geçer;
@@ -92,14 +92,15 @@ async function walk(key: string, opts: { permissions: string[]; isSystemAccount:
 
 async function main(): Promise<void> {
   console.log("§1 küme");
-  check("küme tam iki anahtar", SUPERADMIN_WRITE_SETTING_KEYS.size === 2, [...SUPERADMIN_WRITE_SETTING_KEYS].join(","));
+  check("küme tam üç anahtar", SUPERADMIN_WRITE_SETTING_KEYS.size === 3, [...SUPERADMIN_WRITE_SETTING_KEYS].join(","));
   check("syncEnabled = SETTING_KEYS.PATRON_CLOUD_SYNC_ENABLED", SUPERADMIN_WRITE_SETTING_KEYS.has(SETTING_KEYS.PATRON_CLOUD_SYNC_ENABLED));
   check("inboxEnabled = SETTING_KEYS.PATRON_CLOUD_INBOX_ENABLED", SUPERADMIN_WRITE_SETTING_KEYS.has(SETTING_KEYS.PATRON_CLOUD_INBOX_ENABLED));
+  check("notifications.enabled = SETTING_KEYS.NOTIFICATIONS_ENABLED (bildirim şalteri, 2.13.0)", SUPERADMIN_WRITE_SETTING_KEYS.has(SETTING_KEYS.NOTIFICATIONS_ENABLED));
 
   console.log("\n§2 zincir");
   const layers = chain();
   check("körlük zemini: PUT /settings/:key zinciri bulundu (≥ 4 halka, ilki verifyToken)", layers.length >= 4 && layers[0]?.name === "verifyToken", `${layers.length}`);
-  for (const key of [SETTING_KEYS.PATRON_CLOUD_SYNC_ENABLED, SETTING_KEYS.PATRON_CLOUD_INBOX_ENABLED]) {
+  for (const key of [SETTING_KEYS.PATRON_CLOUD_SYNC_ENABLED, SETTING_KEYS.PATRON_CLOUD_INBOX_ENABLED, SETTING_KEYS.NOTIFICATIONS_ENABLED]) {
     for (const perms of [["admin:settings"], ["admin:*"], ["*"]]) {
       const r = await walk(key, { permissions: perms, isSystemAccount: false });
       check(`⭐ ${key}: ${perms.join(",")} (süperadmin değil) → 403 SUPERADMIN_ONLY`, r.status === 403 && r.code === "SUPERADMIN_ONLY", JSON.stringify(r));

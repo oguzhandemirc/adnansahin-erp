@@ -138,6 +138,10 @@ const DINAMIK_IZIN_KAYNAKLARI: Record<string, readonly string[]> = {
   // gelir (`...RAW_SETTING_SCOPE_PERMISSIONS`, anahtar → izin). Tablodaki her
   // kodun katalogda olduğunu `test_settings_scopes.ts` §1b MEKANİK doğrular.
   "src/routes/admin.routes.ts": [`${DELEGE}scripts/test_settings_scopes.ts`],
+  // matchesPermission(perms, NOTIFICATION_KINDS[kind].dataPermission | NOTIFICATION_PREFERENCE_PERMISSION) —
+  // bildirim tür kataloğu (`constants/notification-catalog.ts`, 2.13.0). Her türün veri izninin katalogda
+  // olduğunu `test_bildirim_cekirdek.ts` §0 MEKANİK doğrular; tercih izni D2'de kataloğa girer.
+  "src/services/notifications/recipients.ts": [`${DELEGE}scripts/test_bildirim_cekirdek.ts`],
   // GERİ SARMA (2026-09-12): `assertEntityPermission` ikinci kapıyı yine
   // `adapter.writePermission`den çözüyor — varlık KOŞUMUN KENDİSİNDEN
   // (`ImportRun.entity`) bulunuyor, `:entity` parametresinden değil. Desen ve

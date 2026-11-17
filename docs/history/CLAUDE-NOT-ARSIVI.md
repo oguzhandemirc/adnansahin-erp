@@ -13398,3 +13398,19 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Açık (kullanıcıya).** Çuval top sayısı panel listesinin hayaletsiz tanımıdır; panel cari kapısı (`listSackCustomers.rollCount`) hayalet topu da sayar — hayalet varken iki panel rakamı ayrışır, telefon liste tanımını izler. Kartela parçası sayısı gönderilmez.
 
 **Bekçi.** `test_patron_bulut_anliklar` §3b (panel `searchSacks`/`listSackCustomers` eşitliği, DISPATCHED dışlanır, PLANNED görünür, hayalet sayılmaz, etiket farkı, bağımsız SQL) · bulut `test_katalog_ozeti` · uygulama `__tests__/cuvallar.test.tsx` (sondalar: cari süzgeç satırı kaldırıldı → 2 kırmızı · rozet koşulu `!!etiketMusteri` → 1 kırmızı).
+
+## 2026-11-17 — Platformlar arası bildirim D1: fabrika çekirdeği (backend 2.13.0) [GENEL + YETKİ-İZİN + PATRON-BULUTU]
+
+**Karar (kullanıcı, 2026-11-17).** İş hangi yüzeyden yapılırsa yapılsın bildirimi TEK yerde fabrika üretir; atanmış ve veri izni olan kişiye teslim edilir, işi yapan kendi bildirimini almaz; okundu kişi başına tek kayıttır. İlk türler: yeni sipariş, yeni iş emri, yeni sevk. Plan: dilimler D1 (çekirdek) → D2 (atama) → D3 (panel zili) → D4 (bulut köprüsü) → D5 (uygulama) → D6 (kalan türler).
+
+**İki kural istisnası — kullanıcı onayı (2026-11-17).**
+1. `AuditService.log` sonunda bildirim kancası. "Audit'ten karar türetilmez" kuralının sınırında: denetim satırı OKUNMAZ; kanca yalnız çağrının canlı argümanını (`action`, `tableName`, `recordId`, `userId`) kullanır, tür ve metin durum tablosundan gelir. Kanca beklenmez, hatası yutulur — fabrikanın yazmasını durdurmaz.
+2. Yeni `/v1/bildirimler` bulut ucu (D4). "Sözleşme sürümü SABİT" kuralına istisna ("şimdi güncelle" emsali, 2026-11-13).
+
+**Tasarım.** Dört ekleyici tablo (`notification_events` UNIQUE(kind, entityId) · `notification_deliveries` · `notification_assignments` · `permission_template_notifications`), migration `20261117132248_bildirim_cekirdek`. Atama izin kodu olarak modellenmedi: izin değişimi `tokenVersion` artırıp oturumu düşürür. Bölünmeyle doğan iş emri de `yeni-is-emri` üretir; içe aktarım (`logMany`) üretmez. Süperadmin alıcı olabilir (görünür gerçek kişi); teknik ve yalnız-saha hesap alıcı olmaz.
+
+**Ana oturum kararları (2026-11-17).** Bildirim olayı ve okundu için ayrı denetim satırı YAZILMAZ (`NotificationEvent` EBEVEYN_EYLEMDE, `NotificationDelivery` KULLANICI_TERCIHI muafiyeti). Şalter `notifications.enabled` varsayılan KAPALI ve `patronCloud.*` şalterleri gibi YALNIZ süperadmin değiştirir (`SUPERADMIN_WRITE_SETTING_KEYS`; önce `admin:settings` yazabiliyordu).
+
+**Bekçi.** `test_bildirim_cekirdek` (sondalar dosya başlığında: mute tercih izninden bağımsız · kanca beklenip hata yutulmadı · şalter yok sayıldı · telefon yazarı teknik kullanıcıya düştü) · `test_patron_cloud_switch_superadmin` §1/§2'ye üçüncü anahtar (sonda: kümeden çıkarıldı → 5 kırmızı).
+
+**Açık.** `test_audit_muafiyeti` §7 (33 > 32) bu işten ÖNCE kırmızı: `helpers/order-link-allocation.helper.ts` (`85f70259`, 2026-11-16); tavan güncellenmedi. `test_backend_surum` §2 paket sürümü etiketin (`backend-v2.12.3`) önüne geçtiğinde kırmızı — 2.12.4'te de öyleydi; etiket paketlemede atılır.

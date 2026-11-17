@@ -8,6 +8,7 @@ Birden çok alanı kesen konvansiyonlar (audit, katman sırası, hata/mesaj söz
 - Her CUD `AuditService.log()` ile yazılır; istisna yalnız `AUDIT_EXEMPT_MODELS`te kapalı sınıf kümesinden biriyle beyanlıdır, beyansız sessizlik kırmızıdır. [bekçi: test_audit_muafiyeti]
 - Audit best-effort ve transaction DIŞINDADIR; hata isteği düşürmez, sayacı `/api/admin/health`tedir — `/health`in alan kümesi dondurulmuştur. [inceleme]
 - Audit yalnız ayak izidir: çalışan kod `SystemLog`dan karar, sayı, durum ya da join türetmez; okuyabilen yalnız insana gösteren yüzeylerdir. [bekçi: test_audit_okuma_kaynagi]
+- Bildirimi yalnız `AuditService.log` sonundaki kanca üretir (2.13.0, onaylı istisna): satır okunmaz, tür `notification-catalog.ts`ten, metin durum tablosundan, yazar çağrının `userId`sinden (iş emri/sevkte `createdById`, telefonda makbuzun hesabı); kanca beklenmez ve hatası yutulur; `notifications.enabled` kayıtsızken KAPALI ve hiç satır doğmaz, şalteri yalnız süperadmin değiştirir (`SUPERADMIN_WRITE_SETTING_KEYS`). [bekçi: test_bildirim_cekirdek, test_patron_cloud_switch_superadmin]
 - Katman sırası Routes → Controllers → Services → Prisma; route/controller `lib/prisma` import etmez. [lint]
 - P2002'nin hangi kolondan geldiği yalnız `src/utils/p2002.ts` yardımcılarıyla okunur; `meta.target` doğrudan okunmaz (pg adaptörü onu vermez). [bekçi: test_p2002_hedef_tek_kaynak]
 - Validation mesajları Türkçedir; i18n kurulmaz. [inceleme]

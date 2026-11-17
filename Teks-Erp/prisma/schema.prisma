@@ -619,6 +619,10 @@ model User {
   duplicateReviewsDecided         DuplicateReview[]         @relation("DuplicateReviewDecidedBy")
   mergedColors                    Color[]                   @relation("ColorMergedBy")
   mergedSubcontractors            Subcontractor[]           @relation("SubcontractorMergedBy")
+  /// Bildirim (2.13.0): yazdığı olaylar · kendi teslimleri · atanmış türleri.
+  authoredNotificationEvents      NotificationEvent[]       @relation("NotificationEventAuthor")
+  notificationDeliveries          NotificationDelivery[]    @relation("NotificationDeliveryUser")
+  notificationAssignments         NotificationAssignment[]  @relation("NotificationAssignmentUser")
 
   @@map("users")
 }
@@ -808,6 +812,8 @@ model PermissionTemplate {
   isActive    Boolean @default(true)
 
   permissions PermissionTemplateItem[]
+  /// Şablonun bildirim türleri (2.13.0) — izinler gibi kişiye KOPYALANIR, canlı bağ yok.
+  notificationKinds PermissionTemplateNotification[]
 
   createdAt DateTime @default(now()) @db.Timestamptz
   updatedAt DateTime @updatedAt @db.Timestamptz
@@ -10747,3 +10753,93 @@ model CloudInboxReceipt {
 
   @@map("cloud_inbox_receipts")
 }
+
+// =============================================================================
+// BİLDİRİM (2.13.0, D1) — platformlar arası bildirim çekirdeği.
+// Fabrika bildirimi TEK yerde üretir (`services/notifications/`): olay defteri + kişi başına teslim.
+// Tür kataloğu kodda (`constants/notification-catalog.ts`); `kind` VarChar çünkü küme büyümeye açık (D6).
+// =============================================================================
+
+/// Bildirim OLAY DEFTERİ — "ne oldu". Bir varlık için bir tür bir kez doğar (UNIQUE(kind, entityId);
+/// bulutun dedup anahtarı `<kind>:<entityId>` ile aynı kimlik). Başlık/metin/yazar adı doğuşta DONDURULUR,
+/// sonradan değişmez. Teslimler budanabilir, defter kalır.
+model NotificationEvent {
+  id           String  @id @default(uuid()) @db.Uuid
+  /// Katalog anahtarı (`yeni-siparis` · `yeni-is-emri` · `yeni-sevk` …).
+  kind         String  @db.VarChar(64)
+  /// Varlık kimliği (sipariş / iş emri / sevkiyat id). Polimorfik ⇒ FK YOK (tür katalogdan çözülür).
+  entityId     String  @db.Uuid
+  /// İşi yapan kullanıcı (telefon siparişinde gerçek bulut hesabı = fabrika kullanıcısı). Çözülemezse NULL.
+  authorUserId String? @db.Uuid
+  author       User?   @relation("NotificationEventAuthor", fields: [authorUserId], references: [id])
+  /// Yazar adı doğuşta dondurulur (kullanıcı adı sonradan değişse de metin değişmez).
+  authorName   String  @db.VarChar(100)
+  title        String  @db.VarChar(200)
+  body         String  @db.VarChar(500)
+  /// Telefon uygulaması rotası (bulutun mevcut biçimi, ör. `/siparisler/<id>`); panel rotayı tür + varlıktan kurar.
+  route        String? @db.VarChar(200)
+
+  deliveries NotificationDelivery[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  @@unique([kind, entityId])
+  @@index([createdAt])
+  @@map("notification_events")
+}
+
+/// Kişi başına TESLİM — okundu bilgisinin tek otoritesi (cihazlar arası tek kayıt).
+/// `onDelete: Cascade`: teslim türev kayıttır (olay defteri kalır); kullanıcı/olay sert silinmez, kural yalnız FK tutarlılığı içindir.
+model NotificationDelivery {
+  id      String            @id @default(uuid()) @db.Uuid
+  userId  String            @db.Uuid
+  user    User              @relation("NotificationDeliveryUser", fields: [userId], references: [id], onDelete: Cascade)
+  eventId String            @db.Uuid
+  event   NotificationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// NULL = okunmadı. Yalnız NULL → an geçişi (atomik claim); okunmuş geri okunmamışa dönmez.
+  readAt  DateTime?         @db.Timestamptz
+
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  @@unique([userId, eventId])
+  /// Liste (kişinin teslimleri, yeniden eskiye) + okunmamış sayısı.
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@index([eventId])
+  @@map("notification_deliveries")
+}
+
+/// Kişiye ATANMIŞ bildirim türü. Ataması olmayan hiçbir şey almaz. `mutedByUser` yalnız kişide
+/// `bildirim:tercih` izni varsa dikkate alınır (yoksa atanan tür zorunludur).
+/// İzin kodu olarak modellenmez: izin değişimi oturumu düşürür (tokenVersion), atama düşürmemeli.
+model NotificationAssignment {
+  id          String  @id @default(uuid()) @db.Uuid
+  userId      String  @db.Uuid
+  user        User    @relation("NotificationAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  kind        String  @db.VarChar(64)
+  mutedByUser Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  @@unique([userId, kind])
+  @@index([kind])
+  @@map("notification_assignments")
+}
+
+/// Rol şablonunun bildirim türleri (D2 uçları yazar). Şablon uygulanınca kişiye KOPYALANIR (izinlerle aynı).
+model PermissionTemplateNotification {
+  id         String             @id @default(uuid()) @db.Uuid
+  templateId String             @db.Uuid
+  template   PermissionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  kind       String             @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  @@unique([templateId, kind])
+  @@map("permission_template_notifications")
+}
+
