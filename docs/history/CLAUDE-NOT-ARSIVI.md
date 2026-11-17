@@ -13436,3 +13436,14 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Bilinen sınır.** Simge durumuna küçültülmüş pencerede Chromium zamanlayıcıyı kısar (5 dk sonra dakikada bir); köşe bildirimi o durumda en çok ~1 dk gecikebilir. `backgroundThrottling` bilinçli olarak değiştirilmedi.
 
 **Bekçi.** `inbox-model.test.ts` (11) · `NotificationInboxBell.test.tsx` (9, IPC mock) · `NotificationPreferencesCard.test.tsx` (4). Negatif sondalar (geri alındı, md5 denetlendi): ilk yükleme koruması kaldırıldı → 2 kırmızı; satır tıklamasında okundu çağrısı kaldırıldı → 1 kırmızı; tercih kilidi gevşetildi → 1 kırmızı.
+
+## 2026-11-17 — Platformlar arası bildirim D4: bulut köprüsü (backend 2.13.0 + patron bulutu) [PATRON-BULUTU]
+
+**Karar (kullanıcı, 2026-11-17).** Yeni imzalı `POST /v1/bildirimler` ucu "sözleşme sürümü sabit" kuralına açık istisnadır ("şimdi güncelle" emsali). Bildirimi fabrika üretir, bulut yalnız telefona iletir; okundu iki yönde eşittir.
+
+**Tasarım.** İstek (KATI): `teslimler[]` (`teslimId` · `hesapId` = fabrika `users.id` · `tur` · `tekilAnahtar` = `<tür>:<varlık>` · `baslik` ≤120 · `metin` · `rota` · `yazar` · `olusturulma`; ≤200) + `okunanlar[]` (`teslimId`, `okundu`; ≤1000). Yanıt (GEVŞEK): `alinan` · `bagli` · `atlanan` · `okunanlar[]` (bulutta okunmuş, fabrika teyit etmemiş — teyide dek tekrar gelir) · `tercihler[]` (D5 için, bugün boş). Bulut teslimi aynı tekillikle (hesap + anahtar) kuyruğa yazar; kendi türettiği satır varsa ona BAĞLAR (`factory_delivery_id`) ⇒ çift push yok. Hesap yok/pasif, tür bulutta yok ya da `BILDIRIM_KIPI=kapali` ⇒ sayılır, atlanır. Okundu: ilk okuma kazanır (`COALESCE`), `read_synced_at` teyittir. Fabrika: `jobs/cloud-notify.job.ts` eşitleme işleriyle başlar/durur, her turda `notifications.enabled`i de sorar; 30 sn süpürme + üretici dürtmesi (≈1 sn); yalnız son 2 saatlik gönderilmemiş teslimler gider (açılışta sel yok); panel-only alıcının teslimi de gider, bulut atlar (fabrikada küme hesabı tutmamak için — daha sade). `BILDIRIM_KAYNAGI=bulut|fabrika` (varsayılan bulut) bulutun kendi `yeni-siparis` türetmesini durdurur. Yeni bulut türleri `yeni-is-emri` (üretim okuma) · `yeni-sevk` (sevkiyat okuma), ikisi de `nativeBody`. Göçler: bulut `20261117170000_bildirim_koprusu`, fabrika `20261117180000_bildirim_bulut_koprusu` (ekleyici).
+
+**Kurulum sırası.** Bulut ÖNCE (göç + `db-rolleri.ts`), sonra backend; bulut eskiyse köprü 404 alır ve 60 dk geri çekilir.
+
+**Bekçi.** Bulut `test_bildirim_koprusu` 35/0 (sondalar başlıkta: bağlama döngüsü · COALESCE · kaynak koşulu); fabrika `test_bildirim_bulut_koprusu` 26/0 (sondalar: şalter sorusu · `readAt: null` claim · pencere süzgeci). Bulut bekçileri yerelde `patron_bildirimd4_test` DB'sinde koşuldu (35/35 dosya).
+

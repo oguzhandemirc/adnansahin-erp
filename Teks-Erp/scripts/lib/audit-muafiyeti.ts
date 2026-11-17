@@ -69,7 +69,7 @@ export const AUDIT_EXEMPT_MODELS: AuditMuafiyeti[] = [
   { model: "NotificationEvent", sinif: "EBEVEYN_EYLEMDE",
     gerekce: "bildirim olayını `notifications/producer` yazar; olay ebeveyn eylemin (sipariş/iş emri/sevk CREATE) `AuditService.log` çağrısının kancasından doğar — audit o eylemde (2.13.0)" },
   { model: "NotificationDelivery", sinif: "KULLANICI_TERCIHI",
-    gerekce: "kişinin kendi bildirim kutusu: teslim olayla birlikte doğar (audit ebeveyn eylemde), `readAt` yalnız sahibinin okundu işaretidir; hiçbir iş kararına ve rapora girmez (2.13.0)" },
+    gerekce: "kişinin kendi bildirim kutusu: teslim olayla birlikte doğar (audit ebeveyn eylemde), `readAt` yalnız sahibinin okundu işaretidir; hiçbir iş kararına ve rapora girmez (2.13.0); `cloudSentAt`/`cloudReadSentAt` bulut köprüsü işinin teknik damgasıdır (D4)" },
   { model: "ShiftInstance", sinif: "SISTEM_ISI",
     gerekce: "vardiya takvimi `jobs/shift-calendar.job` tarafından üretilir; kullanıcı eylemi yok, audit'in öznesi olacak kullanıcı da yok" },
 ];

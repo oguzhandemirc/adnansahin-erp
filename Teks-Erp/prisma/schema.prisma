@@ -10799,11 +10799,17 @@ model NotificationDelivery {
   event   NotificationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   /// NULL = okunmadı. Yalnız NULL → an geçişi (atomik claim); okunmuş geri okunmamışa dönmez.
   readAt  DateTime?         @db.Timestamptz
+  /// Bulut köprüsü (D4): teslim buluta iletildi (`POST /v1/bildirimler` 2xx). NULL = gitmedi; yalnız NULL → an.
+  cloudSentAt     DateTime? @db.Timestamptz
+  /// Bulut köprüsü (D4): bu teslimin okundu bilgisi buluta bildirildi (panel okuması ya da telefon okumasının teyidi).
+  cloudReadSentAt DateTime? @db.Timestamptz
 
   createdAt DateTime @default(now()) @db.Timestamptz
   updatedAt DateTime @updatedAt @db.Timestamptz
 
   @@unique([userId, eventId])
+  /// Köprü taraması: gönderilmemiş yeni teslimler (pencere `createdAt`).
+  @@index([cloudSentAt, createdAt])
   /// Liste (kişinin teslimleri, yeniden eskiye) + okunmamış sayısı.
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, readAt])

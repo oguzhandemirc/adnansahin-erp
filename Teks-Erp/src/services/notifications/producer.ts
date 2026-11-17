@@ -42,7 +42,10 @@ export async function onAuditCall(call: AuditHookCall, kind: NotificationKind | 
   }
   if (!kind) return;
   if (!(await notificationsEnabled())) return;
-  await produceNotification(kind, call.recordId, call.userId ?? null);
+  const produced = await produceNotification(kind, call.recordId, call.userId ?? null);
+  // Bulut köprüsü (D4): teslim doğduysa hemen gönderilsin. İş kurulu değilse (eşitleme kapalı) dürtme etkisizdir;
+  // tembel yükleme: iş modülü (ağ istemcisi) yalnız gerçekten teslim doğunca yüklenir.
+  if (produced && produced.recipients.length > 0) (await import("../../jobs/cloud-notify.job")).nudgeCloudNotify();
 }
 
 interface ResolvedAuthor {
