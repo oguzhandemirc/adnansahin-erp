@@ -11,7 +11,7 @@ import { ordersBoxStyles as s } from './TamburOrdersBox.styles';
 // Tambur sipariş BALONU — sipariş kutusunun hemen altında, aşağı doğru açılan
 // sade panel: her sipariş satırı için "müşteri   metre". Başka hiçbir şey yok
 // (sipariş no, renk, başlık → basılı tutunca açılan ayrıntı modalında).
-// Akışa girer (yer açar), hiçbir şeyin üstüne binmez; dokunuş almaz.
+// Akışa girmez: alttaki bileşenin üstünde yüzer, yer açmaz; dokunuş almaz.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Tablette balonun en geniş hâli (dp) — taşan müşteri adı `…` ile kesilir. */

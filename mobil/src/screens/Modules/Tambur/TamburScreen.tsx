@@ -4029,8 +4029,6 @@ export default function TamburScreen() {
                   style={[
                     styles.headerTitleCol,
                     !compact && styles.headerTitleFlex,
-                    // Balon açılınca başlık kutu satırı hizasında kalsın (ortaya kaymasın).
-                    !compact && styles.headerTitleTop,
                   ]}
                 >
                   {/* Barkod YOKSA satır hiç basılmaz (2026-08-04): barkodsuz açık
@@ -8082,7 +8080,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: '#0f172a',
-    gap: 8,
+    gap: 8,    // Sipariş balonu bandın altına taşar: bant alttaki kardeşlerin üstünde çizilsin.
+    zIndex: 20,
   },
   // MANUEL MOD bandı — koyu lacivert yerine amber: operatör ekranın tepesine
   // baktığında "normal iş değil" bilgisini renkten okur (yanlış modda üretim
@@ -8118,7 +8117,6 @@ const styles = StyleSheet.create({
   headerTitleFlex: { flex: 1 },
   // Kutu yüksekliği (52) kadar blokta dikey ortalı + üste yaslı: kapalıyken
   // görünüm aynı, sipariş balonu açılıp bant uzayınca başlık yerinde kalır.
-  headerTitleTop: { alignSelf: 'flex-start', minHeight: 52, justifyContent: 'center' },
   // Kutu grubu — tablette doğal genişlik, telefonda her kutu eşit pay alıp
   // satırı baştan sona doldurur (headerBoxFlex).
   headerBoxes: { flexDirection: 'row', alignItems: 'center', gap: 8 },

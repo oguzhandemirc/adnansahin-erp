@@ -11,11 +11,18 @@ export const HEADER_BOX_RADIUS = 10;
 export const ORDERS_BOX_COLOR = palette.orange[600];
 
 export const ordersBoxStyles = StyleSheet.create({
-  // Kutu satırı + altında balon: sütun, sağa yaslı → balon kutunun altına yapışır.
-  group: { alignItems: 'flex-end', gap: spacing.xs },
+  // Kutu satırı balonun ÇAPASIDIR: balon akışa girmez, satırın altından taşıp
+  // alttaki bileşenin ÜSTÜNDE yüzer (kullanıcı 2026-11-17: lacivert bant
+  // uzamayacak, hiçbir şey aşağı kaymayacak).
+  group: { alignItems: 'flex-end', zIndex: 20 },
   groupCompact: { alignSelf: 'stretch' },
   balloon: {
-    alignSelf: 'flex-end',
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: spacing.xs,
+    zIndex: 20,
+    elevation: 6,
     backgroundColor: colors.surface,
     borderRadius: HEADER_BOX_RADIUS,
     borderWidth: 1.5,

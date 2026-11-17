@@ -17,6 +17,20 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-17b",
+      "baslik": "Tambur sipariş balonu ekranı kaydırmıyor",
+      "surumler": {
+        "tablet": "1.0.22"
+      },
+      "maddeler": [
+        {
+          "kapsam": "tablet",
+          "tip": "duzeltme",
+          "metin": "Tamburda sipariş balonu açılınca ekranı aşağı itmez; üstteki lacivert bant uzamaz, balon alttaki alanın üzerinde durur."
+        }
+      ]
+    },
+    {
       "id": "2026-11-17",
       "baslik": "Siparişlere metre paylaştırma ve planlama notu",
       "surumler": {

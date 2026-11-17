@@ -13,8 +13,8 @@ import { ordersBoxStyles as s } from './TamburOrdersBox.styles';
 //    kapatır; başka hiçbir etkileşim balonu kapatmaz (popover değil);
 //  · balon iş emri (kart) açık olduğu sürece açık kalır; yeni kart kapalı başlar;
 //  · BASILI TUTMA → ayrıntı modalı (sipariş no, kumaş/renk, siparişin tamamı).
-// Balon kutu satırının ALTINDA akışa girer (başlık bandını uzatır): kesim
-// formunun (kat, uzunluk, Kime?) üstüne binmez, dokunuş yutmaz.
+// Balon akışa GİRMEZ: kutu satırına mutlak konumla çapalanır, başlık bandını
+// uzatmaz, alttaki bileşenin üstünde yüzer; dokunuş yutmaz (pointerEvents none).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Sipariş kutusunu basılı tutma süresi (ms) — ayrıntı modalı bu sürede açılır. */
