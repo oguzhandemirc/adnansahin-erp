@@ -12,17 +12,33 @@ export function badgeText(unread: number): string | null {
  * Desen arama hedefleriyle aynı (`lib/search/search-targets.ts`): sipariş liste sayfasında
  * `?focus=` ile detay sheet'i açılır; iş emri ve sevkiyatın tam sayfa detayı vardır.
  * Tanınmayan tür → null (satır yalnız okundu olur, gezinme yok).
+ * D6a: top ve fason türlerinde varlık (top / fason belgesi) için panel detay sayfası yoktur; ilgili iş emri
+ * telefon rotasında (`/is-emirleri/<id>`) taşınır → iş emri detayı, iş emri yoksa liste/rapor ekranı.
  */
-export function panelRouteFor(kind: string, entityId: string): string | null {
+export function panelRouteFor(kind: string, entityId: string, route: string | null = null): string | null {
   if (!entityId) return null;
   const id = encodeURIComponent(entityId);
+  const wo = /^\/is-emirleri\/([0-9a-fA-F-]{36})$/.exec(route ?? "")?.[1] ?? null;
   switch (kind) {
     case "yeni-siparis":
+    case "siparis-iptal":
+    case "siparis-tamamlandi":
       return `/operations/orders?focus=${id}`;
     case "yeni-is-emri":
       return `/operations/work-orders/${id}`;
     case "yeni-sevk":
+    case "sevkiyat-cikti":
+    case "sevkiyat-iptal":
       return `/operations/shipments/${id}`;
+    case "fire-top-iptal":
+      return wo ? `/operations/work-orders/${wo}` : "/operations/rolls";
+    case "fason-gitti":
+    case "fason-dondu":
+      return wo ? `/operations/work-orders/${wo}` : "/reports/subcontract";
+    case "ham-giris":
+      return "/operations/goods-receipts";
+    case "gun-sonu-ozeti":
+      return "/reports/sales";
     default:
       return null;
   }

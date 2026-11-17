@@ -46,6 +46,22 @@ describe("panelRouteFor", () => {
     expect(panelRouteFor("yeni-is-emri", "w1")).toBe("/operations/work-orders/w1");
     expect(panelRouteFor("yeni-sevk", "s1")).toBe("/operations/shipments/s1");
   });
+  it("D6a: iptal/tamamlanan sipariş → sipariş, sevk çıkışı/iptali → sevkiyat, ham giriş → mal kabul, gün sonu → rapor", () => {
+    expect(panelRouteFor("siparis-iptal", "o1")).toBe("/operations/orders?focus=o1");
+    expect(panelRouteFor("siparis-tamamlandi", "o1")).toBe("/operations/orders?focus=o1");
+    expect(panelRouteFor("sevkiyat-cikti", "s1")).toBe("/operations/shipments/s1");
+    expect(panelRouteFor("sevkiyat-iptal", "s1")).toBe("/operations/shipments/s1");
+    expect(panelRouteFor("ham-giris", "g1")).toBe("/operations/goods-receipts");
+    expect(panelRouteFor("gun-sonu-ozeti", "d1")).toBe("/reports/sales");
+  });
+  it("D6a: top ve fason iş emri ipucu varsa iş emri detayına, yoksa listeye/rapora gider", () => {
+    const wo = "11111111-2222-3333-4444-555555555555";
+    expect(panelRouteFor("fire-top-iptal", "r1", `/is-emirleri/${wo}`)).toBe(`/operations/work-orders/${wo}`);
+    expect(panelRouteFor("fire-top-iptal", "r1", "/stok")).toBe("/operations/rolls");
+    expect(panelRouteFor("fason-gitti", "d1", `/is-emirleri/${wo}`)).toBe(`/operations/work-orders/${wo}`);
+    expect(panelRouteFor("fason-dondu", "d1", "/fason")).toBe("/reports/subcontract");
+    expect(panelRouteFor("fason-gitti", "d1", "/is-emirleri/../x")).toBe("/reports/subcontract");
+  });
   it("tanınmayan tür ya da boş kimlik gezinmez (telefon rotası kullanılmaz)", () => {
     expect(panelRouteFor("bilinmeyen", "x")).toBeNull();
     expect(panelRouteFor("yeni-siparis", "")).toBeNull();

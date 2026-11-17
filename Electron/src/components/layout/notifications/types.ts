@@ -10,7 +10,7 @@ export interface InboxItem {
   authorName: string;
   title: string;
   body: string;
-  /** Telefon rotası — panel KULLANMAZ; panel rotayı `kind` + `entityId`den kurar. */
+  /** Telefon rotası — panel yalnız iş emri ipucu için okur (`panelRouteFor`); hedef `kind` + `entityId`den kurulur. */
   route: string | null;
   createdAt: string;
   readAt: string | null;

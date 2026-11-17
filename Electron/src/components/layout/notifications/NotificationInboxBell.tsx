@@ -61,7 +61,7 @@ export function NotificationInboxBell() {
   const openItem = useCallback(
     (item: InboxItem) => {
       if (item.readAt === null) markRead(item.id);
-      const route = panelRouteFor(item.kind, item.entityId);
+      const route = panelRouteFor(item.kind, item.entityId, item.route);
       setOpen(false);
       trimToFirstPage();
       if (route) openTab(route);
