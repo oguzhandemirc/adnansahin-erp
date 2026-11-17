@@ -79,11 +79,13 @@ export const NATIVE_PAYLOAD_KEYS = ["to", "title", "sound", "priority", "data"] 
 export const NATIVE_DATA_KEYS = ["bildirimId", "rota", "tesisId"] as const;
 
 /** İÇERİKSİZ native yük (F5): başlık + kimlikler; gövde/tutar/ad Expo'ya, FCM'e ve kilit ekranına GİTMEZ — içerik
- *  uygulama içinden (oturumlu) çekilir. Başlık katalog etiketidir; türsüz (deneme) iletide iletinin sabit başlığı. */
+ *  uygulama içinden (oturumlu) çekilir. Başlık katalog etiketidir; türsüz (deneme) iletide iletinin sabit başlığı.
+ *  TEK istisna: kataloğunda `nativeBody` açık tür (bugün yalnız `yeni-siparis`) gövdesini de taşır. */
 export function nativePushPayload(target: PushTarget, msg: PushMessage) {
   const kind = msg.kind && (NOTIFICATION_KINDS as readonly string[]).includes(msg.kind) ? (msg.kind as NotificationKind) : null;
   const title = kind ? KIND_RULES[kind].label : msg.title.slice(0, 60);
-  return { to: target.token, title, sound: "default", priority: "high", data: { bildirimId: msg.id, rota: msg.route, tesisId: msg.tesisId } };
+  const base = { to: target.token, title, sound: "default", priority: "high", data: { bildirimId: msg.id, rota: msg.route, tesisId: msg.tesisId } };
+  return kind && KIND_RULES[kind].nativeBody && msg.body ? { ...base, body: msg.body.slice(0, 200) } : base;
 }
 
 /** Expo push: gönderim bilet döner; asıl teslim sonucu makbuzda (`receipts`, ikinci aşama — `DeviceNotRegistered` çoğu kez orada). */

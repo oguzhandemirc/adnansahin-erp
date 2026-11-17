@@ -46,7 +46,7 @@ export type DetayKey = (typeof DETAY_OGELERI)[number]["key"];
 
 export const DETAY_SECIMI: KartSecimi<DetayKey> = {
   kartlar: DETAY_OGELERI,
-  varsayilan: ["kartAcik", "sube", "sevk", "tarih", "termin", "yon", "uretim", "doviz", "tamam", "iptal"],
+  varsayilan: ["kartAcik", "sube", "sevk", "tarih", "yon", "uretim", "doviz", "tamam", "iptal"],
   alan: "ogeler",
 };
 const DETAY_VARSAYILAN: TabloTercihi = { surum: 1, sutunlar: ["-"], siralama: null, suzgec: {} };

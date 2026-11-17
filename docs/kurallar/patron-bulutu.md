@@ -106,6 +106,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 ### Anlık bildirim (bulut)
 
 - Kip compose'da `.env`ten gelir, varsayılan `kapali` (iş kurulmaz, kuyruk ve dış istek yok); `yeni-siparis` olayı (varsayılan açık, hesap kapatabilir) yalnız "bulut bu siparişi ilk kez son 2 saatte gördü ∧ fabrika doğuşu ilk görüşten ≤ 2 saat önce ∧ tesisin ilk eşitleme paketinden sonra ∧ iptal değil" iken, sipariş başına hesap başına bir kez doğar; telefondan açan hesap (gelen kutusu makbuzu `varlikId`) almaz, makbuzu gecikirse olay en çok gelen kutusu claim süresi bekletilir. [bekçi: patron/sunucu test_bildirim_yeni_siparis · test_bildirim_acma · test_compose_sirlari]
+- Telefon push yükü içeriksizdir (yalnız katalog başlığı + kimlikler); TEK istisna kataloğunda `nativeBody` açık türdür — bugün yalnız `yeni-siparis` (müşteri · sipariş no · metre kilit ekranına gider; kullanıcı kararı 2026-11-17). Yeni istisna bilinçli açılır, bekçi `test_bildirim_patron_push` §2d tür kümesini ölçer.
 
 ## Açma reçetesi (bakım penceresinde, kullanıcıya gösterilerek)
 

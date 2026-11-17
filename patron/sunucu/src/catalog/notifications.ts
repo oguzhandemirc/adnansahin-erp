@@ -13,6 +13,8 @@ export interface KindRule {
   /** Olayın okunduğu projeksiyon (null = hesabın kendi kaydı / eşitleme durumu). */
   readonly source: string | null;
   readonly permissions: readonly CloudPermission[];
+  /** true ⇒ olay gövdesi telefona (Expo/FCM/APNs, kilit ekranı) da gider. Varsayılan içeriksiz (F5); istisna bilinçli açılır. */
+  readonly nativeBody?: true;
 }
 
 export const KIND_RULES: Readonly<Record<NotificationKind, KindRule>> = {
@@ -51,6 +53,8 @@ export const KIND_RULES: Readonly<Record<NotificationKind, KindRule>> = {
     description: "Fabrikada yeni sipariş açıldı (telefondan kendi açtığınız sipariş için gelmez)",
     source: "siparis",
     permissions: ["bulut:siparis:oku"],
+    // Kullanıcı kararı 2026-11-17: kilit ekranında müşteri · sipariş no · metre görünsün.
+    nativeBody: true,
   },
 };
 

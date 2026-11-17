@@ -79,6 +79,13 @@ async function main(): Promise<void> {
   const deneme = nativePushPayload(ANDROID, { id: "d", title: "Deneme bildirimi", body: "gövde", route: null, tesisId: TESIS }) as Record<string, unknown>;
   kontrol("§2c türsüz (deneme) ileti: sabit başlık kalır, gövde yine yok", deneme.title === "Deneme bildirimi" && !("body" in deneme));
 
+  // ── §2d gövde istisnası: YALNIZ kataloğunda `nativeBody` açık tür ─────────
+  const govdeli = NOTIFICATION_KINDS.filter((k) => "body" in (nativePushPayload(ANDROID, { ...DOLU, kind: k }) as Record<string, unknown>));
+  kontrol("§2d ⭐ gövde taşıyan tür kümesi = yalnız yeni-siparis", JSON.stringify(govdeli) === JSON.stringify(["yeni-siparis"]), govdeli.join(","));
+  const ys = nativePushPayload(ANDROID, { ...DOLU, kind: "yeni-siparis", body: "ACME · Sipariş 12 · 800 m" }) as Record<string, unknown>;
+  kontrol("§2e yeni-siparis: gövde aynen, başka yeni anahtar yok",
+    ys.body === "ACME · Sipariş 12 · 800 m" && JSON.stringify(Object.keys(ys).sort()) === JSON.stringify([...NATIVE_PAYLOAD_KEYS, "body"].sort()), JSON.stringify(ys));
+
   // ── §3 ağa yazılan gövde ──────────────────────────────────────────────────
   let govde = "";
   const sahteFetch = ((_u: unknown, init?: { body?: unknown }) => {

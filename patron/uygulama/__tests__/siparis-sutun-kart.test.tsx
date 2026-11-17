@@ -134,7 +134,7 @@ describe("§4 sipariş ayrıntısı", () => {
     render(<OrderDetail />);
     await settle();
     expect(screen.getByTestId("siparis-acik")).toBeTruthy();
-    for (const b of ["sevk", "tarih", "termin", "yon", "uretim"]) expect(screen.getByTestId(`bilgi-${b}`)).toBeTruthy();
+    for (const b of ["sevk", "tarih", "yon", "uretim"]) expect(screen.getByTestId(`bilgi-${b}`)).toBeTruthy();
     for (const id of ["siparis-kart-sevk", "siparis-kart-toplam", "siparis-kart-kalem", "bilgi-kayit"]) expect(screen.queryByTestId(id)).toBeNull();
     fireEvent.press(screen.getByTestId("siparis-ayrinti-sec"));
     for (const k of ["kartSevk", "kartToplam", "kartKalem", "kayit"]) expect(isaretli(`siparis-ayrinti-secici-${k}`)).toBe(false);

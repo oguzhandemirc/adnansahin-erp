@@ -228,8 +228,8 @@ describe("§5 sipariş ayrıntısı", () => {
     expect(screen.queryByTestId("siparis-tutar")).toBeNull();
     expect(screen.queryByTestId("bilgi-doviz")).toBeNull();
     expect(screen.queryByText(/Tutar|Para birimi|₺|TRY/)).toBeNull();
-    // Termin düz bilgi satırı: rozet/geri sayım yok.
-    expect(screen.getByTestId("bilgi-termin")).toBeTruthy();
+    // Termin varsayılan KAPALI (kullanıcı kararı 2026-11-17); seçiciden açılır.
+    expect(screen.queryByTestId("bilgi-termin")).toBeNull();
     expect(screen.queryByText(/gün kaldı|Gecikti/)).toBeNull();
   });
 });
