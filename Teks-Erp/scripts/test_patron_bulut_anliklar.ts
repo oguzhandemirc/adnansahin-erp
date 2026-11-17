@@ -28,6 +28,9 @@
 //   · `ozet` bölümleri tek try içinde kuruldu (eski davranış) → §2 "ozet bölüm yalıtımı" ✗
 // NEGATİF SONDA (2026-11-13, stok-kalem): şemaya `tutar` eklendi → §1 finans adı ✗; bitmiş
 //   top listesinden ilk top düşürüldü → §3 "stok-kalem: bitmiş top listesi" + "kalem top sayısı ≠ topları" ✗.
+// NEGATİF SONDA (2026-11-17, stok-kalem kime/nerede): `etiketMusteri` ← çuval carisi → §3 "raf topu: etiket müşterisi"
+//   + "çuvaldaki top: …" ✗ (2 kırmızı, geri alındı). Çuval sorgusuna SHIPPED eklemek yeşil kaldı: `getSackedFinishedRolls`
+//   ayrıca `isFinishedCell` ile süzer (çift sed, bilinçli).
 // NEGATİF SONDA (2026-11-13, kırmızı verdi, geri alındı):
 //   · `boyahanedeTop` ← tüm açık toplar (kategori süzgeci yok) → §3 fixture farkı + "boyahanedeki top" ✗
 //   · firma `kategoriler` boş dizi → §3 "firma başına top + kategori uyuşmazlığı" ✗
@@ -67,7 +70,7 @@ const CLOUD_SNAPSHOT_NAMES = new Set([
   "emanet-bakiye", "fason-acik", "hizmet-geliri", "stok-karnesi", "stok-kalem", "acik-siparis-karsilama", "rapor-katalogu", "uretim-akisi", "saglik", "tesis", "cari-ozeti",
 ]);
 const STAMP = `TEST-D3B-${Date.now()}-`;
-const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[], wos: [] as string[], dispatches: [] as string[] };
+const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[], wos: [] as string[], dispatches: [] as string[], sacks: [] as string[] };
 const NOT_IN_ADNAN =["ozet-finans", "ozet-masraf", "karlilik-ozet", "hizmet-geliri", "emanet-bakiye", "saglik"];
 
 function keysOf(v: unknown, out: Set<string> = new Set()): Set<string> {
@@ -146,7 +149,21 @@ async function main(): Promise<void> {
   fx.customers.push(customer.id);
   for (const [i, [qty, status]] of ([[123.4, "WAREHOUSE"], [50, "WAREHOUSE"], [77, "STOCK"]] as const).entries()) {
     const r = await prisma.roll.create({
-      data: { itemId: item.id, initialQty: qty, currentQty: qty, status, entrySource: "SUPPLIER_RECEIPT", barcode: `${STAMP}R${i}` },
+      // İlk mamul top etiketi müşteri adına basılmış (2.12.4 `etiketMusteri`); ötekiler stok etiketi.
+      data: { itemId: item.id, initialQty: qty, currentQty: qty, status, entrySource: "SUPPLIER_RECEIPT", barcode: `${STAMP}R${i}`, labelCustomerId: i === 0 ? customer.id : null },
+      select: { id: true },
+    });
+    fx.rolls.push(r.id);
+  }
+  // Çuval (2.12.4): carisi ayrı müşteri; içinde 2 bitmiş top (30 m etiketi müşteriye · 20 m stok etiketi) + 1 SHIPPED top
+  // (çıkmış mal, sayılmaz). Raf rakamlarına (karne, kalem) KARIŞMAMALI; çuval sayısı/metresi ayrı gelmeli.
+  const sackCustomer = await prisma.customer.create({ data: { code: `${STAMP}C2`, name: `${STAMP}Çuval Carisi` }, select: { id: true } });
+  fx.customers.push(sackCustomer.id);
+  const sack = await prisma.sack.create({ data: { sackNo: `${STAMP}S`, customerId: sackCustomer.id }, select: { id: true } });
+  fx.sacks.push(sack.id);
+  for (const [i, [qty, status, label]] of ([[30, "WAREHOUSE", customer.id], [20, "A1_STOCK", null], [10, "SHIPPED", null]] as const).entries()) {
+    const r = await prisma.roll.create({
+      data: { itemId: item.id, initialQty: qty, currentQty: qty, status, entrySource: "SUPPLIER_RECEIPT", barcode: `${STAMP}S${i}`, sackId: sack.id, labelCustomerId: label },
       select: { id: true },
     });
     fx.rolls.push(r.id);
@@ -190,6 +207,23 @@ async function main(): Promise<void> {
   check("fixture farkı: ham stok +77 m", delta("stok-karnesi", "hamMiktar") === 77, `${delta("stok-karnesi", "hamMiktar")}`);
   check("fixture farkı: açık sipariş +1 kalem / +300 m", delta("acik-siparis-karsilama", "acikKalem") === 1 && delta("acik-siparis-karsilama", "acikMiktar") === 300);
   for (const r of acc.rows) check(r.soru, rowOk(r), `anlık ${r.anlik} · SQL ${r.sql} · panel ${r.panel ?? "—"}`);
+  // Kime/nerede (2.12.4): etiket müşterisi · çuval no · çuval carisi; çuvaldaki bitmiş toplar ayrı dizi + fabrika sayısı.
+  type Bitmis = { toplar: Array<Record<string, unknown>>; cuvaldakiToplar: Array<Record<string, unknown>>; cuvaldaTop: number; cuvaldaMetre: number };
+  const kalemOf = (snaps: typeof b.snapshots) => (snaps.find((x) => x.projection === "stok-kalem")?.data as { bitmis: Bitmis }).bitmis;
+  const [kNow, kBase] = [kalemOf(acc.snapshots), kalemOf(base)];
+  const shelfTop = kNow.toplar.find((t) => t.topNo === `${STAMP}R0`);
+  check("raf topu: etiket müşterisi adı, çuval yok", shelfTop?.etiketMusteri === `${STAMP}Müşteri` && shelfTop.cuvalNo === null && shelfTop.cuvalCari === null, JSON.stringify(shelfTop));
+  check("raf topu (stok etiketi): etiket müşterisi null", kNow.toplar.find((t) => t.topNo === `${STAMP}R1`)?.etiketMusteri === null);
+  check("çuvaldaki top raf listesine karışmaz", !kNow.toplar.some((t) => String(t.topNo).startsWith(`${STAMP}S`)));
+  const sackTops = kNow.cuvaldakiToplar.filter((t) => String(t.topNo).startsWith(`${STAMP}S`));
+  check("çuvaldaki bitmiş toplar: 2 (SHIPPED yok)", sackTops.length === 2, sackTops.map((t) => t.topNo).join(","));
+  const s0 = sackTops.find((t) => t.topNo === `${STAMP}S0`);
+  check("çuvaldaki top: çuval no · çuval carisi · etiket müşterisi · kalem alanları",
+    s0?.cuvalNo === `${STAMP}S` && s0.cuvalCari === `${STAMP}Çuval Carisi` && s0.etiketMusteri === `${STAMP}Müşteri` && s0.urun === `${STAMP}Kumaş` && s0.metre === 30,
+    JSON.stringify(s0));
+  check("fixture farkı: çuvalda +2 top / +50 m", kNow.cuvaldaTop - kBase.cuvaldaTop === 2 && Math.round((kNow.cuvaldaMetre - kBase.cuvaldaMetre) * 10) / 10 === 50,
+    `${kNow.cuvaldaTop - kBase.cuvaldaTop} · ${kNow.cuvaldaMetre - kBase.cuvaldaMetre}`);
+  check("çuvalda sayısı = dizi uzunluğu", kNow.cuvaldaTop === kNow.cuvaldakiToplar.length);
 
   // §4–§5 ortak: geçerli anahtar, sahte bulut.
   const dir = mkdtempSync(path.join(tmpdir(), "tst-patron-anlik-"));
@@ -267,6 +301,7 @@ main()
     if (fx.orders.length) await prisma.orderLine.deleteMany({ where: { orderId: { in: fx.orders } } });
     if (fx.orders.length) await prisma.order.deleteMany({ where: { id: { in: fx.orders } } });
     if (fx.rolls.length) await prisma.roll.deleteMany({ where: { id: { in: fx.rolls } } });
+    if (fx.sacks.length) await prisma.sack.deleteMany({ where: { id: { in: fx.sacks } } });
     if (fx.wos.length) await prisma.workOrderStep.deleteMany({ where: { workOrderId: { in: fx.wos } } });
     if (fx.wos.length) await prisma.workOrder.deleteMany({ where: { id: { in: fx.wos } } });
     if (fx.items.length) await prisma.item.deleteMany({ where: { id: { in: fx.items } } });

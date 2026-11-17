@@ -32,15 +32,25 @@ const CariSummary = z.strictObject({
 });
 
 // Stok kalem listesi: kalem (ham = kumaş; bitmiş = kumaş + en + renk + kat) ve raftaki toplar; metre ile kg ayrı (toplanmaz).
-const StockKalemSection = z.strictObject({
+// 2.12.4: top etiket müşterisi (`Roll.labelCustomerId`, sahiplik değil) · çuval no · çuval carisi (ad); bitmiş bölüm
+// çuvaldaki bitmiş topları AYRI dizide (`cuvaldakiToplar`, kalemin görünen alanlarıyla) ve sayısını/metresini taşır.
+const TopFields = {
+  id: z.string().uuid(), topNo: Str.nullable(), kalem: Str, metre: Num, kg: Num.nullable(), parti: Str.nullable(), depo: Str.nullable(), gun: Num.nullable(),
+  etiketMusteri: Str.nullable(), cuvalNo: Str.nullable(), cuvalCari: Str.nullable(),
+};
+const StockKalemSectionFields = {
   toplamTop: Num, toplamMetre: Num,
   kalemler: z.array(z.strictObject({
     anahtar: Str, urun: Str, en: Num.nullable(), renk: Str.nullable(), kat: Str.nullable(),
     top: Num, metre: Num, kg: Num.nullable(), enEskiGun: Num.nullable(),
   })),
-  toplar: z.array(z.strictObject({
-    id: z.string().uuid(), topNo: Str.nullable(), kalem: Str, metre: Num, kg: Num.nullable(), parti: Str.nullable(), depo: Str.nullable(), gun: Num.nullable(),
-  })),
+  toplar: z.array(z.strictObject(TopFields)),
+};
+const StockKalemSection = z.strictObject(StockKalemSectionFields);
+const StockKalemFinishedSection = z.strictObject({
+  ...StockKalemSectionFields,
+  cuvaldaTop: Num, cuvaldaMetre: Num,
+  cuvaldakiToplar: z.array(z.strictObject({ ...TopFields, urun: Str, en: Num.nullable(), renk: Str.nullable(), kat: Str.nullable() })),
 });
 
 export const SNAPSHOT_WIRE_SCHEMAS = {
@@ -61,7 +71,7 @@ export const SNAPSHOT_WIRE_SCHEMAS = {
     yasKovalari: z.array(z.strictObject({ anahtar: Str, etiket: Str, adet: Num, miktar: Num, yuzde: Num })),
     urunler: z.array(z.strictObject({ anahtar: Str, etiket: Str, adet: Num, miktar: Num, enEskiGun: Num.nullable(), siparissizMiktar: Num })),
   }),
-  "stok-kalem": z.strictObject({ ham: StockKalemSection, bitmis: StockKalemSection }),
+  "stok-kalem": z.strictObject({ ham: StockKalemSection, bitmis: StockKalemFinishedSection }),
   "acik-siparis-karsilama": z.strictObject({
     ozet: z.strictObject({
       acikKalem: Num, acikMiktar: Num, depodanMiktar: Num, uretimdenMiktar: Num, karsilanmayanMiktar: Num, hamEksikMiktar: Num,

@@ -20,7 +20,9 @@
 // Görünen ad kat kataloğundan (`loadFoldTypeCatalog`); katalogda yoksa kod.
 // =============================================================================
 
-import { isFinishedCell, isRawCell, loadShelfCells, loadShelfRollExtras, type StockCell } from "./stock-scorecard.report.service";
+import {
+  isFinishedCell, isRawCell, loadSackedFinishedCells, loadShelfCells, loadShelfRollExtras, type ShelfRollExtras, type StockCell,
+} from "./stock-scorecard.report.service";
 import { loadFoldTypeCatalog } from "../helpers/fold-type";
 import { round1 } from "./_breakdown";
 import { factoryYmd } from "../../constants/time";
@@ -156,6 +158,25 @@ export interface StockKalemRoll {
   days: number | null;
   /** Rafa giriş FABRİKA günü (`YYYY-MM-DD`, statü damgasından); damgasız top `null`. */
   shelfDay: string | null;
+  /** Etikette yazan müşteri (`Roll.labelCustomerId`, sahiplik DEĞİL); stok etiketi / eski top `null`. */
+  labelCustomerName: string | null;
+  /** Çuval no ve çuval carisi; raf topunda ikisi de `null`. */
+  sackNo: string | null;
+  sackCustomerName: string | null;
+}
+
+/** Çuvaldaki bitmiş top: kalemi raf kalem listesinde olmayabilir ⇒ kalemin görünen alanlarını kendisi taşır. */
+export interface StockKalemSackRoll extends StockKalemRoll {
+  itemName: string;
+  width: number | null;
+  colorName: string | null;
+  foldName: string | null;
+}
+
+export interface StockKalemSacked {
+  count: number;
+  qty: number;
+  rolls: StockKalemSackRoll[];
 }
 
 export interface StockKalemRolls {
@@ -177,7 +198,15 @@ export async function getStockKalemRolls(
   const ham = filter.section === "bitmis" ? [] : pick(cells.filter(isRawCell), hamKalemKey);
   const bitmis = filter.section === "ham" ? [] : pick(cells.filter(isFinishedCell), bitmisKalemKey);
   const extras = await loadShelfRollExtras([...ham, ...bitmis].map((x) => x.c.rollId));
-  const toRow = ({ c, key }: { c: StockCell; key: string }): StockKalemRoll => {
+  const toRow = rollRow(extras);
+  return { ham: ham.map(toRow).sort(rollOrder), bitmis: bitmis.map(toRow).sort(rollOrder) };
+}
+
+const rollOrder = (a: StockKalemRoll, b: StockKalemRoll) =>
+  (b.days ?? -1) - (a.days ?? -1) || (a.barcode ?? "").localeCompare(b.barcode ?? "", "tr") || a.rollId.localeCompare(b.rollId);
+
+function rollRow(extras: Map<string, ShelfRollExtras>) {
+  return ({ c, key }: { c: StockCell; key: string }): StockKalemRoll => {
     const e = extras.get(c.rollId);
     return {
       rollId: c.rollId, barcode: c.barcode, kalemKey: key, qty: round1(c.qty),
@@ -185,9 +214,31 @@ export async function getStockKalemRolls(
       batchNumber: e?.batchNumber ?? null, warehouseName: e?.warehouseName ?? null,
       days: c.days === null ? null : round1(c.days),
       shelfDay: e?.statusChangedAt ? factoryYmd(e.statusChangedAt) : null,
+      labelCustomerName: e?.labelCustomerName ?? null,
+      sackNo: e?.sackNo ?? null,
+      sackCustomerName: e?.sackCustomerName ?? null,
     };
   };
-  const order = (a: StockKalemRoll, b: StockKalemRoll) =>
-    (b.days ?? -1) - (a.days ?? -1) || (a.barcode ?? "").localeCompare(b.barcode ?? "", "tr") || a.rollId.localeCompare(b.rollId);
-  return { ham: ham.map(toRow).sort(order), bitmis: bitmis.map(toRow).sort(order) };
+}
+
+/**
+ * Çuvaldaki bitmiş toplar (`loadSackedFinishedCells`) — raf kümesine KARIŞMAZ, kalem satırlarına girmez. Sayı ve metre
+ * burada (fabrika) hesaplanır; sıra raf topları gibi en yaşlı önce. Kalem anahtarı raf kalemiyle aynı fonksiyondan.
+ */
+export async function getSackedFinishedRolls(): Promise<StockKalemSacked> {
+  const [cells, foldCatalog] = await Promise.all([loadSackedFinishedCells(), loadFoldTypeCatalog()]);
+  const finished = cells.filter(isFinishedCell);
+  const foldName = new Map(foldCatalog.values.map((v) => [v.code, v.name]));
+  const extras = await loadShelfRollExtras(finished.map((c) => c.rollId));
+  const toRow = rollRow(extras);
+  const rolls = finished.map((c): StockKalemSackRoll => ({
+    ...toRow({ c, key: bitmisKalemKey(c) }),
+    itemName: c.itemName, width: c.width, colorName: c.colorName,
+    foldName: c.foldType === null ? null : (foldName.get(c.foldType) ?? c.foldType),
+  }));
+  return {
+    count: finished.length,
+    qty: round1(finished.reduce((a, c) => a + c.qty, 0)),
+    rolls: rolls.sort(rollOrder),
+  };
 }

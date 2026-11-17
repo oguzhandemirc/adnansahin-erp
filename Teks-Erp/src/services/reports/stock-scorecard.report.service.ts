@@ -151,6 +151,25 @@ function specKey(itemId: string, colorId: string | null, width: number | null): 
  * top artık "raf" değildir; kalırsa ölü stok rakamı çıkmak üzere olan malı da sayardı.
  */
 export async function loadShelfCells(): Promise<StockCell[]> {
+  return loadCells(Prisma.sql`
+    r.status::text IN (${Prisma.join([...FINISHED, ...RAW])})
+      AND r."shipmentId" IS NULL
+      AND r."sackId" IS NULL`);
+}
+
+/**
+ * Çuvaldaki BİTMİŞ toplar (2026-11-17, patron Stok "top bazında"): çuvala girmiş ama kamyona çıkmamış
+ * (`SHIPPED`a yalnız DISPATCHED'te çekilir) bitmiş top — sevkiyata atanmış (kapı önü) çuval dahil.
+ * Raf kümesine KARIŞMAZ: karne, kalem satırları ve ölü stok yalnız `loadShelfCells`ten doğar.
+ * Bitmiş tanımı (`isFinishedCell` statüleri) raf kümesiyle aynıdır.
+ */
+export async function loadSackedFinishedCells(): Promise<StockCell[]> {
+  return loadCells(Prisma.sql`
+    r.status::text IN (${Prisma.join(FINISHED)})
+      AND r."sackId" IS NOT NULL`);
+}
+
+async function loadCells(where: Prisma.Sql): Promise<StockCell[]> {
   const rows = await prisma.$queryRaw<
     Array<{
       rollId: string; barcode: string | null; itemId: string; itemName: string;
@@ -175,9 +194,7 @@ export async function loadShelfCells(): Promise<StockCell[]> {
     FROM rolls r
     JOIN items i       ON i.id = r."itemId"
     LEFT JOIN colors c ON c.id = r."colorId"
-    WHERE r.status::text IN (${Prisma.join([...FINISHED, ...RAW])})
-      AND r."shipmentId" IS NULL
-      AND r."sackId" IS NULL
+    WHERE ${where}
   `);
   return rows.map((r) => ({
     rollId: r.rollId,
@@ -196,18 +213,32 @@ export async function loadShelfCells(): Promise<StockCell[]> {
   }));
 }
 
-/** Raf topunun parti/depo/statü damgası — `loadShelfCells` sorgusuna eklenmez (karne her turda koşar); yalnız kalem sekmesinin top listesi okur. */
-export interface ShelfRollExtras { batchNumber: string | null; warehouseName: string | null; statusChangedAt: Date | null }
+/**
+ * Raf topunun parti/depo/statü damgası — `loadShelfCells` sorgusuna eklenmez (karne her turda koşar); yalnız kalem sekmesinin top listesi okur.
+ * Kime/nerede (2026-11-17): etiket müşterisi `Roll.labelCustomerId` (basılmış kâğıdın izi — emanet `ownerCustomerId`
+ * DEĞİL, iş emri müşterisi DEĞİL) · çuval no `Roll.sackId → Sack.sackNo` · çuval carisi `Sack.customerId`. Ad, kartın bugünkü adıdır.
+ */
+export interface ShelfRollExtras {
+  batchNumber: string | null; warehouseName: string | null; statusChangedAt: Date | null;
+  labelCustomerName: string | null; sackNo: string | null; sackCustomerName: string | null;
+}
 export async function loadShelfRollExtras(ids: string[]): Promise<Map<string, ShelfRollExtras>> {
   if (ids.length === 0) return new Map();
   const rows = await prisma.$queryRaw<Array<ShelfRollExtras & { id: string }>>(Prisma.sql`
-    SELECT r.id, b."batchNumber" AS "batchNumber", w.name AS "warehouseName", r."statusChangedAt" AS "statusChangedAt"
+    SELECT r.id, b."batchNumber" AS "batchNumber", w.name AS "warehouseName", r."statusChangedAt" AS "statusChangedAt",
+           lc.name AS "labelCustomerName", s."sackNo" AS "sackNo", sc.name AS "sackCustomerName"
     FROM rolls r
     LEFT JOIN batches b    ON b.id = r."batchId"
     LEFT JOIN warehouses w ON w.id = r."warehouseId"
+    LEFT JOIN customers lc ON lc.id = r."labelCustomerId"
+    LEFT JOIN sacks s      ON s.id = r."sackId"
+    LEFT JOIN customers sc ON sc.id = s."customerId"
     WHERE r.id = ANY(${ids}::uuid[])
   `);
-  return new Map(rows.map((r) => [r.id, { batchNumber: r.batchNumber, warehouseName: r.warehouseName, statusChangedAt: r.statusChangedAt }]));
+  return new Map(rows.map((r) => [r.id, {
+    batchNumber: r.batchNumber, warehouseName: r.warehouseName, statusChangedAt: r.statusChangedAt,
+    labelCustomerName: r.labelCustomerName, sackNo: r.sackNo, sackCustomerName: r.sackCustomerName,
+  }]));
 }
 
 export async function getStockScorecard(): Promise<StockScorecard> {

@@ -25,6 +25,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 - Anlık hesabı fabrikanın yazma yoluna yük bindirmez: yalnız eşitleme işinde, aralık başına en çok bir kez, kaynaklar sırayla ve tur başına bir kez hesaplanır; bir anlığın hatası yalnız o anlığı düşürür. [bekçi: test_patron_bulut_anliklar]
 - `ozet`in bir bölümünün hatası özeti düşürmez: her bölüm (`ozet.stok` · `ozet.siparis` · `ozet.uretim` · `ozet.sevkiyat` · `ozet.fason`) ayrı kurulur, hatalı bölüm o turda gönderilmez ve tek satır log'a düşer. [bekçi: test_patron_bulut_anliklar]
 - `stok-kalem` anlığı panelin "Kalem ve top" sekmesiyle aynı tanımdır: kalemler `getStockKalem`den, toplar aynı raf okumasından gelir; yaş fabrika takvim günüdür, bu yüzden stok değişmedikçe içerik özeti gün içinde sabit kalır. [bekçi: test_patron_bulut_anliklar]
+- Stokta "top kimin, nerede" (2.12.4): sahiplik yalnız ETİKETTEN okunur (`etiketMusteri` = `Roll.labelCustomerId`; emanet `ownerCustomerId` ve iş emri müşterisi kullanılmaz), yer çuvaldan (`cuvalNo`, `cuvalCari`); çuvaldaki bitmiş toplar raf `toplar`ına karışmaz, `bitmis.cuvaldakiToplar` + fabrikanın saydığı `cuvaldaTop`/`cuvaldaMetre` ile ayrı gider (açıkta = `toplamTop`), raf rakamları değişmez. [bekçi: test_patron_bulut_anliklar]
 - Kirli-bayrak Proxy'si (ana üründeki `withDirtyTracking`) bilerek taşınmadı: değişiklik en geç bir yoklama aralığı sonra gider. [inceleme]
 
 ### Telefondan yazma (gelen kutusu, D4)

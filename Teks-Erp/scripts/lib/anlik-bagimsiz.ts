@@ -95,6 +95,13 @@ export async function accuracyRows(now: Date): Promise<{ rows: AccuracyRow[]; sn
   for (const t of [...kalem.ham.toplar, ...kalem.bitmis.toplar]) topByKalem.set(String(t.kalem), (topByKalem.get(String(t.kalem)) ?? 0) + 1);
   const kalemOff = [...kalem.ham.kalemler, ...kalem.bitmis.kalemler].filter((r) => topByKalem.get(String(r.anahtar)) !== n(r.top)).length;
   rows.push({ soru: "stok-kalem: kalem top sayısı ≠ topları", anlik: kalemOff, sql: 0, panel: null, tol: 0 });
+  // 3c) Çuvaldaki bitmiş top (2.12.4): çuvala girmiş, kamyona çıkmamış (SHIPPED değil) bitmiş top — raf kümesinden ayrı.
+  const [sackSql] = await prisma.$queryRaw<Array<{ qty: number; cnt: number }>>(Prisma.sql`
+    SELECT COALESCE(SUM("currentQty"), 0)::float AS qty, COUNT(*)::int AS cnt FROM rolls
+    WHERE status::text IN ('WAREHOUSE', 'A1_STOCK') AND "sackId" IS NOT NULL`);
+  const sacked = (kalem.bitmis as unknown as { cuvaldaTop: number; cuvaldaMetre: number; cuvaldakiToplar: Obj[] });
+  rows.push({ soru: "stok-kalem: çuvaldaki bitmiş top", anlik: sacked.cuvaldaTop, sql: n(sackSql?.cnt), panel: sacked.cuvaldakiToplar.length, tol: 0 });
+  rows.push({ soru: "stok-kalem: çuvaldaki bitmiş metre", anlik: sacked.cuvaldaMetre, sql: n(sackSql?.qty), panel: null, tol: 0.05 });
 
   // 4) İstasyon bazında üretim: kuyruk (anlık) ve bugün tamamlanan (iç istasyon: bugün çıkışı olan top).
   const stations = await DashboardService.getStationsLiveState();
