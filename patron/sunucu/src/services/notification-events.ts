@@ -159,7 +159,9 @@ export async function generateForFacility(ctx: CloudContext, tesisId: string, no
     const settingsOf = new Map(accounts.map((a) => [a.id, resolveSettings(cfg.byAccount.get(a.id) ?? null, cfg.facility).settings]));
     const snaps = await tx.projectionRow.findMany({ where: { tesisId, projection: { in: [...SNAPSHOT_SOURCES, FACILITY_TIMEZONE_SOURCE] }, deletedAt: null }, select: { projection: true, data: true } });
     const state = await tx.syncState.findUnique({ where: { tesisId }, select: { lastPackageAt: true, createdAt: true } });
-    const orders = await tx.projectionRow.findMany({
+    // `BILDIRIM_KAYNAGI=fabrika`: yeni sipariş bildirimi yalnız fabrikadan gelir (`/v1/bildirimler`), bulut türetmez.
+    const ordersFromCloud = ctx.config.BILDIRIM_KAYNAGI !== "fabrika";
+    const orders = !ordersFromCloud ? [] : await tx.projectionRow.findMany({
       where: { tesisId, projection: ORDER_SOURCE, deletedAt: null, createdAt: { gte: new Date(nowMs - NEW_ORDER_WINDOW_MS) } },
       select: { recordId: true, data: true, createdAt: true },
       orderBy: [{ createdAt: "asc" }, { recordId: "asc" }],

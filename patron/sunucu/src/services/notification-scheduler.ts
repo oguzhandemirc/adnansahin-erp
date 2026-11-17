@@ -62,6 +62,7 @@ export async function runNotificationRound(ctx: CloudContext, transport: PushTra
 export class NotificationScheduler {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
+  private again = false;
 
   constructor(
     private readonly ctx: CloudContext,
@@ -79,9 +80,20 @@ export class NotificationScheduler {
     this.timer = null;
   }
 
+  /** Turu hemen koş (fabrika teslimi kabul edildi). Tur sürüyorsa bitince BİR kez daha koşar; dürtmeler birleşir. */
+  nudge(): void {
+    if (!this.timer) return;
+    if (this.running) {
+      this.again = true;
+      return;
+    }
+    void this.runOnce();
+  }
+
   async runOnce(nowMs: number = this.ctx.now()): Promise<void> {
     if (this.running) return;
     this.running = true;
+    this.again = false;
     try {
       const t = await runNotificationRound(this.ctx, this.runtime.transport, nowMs);
       if (t.created + t.sent + t.failed + t.checked > 0) console.log(`[patron] bildirim: ${t.created} doğdu · ${t.sent} gitti · ${t.skipped} atlandı · ${t.deferred} ertelendi · ${t.retried} yeniden · ${t.failed} başarısız · ${t.checked} makbuz · ${t.invalid} kayıtsız cihaz`);
@@ -89,6 +101,10 @@ export class NotificationScheduler {
       console.error(`[patron] bildirim turu başarısız: ${(err as Error).name}`);
     } finally {
       this.running = false;
+      if (this.again && this.timer) {
+        this.again = false;
+        void this.runOnce();
+      }
     }
   }
 }

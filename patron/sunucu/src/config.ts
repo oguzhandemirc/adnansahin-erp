@@ -73,6 +73,10 @@ const EnvSchema = z
      *  `acik` yalnız `gercek` kipte ve `EXPO_ERISIM_BELIRTECI` verilmişse etkinleşir (yoksa kapalı kalır, tek satır günlük). */
     BILDIRIM_NATIVE_PUSH: z.enum(["kapali", "acik"]).default("kapali"),
     BILDIRIM_ARALIGI_SN: positiveInt(5, 3600).default(30),
+    /** "Yeni sipariş" bildiriminin kaynağı: `bulut` (varsayılan — bugünkü davranış: bulut projeksiyondan türetir) ·
+     *  `fabrika` (bulutun kendi türetmesi DURUR; bildirim yalnız fabrikadan `POST /v1/bildirimler` ile gelir). İkisi aynı
+     *  anahtarı (`yeni-siparis:<id>`) kullanır: `bulut` iken fabrika teslimi de gelse tek satır doğar. */
+    BILDIRIM_KAYNAGI: z.enum(["bulut", "fabrika"]).default("bulut"),
     /** Sonuçlanmış bildirim satırı bu kadar gün sonra budanır (telemetri). */
     BILDIRIM_SAKLAMA_GUN: positiveInt(7, 3650).default(90),
     /** Web push VAPID `sub` (mailto: ya da https:) — `gercek` kipte zorunlu. Anahtar çifti ANAHTAR_DIZINI'nde. */

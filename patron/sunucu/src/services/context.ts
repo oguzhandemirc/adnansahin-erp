@@ -18,6 +18,8 @@ export interface CloudContext {
   readonly now: () => number;
   /** Bildirim çalışma zamanı (`BILDIRIM_KIPI=kapali` iken yok). */
   readonly notifications?: NotificationRuntime | null;
+  /** Bildirim turunu hemen dürt (fabrika teslimi kabul edildi; 30 sn turu beklenmez). Kip kapalıyken yok/etkisiz. */
+  readonly notificationNudge?: () => void;
   /** Etkili Destek çalışma zamanı; yoksa destek KAPALI (uçlar 403 `MODULE_DISABLED`, webhook 404, dış istek yok). */
   readonly destek?: SupportRuntime | null;
 }

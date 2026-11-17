@@ -576,6 +576,8 @@ export const NOTIFICATION_KINDS = [
   "gunluk-uretim",
   "esitleme-gecikti",
   "yeni-siparis",
+  "yeni-is-emri",
+  "yeni-sevk",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

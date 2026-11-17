@@ -23,6 +23,7 @@ export const SYNC_PATHS = {
   REPORT_CLAIM: "/v1/rapor/al",
   REPORT_RESULT: "/v1/rapor/sonuc",
   USERS: "/v1/kullanicilar",
+  NOTIFICATIONS: "/v1/bildirimler",
 } as const;
 export type SyncPath = (typeof SYNC_PATHS)[keyof typeof SYNC_PATHS];
 
@@ -309,6 +310,57 @@ export type UsersPushRequest = z.infer<typeof UsersPushRequestSchema>;
 const Count = z.number().int().min(0).default(0);
 export const UsersPushResponseSchema = z.object({ v: z.literal(ENVELOPE_VERSION), ozet: z.string(), eklenen: Count, guncellenen: Count, kapatilan: Count });
 export type UsersPushResponse = z.input<typeof UsersPushResponseSchema>;
+
+// ---------------------------------------------------------------- bildirim köprüsü (2026-11-17, sözleşme istisnası)
+
+/**
+ * Fabrikada doğan bildirim TESLİMLERİ (kişi başına) buluta gider; bulut telefona iletir (`POST /v1/bildirimler`).
+ * Bildirimi TEK yerde fabrika üretir; okundu bilgisinin otoritesi fabrikanın teslimidir. İstek iki yönü birlikte taşır:
+ *  · `teslimler`: henüz buluta gitmemiş teslimler — `hesapId` = fabrika `users.id` (= bulut hesap kimliği),
+ *    `tekilAnahtar` = `<tür>:<varlık id>` (bulutun kendi türettiği satırla AYNI anahtar ⇒ çift bildirim doğmaz);
+ *  · `okunanlar`: fabrikada okunup buluta bildirilmemiş teslimler (panelde okunan + yanıtta gelip fabrikaya yazılan
+ *    telefon okunanlarının TEYİDİ).
+ * Yanıt `okunanlar`: bulutta/telefonda okunmuş, fabrikanın henüz teyit etmediği teslimler — fabrika TEYİT edene
+ * (sonraki isteğin `okunanlar`ında geri yollayana) dek her yanıtta tekrar gelir (idempotent). `tercihler` ileride
+ * telefondan değişen bildirim tercihleri içindir (bugün hep boş). Bulut hesabı yoksa/pasifse teslim sayılıp atlanır.
+ */
+export const NOTIFICATION_PUSH_MAX = 200;
+export const NOTIFICATION_READS_MAX = 1000;
+const NotificationKindName = z.string().regex(/^[a-z][a-z0-9-]{1,39}$/);
+export const FactoryNotificationSchema = z
+  .strictObject({
+    teslimId: Uuid,
+    hesapId: Uuid,
+    tur: NotificationKindName,
+    tekilAnahtar: z.string().max(200).regex(/^[a-z][a-z0-9-]*:[0-9a-f-]{36}$/),
+    baslik: z.string().trim().min(1).max(120),
+    metin: z.string().max(500),
+    rota: z.string().max(200).nullable(),
+    yazar: z.string().max(100),
+    olusturulma: Iso,
+  })
+  .refine((n) => n.tekilAnahtar.startsWith(`${n.tur}:`), "tekilAnahtar türle başlamalı");
+export type FactoryNotification = z.infer<typeof FactoryNotificationSchema>;
+export const NotificationReadSchema = z.strictObject({ teslimId: Uuid, okundu: Iso });
+export type NotificationRead = z.infer<typeof NotificationReadSchema>;
+export const NotificationsPushRequestSchema = z
+  .strictObject({
+    v: z.literal(ENVELOPE_VERSION),
+    teslimler: z.array(FactoryNotificationSchema).max(NOTIFICATION_PUSH_MAX),
+    okunanlar: z.array(NotificationReadSchema).max(NOTIFICATION_READS_MAX),
+  })
+  .refine((r) => distinct(r.teslimler.map((t) => t.teslimId)) && distinct(r.okunanlar.map((o) => o.teslimId)), "Teslim kimliği tekrar ediyor");
+export type NotificationsPushRequest = z.infer<typeof NotificationsPushRequestSchema>;
+export const NotificationsPushResponseSchema = z.object({
+  v: z.literal(ENVELOPE_VERSION),
+  /** Yeni doğan bulut satırı · bulutun kendi satırına bağlanan · hesabı yok/pasif ya da türü bulutta yok diye atlanan. */
+  alinan: Count,
+  bagli: Count,
+  atlanan: Count,
+  okunanlar: z.array(z.object({ teslimId: Uuid, okundu: Iso })).max(NOTIFICATION_READS_MAX).default([]),
+  tercihler: z.array(z.unknown()).default([]),
+});
+export type NotificationsPushResponse = z.input<typeof NotificationsPushResponseSchema>;
 
 // ---------------------------------------------------------------- rapor isteği (§7, S13, S14)
 

@@ -8,6 +8,7 @@ import { CloudError, badRequest } from "../lib/errors";
 import type { CloudContext } from "../services/context";
 import type { DoorbellTopic } from "../services/doorbell";
 import { claimInbox, recordInboxResults } from "../services/inbox.service";
+import { applyFactoryNotifications } from "../services/factory-notifications.service";
 import { authenticateFactory, type FactoryCaller } from "../services/installation-auth";
 import { claimReports, recordReportResult } from "../services/report.service";
 import { applyPackage, decodeBody } from "../services/sync.service";
@@ -16,6 +17,7 @@ import {
   InboxClaimRequestSchema,
   InboxResultRequestSchema,
   MAX_COMPRESSED_BYTES,
+  NotificationsPushRequestSchema,
   REPORT_CLAIM_HOLD_MS,
   ReportClaimRequestSchema,
   ReportResultRequestSchema,
@@ -84,6 +86,11 @@ export function createFactoryRouter(ctx: CloudContext): Router {
   router.post(SYNC_PATHS.USERS.replace("/v1", ""), async (req: Request, res: Response) => {
     const r = await authenticated(ctx, req, SYNC_PATHS.USERS);
     res.json(await applyUserSet(ctx, r.caller, strictJson(UsersPushRequestSchema, r, req), r.nowMs));
+  });
+
+  router.post(SYNC_PATHS.NOTIFICATIONS.replace("/v1", ""), async (req: Request, res: Response) => {
+    const r = await authenticated(ctx, req, SYNC_PATHS.NOTIFICATIONS);
+    res.json(await applyFactoryNotifications(ctx, r.caller, strictJson(NotificationsPushRequestSchema, r, req), r.nowMs));
   });
 
   router.post(SYNC_PATHS.REPORT_CLAIM.replace("/v1", ""), async (req: Request, res: Response) => {

@@ -450,4 +450,11 @@ export default [
     files: ["src/integrations/destek/**/*.ts"],
     rules: { "max-params": "off" },
   },
+
+  // ── Bulut tel sözleşmesi: `src/cloud-sync/wire/esitleme.ts` bulutla BAYT-EŞİT ve mühürlüdür
+  // (`test_patron_bulut_imza` §0); tek dosyadır, bölünemez. Bulutta aynı istisna (patron/sunucu eslint).
+  {
+    files: ["src/cloud-sync/wire/esitleme.ts"],
+    rules: { "max-lines": "off" },
+  },
 ];

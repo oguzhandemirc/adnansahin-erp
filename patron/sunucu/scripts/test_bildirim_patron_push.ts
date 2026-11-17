@@ -81,7 +81,9 @@ async function main(): Promise<void> {
 
   // ── §2d gövde istisnası: YALNIZ kataloğunda `nativeBody` açık tür ─────────
   const govdeli = NOTIFICATION_KINDS.filter((k) => "body" in (nativePushPayload(ANDROID, { ...DOLU, kind: k }) as Record<string, unknown>));
-  kontrol("§2d ⭐ gövde taşıyan tür kümesi = yalnız yeni-siparis", JSON.stringify(govdeli) === JSON.stringify(["yeni-siparis"]), govdeli.join(","));
+  // Bilinçli istisnalar: yeni-siparis (2026-11-17) + fabrika kaynaklı yeni-is-emri · yeni-sevk (bildirim köprüsü, 2026-11-17).
+  const GOVDELI = ["yeni-siparis", "yeni-is-emri", "yeni-sevk"];
+  kontrol("§2d ⭐ gövde taşıyan tür kümesi = yalnız yeni-siparis · yeni-is-emri · yeni-sevk", JSON.stringify(govdeli) === JSON.stringify(GOVDELI), govdeli.join(","));
   const ys = nativePushPayload(ANDROID, { ...DOLU, kind: "yeni-siparis", body: "ACME · Sipariş 12 · 800 m" }) as Record<string, unknown>;
   kontrol("§2e yeni-siparis: gövde aynen, başka yeni anahtar yok",
     ys.body === "ACME · Sipariş 12 · 800 m" && JSON.stringify(Object.keys(ys).sort()) === JSON.stringify([...NATIVE_PAYLOAD_KEYS, "body"].sort()), JSON.stringify(ys));

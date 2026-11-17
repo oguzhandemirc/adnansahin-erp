@@ -43,6 +43,7 @@ async function main(): Promise<void> {
     const r = await roleBypassesRls(router.db);
     if (r.bypass) throw new Error(`${router.db.label} rolü (${r.role}) RLS'i atlayabiliyor (süper kullanıcı/BYPASSRLS/tablo sahibi) — kiracı yalıtımı yok, açılış DURDU`);
   }
+  let notifier: NotificationScheduler | null = null;
   const ctx: CloudContext = {
     config,
     app,
@@ -52,6 +53,7 @@ async function main(): Promise<void> {
     doorbell: createDoorbell(),
     now: () => Date.now(),
     notifications: createNotificationRuntime(config),
+    notificationNudge: () => notifier?.nudge(),
     // Etkili Destek: anahtar/sır yoksa KAPALI (dış istek yok); açılışta merkeze istek atılmaz.
     destek: createSupportRuntime(process.env),
   };
@@ -62,9 +64,9 @@ async function main(): Promise<void> {
   const maintenance = new MaintenanceScheduler(ctx);
   maintenance.start();
   void maintenance.runOnce();
-  const notifier = ctx.notifications ? new NotificationScheduler(ctx, ctx.notifications) : null;
+  notifier = ctx.notifications ? new NotificationScheduler(ctx, ctx.notifications) : null;
   notifier?.start();
-  console.log(`PATRON_BILDIRIM kip=${config.BILDIRIM_KIPI}`);
+  console.log(`PATRON_BILDIRIM kip=${config.BILDIRIM_KIPI} kaynak=${config.BILDIRIM_KAYNAGI}`);
   console.log(`[patron] ${ctx.destek!.summary}`);
   const security = securityChannelFrom(process.env);
   const stopSecurityAlerts = startSecurityAlerts(security);

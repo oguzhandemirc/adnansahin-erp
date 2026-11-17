@@ -433,10 +433,21 @@ model Notification {
   deliveries    Json?              @map("deliveries")
   /// Expo makbuzu (ikinci aşama) yoklama zamanı: bilet alınmış teslim varken dolu, makbuzlar çözülünce null.
   receiptDueAt  DateTime?          @map("receipt_due_at") @db.Timestamptz
+  /// Kaynak (bildirim köprüsü, 2026-11-17): `bulut` (bulutun kendi türettiği) · `fabrika` (`POST /v1/bildirimler`).
+  /// CHECK `notifications_origin_check`.
+  origin        String             @default("bulut") @map("origin") @db.VarChar(10)
+  /// Fabrikanın teslim kimliği (`notification_deliveries.id`). Bulutun kendi satırı aynı anahtarla önce doğduysa
+  /// fabrika teslimi ona BAĞLANIR (çift bildirim yok, okundu yine eşitlenir).
+  factoryDeliveryId String?        @map("factory_delivery_id") @db.Uuid
+  /// Okundu anı (telefonda ya da fabrikada okundu). NULL = okunmadı; yalnız NULL → an geçişi.
+  readAt        DateTime?          @map("read_at") @db.Timestamptz
+  /// Fabrika bu okunduyu biliyor (teyit). Bağlı satırda `read_at` dolu ∧ bu NULL ⇒ yanıtta fabrikaya geri gider.
+  readSyncedAt  DateTime?          @map("read_synced_at") @db.Timestamptz
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz
 
   @@unique([tesisId, accountId, dedupKey])
+  @@unique([tesisId, factoryDeliveryId])
   @@index([tesisId, status, nextAttemptAt])
   @@index([tesisId, receiptDueAt])
   @@index([tesisId, accountId, createdAt])

@@ -56,6 +56,22 @@ export const KIND_RULES: Readonly<Record<NotificationKind, KindRule>> = {
     // Kullanıcı kararı 2026-11-17: kilit ekranında müşteri · sipariş no · metre görünsün.
     nativeBody: true,
   },
+  // Fabrika kaynaklı türler (bildirim köprüsü, 2026-11-17): olayı fabrika üretir, bulut yalnız iletir.
+  // Gövde kilit ekranına gider (yeni siparişle aynı mantık: kim · ne · ne kadar).
+  "yeni-is-emri": {
+    label: "Yeni iş emri",
+    description: "Fabrikada yeni iş emri açıldı (kendi açtığınız için gelmez)",
+    source: "is-emri",
+    permissions: ["bulut:uretim:oku"],
+    nativeBody: true,
+  },
+  "yeni-sevk": {
+    label: "Yeni sevk",
+    description: "Fabrikada yeni sevkiyat planlandı (kendi açtığınız için gelmez)",
+    source: "sevkiyat",
+    permissions: ["bulut:sevkiyat:oku"],
+    nativeBody: true,
+  },
 };
 
 /** Katalog ölçümü — hata listesi (boşsa tutarlı). Açılışta ve bekçide koşar. */

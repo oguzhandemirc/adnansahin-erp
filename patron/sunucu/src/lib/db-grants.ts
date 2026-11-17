@@ -66,6 +66,9 @@ export const SYNC_COLUMN_GRANTS: ColumnGrants = {
   },
   // Hesap kapanınca / parola değişince açık oturumlar kapanır; belirteç özeti ve istemci OKUNAMAZ.
   sessions: { SELECT: ["id", "tesis_id", "account_id", "closed_at"], UPDATE: ["closed_at", "close_reason", "updated_at"] },
+  // Bildirim köprüsü (`POST /v1/bildirimler`): fabrika teslimini kuyruğa EKLER (tablo düzeyi INSERT), bulutun kendi
+  // satırına bağlar ve okunduyu iki yönde eşitler — gönderim durumu, cihaz sonuçları, metin YAZILAMAZ.
+  notifications: { UPDATE: ["factory_delivery_id", "read_at", "read_synced_at", "updated_at"] },
 };
 
 export const SYNC_GRANTS: Readonly<Record<string, readonly Privilege[]>> = {
@@ -86,6 +89,8 @@ export const SYNC_GRANTS: Readonly<Record<string, readonly Privilege[]>> = {
   installation_routes: ["SELECT", "INSERT"],
   // "Şimdi güncelle" işaretini `/v1/rapor/al` yanıtında TÜKETİR (yalnız `pending_at` NULL'a çekilir).
   sync_requests: ["SELECT", "UPDATE"],
+  // Bildirim köprüsü: UPDATE yalnız kolon düzeyinde (SYNC_COLUMN_GRANTS); silmez.
+  notifications: ["SELECT", "INSERT"],
 };
 
 /** Şemadaki bütün uygulama tabloları (bekçi: şema ↔ bu liste birebir). */

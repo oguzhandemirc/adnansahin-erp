@@ -107,6 +107,11 @@ Kip `.env`ten okunur; yoksa `kapali` (bildirim işi kurulmaz, kuyruk satırı ve
   `EXPO_ERISIM_BELIRTECI_DOSYASI_HOST=./sirlar/expo_erisim_belirteci` · `BILDIRIM_NATIVE_PUSH=acik`; eksikse telefon push'u
   kapalı kalır ve günlükte `PATRON_BILDIRIM native=kapali (<neden>)` görünür.
 - Kapatmak: `.env`te `BILDIRIM_KIPI=kapali` (ya da satırı sil) → `docker compose up -d api` (tek ayar).
+- Bildirim köprüsü (backend 2.13.0): fabrika kendi bildirim teslimlerini `POST /v1/bildirimler` ile gönderir; uç her
+  bulut sürümünde açıktır, kip `kapali` iken teslimler sayılıp atlanır. Göç `20261117170000_bildirim_koprusu` (ekleyici;
+  `migrate deploy` + `db-rolleri.ts`). Kurulum sırası: bulut ÖNCE, sonra backend. "Yeni sipariş"i yalnız fabrikadan
+  almak için `.env`te `BILDIRIM_KAYNAGI=fabrika` → `docker compose up -d api` (günlükte `PATRON_BILDIRIM … kaynak=fabrika`);
+  geri dönüş `BILDIRIM_KAYNAGI=bulut`. `bulut` iken de çift bildirim doğmaz (aynı anahtar).
 
 ## Güncelleme
 

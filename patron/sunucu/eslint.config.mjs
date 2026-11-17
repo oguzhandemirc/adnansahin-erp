@@ -104,6 +104,8 @@ export default [
 
   // ── 1b) Hesap API teli TEK dosyadır ve uygulamada bayt-eşit aynası var (patron-bulutu.md) — bölünemez, boyut tavanı yok.
   { files: ["src/wire/api.ts"], rules: { "max-lines": "off" } },
+  // Eşitleme teli de TEK dosyadır ve fabrikada bayt-eşit aynası var (mühürlü, `test_patron_bulut_imza` §0) — bölünemez.
+  { files: ["src/wire/esitleme.ts"], rules: { "max-lines": "off" } },
 
   // ── 2) Tip bilgili: sahipsiz promise (yalnız src tsconfig kapsamı) ─────────
   {

@@ -111,6 +111,9 @@ services:
       BILDIRIM_KIPI: ${BILDIRIM_KIPI:-kapali}
       BILDIRIM_VAPID_KONU: ${BILDIRIM_VAPID_KONU:-}
       BILDIRIM_NATIVE_PUSH: ${BILDIRIM_NATIVE_PUSH:-kapali}
+      # "Yeni sipariş" bildiriminin kaynağı: bulut (varsayılan = bugünkü davranış) · fabrika (backend 2.13.0 bildirim
+      # köprüsü açıldıktan sonra; bulutun kendi türetmesi durur). Geri dönüş tek ayar: BILDIRIM_KAYNAGI=bulut.
+      BILDIRIM_KAYNAGI: ${BILDIRIM_KAYNAGI:-bulut}
       # Etkili Destek merkez adresi (HTTPS); boş = destek uçları KAPALI (403 MODULE_DISABLED), merkeze istek yok.
       DESTEK_API_URL: ${DESTEK_API_URL:-}
     secrets: [uygulama_parolasi, esitleme_parolasi, destek_api_anahtari, destek_webhook_sirri, expo_erisim_belirteci]
