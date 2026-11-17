@@ -82,6 +82,7 @@ import { nextSeriesNo } from "./number-series.service";
 import { applyDateRange, buildWhereClause } from "../utils/query-parser";
 import { tokenReplay } from "./helpers/token-replay.helper";
 import { isClientTokenP2002 } from "../utils/p2002";
+import { withNotificationsSuppressed } from "./notifications/audit-hook";
 import type { ApiResponse } from "../types/api.types";import { assertItemUsable, assertItemUsableTx, type ItemUsage } from "./helpers/item-usage.helper";
 
 
@@ -1501,11 +1502,12 @@ export class GoodsReceiptService {
     for (const [index, r] of freshRolls.entries()) {
       if (r.status === RollStatus.CANCELLED) continue;
       try {
-        await inventory.softDelete(r.id, userId, {
+        // Fiş iptali belge düzeyidir: top başına "top iptal edildi" bildirimi yağmuru doğmasın (D6a).
+        await withNotificationsSuppressed(() => inventory.softDelete(r.id, userId, {
           confirmActive: true,
           confirmLabelPrinted: true,
           reason: reason?.trim() || `Mal kabul fişi iptali (${receipt.receiptNo})`,
-        });
+        }));
         cancelled.push(r.id);
       } catch (err) {
         skipped.push({ index, itemId: r.id, reason: err instanceof Error ? err.message : "Bilinmeyen hata" });

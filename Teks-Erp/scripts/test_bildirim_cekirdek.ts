@@ -54,6 +54,7 @@ import {
   NOTIFICATION_KIND_KEYS,
   NOTIFICATION_PREFERENCE_PERMISSION,
   notificationKindForAudit,
+  notificationMatchesForAudit,
   type NotificationKind,
 } from "../src/constants/notification-catalog";
 import { PERMISSION_CATALOG } from "../src/constants/permission-catalog";
@@ -131,23 +132,27 @@ async function main(): Promise<void> {
     // ── §0 katalog ↔ çağrı yeri ──────────────────────────────────────────────
     console.log("\n§0 katalog: her türün kaynak denetim çağrısı src'de var; süzgeç türsüz çağrıda null");
     const SRC = path.join(__dirname, "..", "src", "services");
-    const sources: Record<NotificationKind, string[]> = {
+    // Yalnız D1 türleri burada (birincil kaynak); D6a türlerinin tüm kaynakları `test_bildirim_turler` §0'da.
+    const sources: Partial<Record<NotificationKind, string[]>> = {
       "yeni-siparis": ["order.service.ts", "patron-inbox/order-create.ts"],
       "yeni-is-emri": ["workorder.service.ts"],
       "yeni-sevk": ["shipping.service.ts"],
     };
     for (const kind of NOTIFICATION_KIND_KEYS) {
-      const s = NOTIFICATION_KINDS[kind].source;
-      for (const f of sources[kind]) {
+      const files = sources[kind];
+      if (!files) continue;
+      const s = NOTIFICATION_KINDS[kind].sources[0];
+      if (!s) continue;
+      for (const f of files) {
         const txt = readFileSync(path.join(SRC, f), "utf8");
         const literal = new RegExp(`action:\\s*"${s.action}"[\\s\\S]{0,80}tableName:\\s*(?:"${s.tableName}"|this\\.config\\.tableName)`);
         check(`${kind}: ${f} '${s.action} ${s.tableName}' denetim çağrısı taşır`, literal.test(txt));
       }
-      check(`${kind}: süzgeç çağrıyı tanır`, notificationKindForAudit(s.action, s.tableName) === kind);
+      check(`${kind}: süzgeç çağrıyı tanır`, notificationMatchesForAudit({ action: s.action, tableName: s.tableName }).some((m) => m.kind === kind));
       const perm = NOTIFICATION_KINDS[kind].dataPermission;
       check(`${kind}: veri izni '${perm}' izin kataloğunda (web, mobil değil)`, PERMISSION_CATALOG.some((p) => p.code === perm && !perm.startsWith("mobile:")));
     }
-    check("süzgeç: türsüz çağrı (UPDATE ORDER, CREATE ROLL) → null", notificationKindForAudit("UPDATE", "ORDER") === null && notificationKindForAudit("CREATE", "ROLL") === null);
+    check("süzgeç: türsüz çağrı (UPDATE CUSTOMER, CREATE ROLL) → null", notificationKindForAudit("UPDATE", "CUSTOMER") === null && notificationKindForAudit("CREATE", "ROLL") === null);
 
     // ── fixture ──────────────────────────────────────────────────────────────
     const admin = await ensureTestAdmin();

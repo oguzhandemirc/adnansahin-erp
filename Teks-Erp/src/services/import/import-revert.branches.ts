@@ -14,6 +14,7 @@ import { AppError } from "../../utils/app-error";
 import { OrderService } from "../order.service";
 import type { ImportAdapter, ImportContext, PreparedRow } from "./import.types";
 import { importKey } from "./import-key";
+import { withNotificationsSuppressed } from "../notifications/audit-hook";
 
 /** Ters yol sınıfı — §8.2 matrisinin koddaki karşılığı. */
 export type RevertMode = "DEACTIVATE" | "DELETE_PIVOT" | "CANCEL_DOCUMENT";
@@ -198,7 +199,8 @@ async function deletePivot(
 /** Mevcut iptal yolu. Dönüş: atlama gerekçesi ya da `null` (başarılı). */
 async function cancelDocument(recordId: string, userId?: string): Promise<string | null> {
   try {
-    const res = await orderCancelService.softDelete(recordId, userId);
+    // İçe aktarımın geri alınması toplu iştir: içe aktarım bildirim üretmediği gibi geri alması da üretmez (D6a).
+    const res = await withNotificationsSuppressed(() => orderCancelService.softDelete(recordId, userId));
     return res.success ? null : (res.message ?? "Belge iptal edilemedi");
   } catch (e) {
     // İş kuralı engeli bir DALDIR (sevk edilmiş/iş emri açılmış sipariş geri sarılamaz).

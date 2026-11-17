@@ -12,7 +12,7 @@ import { currentOrigin } from "../lib/request-context";
 import { diffCommonFields } from "./helpers/audit-diff.helper";
 import type { SystemEventName } from "../constants/system-events";
 import { hata } from "../lib/logger";
-import { notifyAuditCall } from "./notifications/audit-hook";
+import { auditCallTags, notifyAuditCall } from "./notifications/audit-hook";
 type JsonValue = Prisma.InputJsonValue | typeof Prisma.JsonNull;
 
 const ARCHIVE_BATCH_SIZE = 5000;
@@ -119,7 +119,7 @@ export class AuditService {
     // ── BİLDİRİM KANCASI (2.13.0; kullanıcı onayı 2026-11-17) ───────────────
     // Yalnız çağrının canlı argümanları geçer; yazılan satır OKUNMAZ. Senkron süzgeç, iş beklenmez,
     // her hata kancanın içinde yutulur — fabrikanın yazması ne durur ne gecikir.
-    notifyAuditCall({ userId: params.userId, action: params.action, tableName: params.tableName, recordId: params.recordId });
+    notifyAuditCall({ userId: params.userId, action: params.action, tableName: params.tableName, recordId: params.recordId, tags: auditCallTags(params.newData) });
   }
 
   /**

@@ -11,10 +11,11 @@ import prisma from "../../lib/prisma";
 import { readPatronCloudUserId } from "../helpers/patron-cloud-user.helper";
 import {
   notificationKindDef,
+  type NotificationAuditMatch,
   type NotificationFacts,
   type NotificationKind,
 } from "../../constants/notification-catalog";
-import { NOTIFICATION_FACT_LOADERS } from "./kind-sources";
+import { NOTIFICATION_FACT_LOADERS, resolveNotificationEntities } from "./kind-sources";
 import { resolveNotificationRecipients } from "./recipients";
 import { invalidateNotificationSwitch, isSwitchSettingWrite, notificationsEnabled } from "./notification-switch";
 import type { AuditHookCall } from "./audit-hook";
@@ -35,16 +36,27 @@ export function __setNotificationFaultForTests(fn: (() => void | Promise<void>) 
 }
 
 /** Kancanın gövdesi. Fırlatabilir — çağıran (`audit-hook`) yutar ve loglar. */
-export async function onAuditCall(call: AuditHookCall, kind: NotificationKind | null): Promise<void> {
+export async function onAuditCall(call: AuditHookCall, matches: readonly NotificationAuditMatch[]): Promise<void> {
   if (isSwitchSettingWrite(call.tableName, call.recordId)) {
     invalidateNotificationSwitch();
     return;
   }
-  if (!kind) return;
+  if (matches.length === 0) return;
   if (!(await notificationsEnabled())) return;
-  const produced = await produceNotification(kind, call.recordId, call.userId ?? null);
+  let delivered = false;
+  // Sıralı (paralel değil): bir çağrı birkaç tür doğurabilir (sevk çıkışı → sevkiyat-cikti + siparis-tamamlandi).
+  for (const m of matches) {
+    for (const entityId of await resolveNotificationEntities(m.via, call.recordId)) {
+      const produced = await produceNotification(m.kind, entityId, call.userId ?? null, { tags: call.tags ?? {} });
+      if (produced && produced.recipients.length > 0) delivered = true;
+    }
+  }
   // Bulut köprüsü (D4): teslim doğduysa hemen gönderilsin. İş kurulu değilse (eşitleme kapalı) dürtme etkisizdir;
   // tembel yükleme: iş modülü (ağ istemcisi) yalnız gerçekten teslim doğunca yüklenir.
+  if (delivered) (await import("../../jobs/cloud-notify.job")).nudgeCloudNotify();
+}
+
+export async function nudgeCloudAfterProduce(produced: ProducedNotification | null): Promise<void> {
   if (produced && produced.recipients.length > 0) (await import("../../jobs/cloud-notify.job")).nudgeCloudNotify();
 }
 
@@ -55,6 +67,7 @@ interface ResolvedAuthor {
 
 async function resolveAuthor(kind: NotificationKind, facts: NotificationFacts, entityId: string, callUserId: string | null): Promise<ResolvedAuthor> {
   const def = notificationKindDef(kind);
+  if (def.author === "none") return { userId: null, name: UNKNOWN_AUTHOR_NAME };
   let userId = def.author === "record" ? (facts.createdById ?? callUserId) : callUserId;
   let fallbackName: string | null = null;
   const technicalUserId = userId ? await readPatronCloudUserId() : null;
@@ -79,11 +92,19 @@ const clip = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n -
  * (tür, varlık) için olay + teslimleri doğurur. Varlık yoksa ya da olay zaten varsa null.
  * Şalteri SORMAZ — kanca sorar; doğrudan çağıran (bekçi, ileride tarama) kendi kararını verir.
  */
-export async function produceNotification(kind: NotificationKind, entityId: string, callUserId: string | null): Promise<ProducedNotification | null> {
+export interface ProduceOptions {
+  /** Denetim çağrısının etiketleri (yükleyicinin olay yüklemi için). */
+  readonly tags?: Readonly<Record<string, string>>;
+  /** Hazır olgular (zamanlanmış tür — gün sonu özeti); verilirse yükleyici çağrılmaz. */
+  readonly facts?: NotificationFacts;
+  readonly nowMs?: number;
+}
+
+export async function produceNotification(kind: NotificationKind, entityId: string, callUserId: string | null, opts: ProduceOptions = {}): Promise<ProducedNotification | null> {
   if (faultForTests) await faultForTests();
   const existing = await prisma.notificationEvent.findUnique({ where: { kind_entityId: { kind, entityId } }, select: { id: true } });
   if (existing) return null;
-  const facts = await NOTIFICATION_FACT_LOADERS[kind](entityId);
+  const facts = opts.facts ?? (await NOTIFICATION_FACT_LOADERS[kind](entityId, { tags: opts.tags ?? {}, nowMs: opts.nowMs ?? Date.now() }));
   if (!facts) return null;
   const author = await resolveAuthor(kind, facts, entityId, callUserId);
   const def = notificationKindDef(kind);
@@ -98,7 +119,7 @@ export async function produceNotification(kind: NotificationKind, entityId: stri
         authorName: clip(author.name, 100),
         title: clip(text.title, 200),
         body: clip(text.body, 500),
-        route: def.appRoute(entityId),
+        route: def.appRoute(entityId, facts),
       }],
       skipDuplicates: true,
     });
