@@ -52,9 +52,9 @@ beforeEach(async () => {
 
 describe("§1 model", () => {
   it("varsayılan hepsi; bozuk/boş/bilinmeyen değer varsayılana düşer; çıktı tanım sırasında", () => {
-    expect(shownCards(T())).toEqual(["ham", "yari", "bitmis", "olu", "yas"]);
-    expect(shownCards(T({ kartlar: "" }))).toEqual(["ham", "yari", "bitmis", "olu", "yas"]);
-    expect(shownCards(T({ kartlar: "xyz,,foo" }))).toEqual(["ham", "yari", "bitmis", "olu", "yas"]);
+    expect(shownCards(T())).toEqual(["ham", "yari", "bitmis", "olu", "cuval", "yas"]);
+    expect(shownCards(T({ kartlar: "" }))).toEqual(["ham", "yari", "bitmis", "olu", "cuval", "yas"]);
+    expect(shownCards(T({ kartlar: "xyz,,foo" }))).toEqual(["ham", "yari", "bitmis", "olu", "cuval", "yas"]);
     expect(shownCards(T({ kartlar: "olu,ham,ham,xyz" }))).toEqual(["ham", "olu"]);
   });
 
@@ -65,7 +65,7 @@ describe("§1 model", () => {
     expect(shownCards(hic)).toEqual([]);
     expect(shownCards(toggleCard(hic, "olu"))).toEqual(["olu"]);
     expect(shownCards(toggleCard(yalnizHam, "olu"))).toEqual(["ham", "olu"]);
-    const hepsiEksikBir = T({ kartlar: "ham,yari,bitmis,olu" });
+    const hepsiEksikBir = T({ kartlar: "ham,yari,bitmis,olu,cuval" });
     expect(toggleCard(hepsiEksikBir, "yas").suzgec).toEqual({});
     const r = resetCards(T({ kartlar: "ham", diger: "x" }));
     expect(r.suzgec).toEqual({ diger: "x" });
@@ -86,7 +86,7 @@ describe("§2 ekran", () => {
     await flush();
     expect(screen.queryByTestId("kpi-ham")).toBeNull();
     expect(screen.getByTestId("kpi-yari")).toBeTruthy();
-    for (const k of ["yari", "bitmis", "olu", "yas"]) {
+    for (const k of ["yari", "bitmis", "olu", "cuval", "yas"]) {
       fireEvent.press(screen.getByTestId(`stok-kart-secici-${k}`));
       await flush();
     }
@@ -120,7 +120,7 @@ describe("§3 saklama: mevcut `tablo.stok` tercihi", () => {
       const [anahtar, deger] = mockApi.viewPrefSet.mock.calls[0] as [string, TabloTercihi];
       expect(anahtar).toBe("tablo.stok");
       expect(deger.sutunlar).toEqual(["urun", "siparissiz"]);
-      expect(deger.suzgec).toEqual({ kartlar: "ham,yari,bitmis,yas" });
+      expect(deger.suzgec).toEqual({ kartlar: "ham,yari,bitmis,cuval,yas" });
     } finally {
       jest.useRealTimers();
     }
@@ -137,7 +137,7 @@ describe("§3 saklama: mevcut `tablo.stok` tercihi", () => {
     await flush();
     expect(screen.queryByTestId("kpi-ham")).toBeNull();
     const yerel = JSON.parse((await AsyncStorage.getItem(YEREL)) ?? "null") as { deger: TabloTercihi; kirli: boolean };
-    expect(yerel.deger.suzgec.kartlar).toBe("yari,bitmis,olu,yas");
+    expect(yerel.deger.suzgec.kartlar).toBe("yari,bitmis,olu,cuval,yas");
     expect(yerel.kirli).toBe(true);
   });
 });

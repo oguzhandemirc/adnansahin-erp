@@ -107,7 +107,7 @@ describe("§1 saf okuma", () => {
   });
 
   it("eksik alan çökmez: boş/eski veri boş bölüm", () => {
-    expect(lib.stokBolumu(undefined, "ham")).toEqual({ toplamTop: 0, toplamMetre: 0, kalemler: [], toplar: [] });
+    expect(lib.stokBolumu(undefined, "ham")).toEqual({ toplamTop: 0, toplamMetre: 0, kalemler: [], toplar: [], cuvaldakiToplar: [], cuval: null });
   });
 });
 

@@ -69,9 +69,9 @@ describe("§1 top satırı kalem alanları", () => {
 });
 
 describe("§2 varsayılan sade", () => {
-  it("varsayılan sütunlar bugünküyle aynı; yeni sütunlar varsayılanda yok", () => {
+  it("varsayılan sütunlar bugünküyle aynı (top: + kime/nerede, kullanıcı kararı 2026-11-17); diğer yeni sütunlar varsayılanda yok", () => {
     expect(VARSAYILAN_SUTUN.kalem).toEqual(["kalem", "top", "metre", "gun"]);
-    expect(VARSAYILAN_SUTUN.top).toEqual(["topNo", "kalem", "metre", "gun"]);
+    expect(VARSAYILAN_SUTUN.top).toEqual(["topNo", "kalem", "metre", "gun", "etiket", "cuval", "cuvalCari"]);
     expect(KALEM_SUTUNLARI.map((c) => c.key)).toEqual(expect.arrayContaining(["urun", "en", "renk", "kat"]));
     expect(TOP_SUTUNLARI.map((c) => c.key)).toEqual(expect.arrayContaining(["parti", "depo", "kg", "urun", "en", "renk", "kat"]));
   });
@@ -93,9 +93,9 @@ describe("§3–§4 ekran", () => {
     expect(screen.queryByTestId("stok-top-govde-kaydirma")).toBeNull();
   });
 
-  it("11 sütun saklıysa 10'u çizilir, başlık ve gövde yatay kaydırılır; seçicide 11. kilitli", async () => {
+  it("14 sütun saklıysa 10'u çizilir, başlık ve gövde yatay kaydırılır; seçicide 11. kilitli", async () => {
     const hepsi = TOP_SUTUNLARI.map((c) => c.key);
-    expect(hepsi.length).toBe(11);
+    expect(hepsi.length).toBe(14);
     mockApi.viewPref.mockImplementation(pref(hepsi));
     render(<Stock />);
     await flush();

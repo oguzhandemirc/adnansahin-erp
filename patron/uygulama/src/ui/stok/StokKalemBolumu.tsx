@@ -5,7 +5,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import {
-  gorunenKalemler, gorunenToplar, kaleminToplari, kgVar, stokBolumu, stokSuzgecGruplari,
+  gorunenKalemler, gorunenToplar, kaleminToplari, kgVar, KIM_NEREDE_ANAHTARLARI, kimNeredeGruplari, stokBolumu, stokSuzgecGruplari, tumToplar,
   type Bolum, type Gorunum, type Kalem, type StokBolumu,
 } from "../../lib/stok-kalem";
 import { UNIT } from "../../lib/labels/uretim";
@@ -14,7 +14,7 @@ import { qty } from "../pano/read";
 import { SnapshotGate } from "../pano/SnapshotGate";
 import { useSnapshot } from "../pano/useSnapshot";
 import { SegmentedControl } from "../SegmentedControl";
-import { azamiSutun, etkinSuzgecSayisi, siganSutun, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SutunTanimi } from "../tablo/model";
+import { azamiSutun, etkinSuzgecSayisi, siganSutun, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SuzgecGrubu, type SutunTanimi } from "../tablo/model";
 import { SuzgecSecici, SutunSecici } from "../tablo/Seciciler";
 import { useTabloTercihi } from "../tablo/useTabloTercihi";
 import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useYatayEksen, type YatayEksen } from "../tablo/VeriTablosu";
@@ -23,6 +23,14 @@ import { space, tabularNums, typography } from "../tokens";
 import {
   bolumOf, gorunumOf, gorunumTemizle, kalemTemizle, KALEM_SIRALANABILIR, KALEM_SUTUNLARI, topTemizle, TOP_SIRALANABILIR, TOP_SUTUNLARI, VARSAYILAN_SUTUN,
 } from "./sutunlar";
+
+/** Saklı seçimden yalnız bu gruplarda geçerli olan değerler (seçeneği kalmamış değer süzmez). */
+function gecerliSecim(gs: readonly SuzgecGrubu[], secim: Readonly<Record<string, string>>): Record<string, string> {
+  return Object.fromEntries(gs.flatMap((g) => {
+    const v = secim[g.anahtar];
+    return v && g.secenekler.some((o) => o.deger === v) ? [[g.anahtar, v]] : [];
+  }));
+}
 
 /** İlk çizimde bu kadar satır; "Daha fazla" her basışta bir o kadar açar (telefon ~700 satırı tek seferde çizmez). */
 export const SAYFA = 60;
@@ -48,15 +56,15 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   const bolum = bolumOf(gorunum.tercih);
   const kip = gorunumOf(gorunum.tercih);
   const b = useMemo(() => stokBolumu(veri, bolum), [veri, bolum]);
-  const gruplar = useMemo(() => stokSuzgecGruplari(b), [b]);
+  const gruplar = useMemo(() => stokSuzgecGruplari(b, kip === "top"), [b, kip]);
+  // Kime/nerede süzgeci yalnız top görünümünde ve fabrika çuval bilgisini gönderdiyse; seçim `tablo.stok-top`ta.
+  const knGruplar = useMemo(() => (kip === "top" ? kimNeredeGruplari(b) : []), [b, kip]);
   // Yalnız bu bölümde geçerli seçimler süzer (bitmişte seçilen renk ham bölümü boşaltmaz).
-  const suzgec = useMemo(
-    () => Object.fromEntries(gruplar.flatMap((g) => {
-      const v = kalemPref.tercih.suzgec[g.anahtar];
-      return v && g.secenekler.some((o) => o.deger === v) ? [[g.anahtar, v]] : [];
-    })),
-    [gruplar, kalemPref.tercih.suzgec],
-  );
+  const suzgec = useMemo(() => gecerliSecim(gruplar, kalemPref.tercih.suzgec), [gruplar, kalemPref.tercih.suzgec]);
+  const knSuzgec = useMemo(() => gecerliSecim(knGruplar, topPref.tercih.suzgec), [knGruplar, topPref.tercih.suzgec]);
+  const tumGruplar = knGruplar.length > 0 ? [...gruplar, ...knGruplar] : gruplar;
+  const tumSecim = { ...suzgec, ...knSuzgec };
+  const knAnahtar = (g: string) => (KIM_NEREDE_ANAHTARLARI as readonly string[]).includes(g);
   const [ara, setAra] = useState("");
   const [sutunAcik, setSutunAcik] = useState(false);
   const [suzgecAcik, setSuzgecAcik] = useState(false);
@@ -76,7 +84,7 @@ function Icerik({ veri }: { readonly veri: unknown }) {
       </View>
       <BlokBasligi
         baslik={kip === "kalem" ? "Kalemler" : "Toplar"}
-        sayi={kip === "kalem" ? b.kalemler.length : b.toplar.length}
+        sayi={kip === "kalem" ? b.kalemler.length : tumToplar(b).length}
         sag={<Text style={s.ozet} testID="stok-kalem-ozet">{`${qty(b.toplamTop)} ${UNIT.top} · ${qty(b.toplamMetre)} ${UNIT.metre}`}</Text>}
       />
       <View style={s.segment}>
@@ -87,9 +95,9 @@ function Icerik({ veri }: { readonly veri: unknown }) {
       </View>
       <TabloAraclari
         testID="stok-kalem"
-        ara={{ value: ara, onChangeText: setAra, placeholder: kip === "top" ? "Top no, parti, kalem ara" : bolum === "ham" ? "Ürün ara" : "Ürün, en, renk ara" }}
-        suzgecSayisi={etkinSuzgecSayisi(suzgec)}
-        onSuzgec={gruplar.length > 0 ? () => setSuzgecAcik(true) : undefined}
+        ara={{ value: ara, onChangeText: setAra, placeholder: kip === "top" ? (b.cuval ? "Top no, parti, kalem, müşteri, çuval ara" : "Top no, parti, kalem ara") : bolum === "ham" ? "Ürün ara" : "Ürün, en, renk ara" }}
+        suzgecSayisi={etkinSuzgecSayisi(tumSecim)}
+        onSuzgec={tumGruplar.length > 0 ? () => setSuzgecAcik(true) : undefined}
         onSutun={() => setSutunAcik(true)}
       />
       <TabloBasligi
@@ -99,7 +107,7 @@ function Icerik({ veri }: { readonly veri: unknown }) {
       />
       {kip === "kalem"
         ? <KalemListesi b={b} kalemler={gorunenKalemler(b, ara, suzgec, kalemPref.tercih.siralama)} sutunlar={gorunur} yatay={yatay} />
-        : <SayfaliListe satirlar={gorunenToplar(b, ara, suzgec, topPref.tercih.siralama)} sutunlar={gorunur} yatay={yatay} testID="stok-top" anahtar={(t) => t.id} />}
+        : <SayfaliListe satirlar={gorunenToplar(b, ara, suzgec, topPref.tercih.siralama, knSuzgec)} sutunlar={gorunur} yatay={yatay} testID="stok-top" anahtar={(t) => t.id} />}
       {!kgVar(b) ? null : <Text style={s.not}>Kg yalnız tartılı topların toplamıdır; metreyle toplanmaz.</Text>}
       <SutunSecici
         visible={sutunAcik} testID="stok-kalem-sutun-secici" sutunlar={sutunlar} gorunur={pref.tercih.sutunlar} azami={azami}
@@ -109,9 +117,12 @@ function Icerik({ veri }: { readonly veri: unknown }) {
         onClose={() => setSutunAcik(false)}
       />
       <SuzgecSecici
-        visible={suzgecAcik} testID="stok-kalem-suzgec-secici" gruplar={gruplar} secim={suzgec}
-        onSec={(g, d) => kalemPref.degistir((t) => ({ ...t, suzgec: suzgecSec(t.suzgec, g, d) }))}
-        onTemizle={() => kalemPref.degistir((t) => ({ ...t, suzgec: {} }))}
+        visible={suzgecAcik} testID="stok-kalem-suzgec-secici" gruplar={tumGruplar} secim={tumSecim}
+        onSec={(g, d) => (knAnahtar(g) ? topPref : kalemPref).degistir((t) => ({ ...t, suzgec: suzgecSec(t.suzgec, g, d) }))}
+        onTemizle={() => {
+          kalemPref.degistir((t) => ({ ...t, suzgec: {} }));
+          if (knGruplar.length > 0) topPref.degistir((t) => ({ ...t, suzgec: Object.fromEntries(Object.entries(t.suzgec).filter(([k]) => !knAnahtar(k))) }));
+        }}
         onClose={() => setSuzgecAcik(false)}
       />
     </View>

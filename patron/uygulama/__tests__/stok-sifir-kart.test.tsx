@@ -79,7 +79,7 @@ describe("§2 seçiciden hepsini kapatmak", () => {
       render(<Stock />);
       await flush();
       fireEvent.press(screen.getByTestId("stok-kart-sec"));
-      for (const k of ["ham", "yari", "bitmis", "olu", "yas"]) fireEvent.press(screen.getByTestId(`stok-kart-secici-${k}`));
+      for (const k of ["ham", "yari", "bitmis", "olu", "cuval", "yas"]) fireEvent.press(screen.getByTestId(`stok-kart-secici-${k}`));
       await act(async () => {
         jest.advanceTimersByTime(1_000);
       });

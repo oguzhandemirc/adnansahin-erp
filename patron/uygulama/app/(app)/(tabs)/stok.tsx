@@ -19,6 +19,7 @@ import { SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { STOCK_CARDS, resetCards, shownCards, toggleCard, type StockCardKey } from "../../../src/ui/stok/kartlar";
 import { StokKalemBolumu } from "../../../src/ui/stok/StokKalemBolumu";
+import { stokBolumu } from "../../../src/lib/stok-kalem";
 import { siganSutun as azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
 import { SutunSecici, VisibilityPicker } from "../../../src/ui/tablo/Seciciler";
 import { useTabloTercihi, type TabloTercihiDurumu } from "../../../src/ui/tablo/useTabloTercihi";
@@ -100,7 +101,22 @@ function StockBody({ data, shown, pref, azami }: { readonly data: unknown; reado
   const ages = arr(obj(data).yasKovalari);
   const items = arr(obj(data).urunler);
   const yas = useAcikKapali("stok.yas-dagilimi", false);
+  // Çuvalda · Açıkta: iki sayıyı da fabrika verir (`stok-kalem` bitmiş bölümü); eski fabrika `cuvaldaTop` göndermez → kart yok.
+  const kalem = useSnapshot("stok-kalem");
+  const yer = useMemo(() => stokBolumu(kalem.data?.veri, "bitmis"), [kalem.data]);
   const stat: Partial<Record<StockCardKey, ReactElement>> = {
+    ...(yer.cuval
+      ? {
+        cuval: (
+          <StatCard
+            etiket="Çuvalda · Açıkta" icon="bag-handle-outline" ton="blue"
+            degerler={[{ deger: qty(yer.cuval.top), birim: `${UNIT.top} çuvalda` }, { deger: qty(yer.toplamTop), birim: `${UNIT.top} açıkta` }]}
+            ipucu={`Çuvalda ${qty(yer.cuval.metre)} ${UNIT.metre} · bitmiş`}
+            testID="kpi-cuval"
+          />
+        ),
+      }
+      : {}),
     ham: <StatCard etiket="Ham" icon="layers-outline" ton="teal" degerler={[{ deger: qty(o.hamMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.hamAdet)} ${UNIT.top}`} testID="kpi-ham" />,
     yari: <StatCard etiket="Yarı mamul" icon="sync-outline" ton="blue" degerler={[{ deger: qty(o.yariMamulMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.yariMamulAdet)} ${UNIT.top}`} testID="kpi-yari" />,
     bitmis: <StatCard etiket={FREE_STOCK_LABEL} icon="cube-outline" ton="green" degerler={[{ deger: qty(o.bitmisMiktar), birim: UNIT.metre }]} ipucu={`${qty(o.bitmisAdet)} ${UNIT.top} · ${FREE_STOCK_HINT}`} testID="kpi-bitmis" />,

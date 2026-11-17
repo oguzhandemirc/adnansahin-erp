@@ -13371,3 +13371,16 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **İkinci kusur (bekçi buldu).** `removeSackFromShipment` çuvalın `shipmentId`sini damgadan ÖNCE boşaltıyordu → yeniden hesap (`sack.shipmentId` yüklemi) çıkan çuvalın satırını göremiyor, havuz çuvalında ETKİN hayalet tahsis kalıyordu (sayıya girmez ama silmeyi 409'a düşürür). Düzeltme: `clearSackAllocationsTx` claim'den önce. Fabrika kopyasında hayalet satır 0 (fabrika onaylı-sevk akışı kapalı).
 
 **Bekçi.** `test_sack_allocation_cleared` §7 (35) — sondalar: bağ koparma kaldırıldı → 4 kırmızı (P2003) · çıkarmada damga kaldırıldı → 4 · 409 sayımı kaldırıldı → 1. `test_db_invariants` envanterine iki CHECK.
+
+
+## 2026-11-17 — Patron Stok: top kimin, nerede (etiket müşterisi · çuval · çuval carisi) [PATRON-BULUTU + PATRON-UYGULAMA + RAPORLAR]
+
+**Karar (kullanıcı).** Sahipliğin tek kaynağı ETİKETTİR (`Roll.labelCustomerId`); emanet `ownerCustomerId` canlıda hiç dolu değil, iş emri müşterisi de kullanılmaz. Top başına üç alan: etiket müşterisi (boşsa "Müşterisiz"), çuval no (boşsa "Açıkta"), çuval carisi. Sütunlar varsayılan AÇIK, "Çuvalda · Açıkta" kartı görünür ("yeni sütun/kart kapalı gelir" kuralının istisnası).
+
+**Tasarım.** `stok-kalem` raf listesi (`toplar`) çuvaldaki topu içermez ve bekçi bunu ölçer (raf = karne = kalem toplamı). Çuvaldaki bitmiş toplar bu yüzden AYRI dizi `bitmis.cuvaldakiToplar` (kalemi rafta olmayabilir → `urun/en/renk/kat` kendisinde) + fabrikanın saydığı `cuvaldaTop`/`cuvaldaMetre`; açıktaki = `toplamTop`. "Çuvalda" = `WAREHOUSE`/`A1_STOCK` ∧ `sackId` dolu (sevkiyata atanmış, henüz çıkmamış çuval dahil; `SHIPPED` yalnız DISPATCHED'te). Raf okuması ortak `loadCells`e alındı, `loadShelfCells` süzgeci aynen.
+
+**Süzme yeri (ölçüldü).** Stok kalem/top listesi tek parça anlık belgedir; mevcut ürün/renk/en/yaş süzgeci, arama ve sıralama İSTEMCİDE (`patron/uygulama/src/lib/stok-kalem.ts`). Yeni süzgeçler (Yer · Etiket müşterisi · Çuval carisi · Etiket ≠ çuval carisi) aynı desende; seçim `tablo.stok-top` tercihinde. "Etiket ≠ çuval carisi" = çuvaldaki topun etiket müşterisi ve çuval carisi ikisi de dolu ve AD olarak farklı — panelin `sack-content-mismatch.helper` (şablon/takma ad duyarlı uyarı) ile AYNI soru değildir.
+
+**Bulut.** Anlıklar opak saklanır (alan sınıfı denetimi yalnız KAYIT projeksiyonlarında); bulut kodu ve `wire.ts` değişmedi. Eski fabrika (2.12.3) alan göndermez → sütun "—", süzgeç ve kart çizilmez.
+
+**Bekçi.** `test_patron_bulut_anliklar` §3 (çuval fixture'ı + bağımsız SQL satırı; sonda: `etiketMusteri` ← çuval carisi → 2 kırmızı) · uygulama `__tests__/stok-kime-nerede.test.tsx` (sondalar: fark satırı kaldırıldı → 1 · kart koşulu kaldırıldı → 3).

@@ -2,7 +2,7 @@
 // Eklenen sütunlar (2026-11-17: ürün · en · renk · kat ayrı; topta kalemin alanları) seçicide KAPALI gelir — varsayılan
 // görünüm değişmez. Hepsi telin kendi alanıdır (`stok-kalem` anlığı); burada hesaplanan sayı yok.
 // Bölüm (Ham | Bitmiş) ve görünüm (Kalem | Top) seçimi `stok.gorunum` tercihinin seçim alanında durur (aynı sürümlü şekil).
-import { enYazi, type Bolum, type Gorunum, type Kalem, type Top } from "../../lib/stok-kalem";
+import { ACIKTA, enYazi, MUSTERISIZ, type Bolum, type Gorunum, type Kalem, type Top } from "../../lib/stok-kalem";
 import { num } from "../pano/read";
 import { qty } from "../pano/read";
 import { tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../tablo/model";
@@ -35,13 +35,18 @@ export const TOP_SUTUNLARI: readonly SutunTanimi<Top>[] = [
   { key: "en", baslik: "En", ad: "En (cm)", agirlik: 0.7, sayi: true, sirala: "en", hucre: (t) => en(t.en) },
   { key: "renk", baslik: "Renk", agirlik: 1.3, sirala: "renk", satir: 2, hucre: (t) => metin(t.renk) },
   { key: "kat", baslik: "Kat", agirlik: 0.9, sirala: "kat", hucre: (t) => metin(t.kat) },
+  // Kime/nerede (fabrika 2.12.4+; eski fabrikada "—"). Sahiplik ETİKETTEN — sütun adı "Sahip" değil.
+  { key: "etiket", baslik: "Etiket müşterisi", agirlik: 1.6, sirala: "etiket", satir: 2, hucre: (t) => (t.kimNerede ? (t.etiketMusteri ?? MUSTERISIZ) : "—") },
+  { key: "cuval", baslik: "Çuval", ad: "Çuval no", agirlik: 1.4, sirala: "cuval", hucre: (t) => (t.kimNerede ? (t.cuvalNo ?? ACIKTA) : "—") },
+  { key: "cuvalCari", baslik: "Çuval carisi", agirlik: 1.6, sirala: "cuvalCari", satir: 2, hucre: (t) => (t.kimNerede ? (t.cuvalCari ?? "—") : "—") },
 ];
 
 export const KALEM_SIRALANABILIR = KALEM_SUTUNLARI.flatMap((c) => (c.sirala ? [c.sirala] : []));
 export const TOP_SIRALANABILIR = TOP_SUTUNLARI.flatMap((c) => (c.sirala ? [c.sirala] : []));
 
 const KALEM_VARSAYILAN: TabloTercihi = { surum: 1, sutunlar: ["kalem", "top", "metre", "gun"], siralama: null, suzgec: {} };
-const TOP_VARSAYILAN: TabloTercihi = { surum: 1, sutunlar: ["topNo", "kalem", "metre", "gun"], siralama: null, suzgec: {} };
+// Kime/nerede sütunları varsayılan AÇIK (kullanıcı kararı 2026-11-17; "yeni sütun kapalı gelir" kuralının istisnası).
+const TOP_VARSAYILAN: TabloTercihi = { surum: 1, sutunlar: ["topNo", "kalem", "metre", "gun", "etiket", "cuval", "cuvalCari"], siralama: null, suzgec: {} };
 export const VARSAYILAN_SUTUN = { kalem: KALEM_VARSAYILAN.sutunlar, top: TOP_VARSAYILAN.sutunlar } as const;
 
 export const kalemTemizle = (azami: number) => (ham: unknown) =>

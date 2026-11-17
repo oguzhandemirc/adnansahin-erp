@@ -9,6 +9,9 @@ export const STOCK_CARDS = [
   { key: "yari", label: "Yarı mamul" },
   { key: "bitmis", label: "Serbest stok" },
   { key: "olu", label: "Ölü stok" },
+  // 2026-11-17: bitmiş topun yeri (fabrika `stok-kalem` 2.12.4+ `cuvaldaTop` + `toplamTop`); eski fabrikada çizilmez.
+  // Varsayılan görünür (kullanıcı kararı; kart kümesi `varsayilan` vermediği için hepsi açık).
+  { key: "cuval", label: "Çuvalda · Açıkta" },
   { key: "yas", label: "Yaş dağılımı" },
 ] as const;
 export type StockCardKey = (typeof STOCK_CARDS)[number]["key"];
