@@ -1,7 +1,7 @@
 // Bildirim ayarları ve geçmişi rotaları (B5) — hesap API'si tablosunun parçası (`API_ROUTES`e yayılır).
 import { z } from "zod";
 import { IncomingSettingsSchema } from "../catalog/notifications";
-import { getSettingsView, listOwnNotifications, markAllNotificationsRead, markNotificationRead, setFacilityDefaults, setOwnSettings } from "../services/notification-settings.service";
+import { FactoryPreferenceBody, getSettingsView, listOwnNotifications, markAllNotificationsRead, markNotificationRead, requestFactoryPreferences, setFacilityDefaults, setOwnSettings } from "../services/notification-settings.service";
 import { sendTestNotification } from "../services/notification-test.service";
 import { body, page, param, s, uuidCursor, webPushKey, type ApiRouteDef } from "./api-route-kit";
 
@@ -20,6 +20,13 @@ export const NOTIFICATION_ROUTES: readonly ApiRouteDef[] = [
     auth: "OTURUM",
     kimlik: { muaf: "tesis varsayılanının TAM yerine konması (bulut:hesap:yonet); tekrarı aynı sonuç" },
     handler: async (c) => ({ data: await setFacilityDefaults(c.ctx, s(c), body(c, z.strictObject({ ayarlar: IncomingSettingsSchema })).ayarlar, webPushKey(c)) }),
+  },
+  {
+    method: "post",
+    path: "/bildirim/fabrika-tercih",
+    auth: "OTURUM",
+    kimlik: { muaf: "(hesap, tür) isteğinin TAM yerine konması; tekrarı aynı sonuç (yeni istek kimliği, aynı istenen durum)" },
+    handler: async (c) => ({ data: await requestFactoryPreferences(c.ctx, s(c), body(c, FactoryPreferenceBody).degisiklikler, webPushKey(c)) }),
   },
   {
     method: "post",

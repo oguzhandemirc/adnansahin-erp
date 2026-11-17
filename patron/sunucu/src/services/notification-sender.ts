@@ -27,6 +27,7 @@ interface Claimed {
   body: string;
   route: string | null;
   attempts: number;
+  origin: string;
 }
 
 export interface DeliveryTotals {
@@ -54,7 +55,7 @@ async function claim(ctx: CloudContext, tesisId: string, nowMs: number, until: D
          FOR UPDATE SKIP LOCKED)
       UPDATE notifications n SET status = 'GONDERILIYOR', claim_until = ${until}::timestamptz, attempts = n.attempts + 1, updated_at = now()
         FROM due WHERE n.id = due.id
-      RETURNING n.id, n.account_id, n.kind, n.title, n.body, n.route, n.attempts`,
+      RETURNING n.id, n.account_id, n.kind, n.title, n.body, n.route, n.attempts, n.origin`,
   );
 }
 
@@ -65,7 +66,11 @@ async function decide(ctx: CloudContext, tesisId: string, n: Claimed, nowMs: num
     if (!account || account.status !== "AKTIF") return { kind: "ATLA", reason: "HESAP_KAPALI" };
     const cfg = await loadFacilitySettings(tx, tesisId);
     const settings = resolveSettings(cfg.byAccount.get(n.account_id) ?? null, cfg.facility).settings;
-    const skip = ruleVerdict(settings, n.kind as NotificationKind, effectivePermissions(account.permissions));
+    // Fabrika kipinde fabrika teslimi: türü alıp almamak FABRİKANIN atama/tercih kararıdır (D5) — bulut tür anahtarı
+    // okunmaz (form onu göstermez); ana anahtar, izin ve sessiz saat telefonun ayarı olarak kalır.
+    const factoryDecides = ctx.config.BILDIRIM_KAYNAGI === "fabrika" && n.origin === "fabrika";
+    const rule = factoryDecides ? { ...settings, turler: { ...settings.turler, [n.kind]: true } } : settings;
+    const skip = ruleVerdict(rule, n.kind as NotificationKind, effectivePermissions(account.permissions));
     if (skip) return { kind: "ATLA", reason: skip };
     const tesis = await tx.projectionRow.findFirst({ where: { tesisId, projection: FACILITY_TIMEZONE_SOURCE, deletedAt: null }, select: { data: true } });
     const quiet = quietUntil(settings.sessiz, nowMs, facilityTimeZoneAt(tesis?.data ?? null, nowMs));

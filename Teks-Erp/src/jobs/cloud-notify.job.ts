@@ -21,6 +21,7 @@ import {
 } from "../cloud-sync/wire";
 import { notificationsEnabled } from "../services/notifications/notification-switch";
 import { applyBridgeResult, collectBridgeBatch, type BridgeBatch } from "../services/notifications/cloud-bridge.service";
+import { MirrorState, applyCloudPreferenceRequests } from "../services/notifications/cloud-mirror.service";
 
 export const NOTIFY_TICK_MS = 30 * 1000;
 export const NOTIFY_BACKOFF_MAX_MS = 10 * 60 * 1000;
@@ -49,6 +50,8 @@ let eligibilityFn: () => Promise<CloudEligibility> = () => cloudEligibility();
 let enabledFn: () => Promise<boolean> = notificationsEnabled;
 let nowFn: () => number = Date.now;
 let failures = 0;
+/** D5 atama aynası + tercih teyidi (süreç içi; iş durunca sıfırlanır). */
+let mirror = new MirrorState();
 let lastWarn: string | null = null;
 
 function warnOnce(text: string): void {
@@ -74,19 +77,27 @@ export async function runCloudNotifyOnce(): Promise<NotifyRunResult> {
     for (let i = 0; i < MAX_BATCHES_PER_RUN; i++) {
       const now = nowFn();
       const batch = await collectBridgeBatch(now);
-      const body = NotificationsPushRequestSchema.safeParse({ v: ENVELOPE_VERSION, teslimler: batch.teslimler, okunanlar: batch.okunanlar });
+      const extra = await mirror.collect(now);
+      const body = NotificationsPushRequestSchema.safeParse({ v: ENVELOPE_VERSION, teslimler: batch.teslimler, okunanlar: batch.okunanlar, ...extra });
       if (!body.success) return result("BASARISIZ", "GOVDE_GECERSIZ", sent, requests);
       const res = await cloudPost(ctx, SYNC_PATHS.NOTIFICATIONS, body.data, { gzip: false, nowMs: nowFn });
       requests++;
       if (!res.ok) return res.status === 404 ? result("ESKI_BULUT", res.code, sent, requests) : result("BASARISIZ", res.code, sent, requests);
       const read = NotificationsPushResponseSchema.safeParse(res.json);
       const applied = await applyBridgeResult(batch, read.success ? read.data.okunanlar : [], now);
+      mirror.sent(extra, read.success && read.data.ayna);
+      const prefs = read.success && read.data.tercihler.length > 0 ? await applyCloudPreferenceRequests(read.data.tercihler) : null;
+      if (prefs) {
+        mirror.processed(prefs.ids, prefs.users);
+        bilgi("patron-bulut", `bildirim tercihi (telefon): ${prefs.ids.length} istek · ${prefs.applied} uygulandı · ${prefs.ignored} yok sayıldı`);
+      }
       sent += applied.sent;
       if (applied.sent + applied.readsReported + applied.readFromCloud > 0) {
         const c = read.success ? ` (alınan ${read.data.alinan} · bağlı ${read.data.bagli} · atlanan ${read.data.atlanan})` : "";
         bilgi("patron-bulut", `bildirim köprüsü: ${applied.sent} teslim${c} · ${applied.readsReported} okundu bildirildi · ${applied.readFromCloud} okundu buluttan`);
       }
-      if (!full(batch)) break;
+      // Tercih işlendiyse teyit + gerçek ayna aynı turda döner (telefon bekleyeni uzun görmesin).
+      if (!full(batch) && !prefs) break;
     }
     return result("GONDERILDI", null, sent, requests);
   } catch (err) {
@@ -165,6 +176,7 @@ export function stopCloudNotify(): void {
   started = false;
   if (timer) clearTimeout(timer);
   timer = null;
+  mirror = new MirrorState();
   bilgi("patron-bulut", "bildirim köprüsü işi durdu");
 }
 
@@ -188,6 +200,7 @@ export function __configureCloudNotifyForTests(p: {
     failures = 0;
     backingOff = false;
     lastWarn = null;
+    mirror = new MirrorState();
   }
   if (p.transport) transport = p.transport;
   if (p.eligibility) eligibilityFn = p.eligibility;

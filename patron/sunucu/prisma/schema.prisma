@@ -384,6 +384,42 @@ model NotificationDefaults {
   @@map("notification_defaults")
 }
 
+/// Fabrikanın bildirim ATAMA AYNASI (D5) — hesap başına tek satır: atanmış türler `[{tur, kapali}]` + tercih yetkisi.
+/// Yazarı fabrika (`POST /v1/bildirimler` `atamalar`); bulut yalnız gösterir (hesap yapmaz, karar vermez).
+model NotificationFactoryMirror {
+  id         String   @id @default(uuid()) @db.Uuid
+  tesisId    String   @map("tesis_id") @db.Uuid
+  accountId  String   @map("account_id") @db.Uuid
+  canChange  Boolean  @map("can_change")
+  kinds      Json     @map("kinds")
+  mirroredAt DateTime @map("mirrored_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([tesisId, accountId])
+  @@map("notification_factory_mirrors")
+}
+
+/// Telefondan bildirim TERCİH İSTEĞİ (D5) — (hesap, tür) başına tek satır; yeni istek satırı yeniden açar (yeni
+/// `requestId`, `ackedAt` NULL). Fabrika köprü yanıtında alır, işler, teyit eder; nihai durum aynadan okunur.
+model NotificationPrefRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  tesisId     String    @map("tesis_id") @db.Uuid
+  accountId   String    @map("account_id") @db.Uuid
+  kind        String    @map("kind") @db.VarChar(40)
+  muted       Boolean   @map("muted")
+  requestId   String    @map("request_id") @db.Uuid
+  requestedAt DateTime  @map("requested_at") @db.Timestamptz
+  ackedAt     DateTime? @map("acked_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([tesisId, accountId, kind])
+  @@unique([tesisId, requestId])
+  @@index([tesisId, ackedAt])
+  @@map("notification_pref_requests")
+}
+
 /// Hesabın bildirim ayarı — KULLANICI TERCİHİ. `settings` NULL = tesis varsayılanına uy.
 model NotificationPreference {
   id        String   @id @default(uuid()) @db.Uuid

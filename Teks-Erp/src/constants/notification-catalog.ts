@@ -86,7 +86,7 @@ export const NOTIFICATION_KINDS = {
     source: { action: "CREATE", tableName: "SHIPMENT" },
     author: "record",
     text: (f, a) => ({ title: "Yeni sevkiyat oluşturuldu", body: join([a, f.customerName, `Sevk ${f.number}`]) }),
-    appRoute: () => "/sevkiyat",
+    appRoute: (id) => `/sevkiyat/${id}`,
   },
 } as const satisfies Record<string, NotificationKindDef>;
 

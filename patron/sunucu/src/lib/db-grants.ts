@@ -32,6 +32,9 @@ export const APP_GRANTS: Readonly<Record<string, readonly Privilege[]>> = {
   push_devices: ["SELECT", "INSERT", "UPDATE", "DELETE"],
   notification_defaults: ["SELECT", "INSERT", "UPDATE"],
   notification_preferences: ["SELECT", "INSERT", "UPDATE"],
+  // Bildirim atama aynası (D5): hesap YALNIZ OKUR (yazarı fabrika kanalı). Tercih isteği: hesap açar/yeniden açar; silinmez.
+  notification_factory_mirrors: ["SELECT"],
+  notification_pref_requests: ["SELECT", "INSERT", "UPDATE"],
   // Görünüm tercihi (kullanıcı tercihi): silinmez, "varsayılana dön" varsayılan değeri yazar.
   view_preferences: ["SELECT", "INSERT", "UPDATE"],
   notifications: ["SELECT", "INSERT", "UPDATE", "DELETE"],
@@ -69,6 +72,7 @@ export const SYNC_COLUMN_GRANTS: ColumnGrants = {
   // Bildirim köprüsü (`POST /v1/bildirimler`): fabrika teslimini kuyruğa EKLER (tablo düzeyi INSERT), bulutun kendi
   // satırına bağlar ve okunduyu iki yönde eşitler — gönderim durumu, cihaz sonuçları, metin YAZILAMAZ.
   notifications: { UPDATE: ["factory_delivery_id", "read_at", "read_synced_at", "updated_at"] },
+  notification_pref_requests: { UPDATE: ["acked_at", "updated_at"] },
 };
 
 export const SYNC_GRANTS: Readonly<Record<string, readonly Privilege[]>> = {
@@ -91,6 +95,9 @@ export const SYNC_GRANTS: Readonly<Record<string, readonly Privilege[]>> = {
   sync_requests: ["SELECT", "UPDATE"],
   // Bildirim köprüsü: UPDATE yalnız kolon düzeyinde (SYNC_COLUMN_GRANTS); silmez.
   notifications: ["SELECT", "INSERT"],
+  // Atama aynası (D5): fabrika kanalı TEK yazar (upsert). Tercih isteğinde yalnız teyit damgası (kolon düzeyi).
+  notification_factory_mirrors: ["SELECT", "INSERT", "UPDATE"],
+  notification_pref_requests: ["SELECT"],
 };
 
 /** Şemadaki bütün uygulama tabloları (bekçi: şema ↔ bu liste birebir). */
@@ -108,6 +115,8 @@ export const CLOUD_TABLES: readonly string[] = [
   "push_devices",
   "notification_defaults",
   "notification_preferences",
+  "notification_factory_mirrors",
+  "notification_pref_requests",
   "view_preferences",
   "notifications",
   "projection_rows",

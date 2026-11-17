@@ -321,11 +321,18 @@ export type UsersPushResponse = z.input<typeof UsersPushResponseSchema>;
  *  · `okunanlar`: fabrikada okunup buluta bildirilmemiş teslimler (panelde okunan + yanıtta gelip fabrikaya yazılan
  *    telefon okunanlarının TEYİDİ).
  * Yanıt `okunanlar`: bulutta/telefonda okunmuş, fabrikanın henüz teyit etmediği teslimler — fabrika TEYİT edene
- * (sonraki isteğin `okunanlar`ında geri yollayana) dek her yanıtta tekrar gelir (idempotent). `tercihler` ileride
- * telefondan değişen bildirim tercihleri içindir (bugün hep boş). Bulut hesabı yoksa/pasifse teslim sayılıp atlanır.
+ * (sonraki isteğin `okunanlar`ında geri yollayana) dek her yanıtta tekrar gelir (idempotent). Bulut hesabı yoksa/pasifse
+ * teslim sayılıp atlanır.
+ * ATAMA AYNASI + TERCİH (D5): yanıtta `ayna: true` gören fabrika sonraki isteklerde `atamalar` (kişinin ATANMIŞ ve
+ * alabildiği türleri, gerçek kapalı durumu, tercih yetkisi; değişenler + periyodik tam liste) ve `tercihTeyit` (işlediği
+ * telefon tercih isteklerinin kimlikleri) gönderir — eski bulut bu alanları hiç görmez (katı şema 400 vermesin diye).
+ * Yanıt `tercihler`: telefonda değişen, fabrikanın henüz teyit etmediği istekler; fabrika TEK OTORİTEDİR (yetkisiz /
+ * atanmamışsa yok sayar), gerçek durum bir sonraki `atamalar`la buluta döner. Bulut karar vermez, aynayı gösterir.
  */
 export const NOTIFICATION_PUSH_MAX = 200;
 export const NOTIFICATION_READS_MAX = 1000;
+export const NOTIFICATION_MIRROR_MAX = 1000;
+export const NOTIFICATION_MIRROR_KINDS_MAX = 50;
 const NotificationKindName = z.string().regex(/^[a-z][a-z0-9-]{1,39}$/);
 export const FactoryNotificationSchema = z
   .strictObject({
@@ -343,13 +350,30 @@ export const FactoryNotificationSchema = z
 export type FactoryNotification = z.infer<typeof FactoryNotificationSchema>;
 export const NotificationReadSchema = z.strictObject({ teslimId: Uuid, okundu: Iso });
 export type NotificationRead = z.infer<typeof NotificationReadSchema>;
+/** Kişinin atanmış (ve veri izniyle alabildiği) türü; `kapali` = tercih yetkisi varsa kişinin kapattığı (yoksa hep false). */
+export const NotificationMirrorKindSchema = z.strictObject({ tur: NotificationKindName, kapali: z.boolean() });
+export const NotificationMirrorSchema = z
+  .strictObject({
+    hesapId: Uuid,
+    /** `bildirim:tercih` var mı: yoksa atanan türler ZORUNLUDUR (telefonda kilitli). */
+    tercihYetkisi: z.boolean(),
+    turler: z.array(NotificationMirrorKindSchema).max(NOTIFICATION_MIRROR_KINDS_MAX),
+  })
+  .refine((m) => distinct(m.turler.map((k) => k.tur)), "Aynada tür tekrar ediyor");
+export type NotificationMirror = z.infer<typeof NotificationMirrorSchema>;
+/** Telefondan gelen tercih isteği (yanıtta): `istekId` fabrikanın teyit kimliğidir. */
+export const NotificationPreferenceRequestSchema = z.object({ istekId: Uuid, hesapId: Uuid, tur: NotificationKindName, kapali: z.boolean() });
+export type NotificationPreferenceRequest = z.infer<typeof NotificationPreferenceRequestSchema>;
 export const NotificationsPushRequestSchema = z
   .strictObject({
     v: z.literal(ENVELOPE_VERSION),
     teslimler: z.array(FactoryNotificationSchema).max(NOTIFICATION_PUSH_MAX),
     okunanlar: z.array(NotificationReadSchema).max(NOTIFICATION_READS_MAX),
+    atamalar: z.array(NotificationMirrorSchema).max(NOTIFICATION_MIRROR_MAX).optional(),
+    tercihTeyit: z.array(Uuid).max(NOTIFICATION_READS_MAX).optional(),
   })
-  .refine((r) => distinct(r.teslimler.map((t) => t.teslimId)) && distinct(r.okunanlar.map((o) => o.teslimId)), "Teslim kimliği tekrar ediyor");
+  .refine((r) => distinct(r.teslimler.map((t) => t.teslimId)) && distinct(r.okunanlar.map((o) => o.teslimId)), "Teslim kimliği tekrar ediyor")
+  .refine((r) => distinct((r.atamalar ?? []).map((a) => a.hesapId)), "Atama aynasında hesap tekrar ediyor");
 export type NotificationsPushRequest = z.infer<typeof NotificationsPushRequestSchema>;
 export const NotificationsPushResponseSchema = z.object({
   v: z.literal(ENVELOPE_VERSION),
@@ -358,7 +382,11 @@ export const NotificationsPushResponseSchema = z.object({
   bagli: Count,
   atlanan: Count,
   okunanlar: z.array(z.object({ teslimId: Uuid, okundu: Iso })).max(NOTIFICATION_READS_MAX).default([]),
-  tercihler: z.array(z.unknown()).default([]),
+  tercihler: z.array(NotificationPreferenceRequestSchema).max(NOTIFICATION_READS_MAX).default([]),
+  /** Bulut atama aynasını ve tercih teyidini tanıyor (D5); eski bulut göndermez → fabrika bu alanları yollamaz. */
+  ayna: z.boolean().default(false),
+  /** Aynası işlenen / tanınmayan hesap sayısı (yalnız gözlem). */
+  aynaAlinan: Count,
 });
 export type NotificationsPushResponse = z.input<typeof NotificationsPushResponseSchema>;
 

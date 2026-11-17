@@ -626,6 +626,37 @@ export interface NotificationSettingsView {
   readonly gonderim: "kapali" | "sahte" | "gercek";
   /** Web push aboneliği için VAPID açık anahtarı (base64url); yapılandırılmamışsa null. */
   readonly webPushAnahtari: string | null;
+  /**
+   * Fabrika kaynaklı türlerin tercihi (D5) — yalnız bulut `BILDIRIM_KAYNAGI=fabrika` ∧ fabrika aynası geldiyse dolu;
+   * yoksa (eski bulut/ayna yok) alan gelmez ya da null → bugünkü form. Doluyken `FACTORY_NOTIFICATION_KINDS` türleri
+   * kişinin bulut ayarında (`turler`) DEĞİL burada yönetilir; yalnız atanmış olanlar listelenir.
+   */
+  readonly fabrika?: FactoryNotificationPrefs | null;
+}
+
+/** Fabrikanın ürettiği (atanan) bildirim türleri; bulut ayarındaki aynı adlı anahtar fabrika kipinde kullanılmaz. */
+export const FACTORY_NOTIFICATION_KINDS: readonly string[] = ["yeni-siparis", "yeni-is-emri", "yeni-sevk"];
+
+export interface FactoryNotificationKindPref {
+  readonly tur: string;
+  /** Gösterilen durum: bekleyen istek varsa istenen, yoksa fabrikanın aynası. */
+  readonly kapali: boolean;
+  /** Telefondan istendi, fabrika henüz işlemedi (nihai durum fabrikadan döner). */
+  readonly bekliyor: boolean;
+}
+
+export interface FactoryNotificationPrefs {
+  /** `bildirim:tercih` (fabrikada): yoksa atanan türler zorunludur, form kilitli. */
+  readonly tercihYetkisi: boolean;
+  readonly turler: readonly FactoryNotificationKindPref[];
+  /** Aynanın fabrikadan son geldiği an. */
+  readonly guncelleme: string;
+}
+
+/** `POST /bildirim/fabrika-tercih` gövdesi: atanmış türleri kapat/aç (başlık başına toplu da olabilir). */
+export interface FactoryPreferenceChange {
+  readonly tur: string;
+  readonly kapali: boolean;
 }
 
 /** `POST /bildirim/deneme` — kendi etkin cihazlarına tek deneme (hız sınırlı; geçmişe yazılmaz). */
