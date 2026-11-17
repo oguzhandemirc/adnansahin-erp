@@ -134,3 +134,26 @@ DB'de kalır; eski kod onlara dokunmaz. Şalter açılmışsa geri dönüşte bi
 - `backend-err-*.log` (en yenisi) — yeni hata yok
 - panelde parolayla giriş + bir sipariş listesi açılışı; tabletten PIN ile giriş
 - ölçülen kesinti
+
+## Ek — D6a: kalan bildirim türleri (fabrika + panel; sürüm 2.13.0 kalır, migration YOK)
+
+Yeni türler (hepsi şalter `notifications.enabled` arkasında; kapalıyken sıfır satır):
+
+| Tür | Konu | Veri izni | Doğduğu çağrı |
+|---|---|---|---|
+| `siparis-iptal` | Siparişler | `order:read` | DELETE ORDER · son kalem iptali (UPDATE ORDER_LINE cancelled) |
+| `siparis-tamamlandi` | Siparişler | `order:read` | elle kapatma (UPDATE ORDER) · sevk çıkışının yan etkisi · son kalem iptali |
+| `fire-top-iptal` | Üretim | `roll:read` | UPDATE ROLL mode=SCRAP/CANCEL |
+| `sevkiyat-cikti` | Sevkiyat | `shipping:read` | UPDATE SHIPMENT kind=DISPATCH · CREATE SHIPMENT (onay kapalı) — top/metre BRÜT |
+| `sevkiyat-iptal` | Sevkiyat | `shipping:read` | UPDATE SHIPMENT kind=CANCEL/UNDO_DISPATCH |
+| `ham-giris` | Stok ve fason | `goods-receipt:read` | CREATE GOODS_RECEIPT |
+| `fason-gitti` / `fason-dondu` | Stok ve fason | `workorder:read` | CREATE SUBCONTRACTOR_DISPATCH / _RECEIPT (dokuma hariç) |
+| `gun-sonu-ozeti` | Genel | `report:sales` | süreç içi zamanlayıcı, `notifications.dailySummaryTime` (varsayılan 18:30) |
+
+- Yükleyici durum + 15 dk tazelik doğrular; eski kayda sonraki sıradan yazım bayat bildirim doğurmaz.
+- Mal kabul fişi iptali ve içe aktarım geri alma alt çağrıları bastırılır (top/satır başına yağmur yok).
+- Bulut köprüsü yalnız bulutun TANIDIĞI türleri gönderir (yanıtta `turler` yoksa D1 türleri); diğerleri damgalanmadan
+  bekler. Bulut D6b ile yükseltilmeden yeni türler telefona GİTMEZ, panelde görünür.
+- Yeni ayar anahtarı `notifications.dailySummaryTime` ("SS:DD"; ham ayar ucu, panel satırı yok).
+
+Doğrulama ekleri: şalter kapalıyken `SELECT count(*) FROM notification_events WHERE kind = 'gun-sonu-ozeti'` → 0.

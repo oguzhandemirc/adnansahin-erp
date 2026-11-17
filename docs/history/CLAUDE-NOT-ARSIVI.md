@@ -13461,3 +13461,17 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Bekçi.** Bulut `test_bildirim_okundu` 16/0 · `test_bildirim_tercih_aynasi` 22/0; fabrika `test_bildirim_tercih_aynasi` 16/0; uygulama `__tests__/bildirim-okundu.test.tsx` 11/11 · `__tests__/bildirim-tercih.test.tsx` 13/13 (sondalar: kilit kaldırıldı · ayna-yok dalı kaldırıldı · ret sonrası bindirme kalıyor · yoklama yok · bulut satırı çift → hepsi kırmızı) · `__tests__/taps.test.ts` web okundu (sonda: `?bildirim=` kaldırıldı → kırmızı).
 
 **Açık.** Okunmamış eşitleme gecikmesi en kötü ~45 sn (telefon 15 sn + köprü 30 sn). Eski uygulama yeni `yeni-sevk` rotasını (`/sevkiyat/<id>`) açamaz (gezinme yok).
+
+## 2026-11-17 — Platformlar arası bildirim D6a: kalan türler, fabrika + panel (backend 2.13.0, migration yok) [GENEL + PATRON-BULUTU]
+
+**Karar.** Dokuz tür (`siparis-iptal`, `siparis-tamamlandi`, `fire-top-iptal`, `sevkiyat-cikti`, `sevkiyat-iptal`, `ham-giris`, `fason-gitti`, `fason-dondu`, `gun-sonu-ozeti`) yine `AuditService.log` kancasından doğar; bir tür birden çok çağrıdan gelebilir (katalog `sources`), çağrı `newData`nın üst düzey etiketiyle (kind · mode · cancelled) daraltılır, varlık çözücüyle bulunur (kalem → sipariş, sevkiyat → siparişleri). Satır yine okunmaz. Yükleyici olay yüklemidir: durum uymuyorsa ya da olay damgası 15 dk'dan eskiyse olay yok.
+
+**Ölçüm.** Sipariş "tamamlandı" çoğunlukla sevk çıkışının yan etkisidir (`recomputeOrderStatusTx`); sevk çıkışı çağrısı siparişlere yayılır. Onay kapalıyken sevkiyat doğrudan DISPATCHED kurulduğundan CREATE SHIPMENT de çıkış kaynağıdır. Mal kabul fişi iptali topları tek tek `softDelete` eder → `withNotificationsSuppressed`. İçe aktarım `logMany` kullanır (kanca yok); geri alması bastırılır.
+
+**Gün sonu.** Olay tablosu UUID varlık, bulut tekil anahtarı `<tür>:<uuid>` ister → gün anahtarından deterministik UUID. Sayılar Sipariş Karnesi · Kalite Karnesi · Sevk & Termin Karnesi'nden. Kaçırılan gün üretilmez.
+
+**Bulut.** Bulut tanımadığı türü 400'lemez, ATLAR; fabrika damgalasaydı bildirim kaybolurdu. Köprü yalnız bulutun bildirdiği (`turler`, D6b ekler) ya da D1 türlerini gönderir.
+
+**Bekçi.** `test_bildirim_turler` 77/0 (4 sonda) · `test_bildirim_bulut_koprusu` 29/0 (+1 sonda) · panel vitest 3819/3819. Commit'ler `0359831b` `18321332` `74cf9864` `ec3522bd`.
+
+**Açık.** Kapsanmayan "tamamlandı" yolları: iade/storno sonrası yeniden hesap. Aynı varlıkta ikinci olay doğmaz (ör. geri alınıp yeniden iptal). Fason türlerinin servis yolu bekçisi yok (başlık CHECK'i iş emri adımı fikstürü ister). `gun-sonu-ozeti` veri izni `report:sales` kullanıcı onayı bekler.
