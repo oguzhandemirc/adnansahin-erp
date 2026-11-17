@@ -1,13 +1,18 @@
 // Yeni sipariş fabrikaya GELEN KUTUSU üzerinden gider: sipariş no, yön, durum fabrikada doğar.
 // Gövde `buildOrder` (forms.ts), gönderim `useWrite` (işlem kimliği kuralı; TEK örnek, adımlar arasında yeniden
 // üretilmez). Üç sayfa (şartname §4.10): Müşteri · Kalemler · Gönder; 1 → 2 cari seçilmeden geçilmez.
+// Sesle doldur (src/ses, 2026-11-17): yalnız formu DOLDURUR, asla göndermez; gönderim aşağıdaki aynı `submit` yolundan.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { addDaysToKey, factoryDayKey, fmtDayKey } from "../../../../src/lib/factory-time";
 import { buildOrder, type OrderLineInput } from "../../../../src/lib/forms";
+import { can } from "../../../../src/lib/access";
+import type { FormDoldurma } from "../../../../src/ses/akis";
+import { sesMotoru } from "../../../../src/ses/tanima";
 import { useSession } from "../../../../src/state/session";
+import { SesDugmesi, SesliSiparisModal } from "../../../../src/ui/ses/SesliSiparis";
 import { Screen } from "../../../../src/ui/Frame";
 import { Banner, Button, Field } from "../../../../src/ui/kit";
 import { Picker, type Picked } from "../../../../src/ui/Picker";
@@ -26,8 +31,13 @@ type QuickKey = (typeof QUICK)[number]["key"] | "elle";
 const ADIMLAR = ["Müşteri", "Kalemler", "Gönder"] as const;
 
 export default function NewOrder() {
-  const { api } = useSession();
+  const { api, permissions } = useSession();
   const router = useRouter();
+  const motor = useMemo(() => sesMotoru(), []);
+  // Ses düğmesi yalnız yazma yetkisi VE cihazda tanıma varken (web/Expo Go/izin dışı rolde çizilmez).
+  const sesVar = can(permissions, "bulut:siparis:yaz") && motor.mevcut();
+  const [sesAcik, setSesAcik] = useState(false);
+  const listeYukle = useCallback((projection: string, p: Parameters<typeof api.list>[1]) => api.list(projection, p), [api]);
   const t = useTokens();
   const s = useStyles();
   const [cari, setCari] = useState<Picked | null>(null);
@@ -50,6 +60,21 @@ export default function NewOrder() {
     setQuick(k);
     const q = QUICK.find((x) => x.key === k);
     if (q) setTermin(fmtDayKey(addDaysToKey(factoryDayKey(), q.days)));
+  }
+
+  /** Sesten gelen değerleri forma yazar (boş kalem satırları değişir, dolu olanların ardına eklenir); GÖNDERMEZ. */
+  function sesleDoldur(f: FormDoldurma) {
+    if (f.cari) setCari(f.cari);
+    if (f.kalemler.length) {
+      const yeni: Line[] = f.kalemler.map((k) => ({ urun: k.urun, renk: k.renk, miktar: k.miktar, birimFiyat: "" }));
+      setLines((ls) => [...ls.filter((l) => l.urun || l.renk || l.miktar || l.birimFiyat), ...yeni]);
+    }
+    if (f.termin) {
+      setTermin(f.termin);
+      setQuick("elle");
+    }
+    setSesAcik(false);
+    if (f.cari || cari) setAdim(2);
   }
 
   async function submit() {
@@ -79,6 +104,11 @@ export default function NewOrder() {
       }
     >
       <AdimCubugu adim={adim} toplam={3} etiket={ADIMLAR[adim - 1]!} />
+
+      {adim === 1 && sesVar ? <SesDugmesi onPress={() => setSesAcik(true)} /> : null}
+      {sesVar ? (
+        <SesliSiparisModal visible={sesAcik} onKapat={() => setSesAcik(false)} onAktar={sesleDoldur} motor={motor} listeYukle={listeYukle} bugun={factoryDayKey()} />
+      ) : null}
 
       {adim === 1 ? (
         <FormKarti>

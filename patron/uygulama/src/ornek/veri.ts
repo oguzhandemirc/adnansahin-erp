@@ -393,7 +393,11 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
     }),
   );
   const sube = [kayit("b1", { ad: "Bursa Merkez Depo", cariKartId: "c1", kod: "ORN-001-01", il: "Bursa", aktif: true })];
-  return { siparis, "siparis-kalemi": kalem, "cari-kart": cari, sevkiyat, "is-emri": isEmri, iade, sube };
+  // Seçici ve sesle sipariş önizlemesi için ürün/renk listeleri (2026-11-17).
+  const urun = [["u1", "Örnek Saten 280 cm", "SAT-280"], ["u2", "Deneme Keten 150 cm", "KTN-150"], ["u3", "Numune Tül 320 cm", "TUL-320"], ["u4", "Taslak Kadife 140 cm", "KDF-140"]]
+    .map(([id, ad, kod]) => kayit(id!, { ad, kod, tur: "FABRIC", aktif: true }));
+  const renk = ["Krem", "Beyaz", "Ekru", "Bordo", "Antrasit", "Lacivert", "Siyah"].map((ad, i) => kayit(`r${i + 1}`, { ad, aktif: true }));
+  return { siparis, "siparis-kalemi": kalem, "cari-kart": cari, sevkiyat, "is-emri": isEmri, iade, sube, urun, renk };
 }
 
 const donemOzeti = (o: { siparis: number; mt: number; kg?: number; sevkM: number; top: number; cuval: number; tartili: number; kgSevk: number; iadeTop: number; iadeM: number; urunCarpan: number }): CustomerSummaryPeriod => ({
