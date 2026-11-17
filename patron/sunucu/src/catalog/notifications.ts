@@ -72,6 +72,71 @@ export const KIND_RULES: Readonly<Record<NotificationKind, KindRule>> = {
     permissions: ["bulut:sevkiyat:oku"],
     nativeBody: true,
   },
+  // D6b — kalan fabrika kaynaklı türler (anahtar + etiket fabrika kataloğuyla birebir). Bulut bunları TÜRETMEZ; yalnız
+  // `/v1/bildirimler` ile gelir. Kilit ekranında içerik (kullanıcı kararı 2026-11-17) → hepsi `nativeBody`.
+  "siparis-iptal": {
+    label: "Sipariş iptali",
+    description: "Fabrikada bir sipariş iptal edildi (kendi iptal ettiğiniz için gelmez)",
+    source: "siparis",
+    permissions: ["bulut:siparis:oku"],
+    nativeBody: true,
+  },
+  "siparis-tamamlandi": {
+    label: "Sipariş tamamlandı",
+    description: "Bir sipariş tamamlandı (elle kapatma ya da son sevkle)",
+    source: "siparis",
+    permissions: ["bulut:siparis:oku"],
+    nativeBody: true,
+  },
+  "fire-top-iptal": {
+    label: "Top fire / iptal",
+    description: "Bir top fire edildi ya da iptal edildi",
+    source: "is-emri",
+    permissions: ["bulut:uretim:oku"],
+    nativeBody: true,
+  },
+  "sevkiyat-cikti": {
+    label: "Sevkiyat çıktı",
+    description: "Bir sevkiyat fabrikadan çıktı (brüt top ve metre)",
+    source: "sevkiyat",
+    permissions: ["bulut:sevkiyat:oku"],
+    nativeBody: true,
+  },
+  "sevkiyat-iptal": {
+    label: "Sevkiyat iptali",
+    description: "Bir sevkiyat iptal edildi ya da çıkışı geri alındı",
+    source: "sevkiyat",
+    permissions: ["bulut:sevkiyat:oku"],
+    nativeBody: true,
+  },
+  "ham-giris": {
+    label: "Mal kabul girişi",
+    description: "Depoya ham kumaş girişi (mal kabul fişi) yapıldı",
+    source: "stok-kalem",
+    permissions: ["bulut:stok:oku"],
+    nativeBody: true,
+  },
+  "fason-gitti": {
+    label: "Fasona gönderildi",
+    description: "Toplar fason firmasına gönderildi",
+    source: "fason-acik",
+    permissions: ["bulut:uretim:oku"],
+    nativeBody: true,
+  },
+  "fason-dondu": {
+    label: "Fasondan döndü",
+    description: "Toplar fason firmasından geri alındı",
+    source: "fason-acik",
+    permissions: ["bulut:uretim:oku"],
+    nativeBody: true,
+  },
+  "gun-sonu-ozeti": {
+    label: "Gün sonu özeti",
+    description: "Her akşam bugünün açılan sipariş, üretim ve sevk sayıları",
+    source: null,
+    permissions: ["bulut:ozet:oku"],
+    nativeBody: true,
+  },
 };
 
 /** Katalog ölçümü — hata listesi (boşsa tutarlı). Açılışta ve bekçide koşar. */

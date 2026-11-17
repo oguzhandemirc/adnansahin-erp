@@ -578,6 +578,16 @@ export const NOTIFICATION_KINDS = [
   "yeni-siparis",
   "yeni-is-emri",
   "yeni-sevk",
+  // D6b — fabrika kaynaklı (anahtarlar fabrika kataloğu `Teks-Erp/src/constants/notification-catalog.ts` ile birebir).
+  "siparis-iptal",
+  "siparis-tamamlandi",
+  "fire-top-iptal",
+  "sevkiyat-cikti",
+  "sevkiyat-iptal",
+  "ham-giris",
+  "fason-gitti",
+  "fason-dondu",
+  "gun-sonu-ozeti",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -635,7 +645,20 @@ export interface NotificationSettingsView {
 }
 
 /** Fabrikanın ürettiği (atanan) bildirim türleri; bulut ayarındaki aynı adlı anahtar fabrika kipinde kullanılmaz. */
-export const FACTORY_NOTIFICATION_KINDS: readonly string[] = ["yeni-siparis", "yeni-is-emri", "yeni-sevk"];
+export const FACTORY_NOTIFICATION_KINDS: readonly string[] = [
+  "yeni-siparis",
+  "yeni-is-emri",
+  "yeni-sevk",
+  "siparis-iptal",
+  "siparis-tamamlandi",
+  "fire-top-iptal",
+  "sevkiyat-cikti",
+  "sevkiyat-iptal",
+  "ham-giris",
+  "fason-gitti",
+  "fason-dondu",
+  "gun-sonu-ozeti",
+];
 
 export interface FactoryNotificationKindPref {
   readonly tur: string;

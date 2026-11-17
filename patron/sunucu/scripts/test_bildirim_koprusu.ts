@@ -23,7 +23,8 @@ import { withTesis } from "../src/lib/tenant";
 import { applyFactoryNotifications } from "../src/services/factory-notifications.service";
 import { generateForFacility } from "../src/services/notification-events";
 import type { CloudContext } from "../src/services/context";
-import { NOTIFICATION_PUSH_MAX } from "../src/wire/esitleme";
+import { NOTIFICATION_KINDS } from "../src/wire/api";
+import { NOTIFICATION_PUSH_MAX, NotificationsPushResponseSchema } from "../src/wire/esitleme";
 import { ayar, ayarYaz, bildirimler, cihazKaydet, tur } from "./lib/bildirim-fikstur";
 import { girdi, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestKurulumu } from "./lib/test-ortam";
 
@@ -46,7 +47,7 @@ const teslim = (hesapId: string, tur: string, varlik: string = randomUUID(), ek:
   teslimId: randomUUID(), hesapId, tur, tekilAnahtar: `${tur}:${varlik}`, baslik: "Yeni iş", metin: "Örnek · 120 m", rota: null, yazar: "Ali", olusturulma: new Date().toISOString(), ...ek,
 });
 
-interface Yanit { alinan: number; bagli: number; atlanan: number; okunanlar: { teslimId: string; okundu: string }[]; tercihler: unknown[] }
+interface Yanit { alinan: number; bagli: number; atlanan: number; okunanlar: { teslimId: string; okundu: string }[]; tercihler: unknown[]; turler?: string[] }
 async function gonder(o: Ortam, k: TestKurulumu, govde: { teslimler?: Teslim[]; okunanlar?: { teslimId: string; okundu: string }[] }) {
   const r = await imzali(o, k, YOL, { govde: { v: 1, teslimler: govde.teslimler ?? [], okunanlar: govde.okunanlar ?? [] }, imzaYolu: YOL });
   return { status: r.status, kod: r.json.details?.code, y: r.json as unknown as Yanit };
@@ -97,6 +98,9 @@ async function kabul(o: Ortam, k: TestKurulumu, a: string, pasif: string): Promi
   const s = await satir(o, k.tesisId, t.teslimId);
   kontrol("§2b satır origin=fabrika · BEKLIYOR · anahtar/metin aynen", !!s && s.origin === "fabrika" && s.status === "BEKLIYOR" && s.dedupKey === t.tekilAnahtar && s.body === t.metin && s.accountId === a);
   kontrol("§2c yanıt `tercihler` boş dizi (D5 kanalı)", Array.isArray(r1.y.tercihler) && r1.y.tercihler.length === 0);
+  const tipli = NotificationsPushResponseSchema.safeParse(r1.y);
+  kontrol("§2c' ⭐ yanıt `turler` = bulutun tanıdığı tür kümesi (D6b; fabrika yalnız bunları yollar) ve tel şemasından geçer",
+    tipli.success && JSON.stringify(tipli.data.turler) === JSON.stringify([...NOTIFICATION_KINDS]), JSON.stringify(r1.y.turler));
   const r2 = await gonder(o, k, { teslimler: [t] });
   const ayni = (await satirlar(o, k.tesisId)).filter((x) => x.dedupKey === t.tekilAnahtar);
   kontrol("§2d aynı istek tekrarı etkisiz (alınan 0, tek satır)", r2.status === 200 && r2.y.alinan === 0 && r2.y.bagli === 0 && ayni.length === 1, JSON.stringify(r2.y));

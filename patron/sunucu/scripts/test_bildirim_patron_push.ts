@@ -81,9 +81,16 @@ async function main(): Promise<void> {
 
   // ── §2d gövde istisnası: YALNIZ kataloğunda `nativeBody` açık tür ─────────
   const govdeli = NOTIFICATION_KINDS.filter((k) => "body" in (nativePushPayload(ANDROID, { ...DOLU, kind: k }) as Record<string, unknown>));
-  // Bilinçli istisnalar: yeni-siparis (2026-11-17) + fabrika kaynaklı yeni-is-emri · yeni-sevk (bildirim köprüsü, 2026-11-17).
-  const GOVDELI = ["yeni-siparis", "yeni-is-emri", "yeni-sevk"];
-  kontrol("§2d ⭐ gövde taşıyan tür kümesi = yalnız yeni-siparis · yeni-is-emri · yeni-sevk", JSON.stringify(govdeli) === JSON.stringify(GOVDELI), govdeli.join(","));
+  // Bilinçli istisnalar: yeni-siparis (2026-11-17) + fabrika kaynaklı yeni-is-emri · yeni-sevk (bildirim köprüsü, 2026-11-17)
+  // + D6b fabrika kaynaklı dokuz tür (kilit ekranında içerik, kullanıcı kararı 2026-11-17). Bulutun kendi türettiği eşik
+  // türleri (stok-esigi · geciken-siparis · gunluk-uretim · esitleme-gecikti · gelen-kutusu-sonucu) İÇERİKSİZ kalır.
+  const GOVDELI = [
+    "yeni-siparis", "yeni-is-emri", "yeni-sevk",
+    "siparis-iptal", "siparis-tamamlandi", "fire-top-iptal", "sevkiyat-cikti", "sevkiyat-iptal", "ham-giris", "fason-gitti", "fason-dondu", "gun-sonu-ozeti",
+  ];
+  kontrol("§2d ⭐ gövde taşıyan tür kümesi = yeni-siparis + fabrika kaynaklı türler (eşik türleri içeriksiz)", JSON.stringify(govdeli) === JSON.stringify(GOVDELI), govdeli.join(","));
+  const icerksiz = ["gelen-kutusu-sonucu", "stok-esigi", "geciken-siparis", "gunluk-uretim", "esitleme-gecikti"];
+  kontrol("§2d' eşik ve gelen kutusu türleri içeriksiz", icerksiz.every((k) => !govdeli.includes(k as (typeof govdeli)[number])), govdeli.join(","));
   const ys = nativePushPayload(ANDROID, { ...DOLU, kind: "yeni-siparis", body: "ACME · Sipariş 12 · 800 m" }) as Record<string, unknown>;
   kontrol("§2e yeni-siparis: gövde aynen, başka yeni anahtar yok",
     ys.body === "ACME · Sipariş 12 · 800 m" && JSON.stringify(Object.keys(ys).sort()) === JSON.stringify([...NATIVE_PAYLOAD_KEYS, "body"].sort()), JSON.stringify(ys));

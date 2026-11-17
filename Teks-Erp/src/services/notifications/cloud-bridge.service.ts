@@ -16,22 +16,22 @@
 // =============================================================================
 
 import prisma from "../../lib/prisma";
-import type { FactoryNotification, NotificationRead } from "../../cloud-sync/wire";
+import type { z } from "zod";
+import type { FactoryNotification, NotificationRead, NotificationsPushResponseSchema } from "../../cloud-sync/wire";
 import { NOTIFICATION_PUSH_MAX, NOTIFICATION_READS_MAX } from "../../cloud-sync/wire";
+
+type NotificationsPushResponseParsed = z.infer<typeof NotificationsPushResponseSchema>;
 import { NOTIFICATION_KINDS_D1 } from "../../constants/notification-catalog";
 
 /** Bulut desteklediği türleri bildirmezse varsayılan küme (D4 bulutunun tanıdığı fabrika türleri). */
 export const CLOUD_LEGACY_NOTIFICATION_KINDS: ReadonlySet<string> = new Set(NOTIFICATION_KINDS_D1);
 
 /**
- * Bulut yanıtındaki desteklenen tür listesi (`turler: string[]`, D6b ekler). Alan tel şemasında henüz yok (bayt-eş ayna
- * `patron/` ile birlikte değişir) → ham yanıttan savunmacı okunur; yok/bozuksa null (çağıran eski kümeyi kullanır).
+ * Bulutun desteklediği tür kümesi — tipli yanıttan (`NotificationsPushResponseSchema.turler`, D6b). Şema bozuk listeyi
+ * `undefined`a çevirir (yanıtın geri kalanı düşmez); yanıt geçersiz ya da alan yoksa null (çağıran eski kümeye düşer).
  */
-export function readCloudSupportedKinds(json: unknown): ReadonlySet<string> | null {
-  if (!json || typeof json !== "object") return null;
-  const v = (json as { turler?: unknown }).turler;
-  if (!Array.isArray(v) || v.length > 200 || !v.every((x) => typeof x === "string" && /^[a-z][a-z0-9-]{1,39}$/.test(x))) return null;
-  return new Set(v as string[]);
+export function cloudSupportedKinds(res: Pick<NotificationsPushResponseParsed, "turler"> | null): ReadonlySet<string> | null {
+  return res?.turler ? new Set(res.turler) : null;
 }
 
 /** Yeni teslim penceresi: bundan eski, gönderilmemiş teslim buluta gitmez (kapalı geçen süreden sonra sel olmasın). */

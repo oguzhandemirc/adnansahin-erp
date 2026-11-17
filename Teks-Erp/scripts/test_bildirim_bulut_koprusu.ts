@@ -21,7 +21,7 @@
 // kaldırıldı → §2e ❌ · (D6a) tür kümesi süzgeci kaldırıldı → §7a ❌. Geri yüklenince yeşil.
 // =============================================================================
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import * as bcrypt from "bcryptjs";
@@ -32,8 +32,10 @@ import { generateKeyFile, loadKeyFile } from "../src/lib/cloud-signing/key-file"
 import { REQUEST_HEADER } from "../src/lib/cloud-signing/istek";
 import { PASSWORD_POLICY_VERSION } from "../src/services/helpers/password-policy.helper";
 import { markNotificationRead } from "../src/services/notifications/notification-inbox.service";
-import { CLOUD_NOTIFY_WINDOW_MS, readCloudSupportedKinds } from "../src/services/notifications/cloud-bridge.service";
+import { CLOUD_NOTIFY_WINDOW_MS, cloudSupportedKinds } from "../src/services/notifications/cloud-bridge.service";
 import { reconcilePatronCloud, type ReconcileDeps } from "../src/jobs/patron-cloud.jobs";
+import { NotificationsPushResponseSchema } from "../src/cloud-sync/wire";
+import { NOTIFICATION_KIND_KEYS, notificationKindDef } from "../src/constants/notification-catalog";
 import {
   __cloudNotifyTimerArmedForTests,
   __configureCloudNotifyForTests,
@@ -275,7 +277,30 @@ async function s7(open: Open, a: string): Promise<void> {
   const n = fc.seen.length;
   await runCloudNotifyOnce();
   check("§7b 'turler' bildiren bulut: bekleyen yeni tür sonraki turda gitti ve damgalandı", sentIds(fc, n).has(fresh.id) && !!(await row(fresh.id)).cloudSentAt);
-  check("§7c bozuk 'turler' yok sayılır (eski küme)", readCloudSupportedKinds({ turler: ["Gecersiz Tur"] }) === null && readCloudSupportedKinds({}) === null && readCloudSupportedKinds({ turler: ["a-b"] })?.has("a-b") === true);
+  const base = { v: 1, alinan: 0, bagli: 0, atlanan: 0, aynaAlinan: 0 };
+  const bad = NotificationsPushResponseSchema.safeParse({ ...base, okunanlar: [], turler: ["Gecersiz Tur"] });
+  const none = NotificationsPushResponseSchema.safeParse(base);
+  const good = NotificationsPushResponseSchema.safeParse({ ...base, turler: ["a-b"] });
+  check("§7c bozuk 'turler' yanıtı düşürmez, yok sayılır (eski küme); alan yoksa da eski küme",
+    bad.success && cloudSupportedKinds(bad.data) === null && none.success && cloudSupportedKinds(none.data) === null && good.success && cloudSupportedKinds(good.data)?.has("a-b") === true);
+  check("§7d geçersiz yanıt → eski küme", cloudSupportedKinds(null) === null);
+}
+
+/** D6b: fabrika kataloğunun her türü bulutun tel listesinde, fabrika kaynaklı kümede ve kuralında AYNI etiketle var. */
+function s8(): void {
+  console.log("\n§8 fabrika kataloğu ↔ bulut kataloğu (tür anahtarı + etiket)");
+  const cloudRoot = path.join(__dirname, "..", "..", "patron", "sunucu", "src");
+  const api = readFileSync(path.join(cloudRoot, "wire", "api.ts"), "utf8");
+  const rules = readFileSync(path.join(cloudRoot, "catalog", "notifications.ts"), "utf8");
+  const block = (name: string): string => api.slice(api.indexOf(`export const ${name}`), api.indexOf("];", api.indexOf(`export const ${name}`)));
+  const wireKinds = block("NOTIFICATION_KINDS =");
+  const factoryKinds = block("FACTORY_NOTIFICATION_KINDS");
+  const missWire = NOTIFICATION_KIND_KEYS.filter((k) => !wireKinds.includes(`"${k}"`));
+  const missFactory = NOTIFICATION_KIND_KEYS.filter((k) => !factoryKinds.includes(`"${k}"`));
+  const badLabel = NOTIFICATION_KIND_KEYS.filter((k) => !rules.includes(`"${k}": {\n    label: ${JSON.stringify(notificationKindDef(k).label)},`));
+  check("§8a ⭐ her fabrika türü bulut tel listesinde (NOTIFICATION_KINDS)", missWire.length === 0, missWire.join(","));
+  check("§8b ⭐ her fabrika türü bulutun fabrika kaynaklı kümesinde (FACTORY_NOTIFICATION_KINDS — kişisel forma sızmaz)", missFactory.length === 0, missFactory.join(","));
+  check("§8c ⭐ bulut kuralı var ve etiketi fabrika etiketiyle aynı", badLabel.length === 0, badLabel.join(","));
 }
 
 async function main(): Promise<void> {
@@ -296,6 +321,7 @@ async function main(): Promise<void> {
     await s5(open, a);
     await s6(open, a);
     await s7(open, a);
+    s8();
   } finally {
     stopCloudNotify();
     __configureCloudNotifyForTests({ reset: true });

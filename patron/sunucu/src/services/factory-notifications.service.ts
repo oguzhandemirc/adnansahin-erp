@@ -9,6 +9,7 @@
 //  · Yanıt `okunanlar`: bağlı, okunmuş, teyitsiz satırlar — fabrika sonraki istekte geri yollayana dek tekrar gelir.
 //  · D5: `atamalar` hesabın ayna satırını TAM yerine koyar; `tercihTeyit` aynı kimlikli istekleri kapatır; yanıt
 //    `tercihler` teyitsiz istekleri taşır (`ayna: true` = bu bulut aynayı tanıyor). Karar fabrikanındır.
+//  · D6b: yanıt `turler` bu bulutun tanıdığı tür kümesidir (`NOTIFICATION_KINDS`); fabrika yalnız bunları yollar.
 // Kanal denetimi (`account_audit`) beyanlı istisnadır (fabrika kanalı); günlüğe yalnız SAYI düşer.
 import type { Tx } from "../lib/db";
 import { withTesis } from "../lib/tenant";
@@ -120,6 +121,7 @@ export async function applyFactoryNotifications(
       alinan, bagli, atlanan,
       okunanlar: unsynced.map((u) => ({ teslimId: u.factoryDeliveryId!, okundu: u.readAt!.toISOString() })),
       tercihler, ayna: true, aynaAlinan,
+      turler: [...NOTIFICATION_KINDS],
     };
   });
   if (out.alinan > 0) ctx.notificationNudge?.();

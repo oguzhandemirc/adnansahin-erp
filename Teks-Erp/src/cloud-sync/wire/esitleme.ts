@@ -328,11 +328,13 @@ export type UsersPushResponse = z.input<typeof UsersPushResponseSchema>;
  * telefon tercih isteklerinin kimlikleri) gönderir — eski bulut bu alanları hiç görmez (katı şema 400 vermesin diye).
  * Yanıt `tercihler`: telefonda değişen, fabrikanın henüz teyit etmediği istekler; fabrika TEK OTORİTEDİR (yetkisiz /
  * atanmamışsa yok sayar), gerçek durum bir sonraki `atamalar`la buluta döner. Bulut karar vermez, aynayı gösterir.
+ * TÜR KÜMESİ (D6b): yanıt `turler` bulutun tanıdığı türleri bildirir; fabrika yalnız onları yollar, yoksa eski kümeye düşer.
  */
 export const NOTIFICATION_PUSH_MAX = 200;
 export const NOTIFICATION_READS_MAX = 1000;
 export const NOTIFICATION_MIRROR_MAX = 1000;
 export const NOTIFICATION_MIRROR_KINDS_MAX = 50;
+export const NOTIFICATION_KINDS_LIST_MAX = 200;
 const NotificationKindName = z.string().regex(/^[a-z][a-z0-9-]{1,39}$/);
 export const FactoryNotificationSchema = z
   .strictObject({
@@ -387,6 +389,12 @@ export const NotificationsPushResponseSchema = z.object({
   ayna: z.boolean().default(false),
   /** Aynası işlenen / tanınmayan hesap sayısı (yalnız gözlem). */
   aynaAlinan: Count,
+  /**
+   * Bulutun TANIDIĞI bildirim türleri (D6b). Fabrika yalnız bu kümedeki teslimleri yollar (tanınmayanı bulut atlar,
+   * fabrika damgalasa telefona hiç gitmezdi). Eski bulut göndermez; bozuk liste yanıtın geri kalanını düşürmez → yok
+   * sayılır (fabrika eski kümeye düşer).
+   */
+  turler: z.array(NotificationKindName).max(NOTIFICATION_KINDS_LIST_MAX).optional().catch(undefined),
 });
 export type NotificationsPushResponse = z.input<typeof NotificationsPushResponseSchema>;
 

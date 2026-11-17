@@ -24,7 +24,7 @@ import {
   CLOUD_LEGACY_NOTIFICATION_KINDS,
   applyBridgeResult,
   collectBridgeBatch,
-  readCloudSupportedKinds,
+  cloudSupportedKinds,
   type BridgeBatch,
 } from "../services/notifications/cloud-bridge.service";
 import { MirrorState, applyCloudPreferenceRequests } from "../services/notifications/cloud-mirror.service";
@@ -92,7 +92,7 @@ export async function runCloudNotifyOnce(): Promise<NotifyRunResult> {
       requests++;
       if (!res.ok) return res.status === 404 ? result("ESKI_BULUT", res.code, sent, requests) : result("BASARISIZ", res.code, sent, requests);
       const read = NotificationsPushResponseSchema.safeParse(res.json);
-      cloudKinds = readCloudSupportedKinds(res.json) ?? CLOUD_LEGACY_NOTIFICATION_KINDS;
+      cloudKinds = cloudSupportedKinds(read.success ? read.data : null) ?? CLOUD_LEGACY_NOTIFICATION_KINDS;
       const applied = await applyBridgeResult(batch, read.success ? read.data.okunanlar : [], now);
       mirror.sent(extra, read.success && read.data.ayna);
       const prefs = read.success && read.data.tercihler.length > 0 ? await applyCloudPreferenceRequests(read.data.tercihler) : null;
