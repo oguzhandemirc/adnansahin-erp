@@ -31,6 +31,23 @@ export interface WindowApi {
   isMaximized: () => Promise<boolean>;
 }
 
+/** İşletim sistemi köşe bildirimi (Windows toast). Panel zili yeni bildirimde çağırır. */
+export interface DesktopNotificationOpts {
+  /** Başlık — main tarafında 120 karaktere kırpılır. */
+  title: string;
+  /** Metin — main tarafında 300 karaktere kırpılır. */
+  body: string;
+  /** Tıklanınca renderer'a AYNEN geri dönen opak anahtar (≤ 200 karakter). */
+  tag: string;
+}
+
+export interface DesktopNotificationApi {
+  /** Gösterildiyse true; OS desteklemiyor ya da girdi geçersizse false (fırlatmaz). */
+  show: (opts: DesktopNotificationOpts) => Promise<boolean>;
+  /** Köşe bildirimine tıklanınca (pencere öne getirildikten sonra) `tag` ile çağrılır. Unsubscribe döner. */
+  onClicked: (cb: (tag: string) => void) => () => void;
+}
+
 export interface SystemApi {
   openExternal: (url: string) => Promise<void>;
   showInFolder: (path: string) => void;
@@ -374,6 +391,7 @@ export interface ApiBridge {
   appInfo: AppInfoApi;
   deviceIdentity: DeviceIdentityApi;
   window: WindowApi;
+  desktopNotification: DesktopNotificationApi;
   system: SystemApi;
   screen: ScreenApi;
   power: PowerApi;

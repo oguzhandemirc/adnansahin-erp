@@ -12,6 +12,7 @@ import { registerPdfIpc } from "./pdf.ipc.js";
 import { registerFilesIpc } from "./files.ipc.js";
 import { registerUpdaterIpc } from "./updater.ipc.js";
 import { registerScreenIpc } from "./screen.ipc.js";
+import { registerDesktopNotificationIpc } from "./desktop-notification.ipc.js";
 
 export function registerIpcHandlers(): void {
   registerSecureStoreIpc();
@@ -28,4 +29,5 @@ export function registerIpcHandlers(): void {
   registerFilesIpc();
   registerUpdaterIpc();
   registerScreenIpc();
+  registerDesktopNotificationIpc();
 }

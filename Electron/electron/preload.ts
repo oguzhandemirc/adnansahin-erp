@@ -41,6 +41,14 @@ const api: ApiBridge = {
     close: () => ipcRenderer.send("window:close"),
     isMaximized: () => ipcRenderer.invoke("window:is-maximized"),
   },
+  desktopNotification: {
+    show: (opts) => ipcRenderer.invoke("desktop-notification:show", opts),
+    onClicked: (cb: (tag: string) => void) => {
+      const listener = (_e: unknown, tag: string) => cb(tag);
+      ipcRenderer.on("desktop-notification:clicked", listener);
+      return () => ipcRenderer.removeListener("desktop-notification:clicked", listener);
+    },
+  },
   system: {
     openExternal: (url) => ipcRenderer.invoke("system:open-external", url),
     showInFolder: (path) => ipcRenderer.send("system:show-in-folder", path),

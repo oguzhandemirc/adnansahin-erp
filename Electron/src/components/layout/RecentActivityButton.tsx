@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bell } from "lucide-react";
+import { Activity } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,13 @@ const SEEN_KEY = "notifications.lastSeen";
 const LIMIT = 12;
 
 /**
- * Topbar bildirim zili — son DOMAIN aktivitesini (kim neyi değiştirdi) gösterir.
+ * Topbar "Son aktivite" simgesi (eski adı NotificationBell; 2.13.0 D3'te kişisel bildirim zili
+ * `notifications/NotificationInboxBell` doğunca ayrı simgeye taşındı, davranış AYNI) — son DOMAIN aktivitesini (kim neyi değiştirdi) gösterir.
  * 60sn'de bir tazelenir. Görülmemiş sayısı localStorage'daki son-görülme zamanına
  * göre. Endpoint admin:settings gerektirdiğinden yalnız bu yetki (ya da admin
  * wildcard) olanlara render edilir — aksi halde 60sn'de bir 403 toast'u olurdu.
  */
-export function NotificationBell() {
+export function RecentActivityButton() {
   const { permissions } = useRoleAccess();
   const navigateActive = useTabsStore((s) => s.navigateActive);
   const [lastSeen, setLastSeen] = useState<string>(() => localStorage.getItem(SEEN_KEY) ?? "");
@@ -57,8 +58,8 @@ export function NotificationBell() {
   return (
     <Popover onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Bildirimler" title="Son aktivite">
-          <Bell className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="relative" aria-label="Son aktivite" title="Son aktivite">
+          <Activity className="h-4 w-4" />
           {unseen > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
               {unseen > 9 ? "9+" : unseen}

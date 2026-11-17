@@ -13424,3 +13424,15 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Panel.** Yetkilendirme › "Bildirim Atamaları" (`/access/bildirimler`, `bildirim:yonet`). "Kendi tercihini değiştirebilir" anahtarı `bildirim:tercih` iznini mevcut izin yolundan verir/alır (oturumu düşürür; uyarı gösterilir) ve `admin:users` ister. Ölçüldü: panel şablonu `apply-template` ucuyla DEĞİL, seçimi istemcide kurup `PUT /api/admin/users/:id/permissions` ile kaydeder; bu yüzden gövdeye isteğe bağlı `appliedTemplate {templateId, mode}` eklendi (yoksa bildirime dokunulmaz) ve kopya oradan da koşar.
 
 **Bekçi.** `test_bildirim_atama` (sondalar başlıkta: kişide veri izni denetimi · şablon kopyası · tercih kapısı kaldırıldı → her biri 2 kırmızı).
+
+## 2026-11-17 — Platformlar arası bildirim D3: panel zili (panel, sürüm artmadı) [YETKİ-İZİN + GENEL]
+
+**Karar (plan 2026-11-17).** Topbar'da kişisel zil: rozet okunmamış sayısı, açılınca "Bugün / Daha önce" başlıklı geçmiş (yazar + başlık + metin + göreli zaman, okunmamış nokta), kaydırınca otomatik yükleme ([EL-09]), satıra tıklayınca okundu + kayıt açılır, "Tümünü okundu say". Eski denetim zili davranışı aynı kalarak ayrı "Son aktivite" simgesine taşındı (`RecentActivityButton.tsx`, yalnız `admin:settings`).
+
+**Tasarım.** İlk sayfa 15 sn'de bir yoklanır, pencere odakta değilken de (`refetchIntervalInBackground`); yoklama hata toast'ını bastırır ve uç yoksa (404, 2.13.0 öncesi backend) durur. Panel rotayı `kind` + `entityId`den kurar (telefon `route`u kullanılmaz): sipariş `/operations/orders?focus=`, iş emri ve sevkiyat detay sayfası — arama hedefleriyle aynı desen. Köşe bildirimi yeni IPC kanalı `desktop-notification:show` / `:clicked` (main metni kırpar, `Notification` nesnesini kapanana dek tutar, tıklanınca pencereyi öne getirip opak `tag`i döner). Seçim `pickDesktopNotices`te: ilk yükleme yağmursuz, her teslim bir kez, 3'ten fazla yeni → tek özet, şalter kapalıyken gösterilmez ama görüldü sayılır. Kişinin kendi tercihi Kullanıcı Tercihleri sayfasında "Bildirimlerim" kartı (yeni route yok): `canChange` false ise hepsi kilitli + "Bildirim tercihlerinizi yöneticiniz belirler".
+
+**Yapılmayan (backend gerektirdi).** Yetkilendirme hub'ını `admin:users` YA DA `bildirim:yonet` ile açmak: Electron route'u değişirse `test_screen_catalog` §4 (`access` ekranı yalnız `admin:users` beyan ediyor) kırmızı olur. Ekran kataloğundaki `bildirim:tercih` muaf satırı da backend'de; ekran route'suz bir kart olduğundan muaf gerekçesi güncellenmeli.
+
+**Bilinen sınır.** Simge durumuna küçültülmüş pencerede Chromium zamanlayıcıyı kısar (5 dk sonra dakikada bir); köşe bildirimi o durumda en çok ~1 dk gecikebilir. `backgroundThrottling` bilinçli olarak değiştirilmedi.
+
+**Bekçi.** `inbox-model.test.ts` (11) · `NotificationInboxBell.test.tsx` (9, IPC mock) · `NotificationPreferencesCard.test.tsx` (4). Negatif sondalar (geri alındı, md5 denetlendi): ilk yükleme koruması kaldırıldı → 2 kırmızı; satır tıklamasında okundu çağrısı kaldırıldı → 1 kırmızı; tercih kilidi gevşetildi → 1 kırmızı.

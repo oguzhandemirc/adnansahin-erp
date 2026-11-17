@@ -16,6 +16,7 @@ import {
   workstationEntryPath,
 } from "@/pages/GeneralSettings/settings-config";
 import { usePreferences } from "@/providers/PreferencesProvider";
+import { NotificationPreferencesCard } from "./NotificationPreferencesCard";
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -150,6 +151,9 @@ export function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Kişinin kendi bildirim tercihi (2.13.0 D3) — herkese; kilit kuralı kartın içinde. */}
+        <NotificationPreferencesCard />
 
         {canOpenWorkstation && (
           <Card className="lg:col-span-2">

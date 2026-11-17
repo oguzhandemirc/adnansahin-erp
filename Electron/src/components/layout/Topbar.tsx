@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { DemoModeBadge } from "@/components/demo/DemoModeBadge";
 import { ChannelBadge } from "./ChannelBadge";
 import { AppearanceMenu } from "./AppearanceMenu";
-import { NotificationBell } from "./NotificationBell";
+import { RecentActivityButton } from "./RecentActivityButton";
+import { NotificationInboxBell } from "./notifications/NotificationInboxBell";
 import { GuncellemeDugmesi } from "./GuncellemeDugmesi";
 import { DestekTopbarButton } from "@/pages/Destek/DestekTopbarButton";
 import {
@@ -97,7 +98,11 @@ export function Topbar({ onToggleSidebar, onOpenCommand }: Props) {
         {/* Destek (talep) girişi — `/api/destek/durum` kapalı derse hiç çizilmez. */}
         <DestekTopbarButton />
 
-        <NotificationBell />
+        {/* Son aktivite (denetim akışı) — yalnız `admin:settings`; kendi kapısını kendisi ölçer. */}
+        <RecentActivityButton />
+
+        {/* Kişisel bildirim zili — herkese; uç yalnız oturum ister. */}
+        <NotificationInboxBell />
 
         <AppearanceMenu />
 
