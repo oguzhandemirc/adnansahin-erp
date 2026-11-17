@@ -13447,3 +13447,17 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 
 **Bekçi.** Bulut `test_bildirim_koprusu` 35/0 (sondalar başlıkta: bağlama döngüsü · COALESCE · kaynak koşulu); fabrika `test_bildirim_bulut_koprusu` 26/0 (sondalar: şalter sorusu · `readAt: null` claim · pencere süzgeci). Bulut bekçileri yerelde `patron_bildirimd4_test` DB'sinde koşuldu (35/35 dosya).
 
+
+## 2026-11-17 — Platformlar arası bildirim D5: okundu iki yönde + atama aynası + telefondan tercih (backend 2.13.0 + patron bulutu + uygulama) [PATRON-BULUTU]
+
+**Karar.** Atama aynası ve telefondan tercih isteği yeni bir kanal açmadan bildirim köprüsü `POST /v1/bildirimler` üzerinden taşınır (kullanıcı eşitlemesi değil): aynı şalter ve 30 sn tur, istekler aynı yanıtta döner, mühürlü kullanıcı kümesi değişmez. Fabrika yeni alanları (`atamalar[]`, `tercihTeyit[]`) yalnız yanıtta `ayna: true` gördükten sonra yollar — eski bulut 400 almaz. **Son söz fabrikadadır:** bulut isteği yalnız saklar (`notification_pref_requests`, hesap+tür başına tek satır, silinmez); fabrika aktif ∧ `bildirim:tercih` ∧ mevcut atama koşulunda uygular, her isteği teyit eder ve gerçek aynayı yeniden yollar. Uygulamada değişiklik anında gider (Kaydet beklemez), satır "Kaydediliyor…" der; bulut reddederse bindirme kalkar, fabrika reddederse gerçek ayna satırı eski hâline döndürür; bekleyen varken ayar ~10 sn'de yeniden okunur.
+
+**Form.** Ayna varken türler konu başlıklı (Siparişler · Üretim · Sevkiyat · Stok ve fason · Genel), başlık başına "Tümünü aç/kapat"; fabrika türlerinden YALNIZ atanmışlar; tercih yetkisi yoksa satırlar kilitli + "Bildirim tercihlerinizi yöneticiniz belirler"; atama yoksa sade boş durum. Ayna yoksa (eski bulut, `BILDIRIM_KAYNAGI=bulut`) bugünkü tek bloklu form AYNEN. Zorunluluk tür değil HESAP düzeyindedir (`tercihYetkisi`).
+
+**Okundu.** Bulut uçları `POST /api/bildirimler/:id/okundu` · `/okundu-tumu` (kendi satırı, `read_at` boşken claim); uygulamada okunmamış vurgu, rozet, 15 sn yoklama. Web push dokunuşu da artık okundu sayar: servis işçisi `bildirimId`yi (UUID süzgeçli) `?bildirim=` ile adrese taşır, uygulama aynı tesisteyse okundu ucunu çağırır.
+
+**Göç.** Bulut `20261117200000_bildirim_tercih_aynasi` (ekleyici, RLS'li; `db-grants`). Kurulum sırası bulut ÖNCE.
+
+**Bekçi.** Bulut `test_bildirim_okundu` 16/0 · `test_bildirim_tercih_aynasi` 22/0; fabrika `test_bildirim_tercih_aynasi` 16/0; uygulama `__tests__/bildirim-okundu.test.tsx` 11/11 · `__tests__/bildirim-tercih.test.tsx` 13/13 (sondalar: kilit kaldırıldı · ayna-yok dalı kaldırıldı · ret sonrası bindirme kalıyor · yoklama yok · bulut satırı çift → hepsi kırmızı) · `__tests__/taps.test.ts` web okundu (sonda: `?bildirim=` kaldırıldı → kırmızı).
+
+**Açık.** Okunmamış eşitleme gecikmesi en kötü ~45 sn (telefon 15 sn + köprü 30 sn). Eski uygulama yeni `yeni-sevk` rotasını (`/sevkiyat/<id>`) açamaz (gezinme yok).

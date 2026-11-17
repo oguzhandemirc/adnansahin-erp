@@ -27,6 +27,10 @@ davranır.
 - Bulut köprüsü (D4): teslimler imzalı `POST /v1/bildirimler` ile patron bulutuna gider (telefona push), panelde okunan
   buluta, telefonda okunan fabrikaya döner. Ayrı düğmesi yok: yalnız eşitleme ön koşulu AÇIK ∧ `notifications.enabled`
   AÇIK iken istek atılır; ikisinden biri kapalıysa sıfır dış istek.
+- Atama aynası ve telefondan tercih (D5): aynı köprü isteği kişinin atanmış türlerini ve tercih yetkisini buluta
+  yansıtır; telefondan gelen aç/kapat isteğini fabrika (aktif ∧ `bildirim:tercih` ∧ atama var) uygular ya da reddeder,
+  her isteği teyit eder. Yeni alanlar yalnız bulut `ayna: true` dedikten sonra gider (eski bulut etkilenmez). Fabrika
+  tarafında migration YOK.
 
 Ölçüm (git, 2.12.4 `..` bu commit): yeni migration **2** (`20261117132248_bildirim_cekirdek`,
 `20261117180000_bildirim_bulut_koprusu`; toplam **371**) · yeni bulut kanalı ucu **1** (`/v1/bildirimler`, fabrika istemci) ·
@@ -60,6 +64,11 @@ yeni HTTP ucu **11** (`/api/bildirimler` altında 3 + 3, `/api/bildirim-atamalar
   Bulut hesabı olmayan alıcının teslimi de gider, bulut sayıp atlar. Eski bulut (404) → tek satır uyarı + 60 dk geri
   çekilme; hata → artan geri çekilme; hiçbir hata yazma yoluna sızmaz. Tel sözleşmesi `cloud-sync/wire/esitleme.ts`
   bulutla bayt-eşit güncellendi (mühür yenilendi).
+- **Atama aynası (D5)** (`services/notifications/cloud-mirror.service.ts`, `jobs/cloud-notify.job.ts`): değişince ve
+  periyodik tam liste; telefondan gelen tercih isteği denetim satırıyla uygulanır, teslim kuralı (kapatılmış tür
+  alınmaz) değişmedi. Tel `cloud-sync/wire/esitleme.ts` opsiyonel `atamalar[]` · `tercihTeyit[]` (istek) ve
+  `tercihler[]` · `ayna` · `aynaAlinan` (yanıt) ile bulutla bayt-eşit güncellendi. `yeni-sevk` uygulama rotası
+  `/sevkiyat/<id>` (ayrıntı).
 
 ## 3. Sözleşme
 
@@ -92,6 +101,9 @@ yeni HTTP ucu **11** (`/api/bildirimler` altında 3 + 3, `/api/bildirim-atamalar
 - **KURULUM SIRASI:** bulut ÖNCE (bildirim köprüsü: bulut göçü `20261117170000_bildirim_koprusu` + `db-rolleri.ts`,
   `BILDIRIM_KAYNAGI` varsayılan `bulut` kalır) → bu backend → doğrulama (§7). Panel sürümü ayrı. Bulut önce
   kurulmazsa da zarar yok: köprü 404 alır ve geri çekilir.
+- **D5 eki — bulut göçü:** bulut `20261117200000_bildirim_tercih_aynasi` (ekleyici, RLS'li: `notification_factory_mirrors`,
+  `notification_pref_requests`; izinler `db-rolleri.ts`/`db-grants`) da bulutla birlikte, backend'den ÖNCE uygulanır.
+  Göç yoksa bulut `ayna: true` demez, fabrika aynayı yollamaz; telefon bugünkü formu görür (zarar yok).
 - **Kurulum yöntemi:** 2.12.4 ile aynı — paket `C:\TeksERP\guncelleme\`e; paketin kendi `kur.ps1` + `uzaktan-kos.ps1`i
   çıkarılır, `C:\TeksERP\kur.ps1` onunla değiştirilir; SYSTEM görevi:
   `uzaktan-kos.ps1 -Betik C:\TeksERP\kur.ps1 -Argumanlar '-Kok C:\TeksERP -Paket {zip} -Zorla'`.
