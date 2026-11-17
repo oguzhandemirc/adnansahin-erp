@@ -3,7 +3,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { LayoutAnimation, Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native";
+import { Image, LayoutAnimation, Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MODULES, moduleNavTitle, moduleTitle, moduleVisible, type ModuleKey } from "../lib/access";
@@ -16,7 +16,7 @@ import { Banner } from "./kit";
 import { ScreenHeader, useHeaderScroll } from "./LargeHeader";
 import { SyncIndicator } from "./SyncIndicator";
 import { SyncNowFeedbackText, SyncNowIndicator, useSyncNow } from "./pano/SimdiGuncelle";
-import { RoleBadge } from "./RoleBadge";
+import { ROLE_LABEL, roleOf } from "./RoleBadge";
 import { RAIL_GROUPS, TABS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
 import { useAcikKapali } from "./ortak/useAcikKapali";
@@ -39,6 +39,7 @@ export function FacilityName() {
 /** Rayın açık/daraltılmış durumu: YALNIZ cihazda (`useAcikKapali`, tesis + hesap kapsamlı); varsayılan açık (bugünkü). */
 export const RAY_TERCIHI = "yan-ray.acik";
 /** Ray daralırken/açılırken genişlik ve içerik yumuşak geçer (kullanıcı isteği 2026-11-17). */
+const LOGO = require("../../assets/icon.png") as number;
 const RAY_GECISI = LayoutAnimation.create(280, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity);
 
 /** Ray öğesi: açıkken simge + ad (+ rozet), daraltılmışken yalnız simge (ad erişilebilirlik etiketinde; rozet nokta). */
@@ -80,11 +81,15 @@ function RayOgesi(p: {
  * Başlıktaki düğme rayı simge şeridine daraltır / geri açar (2026-11-17); grup başlıkları daraltılmışken ince çizgidir.
  */
 export function SideNav() {
-  const { permissions } = useSession();
+  const { permissions, facility } = useSession();
   const t = useTokens();
   const s = useStyles();
   const router = useRouter();
   const path = usePathname();
+  const hesapAdi = facility?.hesap.ad?.trim() || facility?.hesap.kullaniciAdi || "";
+  const basHarf = hesapAdi.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p.charAt(0).toLocaleUpperCase("tr-TR")).join("") || "?";
+  const rolAdi = ROLE_LABEL[roleOf(permissions)];
+  const profilAktif = path === "/profil";
   const destekEtkin = useDestekEtkin();
   const destekRozeti = destekRozetMetni(useDestekOkunmamis());
   const destekAktif = path === "/destek" || path.startsWith("/destek/");
@@ -101,10 +106,13 @@ export function SideNav() {
     >
       <View style={[s.railHead, !acik && s.railHeadDar]}>
         {acik ? (
-          <View style={s.railKimlik}>
-            <FacilityName />
-            <RoleBadge permissions={permissions} />
-          </View>
+          <>
+            <Image source={LOGO} style={s.railLogo} accessibilityIgnoresInvertColors />
+            <View style={s.railKimlik}>
+              <FacilityName />
+              <Text style={s.railUrun} numberOfLines={1}>TeksERP</Text>
+            </View>
+          </>
         ) : null}
         <Pressable
           onPress={() => { LayoutAnimation.configureNext(RAY_GECISI); ray.degistir(); }}
@@ -151,6 +159,24 @@ export function SideNav() {
           />
         </View>
       ) : null}
+      <View style={s.railBosluk} />
+      <Pressable
+        onPress={() => router.navigate("/profil" as never)}
+        accessibilityRole="button"
+        accessibilityLabel={`Profil: ${hesapAdi}, ${rolAdi}`}
+        style={({ pressed }) => [s.railHesap, !acik && s.railHesapDar, { marginBottom: insets.bottom + space.s }, profilAktif && { backgroundColor: t.tintContainer }, pressed && !profilAktif && { backgroundColor: t.surfaceAlt }]}
+        testID="ray-hesap"
+      >
+        <View style={[s.railAvatar, { backgroundColor: t.tintContainer }]}>
+          <Text style={[s.railAvatarText, { color: t.tint }]} maxFontSizeMultiplier={1}>{basHarf}</Text>
+        </View>
+        {acik ? (
+          <View style={s.railKimlik}>
+            <Text style={s.railHesapAd} numberOfLines={1}>{hesapAdi}</Text>
+            <Text style={s.railUrun} numberOfLines={1} testID="ray-rol">{rolAdi}</Text>
+          </View>
+        ) : null}
+      </Pressable>
     </View>
   );
 }
@@ -289,10 +315,18 @@ const useStyles = makeStyles((t) => ({
   content: { maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },
   rail: { width: RAIL_WIDTH, borderRightWidth: 1, borderColor: t.separator, backgroundColor: t.surface, paddingTop: space.l, paddingHorizontal: space.s },
-  railHead: { flexDirection: "row" as const, alignItems: "flex-start" as const, paddingLeft: space.s, marginBottom: space.m, gap: space.xs },
+  railHead: { flexDirection: "row" as const, alignItems: "center" as const, paddingLeft: space.s, marginBottom: space.m, gap: space.s },
+  railLogo: { width: 36, height: 36, borderRadius: 9 },
+  railUrun: { ...typography.caption, color: t.textMuted },
+  railBosluk: { flex: 1, minHeight: space.m },
+  railHesap: { minHeight: TOUCH + 8, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingHorizontal: space.s, paddingVertical: space.xs, borderRadius: t.radius.control, borderTopWidth: 1, borderColor: t.separator },
+  railHesapDar: { justifyContent: "center" as const, paddingHorizontal: 0 },
+  railAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center" as const, justifyContent: "center" as const },
+  railAvatarText: { ...typography.callout, fontWeight: "700" as const },
+  railHesapAd: { ...typography.callout, color: t.text, fontWeight: "600" as const },
   railHeadDar: { paddingLeft: 0, justifyContent: "center" as const },
-  railKimlik: { flex: 1, minWidth: 0, gap: space.xs },
-  railToggle: { width: 44, height: 44, marginTop: -10, alignItems: "center" as const, justifyContent: "center" as const, borderRadius: t.radius.control },
+  railKimlik: { flex: 1, minWidth: 0, gap: 1 },
+  railToggle: { width: 44, height: 44, alignItems: "center" as const, justifyContent: "center" as const, borderRadius: t.radius.control },
   railRule: { height: 1, backgroundColor: t.separator, marginVertical: space.s, marginHorizontal: space.s },
   railItemDar: { justifyContent: "center" as const, paddingHorizontal: 0, gap: 0 },
   railDot: { position: "absolute" as const, top: -3, right: -3, width: 10, height: 10, borderRadius: 5, borderWidth: 2 },

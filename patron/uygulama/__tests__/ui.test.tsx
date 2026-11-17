@@ -44,7 +44,7 @@ describe("izinli menü", () => {
     const label = (perms: string[]) => {
       mockSession.permissions = perms;
       const r = render(<SideNav />);
-      const v = screen.getByTestId("rol-rozeti").props.accessibilityLabel;
+      const v = `Rol: ${String(screen.getByTestId("ray-rol").props.children)}`;
       r.unmount();
       return v;
     };
