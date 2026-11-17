@@ -4,7 +4,7 @@
 **SHA256:** `(paketleme yazar)`
 **Commit:** `(paketleme yazar)`
 **İçerik:** 2.12.4 paketinin bütün içeriği + platformlar arası bildirimin fabrika çekirdeği (olay defteri, kişi başına teslim, atama tabloları, üretici kancası, okuma uçları) ve bildirim atama yönetimi (iki yeni izin, atama/şablon/tercih uçları) + patron bulutuna bildirim köprüsü (teslimler buluta, okundu iki yönde). Bildirim üretimi şalteri `notifications.enabled` varsayılan KAPALI.
-**Önceki saha sürümü:** **2.12.4** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.12.4 olduğunu ÖLÇER — farklıysa DUR).
+**Önceki saha sürümü:** **2.12.3** (2.12.4 ayrıca kurulmaz — kullanıcı kararı 2026-11-17: tek seferde en yeni sürüm; 2.12.4'ün bütün içeriği bu pakettedir. Kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.12.3 ve 369 migration olduğunu ÖLÇER — farklıysa DUR).
 
 Paketleme **`-Surum 2.13.0`** ile koşulur.
 
@@ -74,13 +74,13 @@ yeni HTTP ucu **11** (`/api/bildirimler` altında 3 + 3, `/api/bildirim-atamalar
 
 - **Kırıldı mı:** HAYIR — yalnız yeni uçlar ve yeni tablolar EKLENDİ; mevcut yanıtlar değişmedi.
 - **Eski istemci ne yapar:**
-  - **Panel 1.3.15–1.3.18 (masaüstü):** yeni uçları çağırmaz; etkilenmez.
+  - **Panel 1.3.15–1.3.19 (masaüstü):** yeni uçları çağırmaz; etkilenmez. Bildirim ekranları panel 1.3.20 ile gelir.
   - **Tablet 1.0.14–1.0.22:** etkilenmez.
   - **Patron bulutu:** köprü ucunu bilmeyen eski bulut 404 döner → fabrika uyarı yazıp 60 dk geri çekilir; başka
     eşitleme etkilenmez. Yeni bulut ÖNCE kurulur (§5).
   - **Patron uygulaması:** eski uygulama yeni türleri (`yeni-is-emri`, `yeni-sevk`) ayar ekranında göstermez ama
     push'u alır.
-- **Panel uyumluluğu:** panel **1.3.15–1.3.18**, tablet **1.0.14–1.0.22** ile uyumlu.
+- **Panel uyumluluğu:** panel **1.3.15–1.3.20**, tablet **1.0.14–1.0.22** ile uyumlu.
 - **`minVersion` dokunuldu mu:** HAYIR.
 
 ## 4. Migration
@@ -91,7 +91,7 @@ yeni HTTP ucu **11** (`/api/bildirimler` altında 3 + 3, `/api/bildirim-atamalar
   yanlış paket ya da yanlış DB → DUR.
 - **Ne zaman:** bakım penceresinde; tablolar boş doğar, süre ihmal edilebilir.
 - **Veri yazan adımlar:** yok.
-- **Geri alınabilir mi:** kod EVET (`-GeriAl` 2.12.4 koduna döner; yeni tablolar boş kalır ve eski kod onları
+- **Geri alınabilir mi:** kod EVET (`-GeriAl` sahadaki önceki koda, 2.12.3'e döner; yeni tablolar boş kalır ve eski kod onları
   okumaz). Migration geri alınmaz (rollback = yedekten restore; gerekmez).
 
 ## 5. Kurulum notu
@@ -104,7 +104,9 @@ yeni HTTP ucu **11** (`/api/bildirimler` altında 3 + 3, `/api/bildirim-atamalar
 - **D5 eki — bulut göçü:** bulut `20261117200000_bildirim_tercih_aynasi` (ekleyici, RLS'li: `notification_factory_mirrors`,
   `notification_pref_requests`; izinler `db-rolleri.ts`/`db-grants`) da bulutla birlikte, backend'den ÖNCE uygulanır.
   Göç yoksa bulut `ayna: true` demez, fabrika aynayı yollamaz; telefon bugünkü formu görür (zarar yok).
-- **Kurulum yöntemi:** 2.12.4 ile aynı — paket `C:\TeksERP\guncelleme\`e; paketin kendi `kur.ps1` + `uzaktan-kos.ps1`i
+- **2.12.4 içeriği de bu kurulumla gelir:** bulut kataloğundaki `cuval-deposu` girdisi (`backend-2.12.4.md` §5) de
+  bulutla birlikte, backend'den ÖNCE kurulur; ters sırada eski bulut yeni anlığı reddeder (yazma yolu etkilenmez).
+- **Kurulum yöntemi:** 2.12.3 ile aynı — paket `C:\TeksERP\guncelleme\`e; paketin kendi `kur.ps1` + `uzaktan-kos.ps1`i
   çıkarılır, `C:\TeksERP\kur.ps1` onunla değiştirilir; SYSTEM görevi:
   `uzaktan-kos.ps1 -Betik C:\TeksERP\kur.ps1 -Argumanlar '-Kok C:\TeksERP -Paket {zip} -Zorla'`.
 - **Bu sürüme özel:** `notifications.enabled` kurulumda AÇILMAZ (satır yok = kapalı). Açma ayrı karar ve yalnız
@@ -117,7 +119,7 @@ yeni HTTP ucu **11** (`/api/bildirimler` altında 3 + 3, `/api/bildirim-atamalar
 
 ## 6. Geri alma
 
-Uygulama sorununda: `kur.ps1 -GeriAl` bu kurulumun kenara aldığı `app.eski-*`i (2.12.4) geri koyar. Yeni tablolar
+Uygulama sorununda: `kur.ps1 -GeriAl` bu kurulumun kenara aldığı `app.eski-*`i (sahadaki önceki sürüm, 2.12.3) geri koyar. Yeni tablolar
 DB'de kalır; eski kod onlara dokunmaz. Şalter açılmışsa geri dönüşte bildirim üretimi kendiliğinden durur.
 
 ## 7. Doğrulama — kurulumdan sonra rapor edilecekler
