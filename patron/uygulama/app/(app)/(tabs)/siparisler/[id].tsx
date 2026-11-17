@@ -74,8 +74,8 @@ export default function OrderDetail() {
   // Kartlar: fabrikanın sayıları olduğu gibi (sevk BRÜT); açık miktar kartı bugünkü koşuluyla (açık sipariş).
   const kartlar = [
     ogeler.includes("kartAcik") && showOpen ? <StatCard key="acik" etiket="Açık miktar" icon="resize-outline" ton="blue" layout="row" degerler={[{ deger: formatNumber(k.acikMiktar), birim: "m" }]} testID="siparis-acik" /> : null,
-    ogeler.includes("kartSevk") && present(k.sevkMiktari) ? <StatCard key="sevk" etiket="Sevk edilen (brüt)" icon="car-outline" ton="green" layout="row" degerler={[{ deger: formatNumber(k.sevkMiktari), birim: "m" }]} testID="siparis-kart-sevk" /> : null,
-    ogeler.includes("kartToplam") && present(k.toplamMiktar) ? <StatCard key="toplam" etiket="Sipariş toplamı" icon="layers-outline" ton="teal" layout="row" degerler={[{ deger: formatNumber(k.toplamMiktar), birim: "m" }]} testID="siparis-kart-toplam" /> : null,
+    ogeler.includes("kartSevk") && present(k.sevkMiktari) ? <StatCard key="sevk" etiket="Sevk (brüt)" icon="car-outline" ton="green" layout="row" degerler={[{ deger: formatNumber(k.sevkMiktari), birim: "m" }]} testID="siparis-kart-sevk" /> : null,
+    ogeler.includes("kartToplam") && present(k.toplamMiktar) ? <StatCard key="toplam" etiket="Toplam" icon="layers-outline" ton="teal" layout="row" degerler={[{ deger: formatNumber(k.toplamMiktar), birim: "m" }]} testID="siparis-kart-toplam" /> : null,
     ogeler.includes("kartKalem") && present(k.kalemSayisi) ? <StatCard key="kalem" etiket="Kalem" icon="list-outline" ton="violet" layout="row" degerler={[{ deger: formatNumber(k.kalemSayisi, 0), birim: "kalem" }]} testID="siparis-kart-kalem" /> : null,
   ].filter((x) => x !== null);
   const kartSatirlari: (typeof kartlar)[] = [];

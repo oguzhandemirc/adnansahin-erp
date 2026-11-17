@@ -6,7 +6,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Text, useWindowDimensions, View } from "react-native";
 import type { ProjectionRecord } from "../../../../src/api/wire";
 import { can } from "../../../../src/lib/access";
 import { formatDate, formatNumber, kisaBelgeNo } from "../../../../src/lib/format";
@@ -88,9 +88,16 @@ function Ozet({ veri, kartlar }: { veri: unknown; kartlar: readonly SiparisKartK
   };
   const items = kartlar.flatMap((x) => (serit[x] ? [serit[x]!] : []));
   const cariler = Array.isArray(v.enCokCari) ? v.enCokCari.map(asObj) : [];
+  // Telefonda şerit en çok 3 öğe (4'üncüde "52.300" gibi değerler kesilir): fazlası ikinci şeride iner.
+  const genis = useWindowDimensions().width >= 600;
+  const seritler = genis || items.length <= 3 ? [items] : [items.slice(0, 3), items.slice(3)];
   return (
     <View style={{ gap: space.s }}>
-      {items.length > 0 ? <OzetSeridi testID="siparis-ozet" items={items} /> : null}
+      {items.length > 0 ? (
+        <View>
+          {seritler.map((x, i) => <OzetSeridi key={i} testID={i === 0 ? "siparis-ozet" : `siparis-ozet-${i + 1}`} items={x} />)}
+        </View>
+      ) : null}
       {kartlar.includes("enCokCari") ? (
         <ListeBlogu baslik="En çok açık siparişi olan" testID="siparis-en-cok-cari">
           {cariler.length > 0
