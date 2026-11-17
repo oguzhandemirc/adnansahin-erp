@@ -150,7 +150,13 @@ function main(): void {
   // düzeyinde. Ölçüldü: `roll-step.helper` WorkOrderStep/RollMovement/Roll yazdığı için listede
   // KALDI (yalnız WorkOrder düştü) ⇒ net +1. Dürüstlük notu: otomatik geçişlerin audit izi
   // taşımadan ÖNCE de yoktu; artık WorkOrderEvent defterinde izleri var (audit eklemek ayrı borç).
-  const AUDITSIZ_YAZICI_TABAN = 32;
+  // 32 → 33 (2026-11-17): `helpers/order-link-allocation.helper.ts` (85f70259, sipariş
+  // paylaştırma) — `WorkOrderToOrderLine.allocatedQty`nin TEK YAZARI (`applyOrderLinkAllocationsTx`,
+  // tx İÇİNDE, atomik claim) + iş emri hareket defterine alan değişimi satırı; audit'i çağıran
+  // eylem tx DIŞINDA basar (`workorder-link.service` bağ ekleme `ORDER_LINK_ADDED` ·
+  // `setOrderLinkAllocations` `ORDER_ALLOCATION_SET`, ikisi de WORK_ORDER) — EBEVEYN_EYLEMDE
+  // kalıbı, dosya düzeyinde. Ölçüldü: listede tek yeni dosya bu; bildirim işi (2.13.0) listeye girmedi.
+  const AUDITSIZ_YAZICI_TABAN = 33;
   const auditsizYazici: string[] = [];
   for (const [rel, s] of metin) {
     if (auditDosya.has(rel) || /tableName:\s*"/.test(s)) continue;
