@@ -1,8 +1,8 @@
 # Backend `2.13.0`
 
-**Paket:** `(paketleme yazar)`
-**SHA256:** `(paketleme yazar)`
-**Commit:** `(paketleme yazar)`
+**Paket:** `tekserp-backend-20261117_194316-71513513.zip`
+**SHA256:** `FFC6FC87DCC866EDB3A08FDA7421F60F05501CD4B13A6D16BEF7651F51AED13F`
+**Commit:** `71513513`
 **İçerik:** 2.12.4 paketinin bütün içeriği + platformlar arası bildirimin fabrika çekirdeği (olay defteri, kişi başına teslim, atama tabloları, üretici kancası, okuma uçları) ve bildirim atama yönetimi (iki yeni izin, atama/şablon/tercih uçları) + patron bulutuna bildirim köprüsü (teslimler buluta, okundu iki yönde). Bildirim üretimi şalteri `notifications.enabled` varsayılan KAPALI.
 **Önceki saha sürümü:** **2.12.3** (2.12.4 ayrıca kurulmaz — kullanıcı kararı 2026-11-17: tek seferde en yeni sürüm; 2.12.4'ün bütün içeriği bu pakettedir. Kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.12.3 ve 369 migration olduğunu ÖLÇER — farklıysa DUR).
 
@@ -96,8 +96,8 @@ yeni HTTP ucu **11** (`/api/bildirimler` altında 3 + 3, `/api/bildirim-atamalar
 
 ## 5. Kurulum notu
 
-- **Beklenen kesinti:** ≈ 70–90 sn. Kesintiden ÖNCEKİ `[1/9]`–`[3/9]` (paket açma + yedek) ≈ 9 dk; bu sürede
-  fabrika ÇALIŞIR.
+- **Beklenen kesinti:** ≈ 1 dk (Windows provasında ölçülen 45,9 ve 47,0 sn; iki migration birlikte ≈ 0,3 sn). Kesintiden
+  ÖNCEKİ `[1/9]`–`[3/9]` (paket açma + yedek) ≈ 5 dk; bu sürede fabrika ÇALIŞIR.
 - **KURULUM SIRASI:** bulut ÖNCE (bildirim köprüsü: bulut göçü `20261117170000_bildirim_koprusu` + `db-rolleri.ts`,
   `BILDIRIM_KAYNAGI` varsayılan `bulut` kalır) → bu backend → doğrulama (§7). Panel sürümü ayrı. Bulut önce
   kurulmazsa da zarar yok: köprü 404 alır ve geri çekilir.
@@ -185,3 +185,17 @@ Doğrulama ekleri: şalter kapalıyken `SELECT count(*) FROM notification_events
 
 Doğrulama ekleri: bulut kurulduktan sonra backend log'unda bildirim köprüsü satırı; bulut günlüğünde `atlanan` sayısının yeni türler için
 artmaması (tür bulutta tanınıyor).
+
+## Ek — Prova (2026-11-17)
+
+Windows kopyasında (fabrikanın 16-11 gece yedeği verisi, 2.12.3 → 2.13.0; bulut adresi ve destek yok, dış bağlantı her ölçümde 0)
+bu paketle koşuldu. Ayrıntı, komut sırası ve DUR koşulları repo dışı prova belgesinde.
+
+| Adım | Sonuç |
+|---|---|
+| Kurulum (`kur.ps1 -Zorla`) | GEÇTİ — 381,8 sn; "371 migrations found" + 2 uygulandı (294 ms + 12 ms); kesinti ≈ 45,9 sn |
+| Kurulum sonrası | sayılar, sevk tahsisi, `patron_sync_status`, `.env` aynı; bildirim tabloları boş; `notifications.enabled` satırı yok |
+| Duman | okumalar 200; `GET /api/bildirimler` `enabled:false`; atama uçları 200. Şalter açıkken sipariş, sevkiyat çıkışı (sevk onayı kapalı) ve fason kabul gerçek akışla: olay 1, alıcıya 1 teslim, yazara 0; aynı `clientToken` tek kayıt. Fason GÖNDERİM denenemedi (kopyada fason adımında bekleyen top yok) |
+| Bulgu | şalter 18:30'dan sonra açılınca o günün `gun-sonu-ozeti` olayı hemen doğar |
+| Geri alma (`-GeriAl -Zorla`, şalter açıkken) | GEÇTİ — 14,8 sn, kesinti ≈ 5,5 sn. **Veritabanı geri yüklemeden geri dönüş çalışıyor:** 2.12.3 kodu 371 migration'lı şemada açıldı (açılışta migration denetimi yok, günlükte Prisma/şema hatası yok); sipariş/iş emri/stok karnesi/sevkiyat 200, yeni sipariş 201; bildirim üretimi durdu |
+| Yeniden kurulum | GEÇTİ — 382 sn, "No pending migrations"; kesinti ≈ 47,0 sn; üretim geri geldi, şalter kapatılınca durdu |
