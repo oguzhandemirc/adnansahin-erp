@@ -25,7 +25,10 @@ export const VERI_SORUMLUSU = {
   eposta: "adnansahintekstil@gmail.com",
 } as const;
 export const SAGLAYICI = { ad: "Etkili Yazılım", eposta: "info@etkiliyazilim.com" } as const;
+/** Mağaza kaydındaki uygulama adı — politika ve silme sayfası bunu geliştirici adıyla (`SAGLAYICI.ad`) birlikte anar. */
 export const UYGULAMA = "Adnan Şahin Yönetim";
+/** Hesap silme e-postasının konusu (mailto `subject`, kodlanmış) — TR ve EN. */
+export const SILME_KONUSU = { tr: "Hesap%20silme%20talebi", en: "Account%20deletion%20request" } as const;
 
 export function legalFactsOf(c: CloudConfig): LegalFacts {
   return {
@@ -61,6 +64,8 @@ const CSS = [
   "h3{font-size:1rem;margin:1.2em 0 .3em}p,li,td{overflow-wrap:anywhere}ul{padding-left:1.2em}",
   "a{color:var(--v)}.ust{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--s);font-size:.9rem}",
   ".kutu{background:var(--k);border-radius:10px;padding:12px 16px;margin:1em 0}",
+  ".alt{color:var(--s);margin-top:0}.adim li{margin:.5em 0;font-size:1.05rem}",
+  ".dugme{display:inline-block;background:var(--v);color:var(--z);font-weight:600;text-decoration:none;border-radius:10px;padding:10px 16px;margin:.3em 0}",
   ".tablo{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.92rem}",
   "th,td{border:1px solid var(--c);padding:8px;text-align:left;vertical-align:top}th{background:var(--k)}",
   "@media (max-width:620px){thead{display:none}table,tbody,tr,td{display:block;width:100%}tr{border:1px solid var(--c);border-radius:10px;margin:0 0 12px;overflow:hidden}td{border:0;border-top:1px solid var(--c)}td:first-child{border-top:0;background:var(--k);font-weight:600}td+td::before{content:attr(data-b);display:block;color:var(--s);font-size:.8rem;font-weight:600}}",

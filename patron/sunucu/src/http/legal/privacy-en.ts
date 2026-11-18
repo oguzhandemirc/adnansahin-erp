@@ -23,7 +23,8 @@ ${row("Support requests (only if the Support feature is enabled): subject, messa
 function bolumBir(f: LegalFacts): string {
   return `<div class="ust"><span>Effective date: ${YURURLUK}</span><a href="/gizlilik" hreflang="tr" lang="tr">Türkçe</a></div>
 <h1>${UYGULAMA} — Privacy Policy</h1>
-<p>This policy explains how your personal data is processed when you use the ${UYGULAMA} mobile app (Android and iOS) and the cloud server it connects to. This is a translation; if the two versions differ, the Turkish text prevails.</p>
+<p class="alt">App: <strong>${UYGULAMA}</strong> · Developer: <strong>${SAGLAYICI.ad}</strong></p>
+<p>This policy explains how your personal data is collected, what it is used for, with whom it is shared, how long it is kept and how it is deleted when you use the ${UYGULAMA} mobile app (Android and iOS), developed by ${SAGLAYICI.ad}, and the cloud server it connects to. Your rights under the Turkish Personal Data Protection Law No. 6698 (KVKK) are in section 9. This is a translation; if the two versions differ, the Turkish text prevails.</p>
 <nav><ol>
 <li><a href="#who">Data controller and contact</a></li><li><a href="#purpose">Purpose of the app</a></li>
 <li><a href="#data">Data we process</a></li><li><a href="#permissions">App permissions</a></li>
@@ -47,6 +48,12 @@ function bolumBir(f: LegalFacts): string {
 <p><strong>Legal basis:</strong> performance of the working relationship and the service (KVKK Art. 5/2-c; GDPR Art. 6(1)(b)), legal obligations (KVKK Art. 5/2-ç; GDPR Art. 6(1)(c)) and legitimate interests such as account security (KVKK Art. 5/2-f; GDPR Art. 6(1)(f)).</p>
 
 <h2 id="data">3. Data we process</h2>
+<p><strong>How is data collected?</strong> In three ways:</p>
+<ul>
+<li><strong>Synchronized from the mill:</strong> account details (full name, user name, permissions, account status) and the password hash are sent from the mill's management system to the cloud server. The business data you see in the app arrives the same way.</li>
+<li><strong>Entered by you:</strong> your sign-in details, new orders and new customers you send from the phone, support requests and their attachments, two-step verification if you turn it on, and your preferences.</li>
+<li><strong>Created automatically during use:</strong> session record, security log, IP address, the notification device record if you allow notifications, notification history, and the app version and device details added to a support request.</li>
+</ul>
 ${dataTable(f)}
 <p>The app contains no advertising, analytics, crash reporting or tracking tools. Your location, contacts, photo library and advertising ID are not read. Your data is not sold and not used for advertising.</p>
 
@@ -56,6 +63,8 @@ ${dataTable(f)}
 <h3>Microphone and speech recognition</h3>
 <p>Used only when you want to fill in the new order form by voice, and only while you tap the microphone button. Your speech is converted to text by your phone's own speech recognition service: Apple's on iPhone, Google's on Android. These services may send the audio to their own servers for recognition, subject to that company's privacy terms. The app does not record audio and does not send it to the ${UYGULAMA} cloud; the resulting text is used only on the phone to fill in the form, and the order is sent only when you tap Send. Without this permission you can fill in the form by hand.</p>
 <p>The app does not request location, camera, contacts or photo library permissions. A screenshot attached to a support request is taken only of the app's own screen and only when you ask for it.</p>
+<h3 id="withdraw-permissions">Withdrawing permissions</h3>
+<p>You can turn off the notification and microphone permissions at any time in your phone's Settings app (${UYGULAMA} › Permissions or Notifications); from then on no data is collected through that permission. You can also remove your notification device in Notification Settings in the app; no notifications are sent to a removed device. You can request deletion of your account as described in section 10.</p>
 
 <h2 id="device">5. Data kept on your phone</h2>
 <ul>
@@ -74,7 +83,8 @@ ${dataTable(f)}
 <li><strong>Apple / Google speech recognition services</strong> — only when you use the microphone, through your phone's operating system (see section 4).</li>
 <li>Authorized public authorities — only when required by law.</li>
 </ul>
-<p><strong>International transfers:</strong> servers of the notification and speech recognition providers may be located outside Türkiye (mainly in the USA). Transfers for notifications are made in line with KVKK Art. 9; if you do not allow notifications, no data is transferred abroad for notifications.</p>
+<p>Service providers that receive data are obliged to use it only to provide the service above and to provide the same or equivalent protection as this policy.</p>
+<p><strong>Hosting and international transfers:</strong> the cloud server is hosted in Türkiye. Only the following leaves Türkiye: (1) when a notification is sent, the push token and the notification title and text go to Expo and from there to Google's or Apple's notification service; (2) when you use the microphone, your speech goes through your phone's operating system to Google's or Apple's speech recognition service. These providers' servers are mainly in the USA. If you do not allow or turn off notifications, no data leaves Türkiye for notifications; if you do not use the microphone, none leaves for speech recognition.</p>
 `;
 }
 
@@ -128,5 +138,5 @@ function bolumIki(f: LegalFacts): string {
 }
 
 export function privacyEn(f: LegalFacts): string {
-  return sayfa({ lang: "en", baslik: `${UYGULAMA} — Privacy Policy`, govde: `${bolumBir(f)}\n${bolumIki(f)}` });
+  return sayfa({ lang: "en", baslik: `${UYGULAMA} — Privacy Policy · ${SAGLAYICI.ad}`, govde: `${bolumBir(f)}\n${bolumIki(f)}` });
 }

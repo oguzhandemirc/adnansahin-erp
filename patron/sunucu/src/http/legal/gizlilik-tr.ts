@@ -23,8 +23,9 @@ ${satir("Destek talepleri (yalnız Destek özelliği açıksa): konu, mesaj, siz
 
 function bolumBir(f: LegalFacts): string {
   return `<div class="ust"><span>Yürürlük tarihi: ${YURURLUK}</span><a href="/privacy" hreflang="en" lang="en">English</a></div>
-<h1>${UYGULAMA} — Gizlilik Politikası</h1>
-<p>Bu politika, ${UYGULAMA} mobil uygulamasını (Android ve iOS) ve uygulamanın bağlandığı bulut sunucusunu kullanırken kişisel verilerinizin nasıl işlendiğini anlatır. 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında aydınlatma metni yerine de geçer.</p>
+<h1>${UYGULAMA} — Gizlilik Politikası (Privacy Policy)</h1>
+<p class="alt">Uygulama: <strong>${UYGULAMA}</strong> · Geliştirici: <strong>${SAGLAYICI.ad}</strong></p>
+<p>Bu politika, ${SAGLAYICI.ad} tarafından geliştirilen ${UYGULAMA} mobil uygulamasını (Android ve iOS) ve uygulamanın bağlandığı bulut sunucusunu kullanırken kişisel verilerinizin hangi yollarla toplandığını, ne için kullanıldığını, kimlerle paylaşıldığını, ne kadar saklandığını ve nasıl silindiğini anlatır. Kişisel verilerinizin korunmasına ilişkin 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamındaki haklarınız 9. bölümdedir.</p>
 <nav><ol>
 <li><a href="#kim">Veri sorumlusu ve iletişim</a></li><li><a href="#amac">Uygulamanın amacı</a></li>
 <li><a href="#veriler">İşlediğimiz veriler</a></li><li><a href="#izinler">Uygulama izinleri</a></li>
@@ -48,6 +49,12 @@ function bolumBir(f: LegalFacts): string {
 <p><strong>Hukuki sebep:</strong> Verileriniz, fabrika ile aranızdaki çalışma ilişkisinin ve verilen hizmetin yürütülmesi (KVKK md. 5/2-c), hukuki yükümlülüklerin yerine getirilmesi (md. 5/2-ç) ve hesap güvenliği gibi meşru menfaatler (md. 5/2-f) kapsamında işlenir.</p>
 
 <h2 id="veriler">3. İşlediğimiz veriler</h2>
+<p><strong>Veriler nasıl toplanır?</strong> Üç yoldan:</p>
+<ul>
+<li><strong>Fabrikadan eşitlemeyle gelenler:</strong> hesap bilgileri (ad soyad, kullanıcı adı, yetkiler, hesap durumu) ve parola özeti, fabrikanın yönetim sisteminden bulut sunucusuna gönderilir. Uygulamada gördüğünüz iş verileri de aynı yoldan gelir.</li>
+<li><strong>Sizin girdikleriniz:</strong> giriş bilgileriniz, telefondan gönderdiğiniz yeni sipariş ve yeni müşteri kayıtları, destek talepleri ve ekleri, açtıysanız iki adımlı doğrulama, tercihleriniz.</li>
+<li><strong>Kullanım sırasında otomatik oluşanlar:</strong> oturum kaydı, güvenlik kayıtları, IP adresi, bildirim izni verdiyseniz bildirim cihazı kaydı, bildirim geçmişi, destek talebine eklenen uygulama sürümü ve cihaz bilgisi.</li>
+</ul>
 ${veriTablosu(f)}
 <p>Uygulamada reklam, analitik, çökme raporlama ya da izleme (tracking) aracı yoktur. Konumunuz, rehberiniz, fotoğraf arşiviniz veya reklam kimliğiniz okunmaz. Verileriniz satılmaz ve reklam amacıyla kullanılmaz.</p>
 
@@ -57,6 +64,8 @@ ${veriTablosu(f)}
 <h3>Mikrofon ve konuşma tanıma</h3>
 <p>Yalnız yeni sipariş formunu sesle doldurmak istediğinizde ve yalnız mikrofon düğmesine bastığınızda kullanılır. Konuşmanız telefonunuzun kendi konuşma tanıma hizmetiyle yazıya çevrilir: iPhone'da Apple'ın, Android'de Google'ın hizmeti. Bu hizmetler sesi tanıma için kendi sunucularına gönderebilir; bu işlem ilgili şirketin gizlilik koşullarına tabidir. Uygulama ses kaydı tutmaz, sesi ${UYGULAMA} bulutuna göndermez; ortaya çıkan metin yalnız telefonda formu doldurmak için kullanılır ve sipariş ancak siz Gönder'e bastığınızda iletilir. İzin vermezseniz formu elle doldurabilirsiniz.</p>
 <p>Uygulama konum, kamera, kişiler veya fotoğraf arşivi izni istemez. Destek talebine eklenen ekran görüntüsü yalnız uygulamanın kendi ekranından ve yalnız siz istediğinizde alınır.</p>
+<h3 id="izin-geri-alma">İzinleri geri alma</h3>
+<p>Verdiğiniz bildirim ve mikrofon izinlerini telefonunuzun Ayarlar uygulamasından (${UYGULAMA} › İzinler ya da Bildirimler) her an kapatabilirsiniz; kapattığınız andan sonra o izinle veri toplanmaz. Bildirim cihazınızı uygulamadaki Bildirim Ayarları'ndan da kaldırabilirsiniz; kaldırılan cihaza bildirim gönderilmez. Hesabınızın silinmesini 10. bölümdeki yoldan isteyebilirsiniz.</p>
 
 <h2 id="cihaz">5. Telefonunuzda tutulanlar</h2>
 <ul>
@@ -75,7 +84,8 @@ ${veriTablosu(f)}
 <li><strong>Apple / Google konuşma tanıma hizmetleri</strong> — yalnız mikrofonu kullandığınızda, telefonunuzun işletim sistemi üzerinden (bkz. bölüm 4).</li>
 <li>Kanunen yetkili kamu kurum ve kuruluşları — yalnız yasal zorunluluk hâlinde.</li>
 </ul>
-<p><strong>Yurt dışına aktarım:</strong> Bildirim ve konuşma tanıma hizmeti sağlayıcılarının sunucuları yurt dışında (ağırlıklı olarak ABD'de) bulunabilir. Bildirim gönderimi için bu aktarım, KVKK md. 9'daki şartlara uygun olarak yapılır; bildirim izni vermemeniz hâlinde bildirim için yurt dışına veri aktarılmaz.</p>
+<p>Veri aktarılan hizmet sağlayıcılar, verileri yalnız yukarıdaki hizmeti vermek için kullanmakla ve bu politikadakiyle aynı ya da eşdeğer bir koruma sağlamakla yükümlüdür.</p>
+<p><strong>Barındırma ve yurt dışına aktarım:</strong> Bulut sunucusu Türkiye'de barındırılır. Yurt dışına yalnız şu veriler gider: (1) bir bildirim gönderildiğinde bildirim anahtarı ile bildirimin başlığı ve metni Expo'ya ve oradan Google ya da Apple'ın bildirim hizmetine; (2) mikrofonu kullandığınızda konuşmanız, telefonunuzun işletim sistemi üzerinden Google ya da Apple'ın konuşma tanıma hizmetine. Bu sağlayıcıların sunucuları ağırlıklı olarak ABD'dedir. Bildirim iznini vermezseniz ya da kapatırsanız bildirim için, mikrofonu kullanmazsanız konuşma tanıma için yurt dışına veri gitmez.</p>
 `;
 }
 
@@ -129,5 +139,5 @@ function bolumIki(f: LegalFacts): string {
 }
 
 export function gizlilikTr(f: LegalFacts): string {
-  return sayfa({ lang: "tr", baslik: `${UYGULAMA} — Gizlilik Politikası`, govde: `${bolumBir(f)}\n${bolumIki(f)}` });
+  return sayfa({ lang: "tr", baslik: `${UYGULAMA} — Gizlilik Politikası (Privacy Policy) · ${SAGLAYICI.ad}`, govde: `${bolumBir(f)}\n${bolumIki(f)}` });
 }

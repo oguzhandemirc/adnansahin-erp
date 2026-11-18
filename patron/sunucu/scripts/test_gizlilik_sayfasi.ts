@@ -3,16 +3,18 @@
 //   §1 /gizlilik · /privacy · /hesap-silme oturumsuz 200 + text/html utf-8 + sayfa CSP'si + nosniff + DENY +
 //      no-referrer + Cache-Control public; çerez yok; HEAD 200
 //   §2 yazma yöntemleri (POST/PUT/PATCH/DELETE) 405 + Allow: GET, HEAD; alt yol 404
-//   §3 içerik: veri sorumlusu ünvanı + e-postası, silme çapaları (`#hesap-silme`, `#account-deletion`), dil bağlantısı;
+//   §3 içerik: veri sorumlusu ünvanı + e-postası; başlıkta "Privacy Policy" + uygulama + geliştirici; /hesap-silme
+//      numaralı adımlar + hazır mailto; mağaza ibareleri (eşdeğer koruma, izin geri alma, barındırma); silme çapaları (`#hesap-silme`, `#account-deletion`), dil bağlantısı;
 //      betik/dış kaynak/görsel/çerçeve YOK; CSP'deki özet sayfadaki <style> içeriğiyle birebir
 //   §4 süreler tek kaynaktan: yapılandırma değişince sayfa metni değişir (budama ile aynı değer)
 //   §5 hız sınırı: sayfa uçları IP başına `API_HIZ_DK` kovasına tabidir (sınır+1 → 429)
 // NEGATİF SONDA (2026-11-18, dosya DIŞI, geri alındı): `sayfa.ts`te CSP başlığı satırı çıkarıldı → §1 ❌ (×3);
+//   `hesap-silme.ts` mailto konusu + `gizlilik-tr.ts` eşdeğer koruma cümlesi bozuldu → §3 ❌ (×2);
 //   `app.all` 405 bloğu çıkarıldı → §2 ❌ (×3, 404).
 // Koşum: npx tsx scripts/test_gizlilik_sayfasi.ts
 // =============================================================================
 import { createHash } from "node:crypto";
-import { PAGE_CSP, VERI_SORUMLUSU } from "../src/http/legal/ortak";
+import { PAGE_CSP, SAGLAYICI, SILME_KONUSU, UYGULAMA, VERI_SORUMLUSU } from "../src/http/legal/ortak";
 import { LEGAL_PATHS } from "../src/http/legal/sayfa";
 import { IDENTITY_PURGE_DAYS, IP_RETENTION_DAYS } from "../src/services/maintenance";
 import { kontrol, ortamKur, sonuc } from "./lib/test-ortam";
@@ -61,6 +63,29 @@ async function basliklarVeYontemler(): Promise<void> {
     kontrol("§3 /gizlilik: lang=tr, silme çapası id=hesap-silme, İngilizce bağlantısı", /<html lang="tr">/.test(tr.govde) && tr.govde.includes('id="hesap-silme"') && tr.govde.includes('href="/privacy"'));
     kontrol("§3 /privacy: lang=en, silme çapası id=account-deletion, Türkçe bağlantısı", /<html lang="en">/.test(en.govde) && en.govde.includes('id="account-deletion"') && en.govde.includes('href="/gizlilik"'));
     kontrol("§3 /hesap-silme: iki dil, iki çapa, ayrıntı bağlantıları", sil.govde.includes('id="hesap-silme"') && sil.govde.includes('id="account-deletion"') && sil.govde.includes('href="/gizlilik#hesap-silme"') && sil.govde.includes('href="/privacy#account-deletion"'));
+    const baslik = (g: string) => /<title>([^<]*)<\/title>/.exec(g)?.[1] ?? "";
+    kontrol(
+      "§3 /hesap-silme: uygulama + geliştirici adı başta, numaralı adımlar, hazır mailto (konu dolu, TR + EN)",
+      sil.govde.includes(`<h1>${UYGULAMA} — Hesap silme talebi</h1>`) &&
+        sil.govde.includes(`Geliştirici: <strong>${SAGLAYICI.ad}</strong>`) &&
+        (sil.govde.match(/<ol class="adim">/g) ?? []).length === 2 &&
+        sil.govde.includes(`href="mailto:${VERI_SORUMLUSU.eposta}?subject=${SILME_KONUSU.tr}"`) &&
+        sil.govde.includes(`href="mailto:${VERI_SORUMLUSU.eposta}?subject=${SILME_KONUSU.en}"`),
+    );
+    kontrol(
+      "§3 başlıkta 'Privacy Policy' + uygulama + geliştirici adı (TR ve EN)",
+      [baslik(tr.govde), baslik(en.govde)].every((b) => b.includes("Privacy Policy") && b.includes(UYGULAMA) && b.includes(SAGLAYICI.ad)) &&
+        baslik(tr.govde).includes("Gizlilik Politikası (Privacy Policy)"),
+      `${baslik(tr.govde)} | ${baslik(en.govde)}`,
+    );
+    kontrol(
+      "§3 mağaza zorunlu ibareleri: eşdeğer koruma · izin geri alma · Türkiye'de barındırma · toplama yolları; iddialı KVKK md. 9 / aydınlatma cümlesi yok",
+      tr.govde.includes("aynı ya da eşdeğer bir koruma") && en.govde.includes("same or equivalent protection") &&
+        tr.govde.includes('id="izin-geri-alma"') && en.govde.includes('id="withdraw-permissions"') &&
+        tr.govde.includes("Bulut sunucusu Türkiye'de barındırılır") && en.govde.includes("hosted in Türkiye") &&
+        tr.govde.includes("Fabrikadan eşitlemeyle gelenler") && en.govde.includes("Synchronized from the mill") &&
+        !/md\. 9|Art\. 9|aydınlatma metni yerine/.test(tr.govde + en.govde),
+    );
     kontrol("§3 kod sabitleri metinde (IP 30 gün · kimlik silme 30 gün)", tr.govde.includes(`${IP_RETENTION_DAYS} gün sonra silinir`) && tr.govde.includes(`Kapanıştan ${IDENTITY_PURGE_DAYS} gün sonra`));
     const alt = await al(o.adres, "/gizlilik/ek");
     kontrol("§2 alt yol (/gizlilik/ek) 404", alt.status === 404, String(alt.status));
