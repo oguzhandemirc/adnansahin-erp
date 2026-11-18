@@ -5,7 +5,7 @@
 // No sütunu belge numarasının tamamını taşıyacak genişlikte (1.5 × 80 = 120 pt ≥ "SVK1811260003"): numara KIRPILMAZ.
 import type { ProjectionRecord } from "../../api/wire";
 import { formatDate, formatNumber } from "../../lib/format";
-import { UNIT } from "../../lib/labels/uretim";
+import { SHIPMENT_DESTINATION, UNIT } from "../../lib/labels/uretim";
 import { Rozet } from "../ortak";
 import { qty } from "../pano/read";
 import { asObj, present, str } from "../siparis/OrderRow";
@@ -21,16 +21,26 @@ function DurumHucresi({ durum }: { durum: unknown }) {
 }
 
 export const SEVKIYAT_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
-  { key: "no", baslik: "Sevk no", agirlik: 1.5, hucre: (r) => str(k(r).sevkNo) ?? "—" },
-  { key: "tarih", baslik: "Tarih", ad: "Sevk tarihi", agirlik: 1.1, hucre: (r) => formatDate(str(k(r).cikisTarihi) ?? str(k(r).olusturulma)) },
-  { key: "top", baslik: "Top", ad: "Top sayısı (brüt)", agirlik: 0.7, sayi: true, hucre: (r) => sayi(k(r).topSayisi) },
-  { key: "metre", baslik: "Metre", ad: "Sevk (m, brüt)", agirlik: 1.1, sayi: true, hucre: (r) => (present(k(r).toplamMetre) ? `${qty(k(r).toplamMetre)} ${UNIT.metre}` : "—") },
-  { key: "kg", baslik: "Kg", ad: "Toplam kg", agirlik: 0.9, sayi: true, hucre: (r) => sayi(k(r).toplamKg) },
-  { key: "cuval", baslik: "Çuval", ad: "Çuval sayısı", agirlik: 0.8, sayi: true, hucre: (r) => sayi(k(r).cuvalSayisi) },
+  { key: "no", baslik: "Sevk no", agirlik: 1.5, sirala: "sevkNo", hucre: (r) => str(k(r).sevkNo) ?? "—" },
+  { key: "tarih", baslik: "Tarih", ad: "Sevk tarihi", agirlik: 1.1, sirala: "cikisTarihi", hucre: (r) => formatDate(str(k(r).cikisTarihi) ?? str(k(r).olusturulma)) },
+  // Müşteri adı kesilmez: geniş sütun + alt satıra kayar (sipariş listesiyle aynı).
+  { key: "musteri", baslik: "Müşteri", agirlik: 1.6, satir: 2, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
+  { key: "yon", baslik: "Tür", ad: "Sevk türü (yurtiçi/ihracat)", agirlik: 0.9, hucre: (r) => SHIPMENT_DESTINATION[str(k(r).yon) ?? ""] ?? "—" },
+  { key: "top", baslik: "Top", ad: "Top sayısı (brüt)", agirlik: 0.7, sayi: true, sirala: "topSayisi", hucre: (r) => sayi(k(r).topSayisi) },
+  { key: "metre", baslik: "Metre", ad: "Sevk (m, brüt)", agirlik: 1.1, sayi: true, sirala: "toplamMetre", hucre: (r) => (present(k(r).toplamMetre) ? `${qty(k(r).toplamMetre)} ${UNIT.metre}` : "—") },
+  { key: "kg", baslik: "Kg", ad: "Toplam kg", agirlik: 0.9, sayi: true, sirala: "toplamKg", hucre: (r) => sayi(k(r).toplamKg) },
+  { key: "cuval", baslik: "Çuval", ad: "Çuval sayısı", agirlik: 0.8, sayi: true, sirala: "cuvalSayisi", hucre: (r) => sayi(k(r).cuvalSayisi) },
   { key: "durum", baslik: "Durum", agirlik: 1.3, hucre: (r) => sevkDurumu(k(r).durum).label, ogeler: (r) => <DurumHucresi durum={k(r).durum} /> },
+  // Sütun seçicide KAPALI gelen ekler (eski "Satırda göster" alanları): telin kendi alanları.
+  { key: "fatura", baslik: "Fatura", ad: "Fatura no", agirlik: 1.1, hucre: (r) => str(k(r).disFaturaNo) ?? "—" },
+  { key: "faturaTarihi", baslik: "Fatura tar.", ad: "Fatura tarihi", agirlik: 1.1, hucre: (r) => formatDate(k(r).faturalanma) },
+  { key: "kayit", baslik: "Kayıt", ad: "Kayıt tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).olusturulma) },
+  { key: "iptal", baslik: "İptal", ad: "İptal tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).iptalTarihi) },
 ];
 
 /** Cari ayrıntısındaki sevkiyat tablosu: sevkiyat kaydının taşıdığı her sayı alanı. */
 export const CARI_SEVK_SUTUNLARI = ["no", "tarih", "top", "metre", "kg", "cuval", "durum"] as const;
 /** Özet'teki kısa "son sevkiyatlar": tarih · no · top · metre (+ durum). */
 export const OZET_SEVK_SUTUNLARI = ["tarih", "no", "top", "metre", "durum"] as const;
+/** Sevkiyat ekranı tablosunun varsayılan sütunları (cari sekmesiyle aynı tanımlar + müşteri + tür). */
+export const SEVK_LISTE_VARSAYILAN: readonly string[] = ["no", "tarih", "musteri", "yon", "top", "metre", "durum"];
