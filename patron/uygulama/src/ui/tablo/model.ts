@@ -24,9 +24,9 @@ export interface SutunTanimi<R> {
   readonly ad?: string;
   /** Oranlı genişlik (flex); başlık ve satır AYNI ağırlığı kullanır → hizalı. */
   readonly agirlik: number;
-  /** Sayı sütunu: rakamlar tabular (alt alta hizalı); hiza verilmezse sağa yaslı. */
+  /** Sayı sütunu: rakamlar tabular (alt alta hizalı); hiza sayı olmasından bağımsızdır (varsayılan sol). */
   readonly sayi?: boolean;
-  /** Başlık + hücre hizası (tek kaynak `sutunHizasi`); verilmezse sayı sağa, metin sola. */
+  /** Başlık + hücre hizası (tek kaynak `sutunHizasi`); verilmezse SOLA (sayı da). */
   readonly hiza?: "sol" | "sag";
   /** Sunucu sıralama alanı (`LIST_SORT`); yoksa sütun sıralanamaz. */
   readonly sirala?: string;
@@ -62,8 +62,12 @@ export const azamiSutun = (_genislik?: number): number => AZAMI_SUTUN;
 export const SUTUN_BIRIMI = 80;
 export const sutunGenisligi = (agirlik: number): number => Math.round(agirlik * SUTUN_BIRIMI);
 
-/** Sütunun hizası: başlık ve hücre bunu okur (birebir aynı). Varsayılan bugünkü davranış: sayı sağa, metin sola. */
-export const sutunHizasi = (c: { readonly sayi?: boolean; readonly hiza?: "sol" | "sag" }): "sol" | "sag" => c.hiza ?? (c.sayi ? "sag" : "sol");
+/**
+ * Sütunun hizası: başlık ve hücre bunu okur (birebir aynı). Kullanıcı kararı 2026-11-18 ("hepsini sola al"): her
+ * liste/tablo sütunu SOLA dayalıdır, sayı sütunu da (rakamlar `tabular-nums` ile alt alta hizalı kalır). Sağa yaslamak
+ * isteyen sütun `hiza: "sag"` verir.
+ */
+export const sutunHizasi = (c: { readonly hiza?: "sol" | "sag" }): "sol" | "sag" => c.hiza ?? "sol";
 
 /** Başlığa dokununca: başka sütun → artan; artan → azalan; azalan → kapalı (sunucunun varsayılan sırası). */
 export function sonrakiSiralama(simdiki: Siralama | null, alan: string): Siralama | null {

@@ -1,6 +1,6 @@
 // Veri tablosu çizimi (şartname §4 liste): araç şeridi (arama · süzgeç rozeti · sütun seçimi) + yapışkan sütun başlığı +
 // tek satırlık hizalı satırlar. Başlık ve satır AYNI sütun ağırlıklarını ve AYNI iç boşluğu kullanır → sütunlar hizalı.
-// Sayılar tabular rakamlı; hiza `sutunHizasi` (varsayılan sayı sağa, sütun `hiza` ile değiştirir). Başlığa dokunmak sıralamayı döndürür (artan → azalan → kapalı); sıralanamayan
+// Sayılar tabular rakamlı; hiza `sutunHizasi` (varsayılan her sütun sola, sütun `hiza` ile değiştirir). Başlığa dokunmak sıralamayı döndürür (artan → azalan → kapalı); sıralanamayan
 // sütunun başlığı düğme değildir. Süzme/sıralama SUNUCUDA (`useVeriTablosu`); burada yalnız çizim.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef, type RefObject } from "react";

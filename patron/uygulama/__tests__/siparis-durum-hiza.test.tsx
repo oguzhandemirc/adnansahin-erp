@@ -1,10 +1,10 @@
 // Sipariş durumu renkleri + sipariş listesi hizası bekçisi (2026-11-18, kullanıcı: "her durumun kendine özgü rengi
-// olmalı" · "her şey sola dayalı yazılmalı").
+// olmalı" · "her şey sola dayalı yazılmalı" · "hepsini sola al").
 // §1 Her sipariş durumu (sözlük + bulut süzgeç kataloğunun `durum` değerleri) TEK kaynakta (`ui/siparis/durum.ts`)
 //    bir tona eşli; tonlar birbirinden ayrık; metin/zemin kontrastı açık ve koyu temada ≥ 4.5; bilinmeyen değer nötr.
 // §2 Liste, cari satırı ve ayrıntı rozeti aynı helper'dan okur.
-// §3 Sipariş listesinde TÜM sütunlar (başlık + hücre) sola dayalı; sayı sütunu tabular rakamlı kalır. Ortak tablonun
-//    varsayılanı (sayı sağa) başka listeler için DEĞİŞMEDİ.
+// §3 Uygulamanın TÜM tablolarında (sipariş, stok kalem/top, çuval, iş emri, üretim istasyonu, cari) her sütun (başlık +
+//    hücre) sola dayalı; sayı sütunu tabular rakamlı kalır. Ortak tablonun varsayılanı sola; `hiza: "sag"` açık istisnadır.
 import { render, screen } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 import { ORDER_STATUS } from "../src/lib/labels/siparis";
@@ -14,6 +14,11 @@ import { rozetRenk } from "../src/ui/ortak";
 import { SIPARIS_DURUM_GORUNUMU, siparisDurumu } from "../src/ui/siparis/durum";
 import { orderRowText } from "../src/ui/siparis/OrderRow";
 import { SIPARIS_SUTUNLARI } from "../src/ui/siparis/sutunlar";
+import { KALEM_SUTUNLARI, TOP_SUTUNLARI } from "../src/ui/stok/sutunlar";
+import { CUVAL_SUTUNLARI } from "../src/ui/cuval/gorunum";
+import { IS_EMRI_SUTUNLARI } from "../src/ui/is-emri/sutunlar";
+import { ISTASYON_SUTUNLARI } from "../src/ui/uretim/kartlar";
+import { CARI_SUTUNLARI } from "../src/ui/cari/sutunlar";
 import { sutunHizasi, type SutunTanimi } from "../src/ui/tablo/model";
 import { TabloBasligi, TabloSatiri } from "../src/ui/tablo/VeriTablosu";
 import { schemes } from "../src/ui/tokens";
@@ -114,9 +119,28 @@ describe("§3 hizalama", () => {
     expect(st.textAlign).not.toBe("right");
   });
 
-  it("ortak varsayılan değişmedi: hiza verilmemiş sayı sütunu (stok, çuval, iş emri…) sağa yaslı", () => {
+  it("ortak varsayılan sola: hiza verilmemiş sayı sütunu da sola dayalı, tabular", () => {
     const sayiSutun = { key: "m", baslik: "Metre", agirlik: 1, sayi: true, hucre: () => "5" } as SutunTanimi<never>;
-    expect(sutunHizasi(sayiSutun)).toBe("sag");
-    expect(hizaOlc([sayiSutun])).toEqual([{ key: "m", baslikSag: true, hucreSag: true }]);
+    expect(sutunHizasi(sayiSutun)).toBe("sol");
+    expect(hizaOlc([sayiSutun])).toEqual([{ key: "m", baslikSag: false, hucreSag: false }]);
+    const st = duz(screen.getAllByText("5")[0]!.props.style) as { fontVariant?: string[]; textAlign?: string };
+    expect(st.fontVariant).toContain("tabular-nums");
+    expect(st.textAlign).not.toBe("right");
+  });
+
+  it("her ekran tablosunda (stok kalem/top, çuval, iş emri, üretim istasyonu, cari) her sütun sola; açık hiza yok", () => {
+    const tablolar: Record<string, readonly SutunTanimi<never>[]> = {
+      "stok-kalem": KALEM_SUTUNLARI as never, "stok-top": TOP_SUTUNLARI as never, cuval: CUVAL_SUTUNLARI as never,
+      "is-emri": IS_EMRI_SUTUNLARI as never, istasyon: ISTASYON_SUTUNLARI as never, cari: CARI_SUTUNLARI as never,
+    };
+    for (const [ad, sutunlar] of Object.entries(tablolar)) {
+      expect(sutunlar.length).toBeGreaterThan(0);
+      for (const c of sutunlar) expect([ad, c.key, sutunHizasi(c), c.hiza]).toEqual([ad, c.key, "sol", undefined]);
+    }
+  });
+
+  it("negatif sonda: açık hiza: sag verilen sütun sağa yaslanır (ölçer gerçekten ayırt ediyor)", () => {
+    const sag = { key: "x", baslik: "X", agirlik: 1, sayi: true, hiza: "sag", hucre: () => "7" } as SutunTanimi<never>;
+    expect(hizaOlc([sag])).toEqual([{ key: "x", baslikSag: true, hucreSag: true }]);
   });
 });

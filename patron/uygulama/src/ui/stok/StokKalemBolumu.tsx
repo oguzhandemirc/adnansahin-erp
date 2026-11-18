@@ -202,6 +202,7 @@ const useStyles = makeStyles((t) => ({
   topSatir: { flexDirection: "row" as const, alignItems: "center" as const, minHeight: 30, gap: space.s },
   topYazi: { ...typography.footnote, color: t.textSecondary },
   topNo: { flex: 1.6, color: t.text },
-  sayi: { flex: 1, textAlign: "right" as const, ...tabularNums },
+  // Sola dayalı (kullanıcı kararı 2026-11-18, tablolarla aynı); rakamlar tabular.
+  sayi: { flex: 1, ...tabularNums },
   parti: { flex: 0.8 },
 }));

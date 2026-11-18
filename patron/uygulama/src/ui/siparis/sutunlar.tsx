@@ -18,7 +18,8 @@ function DurumHucresi({ durum }: { durum: unknown }) {
   return <Rozet label={d.kisa} tone={d.ton} accessibilityLabel={`Durum: ${d.label}`} />;
 }
 
-const TANIM: readonly SutunTanimi<ProjectionRecord>[] = [
+/** Hepsi sola dayalı: ortak tablonun varsayılanı (`sutunHizasi`); burada ayrıca hiza verilmez. */
+export const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "no", baslik: "No", ad: "Sipariş no", agirlik: 1.15, sirala: "siparisNo", hucre: (r) => kisaBelgeNo(str(k(r).siparisNo)) ?? "—" },
   // Müşteri adı kesilmez: geniş sütun + alt satıra kayar (en çok 3 satır).
   { key: "musteri", baslik: "Müşteri", agirlik: 1.5, satir: 3, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
@@ -46,6 +47,3 @@ const TANIM: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "iptal", baslik: "İptal", ad: "İptal tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).iptalTarihi) },
   { key: "kayit", baslik: "Kayıt", ad: "Kayıt tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).olusturulma) },
 ];
-
-/** Hepsi sola dayalı: hiza burada TEK yerden verilir (yeni sütun da sola gelir). */
-export const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = TANIM.map((c) => ({ ...c, hiza: "sol" as const }));
