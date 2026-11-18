@@ -22,7 +22,7 @@ import { STOCK_CARDS, resetCards, shownCards, toggleCard, type StockCardKey } fr
 import { StokKalemBolumu } from "../../../src/ui/stok/StokKalemBolumu";
 import { StokToplamSatiri } from "../../../src/ui/stok/StokToplamSatiri";
 import { stokBolumu } from "../../../src/lib/stok-kalem";
-import { siganSutun as azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
+import { azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
 import { SutunSecici, VisibilityPicker } from "../../../src/ui/tablo/Seciciler";
 import { useTabloTercihi, type TabloTercihiDurumu } from "../../../src/ui/tablo/useTabloTercihi";
 import { AracDugmesi, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useTabloOlcusu } from "../../../src/ui/tablo/VeriTablosu";

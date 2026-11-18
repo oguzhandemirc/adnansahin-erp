@@ -74,8 +74,8 @@ export const ANA = "ana";
 export const TELEFON_SUTUN = 4;
 export const GENIS_SUTUN = 7;
 export const siganSutun = (genislik: number): number => (genislik >= 600 ? GENIS_SUTUN : TELEFON_SUTUN);
-/** Seçilebilecek en çok sütun (sığmayanlar yatay kaydırmayla görünür). */
-export const AZAMI_SUTUN = 10;
+/** Seçilebilecek sütun SINIRSIZ (kullanıcı kararı 2026-11-19: tablo zaten yatay kayar; teknik gerekçe yok). Tek kural: son görünür sütun gizlenemez. `azami` parametresi yalnız tek öğeli görünüm tercihleri (`["-"]`, azami 1) için kalır. */
+export const AZAMI_SUTUN = Number.POSITIVE_INFINITY;
 export const azamiSutun = (_genislik?: number): number => AZAMI_SUTUN;
 /** Yatay kipte sütun genişliği = ağırlık × birim (pt); kırpılmaz sütun hesaplanan genişliğinden dar olamaz. */
 export const SUTUN_BIRIMI = 80;
@@ -186,8 +186,8 @@ export function sonrakiSiralama(simdiki: Siralama | null, alan: string): Siralam
   return null;
 }
 
-/** Göster/gizle: son görünür sütun gizlenemez; azamiye ulaşınca yenisi eklenmez. */
-export function sutunDegistir(sutunlar: readonly string[], key: string, azami: number): readonly string[] {
+/** Göster/gizle: son görünür sütun gizlenemez (sütun sayısı sınırsız; `azami` yalnız tek öğeli tercihler için). */
+export function sutunDegistir(sutunlar: readonly string[], key: string, azami: number = AZAMI_SUTUN): readonly string[] {
   if (sutunlar.includes(key)) return sutunlar.length <= 1 ? sutunlar : sutunlar.filter((k) => k !== key);
   return sutunlar.length >= azami ? sutunlar : [...sutunlar, key];
 }

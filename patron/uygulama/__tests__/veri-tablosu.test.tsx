@@ -69,9 +69,12 @@ describe("§1 saf model", () => {
     expect(M.sonrakiSiralama(b, "siparisNo")).toEqual({ alan: "siparisNo", yon: "artan" });
   });
 
-  it("sütun seçimi: son sütun gizlenemez, azamiden fazla eklenmez; taşıma sınırda değişmez", () => {
+  it("sütun seçimi: son sütun gizlenemez, sütun sayısı sınırsız (2026-11-19), tek öğeli tercihte azami geçerli; taşıma sınırda değişmez", () => {
     expect(M.sutunDegistir(["no"], "no", 4)).toEqual(["no"]);
     expect(M.sutunDegistir(["a", "b", "c", "d"], "e", 4)).toEqual(["a", "b", "c", "d"]);
+    const on = Array.from({ length: 12 }, (_, i) => `s${i}`);
+    expect(M.sutunDegistir(on, "x")).toEqual([...on, "x"]); // varsayılan: sınır yok
+    expect(M.tercihiTemizle({ sutunlar: [...on, "x"] }, { varsayilan: { surum: 1, sutunlar: ["s0"], siralama: null, suzgec: {} }, sutunlar: [...on, "x"], azami: M.AZAMI_SUTUN }).sutunlar).toHaveLength(13);
     expect(M.sutunDegistir(["a", "b"], "c", 4)).toEqual(["a", "b", "c"]);
     expect(M.sutunDegistir(["a", "b"], "a", 4)).toEqual(["b"]);
     expect(M.sutunTasi(["a", "b", "c"], "a", -1)).toEqual(["a", "b", "c"]);
@@ -80,7 +83,7 @@ describe("§1 saf model", () => {
     expect(M.siganSutun(800)).toBe(M.GENIS_SUTUN);
     // Seçilebilen sütun sığandan fazladır; fazlası yatay kaydırılır.
     expect(M.azamiSutun(390)).toBe(M.AZAMI_SUTUN);
-    expect(M.AZAMI_SUTUN).toBeGreaterThan(M.GENIS_SUTUN);
+    expect(M.AZAMI_SUTUN).toBe(Number.POSITIVE_INFINITY);
     expect(M.sutunGenisligi({ agirlik: 1.5 })).toBe(120);
   });
 
@@ -178,7 +181,7 @@ describe("§2 ekran: sıralama ve süzgeç SUNUCUDA", () => {
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
   });
 
-  it("sütun seçimi: gizli sütun eklenir, azamiden fazlası eklenmez, son sütun gizlenemez", async () => {
+  it("sütun seçimi: gizli sütunların hepsi eklenir (sınır yok), son sütun gizlenemez", async () => {
     const azami = M.azamiSutun(require("react-native").Dimensions.get("window").width as number);
     mockList.mockResolvedValue(page(rec(ID1, { siparisNo: "SP-1", musteriAdi: "A", siparisTarihi: "2026-11-01", durum: "APPROVED" })));
     render(<Orders />);
@@ -187,7 +190,7 @@ describe("§2 ekran: sıralama ve süzgeç SUNUCUDA", () => {
     const gizli = ["tarih", "kalem", "yon"]; // varsayılan 5 sütunun dışındakiler, tanım sırasıyla
     for (const k of gizli) fireEvent.press(screen.getByTestId(`siparis-sutun-secici-${k}`));
     const gorunen = gizli.filter((k) => screen.queryByTestId(`siparis-sutun-${k}`) !== null);
-    expect(gorunen).toEqual(gizli.slice(0, Math.max(0, azami - 5))); // azamiye ulaşınca yenisi eklenmez
+    expect(gorunen).toEqual(gizli.slice(0, Math.max(0, Math.min(gizli.length, azami - 5)))); // sınır yok → hepsi
     for (const k of ["no", "musteri", "sevkToplam", "uretim", "durum", ...gorunen.slice(1)]) fireEvent.press(screen.getByTestId(`siparis-sutun-secici-${k}`));
     const kalan = gorunen[0] ?? "durum";
     expect(screen.getByTestId(`siparis-sutun-${kalan}`)).toBeTruthy(); // son sütun gizlenemez

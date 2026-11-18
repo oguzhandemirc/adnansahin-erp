@@ -1,5 +1,5 @@
 // Tablo seçicileri — düğme DOĞRUDAN alt sayfayı açar (açılır kutu yok): sütun seçimi (göster/gizle + sıra; en az bir,
-// en çok `azami`) ve süzgeç (grup başına tek seçim, "Tümü" kaldırır). Değişiklik anında uygulanır (ayrı "uygula" yok).
+// sınırsız; `azami` yalnız tek öğeli tercihlerde) ve süzgeç (grup başına tek seçim, "Tümü" kaldırır). Değişiklik anında uygulanır (ayrı "uygula" yok).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
@@ -56,7 +56,7 @@ export function SutunSecici<R>(p: {
       visible={p.visible} title="Sütunlar" onClose={p.onClose} testID={p.testID}
       alt={
         <View style={s.altSatir}>
-          <Text style={s.not}>{`En az 1, en çok ${p.azami} sütun`}</Text>
+          <Text style={s.not}>{Number.isFinite(p.azami) ? `En az 1, en çok ${p.azami} sütun` : "En az 1 sütun"}</Text>
           <Pressable onPress={p.onVarsayilan} hitSlop={8} accessibilityRole="button" testID={`${p.testID}-varsayilan`}>
             <Text style={[s.bittiYazi, { color: t.tint }]}>Varsayılan</Text>
           </Pressable>
