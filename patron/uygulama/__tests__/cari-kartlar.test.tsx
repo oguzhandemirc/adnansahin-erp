@@ -79,6 +79,9 @@ describe("§1 varsayılan görünüm değişmedi", () => {
     render(<CustomerDetail />);
     await settle();
     fireEvent.press(screen.getByTestId("cari-sekme-bilgi"));
+    // Cari kodu başlıkta yok (2026-11-19); Bilgi sekmesinde durur.
+    expect(metinler()).toContain("Kod");
+    expect(metinler()).toContain("ORN-001");
     expect(metinler()).not.toContain("Kayıt tarihi");
     fireEvent.press(screen.getByTestId("cari-kart-sec"));
     fireEvent.press(screen.getByTestId("cari-kart-secici-kayitTarihi"));

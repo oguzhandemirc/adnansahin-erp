@@ -71,16 +71,17 @@ beforeEach(() => {
   mockList.mockImplementation(byProjection({ iade: () => Promise.resolve(page(IADE, IADE_IPTAL)), acik: () => Promise.resolve(page(ACIK)) }));
 });
 
-describe("§0 tek satır başlık (2026-11-16)", () => {
-  it("kod · il ve tür rozeti başlık kutusunda; ayrı kimlik bloğu yok", async () => {
+describe("§0 tek satır başlık (2026-11-19: yalnız ad + tür rozeti)", () => {
+  it("başlıkta ad ve tür rozeti; cari KODU ve il başlığa yazılmaz (kod Bilgi sekmesinde)", async () => {
     mockRecord.mockResolvedValue(rec(ID, { ad: "Örnek Tekstil A.Ş.", kod: "ORN-001", il: "Bursa", musteriRolu: true }));
     render(<CustomerDetail />);
     await settle();
     const kutu = screen.getByTestId("baslik-kutusu");
     expect(within(kutu).getByText("Örnek Tekstil A.Ş.")).toBeTruthy();
     const kimlik = within(kutu).getByTestId("cari-kimlik");
-    expect(within(kimlik).getByText("ORN-001 · Bursa")).toBeTruthy();
     expect(within(kimlik).getByText("Müşteri")).toBeTruthy();
+    expect(within(kutu).queryByText(/ORN-001/)).toBeNull();
+    expect(within(kutu).queryByText(/Bursa/)).toBeNull();
     expect(screen.getAllByTestId("cari-kimlik")).toHaveLength(1);
   });
 });

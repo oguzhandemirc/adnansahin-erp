@@ -1,4 +1,4 @@
-// Cari kartı (şartname §4.8): tek satır başlık (ad · kod · il · rozet · tazelik) → alt sekme şeridi (Özet · Siparişler · Sevkiyatlar · Bilgi) → seçili
+// Cari kartı (şartname §4.8): tek satır başlık (ad · tür rozeti) → alt sekme şeridi (Özet · Siparişler · Sevkiyatlar · Bilgi) → seçili
 // sekmenin blokları. Adnan'da bakiye/ekstre/hareket (finans) YOKTUR. İadeler, toplamlar ve en çok alınan ürünler için
 // fabrika henüz alan göndermiyor: "henüz gelmedi" satırı, yer tutucu sayı YOK. Uygulama listeyi sayıp toplamaz.
 // Kart seçimi (2026-11-17): başlıktaki simge → Özet kartları, blokları ve Bilgi'deki kayıt tarihi aç/kapa (hepsi
@@ -105,12 +105,10 @@ export default function CustomerDetail() {
     { key: "kayit", etiket: "Kayıt tarihi", deger: goster("kayitTarihi") && str(k.olusturulma) ? formatDate(k.olusturulma) : null },
   ].filter((x) => x.deger !== null);
   const kartlarEylemi = kartSecEylemi(() => setSecici(true), "cari-kart-sec");
-  // Kimlik başlıkla TEK satırda (2026-11-16): ad · "kod · il" · tür rozeti (ardından ortak tazelik öğesi). Dar ekranda ad sarılırsa bu öğe
-  // adın altına küçük alt yazı olarak düşer; ayrı kimlik bloğu ve büyük simge yok.
-  const kodIl = [str(k.kod), str(k.il)].filter(Boolean).join(" · ");
+  // Başlıkta yalnız insanın tanıdığı ad + tür rozeti (2026-11-19, kullanıcı: "müşteri kodu yazmasına gerek yok"); kod ve
+  // adres Bilgi sekmesindedir. Ayrı kimlik bloğu ve büyük simge yok.
   const meta = !kimlik ? undefined : (
     <View style={s.kimlik} testID="cari-kimlik">
-      {kodIl ? <Text style={s.kod} numberOfLines={1}>{kodIl}</Text> : null}
       {kimlik.roles.map((x) => <Rozet key={x.key} label={x.label} tone="primary" />)}
       {kimlik.passive ? <Rozet label="Pasif" /> : null}
     </View>
@@ -213,7 +211,6 @@ export default function CustomerDetail() {
 
 const useStyles = makeStyles((t) => ({
   kimlik: { flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, columnGap: space.s, rowGap: space.xs },
-  kod: { ...typography.footnote, ...tabularNums, color: t.color.textMuted, flexShrink: 1 },
   aracSatiri: { flexDirection: "row" as const, alignItems: "center" as const, flexWrap: "wrap" as const, gap: space.m, marginTop: space.m, marginBottom: space.s },
   ustBosluk: { height: space.m },
   sayi: { ...typography.footnote, ...tabularNums, color: t.color.textMuted },
