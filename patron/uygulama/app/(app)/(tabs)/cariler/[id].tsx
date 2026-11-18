@@ -28,7 +28,7 @@ import { cariRowText } from "../../../../src/ui/siparis/CustomerRow";
 import { asObj, str } from "../../../../src/ui/siparis/OrderRow";
 import { FabrikaVeriAni, ListStates, StaleNote } from "../../../../src/ui/siparis/parts";
 import { CARI_SIPARIS_SUTUNLARI, SIPARIS_SUTUNLARI } from "../../../../src/ui/siparis/sutunlar";
-import { CARI_SEVK_SUTUNLARI, SEVKIYAT_SUTUNLARI } from "../../../../src/ui/sevkiyat/sutunlar";
+import { CARI_SEVK_SUTUNLARI, OZET_SEVK_SUTUNLARI, SEVKIYAT_SUTUNLARI } from "../../../../src/ui/sevkiyat/sutunlar";
 import { KisaTablo, sutunSec } from "../../../../src/ui/tablo/KisaTablo";
 import { KompaktSecim } from "../../../../src/ui/KompaktSecim";
 import { useRemoteList } from "../../../../src/ui/siparis/useRemoteList";
@@ -42,10 +42,11 @@ const OZET_SATIR = 5;
 // Satırlar ortak tablonun sütun tanımlarından (liste ekranlarıyla aynı biçim/hücre; elle kopya yok), hepsi sola dayalı.
 const SIPARIS_TABLO = sutunSec(SIPARIS_SUTUNLARI, CARI_SIPARIS_SUTUNLARI);
 const SEVK_TABLO = sutunSec(SEVKIYAT_SUTUNLARI, CARI_SEVK_SUTUNLARI);
+const OZET_SEVK_TABLO = sutunSec(SEVKIYAT_SUTUNLARI, OZET_SEVK_SUTUNLARI);
 
 export default function CustomerDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { api, permissions } = useSession();
+  const { api, permissions, facility } = useSession();
   const router = useRouter();
   const s = useStyles();
   const cap = useListCapability();
@@ -70,9 +71,13 @@ export default function CustomerDetail() {
   const acikDestek = orders && !!cap.search("siparis")?.suzgec?.secenekler.some((o) => o.deger === "ACIK");
   const acikGorunum = sekme === "siparisler" && gorunum === "ACIK";
   const ozet = useCariOzeti(cariId, orders && hazir && ozetGorunur);
-  const acik = useRemoteList("siparis", { cariKartId: cariId ?? undefined, suzgec: "ACIK" }, { enabled: acikDestek && hazir && (ozetGorunur || acikGorunum), limit: 25 });
+  // Açık siparişler en ESKİ üstte (bekleyen en uzun iş önce): sunucu `siparisTarihi`ne göre sıralamayı beyan ediyorsa (termine
+  // göre sıralama beyanı yok). Beyan etmeyen eski bulutta sunucunun varsayılan sırası.
+  const eskiOnce = facility?.liste?.siralama?.siparis?.includes("siparisTarihi") ? { sirala: "siparisTarihi", yon: "artan" as const } : {};
+  const acik = useRemoteList("siparis", { cariKartId: cariId ?? undefined, suzgec: "ACIK", ...eskiOnce }, { enabled: acikDestek && hazir && (ozetGorunur || acikGorunum), limit: 25 });
   const iadeIzni = can(permissions, "bulut:sevkiyat:oku");
   const acikSayi = ozet.data?.ozet?.acik.siparisSayisi;
+  const sonSiparisGorunur = orders && goster("sonSiparisler") && !(acikDestek && goster("acikSiparisler"));
   const k = asObj(r.data?.kayit);
   const kisisel = r.data?.kisisel === undefined || r.data.kisisel === null ? null : asObj(r.data.kisisel);
   const kimlik = r.data ? cariRowText(r.data) : null;
@@ -133,20 +138,23 @@ export default function CustomerDetail() {
                 <AcikSiparislerBolumu list={acik} sayi={ozet.data?.ozet?.acik.siparisSayisi} onAc={(x) => openRecord(router, "siparis", x)}
                   onTumu={() => { setGorunum("ACIK"); setSekme("siparisler"); }} />
               ) : null}
-              {orders && goster("enCokUrun") ? <EnCokUrunBolumu ozet={ozet} donem={donem} /> : null}
-              {iadeIzni && cariId && goster("iadeler") ? <IadelerBolumu cariKartId={cariId} destek={cap.idFilter("iade", "cariKartId")} enabled={ozetGorunur} iade={ozet.data?.ozet?.tumZamanlar.iade} /> : null}
-              {orders && goster("sonSiparisler") && recent.loading && recent.items.length === 0 ? <Iskelet bicim="liste" satir={2} testID="cari-siparisler-yukleniyor" /> : null}
-              {orders && goster("sonSiparisler") && recent.items.length > 0 ? (
-                <View style={s.bolum}>
-                  <BlokBasligi baslik="Son siparişler" sag={<Text style={s.tumu} onPress={() => setSekme("siparisler")} accessibilityRole="link">Tümü</Text>} />
-                  <KisaTablo sutunlar={SIPARIS_TABLO} satirlar={recent.items.slice(0, OZET_SATIR)} onPress={siparisAc} testID="cari-siparisler" />
-                </View>
-              ) : null}
+              {/* "Son sevkiyatlar" açık siparişlerin hemen altında: "en son ne zaman, ne kadar sevk edildi". */}
               {shipments && goster("sonSevkiyatlar") && sevk.loading && sevk.items.length === 0 ? <Iskelet bicim="liste" satir={2} testID="cari-sevkiyatlar-yukleniyor" /> : null}
               {shipments && goster("sonSevkiyatlar") && sevk.items.length > 0 ? (
                 <View style={s.bolum}>
                   <BlokBasligi baslik="Son sevkiyatlar" sag={<Text style={s.tumu} onPress={() => setSekme("sevkiyatlar")} accessibilityRole="link">Tümü</Text>} />
-                  <KisaTablo sutunlar={SEVK_TABLO} satirlar={sevk.items.slice(0, OZET_SATIR)} onPress={sevkAc} testID="cari-sevkiyatlar" />
+                  <KisaTablo sutunlar={OZET_SEVK_TABLO} satirlar={sevk.items.slice(0, OZET_SATIR)} onPress={sevkAc} testID="cari-sevkiyatlar" />
+                </View>
+              ) : null}
+              {orders && goster("enCokUrun") ? <EnCokUrunBolumu ozet={ozet} donem={donem} /> : null}
+              {iadeIzni && cariId && goster("iadeler") ? <IadelerBolumu cariKartId={cariId} destek={cap.idFilter("iade", "cariKartId")} enabled={ozetGorunur} iade={ozet.data?.ozet?.tumZamanlar.iade} /> : null}
+              {/* "Son siparişler" açık siparişler bölümü görünürken çizilmez (2026-11-19: iki bölüm çoğu satırı yineliyordu);
+                  açık bölümü yoksa (eski bulut ya da kart kapalı) son siparişler tek sipariş listesidir. */}
+              {sonSiparisGorunur && recent.loading && recent.items.length === 0 ? <Iskelet bicim="liste" satir={2} testID="cari-siparisler-yukleniyor" /> : null}
+              {sonSiparisGorunur && recent.items.length > 0 ? (
+                <View style={s.bolum}>
+                  <BlokBasligi baslik="Son siparişler" sag={<Text style={s.tumu} onPress={() => setSekme("siparisler")} accessibilityRole="link">Tümü</Text>} />
+                  <KisaTablo sutunlar={SIPARIS_TABLO} satirlar={recent.items.slice(0, OZET_SATIR)} onPress={siparisAc} testID="cari-siparisler" />
                 </View>
               ) : null}
             </KademeliGiris>

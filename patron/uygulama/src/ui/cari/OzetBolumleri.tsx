@@ -2,16 +2,19 @@
 // kendi isteği, iskeleti, boş durumu ve hatasıyla yaşar; birinin hatası diğerini düşürmez. Uygulama SAYMAZ:
 // sayılar fabrikanın `cari-ozeti` anlığından, listeler sunucu süzgecinden. Para yok; birimler toplanmaz.
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Text, useWindowDimensions, View } from "react-native";
 import type { CustomerSummary, CustomerSummaryPeriod, CustomerSummaryResponse, UnitQuantity } from "../../api/wire";
 import { formatDate, formatNumber } from "../../lib/format";
 import { UNIT } from "../../lib/labels/siparis";
 import { useSession } from "../../state/session";
 import { useRemote, type Remote } from "../../state/useRemote";
 import { MODULE_ICON } from "../icons";
-import { BosDurum, HataDurumu, Iskelet, ListeBlogu, ListeSatiri, Rozet, StatCard, type StatDeger } from "../ortak";
-import { SegmentedControl } from "../SegmentedControl";
-import { OrderRow, asObj, str } from "../siparis/OrderRow";
+import { BlokBasligi, BosDurum, HataDurumu, Iskelet, ListeBlogu, ListeSatiri, Rozet, StatCard, type StatDeger } from "../ortak";
+import { KompaktSecim } from "../KompaktSecim";
+import { CARI_SIPARIS_SUTUNLARI, SIPARIS_SUTUNLARI } from "../siparis/sutunlar";
+import { KisaTablo, sutunSec } from "../tablo/KisaTablo";
+import type { SutunTanimi } from "../tablo/model";
+import { asObj, str } from "../siparis/OrderRow";
 import { ListStates } from "../siparis/parts";
 import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
 import { makeStyles } from "../theme-context";
@@ -74,7 +77,7 @@ function temelKartlar(ozet: CustomerSummary, d: CustomerSummaryPeriod) {
     },
     {
       key: "sevk", etiket: "Sevk (brüt)", icon: MODULE_ICON.sevkiyat.icon, ton: "sky" as const, degerler: sevk,
-      ipucu: d.sevk.cuval > 0 ? `${sayi(d.sevk.kg)} kg · ${sayi(d.sevk.tartiliCuval, 0)}/${sayi(d.sevk.cuval, 0)} çuval tartılı` : undefined,
+      ipucu: d.sevk.cuval > 0 ? `${sayi(d.sevk.kg)} kg · ${sayi(d.sevk.tartiliCuval, 0)}/${sayi(d.sevk.cuval, 0)} tartılı` : undefined,
     },
     {
       key: "iade", etiket: "İade", icon: "return-down-back-outline" as const, ton: "rose" as const,
@@ -101,6 +104,7 @@ export function ToplamlarBolumu({ ozet, donem, onDonem, kartlar = ["siparis", "a
   ozet: Remote<CustomerSummaryResponse>; donem: Donem; onDonem: (d: Donem) => void; kartlar?: readonly string[]; donemli?: boolean;
 }) {
   const s = useStyles();
+  const taban = useKartTabani();
   if (ozet.forbidden) return null;
   if (kartlar.length === 0 && !donemli) return null;
   if (ozet.loading && !ozet.data) return <View style={s.bolum}><Iskelet bicim="kpi" satir={4} testID="cari-toplamlar-yukleniyor" /></View>;
@@ -109,19 +113,49 @@ export function ToplamlarBolumu({ ozet, donem, onDonem, kartlar = ["siparis", "a
   const veri = ozet.data?.ozet;
   if (ozet.data && !veri) return <View style={s.bolum}><BosDurum baslik="Bu müşterinin henüz hareketi yok" icon={MODULE_ICON.siparisler.icon} testID="cari-toplamlar-bos" /></View>;
   if (!veri) return null;
+  const cikanlar = oneCikanlar(veri, kartlar);
   return (
     <View style={s.bolum} testID="cari-toplamlar">
-      {donemli ? <SegmentedControl items={DONEMLER} value={donem} onChange={onDonem} testIDPrefix="cari-donem-" accessibilityLabel="Dönem" /> : null}
+      {/* Dönem: kompakt bölmeli seçim, içerik genişliğinde, sola dayalı (N seçenek alır; "Aralık…" girişi ileride yanına). */}
+      {donemli ? <KompaktSecim items={DONEMLER} value={donem} onChange={onDonem} testIDPrefix="cari-donem-" accessibilityLabel="Dönem" /> : null}
       {kartlar.length > 0 ? (
         <View style={s.izgara}>
           {toplamKartlari(veri, veri[donem]).filter((k) => kartlar.includes(k.key)).map((k) => (
-            <StatCard key={k.key} etiket={k.etiket} icon={k.icon} ton={k.ton} degerler={k.degerler} ipucu={k.ipucu} bos={"bos" in k ? k.bos : undefined} testID={`cari-toplam-${k.key}`} />
+            <StatCard key={k.key} taban={taban} etiket={k.etiket} icon={k.icon} ton={k.ton} degerler={k.degerler} ipucu={k.ipucu} bos={"bos" in k ? k.bos : undefined} testID={`cari-toplam-${k.key}`} />
           ))}
         </View>
       ) : null}
+      {cikanlar ? <Text style={s.cikanlar} testID="cari-one-cikanlar">{cikanlar}</Text> : null}
     </View>
   );
 }
+
+/**
+ * "Öne çıkanlar" satırı: patronun "en son ne zaman sipariş verdi / sevk aldı" sorusu. Tarihler fabrikanın `cari-ozeti`
+ * alanları (`sonSiparisTarihi`, `sonSevkTarihi`); gün farkı HESAPLANMAZ. Aynı tarihin kartı açıksa satırda yinelenmez.
+ */
+export function oneCikanlar(ozet: CustomerSummary, kartlar: readonly string[] = []): string | null {
+  const xs = [
+    ozet.sonSiparisTarihi && !kartlar.includes("sonSiparis") ? `Son sipariş ${formatDate(ozet.sonSiparisTarihi)}` : null,
+    ozet.sonSevkTarihi && !kartlar.includes("sonSevk") ? `Son sevk ${formatDate(ozet.sonSevkTarihi)}` : null,
+  ].filter(Boolean);
+  return xs.length > 0 ? xs.join(" · ") : null;
+}
+
+/** Kart tabanı: telefonda 150 (2×2), tablet dikeyde 260 (2×2), tablet yatayda dört kart tek satıra sığar (4×1). */
+function useKartTabani(): number {
+  return useWindowDimensions().width < 600 ? 150 : 260;
+}
+
+type Urun = CustomerSummaryPeriod["enCokUrun"][number] & { readonly id: string };
+/** En çok alınan: Ürün · Renk · Sipariş adedi · Miktar (birim fabrikanın; birimler toplanmaz). Son sipariş tarihi telde YOK. */
+export const URUN_SUTUNLARI: readonly SutunTanimi<Urun>[] = [
+  { key: "urun", baslik: "Ürün", agirlik: 2, satir: 2, hucre: (u) => u.urunAdi },
+  { key: "renk", baslik: "Renk", agirlik: 1.3, hucre: (u) => u.renkAdi ?? "—" },
+  { key: "siparis", baslik: "Sipariş", ad: "Sipariş adedi", agirlik: 0.8, sayi: true, hucre: (u) => sayi(u.siparisSayisi, 0) },
+  { key: "miktar", baslik: "Miktar", agirlik: 1.1, sayi: true, hucre: (u) => `${sayi(u.miktar)} ${birimEtiketi(u.birim)}` },
+];
+const ACIK_SUTUNLARI = sutunSec(SIPARIS_SUTUNLARI, CARI_SIPARIS_SUTUNLARI);
 
 export function EnCokUrunBolumu({ ozet, donem }: { ozet: Remote<CustomerSummaryResponse>; donem: Donem }) {
   const s = useStyles();
@@ -133,19 +167,12 @@ export function EnCokUrunBolumu({ ozet, donem }: { ozet: Remote<CustomerSummaryR
   const sag = urunler.length > OZET_ILK ? (
     <Text style={s.tumu} onPress={() => setTumu((v) => !v)} accessibilityRole="button" testID="cari-urun-tumu">{tumu ? "Daha az" : "Tümü"}</Text>
   ) : undefined;
+  const satirlar: Urun[] = gorunen.map((u) => ({ ...u, id: `${u.urunId}:${u.renkId ?? ""}:${u.birim}` }));
   return (
-    <ListeBlogu baslik="En çok alınan · miktara göre" sag={sag} testID="cari-urunler">
-      {gorunen.map((u, i) => (
-        <ListeSatiri
-          key={`${u.urunId}:${u.renkId ?? ""}:${u.birim}`}
-          birincil={u.urunAdi}
-          ikincil={[u.renkAdi, `${sayi(u.siparisSayisi, 0)} sipariş`].filter(Boolean).join(" · ")}
-          deger={`${sayi(u.miktar)} ${birimEtiketi(u.birim)}`}
-          ayrac={i > 0}
-          testID={`cari-urun-${i}`}
-        />
-      ))}
-    </ListeBlogu>
+    <View style={s.bolum} testID="cari-urunler">
+      <BlokBasligi baslik="En çok alınan · miktara göre" sag={sag} />
+      <KisaTablo sutunlar={URUN_SUTUNLARI} satirlar={satirlar} testID="cari-urun" />
+    </View>
   );
 }
 
@@ -165,9 +192,10 @@ export function AcikSiparislerBolumu({ list, sayi: adet, onAc, onTumu }: { list:
   }
   const sag = <Text style={s.tumu} onPress={onTumu} accessibilityRole="link" testID="cari-acik-tumu">Tümü</Text>;
   return (
-    <ListeBlogu baslik="Açık siparişler" sayi={adet} sag={sag} testID="cari-acik">
-      {list.items.slice(0, OZET_ILK).map((o, i) => <OrderRow key={o.id} r={o} showCustomer={false} ayrac={i > 0} onPress={() => onAc(o.id)} />)}
-    </ListeBlogu>
+    <View style={s.bolum} testID="cari-acik">
+      <BlokBasligi baslik="Açık siparişler" sayi={adet} sag={sag} />
+      <KisaTablo sutunlar={ACIK_SUTUNLARI} satirlar={list.items.slice(0, OZET_ILK)} onPress={(o) => onAc(o.id)} testID="cari-acik-tablo" />
+    </View>
   );
 }
 
@@ -229,6 +257,7 @@ export function IadelerBolumu({ cariKartId, destek, enabled, iade }: { cariKartI
 const useStyles = makeStyles((t) => ({
   bolum: { marginTop: space.l, gap: space.m },
   izgara: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.m },
+  cikanlar: { fontSize: 13, lineHeight: 18, color: t.color.textMuted },
   sagSira: { flexDirection: "row" as const, alignItems: "center" as const },
   ozetMetni: { fontSize: 13, lineHeight: 18, color: t.color.textMuted },
   tumu: { fontSize: 15, lineHeight: 20, fontWeight: "600" as const, color: t.color.link, paddingVertical: space.xs, paddingLeft: space.m },

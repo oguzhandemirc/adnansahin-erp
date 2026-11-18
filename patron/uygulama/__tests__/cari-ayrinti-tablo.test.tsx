@@ -11,7 +11,7 @@ const mockRecord = jest.fn();
 const mockSummary = jest.fn();
 const mockCache = { load: jest.fn(async (_k: string, f: () => Promise<unknown>) => ({ data: await f(), offline: false, savedAt: "" })), peek: jest.fn(async () => null) };
 const mockSession = {
-  api: { list: mockList, record: mockRecord, snapshot: jest.fn(), customerSummary: mockSummary },
+  api: { list: mockList, record: mockRecord, snapshot: jest.fn(), customerSummary: mockSummary, viewPref: jest.fn(async () => null) },
   cache: mockCache, markOnline: jest.fn(),
   permissions: [] as string[], offline: false, offlineSince: null as string | null, facility: null as unknown, switchError: null as string | null,
   factoryStamp: "2026-11-18T21:10:00.000Z" as string | null,
@@ -31,8 +31,9 @@ const ID = "0b7c5a1e-4f2d-4c8e-9a51-3d6f2e8b1c40";
 const rec = (id: string, kayit: Record<string, unknown>) => ({ id, kayit, surum: "2026-11-15T21:09:00.000Z" });
 const page = (...kayitlar: unknown[]) => ({ kayitlar, sonraki: null });
 const AC = { siparisSayisi: 1, kalemSayisi: 1, acikMiktar: [] };
-const DONEM = { siparisSayisi: 2, kalemSayisi: 2, siparisMiktari: [], sevk: { metre: 0, top: 0, kg: 0, tartiliCuval: 0, cuval: 0 }, iade: { adet: 0, metre: 0 }, enCokUrun: [] };
-const OZET = { cariKartId: ID, son12AyBaslangic: null, surum: "2026-11-18T21:10:00.000Z", ozet: { tumZamanlar: DONEM, son12Ay: DONEM, acik: AC, sonSiparisTarihi: null, sonSevkTarihi: null } };
+const URUN = { urunId: "u1", urunAdi: "PANOS", renkId: "r1", renkAdi: "03-KREM", birim: "MT", miktar: 15500, siparisSayisi: 9 };
+const DONEM = { siparisSayisi: 2, kalemSayisi: 2, siparisMiktari: [], sevk: { metre: 0, top: 0, kg: 0, tartiliCuval: 0, cuval: 0 }, iade: { adet: 0, metre: 0 }, enCokUrun: [URUN] };
+const OZET = { cariKartId: ID, son12AyBaslangic: null, surum: "2026-11-18T21:10:00.000Z", ozet: { tumZamanlar: DONEM, son12Ay: DONEM, acik: AC, sonSiparisTarihi: "2026-11-18", sonSevkTarihi: "2026-11-17" } };
 
 const SIP = rec("s1", { siparisNo: "SIP1811260003", durum: "APPROVED", acik: true, cariKartId: ID, siparisTarihi: "2026-11-18", sevkMiktari: "120", toplamMiktar: "1377", termin: "2026-12-01" });
 const SIP2 = rec("s2", { siparisNo: "SIP1611260005", durum: "PARTIAL_SHIPPED", acik: true, cariKartId: ID, siparisTarihi: "2026-11-16", sevkMiktari: "100", toplamMiktar: "270", termin: null });
@@ -133,5 +134,34 @@ describe("Fabrika verisi damgası", () => {
     render(<CustomerDetail />);
     await settle();
     expect(screen.queryByTestId("fabrika-veri-ani")).toBeNull();
+  });
+});
+
+describe("Özet sekmesi (2026-11-19 düzeni)", () => {
+  it("dönem kompakt seçim; açık siparişler tablo (en eski önce); son siparişler YİNELENMEZ; son sevkiyatlar tablo; öne çıkanlar", async () => {
+    mockSession.facility = { liste: { kimlikSuzgecleri: LIST_ID_FILTERS, aranabilir: Object.keys(LIST_SEARCH), siralama: { siparis: ["siparisTarihi"] } } };
+    render(<CustomerDetail />);
+    await settle();
+    expect(screen.getByTestId("cari-donem-secim")).toBeTruthy();
+    expect(mockList).toHaveBeenCalledWith("siparis", expect.objectContaining({ suzgec: "ACIK", sirala: "siparisTarihi", yon: "artan" }));
+    const acikBaslik = screen.getByTestId("cari-acik-tablo-baslik");
+    for (const b of ["No", "Tarih", "Sevk / Toplam", "Termin", "Durum"]) expect(within(acikBaslik).getByText(b)).toBeTruthy();
+    expect(screen.queryByTestId("cari-siparisler")).toBeNull();
+    const sevkBaslik = screen.getByTestId("cari-sevkiyatlar-baslik");
+    for (const b of ["Tarih", "Sevk no", "Top", "Metre", "Durum"]) expect(within(sevkBaslik).getByText(b)).toBeTruthy();
+    expect(within(screen.getByTestId("cari-sevkiyatlar-satir-v1")).getByText("SVK1811260003")).toBeTruthy();
+    expect(screen.getByTestId("cari-one-cikanlar").props.children).toBe("Son sipariş 18.11.2026 · Son sevk 17.11.2026");
+    const urunBaslik = screen.getByTestId("cari-urun-baslik");
+    for (const b of ["Ürün", "Renk", "Sipariş", "Miktar"]) expect(within(urunBaslik).getByText(b)).toBeTruthy();
+    expect(within(screen.getByTestId("cari-urun-satir-u1:r1:MT")).getByText("15.500 m")).toBeTruthy();
+  });
+
+  it("dönem değişince kompakt seçim durumu değişir", async () => {
+    render(<CustomerDetail />);
+    await settle();
+    expect(screen.getByTestId("cari-donem-tumZamanlar").props.accessibilityState).toEqual({ selected: true });
+    fireEvent.press(screen.getByTestId("cari-donem-son12Ay"));
+    await settle();
+    expect(screen.getByTestId("cari-donem-son12Ay").props.accessibilityState).toEqual({ selected: true });
   });
 });

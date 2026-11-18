@@ -3,8 +3,8 @@
 // `row`: tam genişlik, simge md solda, para birimi başına ayrı değer satırı (toplanmaz). Sol şerit YOK.
 // Değer yoksa "—" ve ipucu yerine `bos` metni. Basılabilirse tüm kart (ölçek .98 + basılı zemin).
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { useState, type ReactNode } from "react";
+import { Text, View, type LayoutChangeEvent } from "react-native";
 import { Basilabilir } from "../hareket/Basilabilir";
 import { SayiGecisi } from "../hareket/SayiGecisi";
 import type { IconName } from "../icons";
@@ -40,7 +40,13 @@ export interface StatCardProps {
   readonly sag?: ReactNode;
   readonly onPress?: () => void;
   readonly testID?: string;
+  /** `stacked` kartın esneme tabanı (varsayılan 150): ızgarada satır başına kaç kart düşeceğini çağıran seçer. */
+  readonly taban?: number;
 }
+
+/** Süs simgesinin boyu ve çizildiği en dar kart (pt). */
+const SIMGE = 56;
+const SIMGE_ESIGI = 180;
 
 const yuzdeYazi = (n: number) => `%${Math.abs(n).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`;
 
@@ -55,6 +61,11 @@ export function StatCard(p: StatCardProps) {
   const t = useTokens();
   const s = useStyles();
   const row = p.layout === "row";
+  // Süs simgesi yalnız geniş kartta (≥ SIMGE_ESIGI) ve metne sağ pay bırakarak çizilir: dar kartta metnin üstüne biniyordu
+  // (2026-11-19, "110.926,7 m"nin "m"si simgenin altında kaldı).
+  const [genislik, setGenislik] = useState(0);
+  const simge = !row && genislik >= SIMGE_ESIGI;
+  const olc = (e: LayoutChangeEvent) => setGenislik(e.nativeEvent.layout.width);
   const bos = p.degerler.length === 0;
   const d = p.degisim;
   const iyi = d ? (d.yuzde >= 0) === (d.artisIyi ?? true) : true;
@@ -98,20 +109,24 @@ export function StatCard(p: StatCardProps) {
       {p.sag}
     </View>
   ) : (
-    <>
-      <View style={s.arkaSimge} pointerEvents="none" importantForAccessibility="no-hide-descendants">
-        <Ionicons name={p.icon} size={76} color={tilePair(t, p.ton ?? "primary").fg} />
+    <View onLayout={olc} style={s.ic}>
+      {simge ? (
+        <View style={s.arkaSimge} pointerEvents="none" importantForAccessibility="no-hide-descendants">
+          <Ionicons name={p.icon} size={SIMGE} color={tilePair(t, p.ton ?? "primary").fg} />
+        </View>
+      ) : null}
+      <View style={[s.metin, simge && s.simgePayi]}>
+        <View style={s.ust}>
+          <Text style={[s.etiket, s.esnek]} numberOfLines={1}>{p.etiket}</Text>
+          {p.sag}
+        </View>
+        <View style={s.orta}>{degerler}</View>
+        {alt}
       </View>
-      <View style={s.ust}>
-        <Text style={[s.etiket, s.esnek]} numberOfLines={1}>{p.etiket}</Text>
-        {p.sag}
-      </View>
-      <View style={s.orta}>{degerler}</View>
-      {alt}
-    </>
+    </View>
   );
 
-  const kartStil = [s.kart, row ? s.kartRow : s.kartStacked];
+  const kartStil = [s.kart, row ? s.kartRow : s.kartStacked, !row && p.taban !== undefined && { flexBasis: p.taban }];
   if (!p.onPress) {
     return <View style={kartStil} testID={p.testID} accessible accessibilityLabel={etiket}>{icerik}</View>;
   }
@@ -125,7 +140,12 @@ export function StatCard(p: StatCardProps) {
 const useStyles = makeStyles((t) => ({
   kart: { backgroundColor: t.color.card, borderRadius: t.radius.card, borderWidth: 1, borderColor: t.color.cardBorder, ...t.shadow.card },
   kartStacked: { flexGrow: 1, flexBasis: 150, paddingVertical: 8, paddingHorizontal: 10, gap: 2, overflow: "hidden" as const },
-  arkaSimge: { position: "absolute" as const, right: -18, top: "50%" as const, marginTop: -38, opacity: 0.32 },
+  // İç görünüm kartın dolgusu (10) kadar içeride: simge kart kenarından 12 taşar (kart `overflow: hidden`).
+  ic: { flexGrow: 1 },
+  arkaSimge: { position: "absolute" as const, right: -22, top: "50%" as const, marginTop: -SIMGE / 2, opacity: 0.22 },
+  metin: { gap: 2 },
+  // Simgenin iç görünüme düşen kısmı (SIMGE − 22) + 8 nefes: metin simgeye hiç değmez.
+  simgePayi: { paddingRight: SIMGE - 22 + space.s },
   kartRow: { width: "100%" as const, padding: CARD_PAD },
   rowIc: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.m },
   ust: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
