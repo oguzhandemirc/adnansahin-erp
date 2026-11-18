@@ -4,7 +4,16 @@
 // Kime/nerede (fabrika 2.12.4+): top etiket müşterisi · çuval no · çuval carisi; çuvaldaki bitmiş toplar ayrı dizi ve
 // sayıları fabrikadan (`cuvaldaTop`). Süzgeçleri de burada (mevcut desen: belge istemcide); alan yoksa grup çizilmez.
 import { arr, num, obj, str } from "../ui/pano/read";
-import type { SuzgecGrubu, Siralama } from "../ui/tablo/model";
+import { secimDegerleri, type SuzgecGrubu, type Siralama } from "../ui/tablo/model";
+
+/**
+ * Alan süzgeci: seçim yoksa geçer; varsa değer seçilenlerden BİRİ olmalı (çoklu seçim VEYA; alanlar arası VE).
+ * Belge tam ve istemcide ⇒ çoklu seçim burada mümkündür (bulut listesi grup başına tek eşitlik bilir).
+ */
+export function alanGecer(secim: string | undefined, deger: string | null): boolean {
+  const xs = secimDegerleri(secim);
+  return xs.length === 0 || (deger !== null && xs.includes(deger));
+}
 
 export type Bolum = "ham" | "bitmis";
 export type Gorunum = "kalem" | "top";
@@ -104,7 +113,7 @@ export const MUSTERISIZ = "Müşterisiz";
 export const ACIKTA = "Açıkta";
 /** Seçenek değeri: etiketsiz (stok etiketi) top / carisiz çuval. Ad olamayacak bir işaret. */
 export const YOK = "~yok~";
-export const KIM_NEREDE_ANAHTARLARI = ["etiket", "cuvalCari", "yer", "fark"] as const;
+export const KIM_NEREDE_ANAHTARLARI = ["etiket", "cuvalCari", "cuval", "yer", "fark"] as const;
 
 /** Etiket ≠ çuval carisi: çuvaldaki topun etiketi bir müşteri adına basılmış ve çuvalın carisi başka (ikisi de dolu). */
 export const etiketCuvalFarkli = (t: Top): boolean =>
@@ -116,16 +125,18 @@ export function kimNeredeGruplari(b: StokBolumu): SuzgecGrubu[] {
   const hepsi = tumToplar(b);
   const etiketler = benzersiz(hepsi.flatMap((t) => (t.etiketMusteri ? [t.etiketMusteri] : []))).sort(trSirala);
   const cariler = benzersiz(b.cuvaldakiToplar.flatMap((t) => (t.cuvalCari ? [t.cuvalCari] : []))).sort(trSirala);
+  const cuvallar = benzersiz(b.cuvaldakiToplar.flatMap((t) => (t.cuvalNo ? [t.cuvalNo] : []))).sort(trSirala);
   const gruplar: SuzgecGrubu[] = [
-    { anahtar: "yer", etiket: "Yer", secenekler: [{ deger: "cuvalda", etiket: "Çuvalda" }, { deger: "acikta", etiket: ACIKTA }] },
     {
-      anahtar: "etiket", etiket: "Etiket müşterisi",
+      anahtar: "etiket", etiket: "Müşteri (etiket)", coklu: true,
       secenekler: [...etiketler.map((e) => ({ deger: e, etiket: e })), ...(hepsi.some((t) => t.etiketMusteri === null) ? [{ deger: YOK, etiket: MUSTERISIZ }] : [])],
     },
     {
-      anahtar: "cuvalCari", etiket: "Çuval carisi",
+      anahtar: "cuvalCari", etiket: "Çuval carisi", coklu: true,
       secenekler: [...cariler.map((c) => ({ deger: c, etiket: c })), ...(b.cuvaldakiToplar.some((t) => t.cuvalCari === null) ? [{ deger: YOK, etiket: "Carisiz çuval" }] : [])],
     },
+    { anahtar: "cuval", etiket: "Çuval", coklu: true, secenekler: cuvallar.map((c) => ({ deger: c, etiket: c })) },
+    { anahtar: "yer", etiket: "Yer", secenekler: [{ deger: "cuvalda", etiket: "Çuvalda" }, { deger: "acikta", etiket: ACIKTA }] },
     { anahtar: "fark", etiket: "Yanlış çuval", secenekler: [{ deger: "evet", etiket: "Etiket ≠ çuval carisi" }] },
   ];
   return gruplar.filter((g) => g.secenekler.length > 0);
@@ -135,8 +146,9 @@ export function kimNeredeGruplari(b: StokBolumu): SuzgecGrubu[] {
 export function kimNeredeGecer(t: Top, s: Readonly<Record<string, string>>): boolean {
   if (s.yer === "cuvalda" && t.cuvalNo === null) return false;
   if (s.yer === "acikta" && t.cuvalNo !== null) return false;
-  if (s.etiket && (s.etiket === YOK ? t.etiketMusteri !== null : t.etiketMusteri !== s.etiket)) return false;
-  if (s.cuvalCari && (t.cuvalNo === null || (s.cuvalCari === YOK ? t.cuvalCari !== null : t.cuvalCari !== s.cuvalCari))) return false;
+  if (!alanGecer(s.etiket, t.etiketMusteri ?? YOK)) return false;
+  if (s.cuvalCari && (t.cuvalNo === null || !alanGecer(s.cuvalCari, t.cuvalCari ?? YOK))) return false;
+  if (!alanGecer(s.cuval, t.cuvalNo)) return false;
   if (s.fark === "evet" && !etiketCuvalFarkli(t)) return false;
   return true;
 }
@@ -177,32 +189,34 @@ const benzersiz = <T,>(xs: readonly T[]): T[] => [...new Set(xs)];
 const trSirala = (a: string, b: string) => a.localeCompare(b, "tr");
 
 /**
- * Veriden süzgeç grupları (ürün · renk · en · yaş); seçeneği olmayan grup çizilmez (ham bölümde en/renk yok).
- * `cuvalDahil` (top görünümü): çuvaldaki topların ürün/renk/en/yaşı da seçenek olur (kalemi rafta olmayabilir).
+ * Veriden süzgeç alanları (kumaş · renk · en · kat · yaş; top görünümünde + depo); seçeneği olmayan alan çizilmez (ham
+ * bölümde en/renk yok). Seçenekler TAM belgeden (anlık sayfasız) ⇒ eksiksiz. `cuvalDahil` (top görünümü): çuvaldaki
+ * topların kumaş/renk/en/kat/yaşı da seçenek olur (kalemi rafta olmayabilir). Her alan çoklu seçimlidir.
  */
 export function stokSuzgecGruplari(b: StokBolumu, cuvalDahil = false): SuzgecGrubu[] {
   const ek = cuvalDahil ? b.cuvaldakiToplar : [];
+  const kat = benzersiz([...b.kalemler, ...ek].flatMap((k) => (k.kat ? [k.kat] : []))).sort(trSirala);
+  const depo = cuvalDahil ? benzersiz(tumToplar(b).flatMap((t) => (t.depo ? [t.depo] : []))).sort(trSirala) : [];
   const urun = benzersiz([...b.kalemler.map((k) => k.urun), ...ek.flatMap((t) => (t.urun ? [t.urun] : []))]).sort(trSirala);
   const renk = benzersiz([...b.kalemler, ...ek].flatMap((k) => (k.renk ? [k.renk] : []))).sort(trSirala);
   const en = benzersiz([...b.kalemler, ...ek].flatMap((k) => (k.en === null ? [] : [k.en]))).sort((x, y) => x - y);
   const yaslar = new Set([...b.kalemler.map((k) => yasKovasi(k.enEskiGun)), ...ek.map((t) => yasKovasi(t.gun))]);
   const yas = [...YAS_KOVALARI, YAS_BILINMIYOR].filter((k) => yaslar.has(k.deger)).map((k) => ({ deger: k.deger, etiket: k.etiket }));
   const gruplar: SuzgecGrubu[] = [
-    { anahtar: "urun", etiket: "Ürün", secenekler: urun.map((u) => ({ deger: u, etiket: u })) },
-    { anahtar: "renk", etiket: "Renk", secenekler: renk.map((r) => ({ deger: r, etiket: r })) },
-    { anahtar: "en", etiket: "En (cm)", secenekler: en.map((e) => ({ deger: String(e), etiket: enYazi(e) })) },
-    { anahtar: "yas", etiket: "En eski top yaşı", secenekler: yas },
+    { anahtar: "urun", etiket: "Kumaş", coklu: true, secenekler: urun.map((u) => ({ deger: u, etiket: u })) },
+    { anahtar: "renk", etiket: "Renk", coklu: true, secenekler: renk.map((r) => ({ deger: r, etiket: r })) },
+    { anahtar: "en", etiket: "En", coklu: true, secenekler: en.map((e) => ({ deger: String(e), etiket: `${enYazi(e)} cm` })) },
+    { anahtar: "kat", etiket: "Kat", coklu: true, secenekler: kat.map((k) => ({ deger: k, etiket: k })) },
+    { anahtar: "depo", etiket: "Depo", coklu: true, secenekler: depo.map((d) => ({ deger: d, etiket: d })) },
+    { anahtar: "yas", etiket: cuvalDahil ? "Top yaşı" : "En eski top yaşı", coklu: true, secenekler: yas },
   ];
   return gruplar.filter((g) => g.secenekler.length > 0);
 }
 
 /** Kalem süzgeçten geçiyor mu (bilinmeyen/boş seçim süzmez). */
 export function kalemGecer(k: Kalem, suzgec: Readonly<Record<string, string>>): boolean {
-  if (suzgec.urun && k.urun !== suzgec.urun) return false;
-  if (suzgec.renk && k.renk !== suzgec.renk) return false;
-  if (suzgec.en && (k.en === null || String(k.en) !== suzgec.en)) return false;
-  if (suzgec.yas && yasKovasi(k.enEskiGun) !== suzgec.yas) return false;
-  return true;
+  return alanGecer(suzgec.urun, k.urun) && alanGecer(suzgec.renk, k.renk) && alanGecer(suzgec.en, k.en === null ? null : String(k.en)) &&
+    alanGecer(suzgec.kat, k.kat) && alanGecer(suzgec.yas, yasKovasi(k.enEskiGun));
 }
 
 // ── Sıralama ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -243,13 +257,13 @@ export function gorunenKalemler(b: StokBolumu, ara: string, suzgec: Readonly<Rec
 export function gorunenToplar(
   b: StokBolumu, ara: string, suzgec: Readonly<Record<string, string>>, s: Siralama | null, kimNerede: Readonly<Record<string, string>> = {},
 ): readonly Top[] {
-  const gecen = new Set(b.kalemler.filter((k) => kalemGecer(k, suzgec)).map((k) => k.anahtar));
-  const cuvalGecer = (t: Top) =>
-    (!suzgec.urun || t.urun === suzgec.urun) && (!suzgec.renk || t.renk === suzgec.renk) &&
-    (!suzgec.en || (t.en !== null && String(t.en) === suzgec.en)) && (!suzgec.yas || yasKovasi(t.gun) === suzgec.yas);
+  // Top görünümünde her top KENDİ alanlarıyla süzülür (kalemin ürün/renk/en/kat'ı topa taşınmış; yaş topun kendi yaşı).
+  const topGecer = (t: Top) =>
+    alanGecer(suzgec.urun, t.urun) && alanGecer(suzgec.renk, t.renk) && alanGecer(suzgec.en, t.en === null ? null : String(t.en)) &&
+    alanGecer(suzgec.kat, t.kat) && alanGecer(suzgec.depo, t.depo) && alanGecer(suzgec.yas, yasKovasi(t.gun));
   const rows = [
-    ...b.toplar.filter((t) => gecen.has(t.kalem)),
-    ...b.cuvaldakiToplar.filter(cuvalGecer),
+    ...b.toplar.filter(topGecer),
+    ...b.cuvaldakiToplar.filter(topGecer),
   ].filter((t) => kimNeredeGecer(t, kimNerede) && eslesir(`${t.topNo ?? ""} ${t.parti ?? ""} ${t.kalemEtiket} ${t.etiketMusteri ?? ""} ${t.cuvalNo ?? ""} ${t.cuvalCari ?? ""}`, ara));
   return sirala(rows, s, TOP_SIRALAMA);
 }

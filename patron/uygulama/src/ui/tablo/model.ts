@@ -66,9 +66,69 @@ export interface SuzgecGrubu {
   readonly anahtar: string;
   readonly etiket: string;
   readonly secenekler: readonly SuzgecSecenegi[];
+  /**
+   * Alanda birden çok değer seçilebilir mi (değerler VEYA ile, alanlar VE ile birleşir). Yalnız istemcide süzülen tam
+   * belgede (stok anlığı) açılır; bulut liste süzgeci grup başına TEK eşitlik kabul eder (`?suzgec=`, 400 "Aynı süzgeç
+   * grubundan tek seçim") → sunucu listelerinde tek seçim.
+   */
+  readonly coklu?: boolean;
 }
 
 export const ANA = "ana";
+
+/**
+ * Çoklu seçimin saklı biçimi: değerler satır sonuyla birleşir (ad/renk adı virgül içerebilir; satır sonu içermez).
+ * Tek değer ayırıcısız durur → eski tek seçimli tercih aynen okunur.
+ */
+export const SECIM_AYIRICI = "\n";
+export const secimDegerleri = (v: string | undefined): string[] => (v ? v.split(SECIM_AYIRICI).filter((x) => x !== "") : []);
+export const secimYaz = (xs: readonly string[]): string => xs.join(SECIM_AYIRICI);
+
+/** Grupta saklı seçimden yalnız hâlâ seçeneği olan değerler (kalmamış değer süzmez). */
+export function gecerliDegerler(g: SuzgecGrubu, v: string | undefined): string[] {
+  const xs = secimDegerleri(v).filter((d) => g.secenekler.some((o) => o.deger === d));
+  return g.coklu ? xs : xs.slice(0, 1);
+}
+
+/** Saklı seçimden yalnız bu gruplarda geçerli olanlar (anahtar → saklı biçim). */
+export function gecerliSecim(gs: readonly SuzgecGrubu[], secim: Readonly<Record<string, string>>): Record<string, string> {
+  return Object.fromEntries(gs.flatMap((g) => {
+    const xs = gecerliDegerler(g, secim[g.anahtar]);
+    return xs.length > 0 ? [[g.anahtar, secimYaz(xs)]] : [];
+  }));
+}
+
+/** Alan listesindeki / çipteki özet: seçili değerlerin etiketleri ("PANOS, KREP"); seçim yoksa "Tümü". */
+export function secimOzeti(g: SuzgecGrubu, v: string | undefined): string {
+  const xs = gecerliDegerler(g, v);
+  if (xs.length === 0) return "Tümü";
+  return xs.map((d) => g.secenekler.find((o) => o.deger === d)?.etiket ?? d).join(", ");
+}
+
+/** Alanın değerlerini yerine koyar (boş liste alanı kaldırır); diğer alanlar korunur. */
+export function suzgecAta(suzgec: Readonly<Record<string, string>>, grup: string, degerler: readonly string[]): Readonly<Record<string, string>> {
+  const { [grup]: _eski, ...rest } = suzgec;
+  return degerler.length > 0 ? { ...rest, [grup]: secimYaz(degerler) } : rest;
+}
+
+/** Seçenekte dokunma: tek seçimde değeri değiştirir/kaldırır, çoklu seçimde ekler/çıkarır. */
+export function secenekDegistir(g: SuzgecGrubu, mevcut: readonly string[], deger: string): string[] {
+  const var_ = mevcut.includes(deger);
+  if (!g.coklu) return var_ ? [] : [deger];
+  return var_ ? mevcut.filter((d) => d !== deger) : [...mevcut, deger];
+}
+
+/**
+ * Seçenek listesi: arama Türkçe harf katlamalı (`katla`; yerel ayarlı büyük/küçük çeviri YASAK) ve her kelime etikette
+ * geçmeli; seçili olanlar başta (kendi sıralarıyla), ardından kalanlar beyandaki sırayla.
+ */
+export function secenekleriSuz(g: SuzgecGrubu, secili: readonly string[], ara: string, katla: (s: string) => string): readonly SuzgecSecenegi[] {
+  const q = katla(ara).replace(/\s+/g, " ").trim();
+  const kelimeler = q ? q.split(" ") : [];
+  const uyar = (o: SuzgecSecenegi) => kelimeler.every((w) => katla(o.etiket).includes(w));
+  const xs = g.secenekler.filter(uyar);
+  return [...xs.filter((o) => secili.includes(o.deger)), ...xs.filter((o) => !secili.includes(o.deger))];
+}
 
 /** Ekrana SIĞAN sütun: telefon dikeyde 4 (390 pt'de her sütun ≥ ~80 pt), geniş ekranda 7. Fazlası yatay kaydırılır. */
 export const TELEFON_SUTUN = 4;

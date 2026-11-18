@@ -249,9 +249,11 @@ describe("§5 sipariş listesi 'Açık' süzgeci (bulut `LIST_SEARCH` aynasında
     await settle();
     fireEvent.press(screen.getByTestId("siparis-suzgec"));
     await settle();
+    fireEvent.press(screen.getByTestId("siparis-suzgec-secici-alan-ana"));
     expect(screen.getByTestId("siparis-suzgec-secici-ana-ACIK")).toBeTruthy();
     expect(screen.getByText("Açık (gönderilmeyi bekleyen)")).toBeTruthy();
     fireEvent.press(screen.getByTestId("siparis-suzgec-secici-ana-ACIK"));
+    fireEvent.press(screen.getByTestId("siparis-suzgec-secici-uygula"));
     await settle();
     expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ suzgec: "ACIK" }));
     // Sunucu ne döndürdüyse o çizilir (ör. eski satır) — istemci `acik` alanına bakıp süzmez.

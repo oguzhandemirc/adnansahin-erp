@@ -12,7 +12,7 @@ import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain } from "../tokens";
 import type { RemoteList } from "./useRemoteList";
 
-export function SearchField(p: { value: string; onChangeText: (v: string) => void; placeholder: string; testID?: string; accessibilityLabel?: string }) {
+export function SearchField(p: { value: string; onChangeText: (v: string) => void; placeholder: string; testID?: string; accessibilityLabel?: string; autoFocus?: boolean }) {
   const t = useTokens();
   const s = useStyles();
   return (
@@ -27,6 +27,7 @@ export function SearchField(p: { value: string; onChangeText: (v: string) => voi
         autoCorrect={false}
         autoCapitalize="none"
         returnKeyType="search"
+        autoFocus={p.autoFocus}
         testID={p.testID}
         accessibilityLabel={p.accessibilityLabel ?? p.placeholder}
         style={s.searchInput}

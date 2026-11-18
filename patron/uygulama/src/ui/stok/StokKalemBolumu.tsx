@@ -13,8 +13,9 @@ import { UNIT } from "../../lib/labels/uretim";
 import { qty } from "../pano/read";
 import { SnapshotGate } from "../pano/SnapshotGate";
 import { useSnapshot } from "../pano/useSnapshot";
-import { azamiSutun, etkinSuzgecSayisi, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SuzgecGrubu, type SutunTanimi } from "../tablo/model";
-import { SuzgecSecici, SutunSecici } from "../tablo/Seciciler";
+import { azamiSutun, etkinSuzgecSayisi, gecerliSecim, sonrakiSiralama, sutunDegistir, sutunTasi, suzgecAta, type SutunTanimi } from "../tablo/model";
+import { SutunSecici } from "../tablo/Seciciler";
+import { EtkinSuzgecler, SuzgecBos, SuzgecSayfasi } from "../tablo/Suzgec";
 import { useTabloTercihi } from "../tablo/useTabloTercihi";
 import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useTabloOlcusu, type YatayEksen } from "../tablo/VeriTablosu";
 import { makeStyles, useTokens } from "../theme-context";
@@ -23,14 +24,6 @@ import {
   bolumOf, gorunumOf, gorunumTemizle, kalemTemizle, KALEM_SIRALANABILIR, KALEM_SUTUNLARI, topTemizle, TOP_SIRALANABILIR, TOP_SUTUNLARI, VARSAYILAN_SUTUN,
 } from "./sutunlar";
 import { KompaktSecim } from "../KompaktSecim";
-
-/** Saklı seçimden yalnız bu gruplarda geçerli olan değerler (seçeneği kalmamış değer süzmez). */
-function gecerliSecim(gs: readonly SuzgecGrubu[], secim: Readonly<Record<string, string>>): Record<string, string> {
-  return Object.fromEntries(gs.flatMap((g) => {
-    const v = secim[g.anahtar];
-    return v && g.secenekler.some((o) => o.deger === v) ? [[g.anahtar, v]] : [];
-  }));
-}
 
 /** İlk çizimde bu kadar satır; "Daha fazla" her basışta bir o kadar açar (telefon ~700 satırı tek seferde çizmez). */
 export const SAYFA = 60;
@@ -77,6 +70,19 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   const gorunur = olcu.sutunlar;
   const yatay = olcu.yatay;
   const sec = (k: "bolum" | "gorunum", v: Bolum | Gorunum) => gorunum.degistir((t) => ({ ...t, suzgec: { ...t.suzgec, [k]: v } }));
+  const suzgecEtkin = Object.keys(tumSecim).length > 0;
+  // Kalem süzgeci `tablo.stok-kalem`te, kime/nerede `tablo.stok-top`ta (mevcut tercih anahtarları; yeni anahtar yok).
+  const kalemAnahtarlari = (sec: Readonly<Record<string, string>>) => Object.fromEntries(Object.entries(sec).filter(([k]) => !knAnahtar(k)));
+  const knAnahtarlari = (sec: Readonly<Record<string, string>>) => Object.fromEntries(Object.entries(sec).filter(([k]) => knAnahtar(k)));
+  const uygula = (yeni: Readonly<Record<string, string>>) => {
+    kalemPref.degistir((t) => ({ ...t, suzgec: { ...Object.fromEntries(Object.entries(t.suzgec).filter(([k]) => !gruplar.some((g) => g.anahtar === k))), ...kalemAnahtarlari(yeni) } }));
+    if (knGruplar.length > 0) topPref.degistir((t) => ({ ...t, suzgec: { ...Object.fromEntries(Object.entries(t.suzgec).filter(([k]) => !knAnahtar(k))), ...knAnahtarlari(yeni) } }));
+  };
+  const kaldir = (g: string) => (knAnahtar(g) ? topPref : kalemPref).degistir((t) => ({ ...t, suzgec: suzgecAta(t.suzgec, g, []) }));
+  const temizle = () => uygula({});
+  // Belge tam ve istemcide ⇒ taslağın sonuç sayısı kesin ("Sonuçları göster (N)"); satır sayımıdır, stok hesabı değil.
+  const sayac = (taslak: Readonly<Record<string, string>>) =>
+    kip === "kalem" ? gorunenKalemler(b, ara, gecerliSecim(gruplar, taslak), null).length : gorunenToplar(b, ara, gecerliSecim(gruplar, taslak), null, gecerliSecim(knGruplar, taslak)).length;
 
   return (
     <View testID="stok-kalem-bolumu" onLayout={olcu.onLayout}>
@@ -103,14 +109,15 @@ function Icerik({ veri }: { readonly veri: unknown }) {
           />
         </View>
       </View>
+      <EtkinSuzgecler gruplar={tumGruplar} secim={tumSecim} onKaldir={kaldir} onTemizle={temizle} testID="stok-kalem-suzgec" />
       <TabloBasligi
         testID="stok-kalem" sutunlar={gorunur} siralama={pref.tercih.siralama} yatay={yatay ?? undefined}
         siralanabilir={kip === "kalem" ? KALEM_SIRALANABILIR : TOP_SIRALANABILIR}
         onSirala={(alan) => pref.degistir((t) => ({ ...t, siralama: sonrakiSiralama(t.siralama, alan) }))}
       />
       {kip === "kalem"
-        ? <KalemListesi b={b} kalemler={kalemler ?? []} sutunlar={gorunur} yatay={yatay} />
-        : <SayfaliListe satirlar={toplar ?? []} sutunlar={gorunur} yatay={yatay} testID="stok-top" anahtar={(t) => t.id} />}
+        ? <KalemListesi b={b} kalemler={kalemler ?? []} sutunlar={gorunur} yatay={yatay} bos={suzgecEtkin ? temizle : undefined} />
+        : <SayfaliListe satirlar={toplar ?? []} sutunlar={gorunur} yatay={yatay} testID="stok-top" anahtar={(t) => t.id} bos={suzgecEtkin ? temizle : undefined} />}
       {!kgVar(b) ? null : <Text style={s.not}>Kg yalnız tartılı topların toplamıdır; metreyle toplanmaz.</Text>}
       <SutunSecici
         visible={sutunAcik} testID="stok-kalem-sutun-secici" sutunlar={sutunlar} gorunur={pref.tercih.sutunlar} azami={azami}
@@ -119,24 +126,16 @@ function Icerik({ veri }: { readonly veri: unknown }) {
         onVarsayilan={() => pref.degistir((t) => ({ ...t, sutunlar: VARSAYILAN_SUTUN[kip] }))}
         onClose={() => setSutunAcik(false)}
       />
-      <SuzgecSecici
-        visible={suzgecAcik} testID="stok-kalem-suzgec-secici" gruplar={tumGruplar} secim={tumSecim}
-        onSec={(g, d) => (knAnahtar(g) ? topPref : kalemPref).degistir((t) => ({ ...t, suzgec: suzgecSec(t.suzgec, g, d) }))}
-        onTemizle={() => {
-          kalemPref.degistir((t) => ({ ...t, suzgec: {} }));
-          if (knGruplar.length > 0) topPref.degistir((t) => ({ ...t, suzgec: Object.fromEntries(Object.entries(t.suzgec).filter(([k]) => !knAnahtar(k))) }));
-        }}
-        onClose={() => setSuzgecAcik(false)}
-      />
+      <SuzgecSayfasi visible={suzgecAcik} testID="stok-kalem-suzgec-secici" gruplar={tumGruplar} secim={tumSecim} onUygula={uygula} sayac={sayac} onClose={() => setSuzgecAcik(false)} />
     </View>
   );
 }
 
-function KalemListesi({ b, kalemler, sutunlar, yatay }: { readonly b: StokBolumu; readonly kalemler: readonly Kalem[]; readonly sutunlar: readonly SutunTanimi<unknown>[]; readonly yatay: YatayEksen | null }) {
+function KalemListesi({ b, kalemler, sutunlar, yatay, bos }: { readonly b: StokBolumu; readonly kalemler: readonly Kalem[]; readonly sutunlar: readonly SutunTanimi<unknown>[]; readonly yatay: YatayEksen | null; readonly bos?: () => void }) {
   const [acik, setAcik] = useState<string | null>(null);
   return (
     <SayfaliListe
-      satirlar={kalemler} sutunlar={sutunlar} yatay={yatay} testID="stok-kalem" anahtar={(k) => k.anahtar}
+      satirlar={kalemler} sutunlar={sutunlar} yatay={yatay} testID="stok-kalem" anahtar={(k) => k.anahtar} bos={bos}
       onPress={(k) => setAcik((a) => (a === k.anahtar ? null : k.anahtar))}
       ek={(k) => (acik === k.anahtar ? <KalemToplari b={b} kalem={k} /> : null)}
     />
@@ -151,11 +150,15 @@ function SayfaliListe<R>(p: {
   readonly anahtar: (r: R) => string;
   readonly onPress?: (r: R) => void;
   readonly ek?: (r: R) => ReactNode;
+  /** Süzgeç etkinse temizleme eylemi: sonuç yoksa "Bu süzgece uyan kayıt yok" + "Süzgeci temizle". */
+  readonly bos?: () => void;
 }) {
   const s = useStyles();
   const t = useTokens();
   const [adet, setAdet] = useState(SAYFA);
-  if (p.satirlar.length === 0) return <Text style={s.bos} testID={`${p.testID}-bos`}>Aramaya ya da süzgece uyan kayıt yok</Text>;
+  if (p.satirlar.length === 0) {
+    return p.bos ? <SuzgecBos onTemizle={p.bos} testID={`${p.testID}-bos-suzgec`} /> : <Text style={s.bos} testID={`${p.testID}-bos`}>Aramaya uyan kayıt yok</Text>;
+  }
   const kalan = p.satirlar.length - adet;
   return (
     <View>

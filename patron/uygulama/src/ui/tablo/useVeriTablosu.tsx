@@ -11,8 +11,9 @@ import { ListStates } from "../siparis/parts";
 import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
 import { useSession } from "../../state/session";
 import type { ListQuery } from "../siparis/useRemoteList";
-import { azamiSutun, etkinSuzgecSayisi, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecSec, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
-import { SutunSecici, SuzgecSecici } from "./Seciciler";
+import { azamiSutun, etkinSuzgecSayisi, gecerliSecim, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecAta, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
+import { SutunSecici } from "./Seciciler";
+import { EtkinSuzgecler, SuzgecBos, SuzgecSayfasi } from "./Suzgec";
 import { useTabloTercihi } from "./useTabloTercihi";
 import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useTabloOlcusu, type YatayEksen } from "./VeriTablosu";
 
@@ -43,6 +44,10 @@ export interface VeriTablosu {
   readonly onLayout: (e: LayoutChangeEvent) => void;
   readonly list: RemoteList;
   readonly suzuldu: boolean;
+  /** Kullanıcının süzgeç seçimi etkin mi (arama ve ekranın sabit koşulu sayılmaz). */
+  readonly suzgecEtkin: boolean;
+  /** Yalnız süzgeç gruplarını kaldırır; aynı tercihteki kart seçimi (`suzgec.<alan>`) korunur. */
+  suzgecTemizle(): void;
   degistir(f: (t: TabloTercihi) => TabloTercihi): void;
 }
 
@@ -90,6 +95,8 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
     ayar, tercih: pref.tercih, gorunur, gruplar: gs, siralanabilir, aramaVar: !!spec, terim, setTerim, azami, list,
     yatay: olcu.yatay, onLayout: olcu.onLayout,
     suzuldu: !!sorgu.ara || !!temel.suzgec || Object.values(ek.kimlik ?? {}).some(Boolean),
+    suzgecEtkin: !!temel.suzgec,
+    suzgecTemizle: () => pref.degistir((t) => ({ ...t, suzgec: Object.fromEntries(Object.entries(t.suzgec).filter(([g]) => !gs.some((x) => x.anahtar === g))) })),
     degistir: pref.degistir,
   };
 }
@@ -104,9 +111,14 @@ export function TabloUstu({ tablo }: { readonly tablo: VeriTablosu }) {
       <TabloAraclari
         testID={ayar.testID}
         ara={tablo.aramaVar ? { value: tablo.terim, onChangeText: tablo.setTerim, placeholder: ayar.aramaIpucu } : undefined}
-        suzgecSayisi={etkinSuzgecSayisi(Object.fromEntries(tablo.gruplar.flatMap((g) => (tercih.suzgec[g.anahtar] ? [[g.anahtar, tercih.suzgec[g.anahtar]!]] : []))))}
+        suzgecSayisi={etkinSuzgecSayisi(gecerliSecim(tablo.gruplar, tercih.suzgec))}
         onSuzgec={tablo.gruplar.length > 0 ? () => setSuzgecAcik(true) : undefined}
         onSutun={() => setSutunAcik(true)}
+      />
+      <EtkinSuzgecler
+        gruplar={tablo.gruplar} secim={tercih.suzgec} testID={`${ayar.testID}-suzgec`}
+        onKaldir={(g) => degistir((t) => ({ ...t, suzgec: suzgecAta(t.suzgec, g, []) }))}
+        onTemizle={tablo.suzgecTemizle}
       />
       <TabloBasligi testID={ayar.testID} yatay={tablo.yatay ?? undefined} sutunlar={tablo.gorunur} siralama={tercih.siralama} siralanabilir={tablo.siralanabilir} onSirala={(alan) => degistir((t) => ({ ...t, siralama: sonrakiSiralama(t.siralama, alan) }))} />
       <SutunSecici
@@ -116,11 +128,11 @@ export function TabloUstu({ tablo }: { readonly tablo: VeriTablosu }) {
         onVarsayilan={() => degistir((t) => ({ ...t, sutunlar: ayar.varsayilan }))}
         onClose={() => setSutunAcik(false)}
       />
-      <SuzgecSecici
+      {/* Bulut liste süzgeci grup başına TEK eşitlik (`?suzgec=`) ⇒ tek seçim; sonuç sayısını bulut vermez ⇒ "Uygula". */}
+      <SuzgecSayfasi
         visible={suzgecAcik} testID={`${ayar.testID}-suzgec-secici`} gruplar={tablo.gruplar} secim={tercih.suzgec}
-        onSec={(g, d) => degistir((t) => ({ ...t, suzgec: suzgecSec(t.suzgec, g, d) }))}
-        // Yalnız süzgeç grupları silinir; aynı tercihteki kart seçimi (`suzgec.<alan>`) korunur.
-        onTemizle={() => degistir((t) => ({ ...t, suzgec: Object.fromEntries(Object.entries(t.suzgec).filter(([g]) => !tablo.gruplar.some((x) => x.anahtar === g))) }))}
+        // Yalnız süzgeç grupları yerine konur; aynı tercihteki kart seçimi (`suzgec.<alan>`) korunur.
+        onUygula={(yeni) => degistir((t) => ({ ...t, suzgec: { ...Object.fromEntries(Object.entries(t.suzgec).filter(([g]) => !tablo.gruplar.some((x) => x.anahtar === g))), ...yeni } }))}
         onClose={() => setSuzgecAcik(false)}
       />
     </View>
@@ -149,7 +161,9 @@ export function TabloListesi({ tablo, onPress, bos, bosSuzgecli, icon, goster }:
           {satirlar.map((r, i) => <TabloSatiri key={r.id} yatay={!!tablo.yatay} sutunlar={tablo.gorunur} kayit={r} ayrac={i > 0} onPress={() => onPress(r)} testID={`${tablo.ayar.testID}-satir-${r.id}`} />)}
         </TabloGovdesi>
       ) : null}
-      <ListStates list={durum} empty={tablo.suzuldu ? bosSuzgecli : bos} icon={icon} testID={tablo.ayar.testID} />
+      {tablo.suzgecEtkin && !list.loading && !list.error && satirlar.length === 0 && !durum.hasMore
+        ? <SuzgecBos onTemizle={tablo.suzgecTemizle} testID={`${tablo.ayar.testID}-bos-suzgec`} />
+        : <ListStates list={durum} empty={tablo.suzuldu ? bosSuzgecli : bos} icon={icon} testID={tablo.ayar.testID} />}
     </View>
   );
 }

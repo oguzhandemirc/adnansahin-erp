@@ -91,7 +91,11 @@ describe("§1 saf okuma", () => {
   it("süzgeç grupları veriden; ham bölümde en/renk grubu yok; yaş kovası 7/30/90", () => {
     const b = lib.stokBolumu(KALEM, "bitmis");
     const g = lib.stokSuzgecGruplari(b);
-    expect(g.map((x) => x.anahtar)).toEqual(["urun", "renk", "en", "yas"]);
+    expect(g.map((x) => x.anahtar)).toEqual(["urun", "renk", "en", "kat", "yas"]);
+    expect(g.map((x) => x.etiket)).toEqual(["Kumaş", "Renk", "En", "Kat", "En eski top yaşı"]);
+    expect(g.every((x) => x.coklu)).toBe(true);
+    // Depo yalnız top görünümünde (kalem satırında depo yok).
+    expect(lib.stokSuzgecGruplari(b, true).map((x) => x.anahtar)).toContain("depo");
     expect(g.find((x) => x.anahtar === "yas")!.secenekler.map((o) => o.deger)).toEqual(["90+", "yok"]);
     expect(lib.stokSuzgecGruplari(lib.stokBolumu(KALEM, "ham")).map((x) => x.anahtar)).toEqual(["urun", "yas"]);
     expect([0, 7, 8, 30, 31, 90, 91].map(lib.yasKovasi)).toEqual(["0-7", "0-7", "8-30", "8-30", "31-90", "31-90", "90+"]);

@@ -184,10 +184,15 @@ describe("§4 süzgeç ve arama SUNUCUDA", () => {
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("cari-kart", expect.objectContaining({ ara: "deniz" }));
       fireEvent.press(screen.getByTestId("cari-suzgec"));
+      fireEvent.press(screen.getByTestId("cari-suzgec-secici-alan-ana"));
       fireEvent.press(screen.getByTestId("cari-suzgec-secici-ana-TEDARIKCI"));
+      fireEvent.press(screen.getByTestId("cari-suzgec-secici-uygula"));
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("cari-kart", expect.objectContaining({ ara: "deniz", suzgec: "TEDARIKCI" }));
+      fireEvent.press(screen.getByTestId("cari-suzgec"));
+      fireEvent.press(screen.getByTestId("cari-suzgec-secici-alan-ana"));
       fireEvent.press(screen.getByTestId("cari-suzgec-secici-ana-tumu"));
+      fireEvent.press(screen.getByTestId("cari-suzgec-secici-uygula"));
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("cari-kart", expect.objectContaining({ suzgec: undefined }));
     } finally {
@@ -297,12 +302,17 @@ describe("§7 P6 sipariş araması + görünüm süzgeci (modal)", () => {
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ ara: "mavi", suzgec: undefined, durum: undefined }));
       fireEvent.press(screen.getByTestId("siparis-suzgec"));
+      fireEvent.press(screen.getByTestId("siparis-suzgec-secici-alan-ana"));
       fireEvent.press(screen.getByTestId("siparis-suzgec-secici-ana-KISMI_SEVK"));
+      fireEvent.press(screen.getByTestId("siparis-suzgec-secici-uygula"));
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ ara: "mavi", suzgec: "KISMI_SEVK" }));
       expect(screen.getByText("Sunucunun döndüğü")).toBeTruthy(); // istemci süzmez
       expect(screen.getByTestId("siparis-suzgec-rozet")).toBeTruthy();
+      fireEvent.press(screen.getByTestId("siparis-suzgec"));
+      fireEvent.press(screen.getByTestId("siparis-suzgec-secici-alan-ana"));
       fireEvent.press(screen.getByTestId("siparis-suzgec-secici-ana-tumu"));
+      fireEvent.press(screen.getByTestId("siparis-suzgec-secici-uygula"));
       await settle();
       expect(mockList).toHaveBeenLastCalledWith("siparis", expect.objectContaining({ suzgec: undefined }));
     } finally {
@@ -316,6 +326,7 @@ describe("§7 P6 sipariş araması + görünüm süzgeci (modal)", () => {
     const view = render(<Orders />);
     await settle();
     fireEvent.press(screen.getByTestId("siparis-suzgec"));
+    fireEvent.press(screen.getByTestId("siparis-suzgec-secici-alan-ana"));
     for (const o of LIST_SEARCH.siparis!.suzgec!.secenekler) {
       const id = `siparis-suzgec-secici-ana-${o.deger}`;
       if (o.alan === "gecikmis") expect(screen.queryByTestId(id)).toBeNull(); // gecikme görünümü çizilmez

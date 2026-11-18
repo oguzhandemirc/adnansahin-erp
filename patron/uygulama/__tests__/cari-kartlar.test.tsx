@@ -198,6 +198,7 @@ describe("§7 süzgeç Temizle", () => {
       await settle();
       fireEvent.press(screen.getByTestId("cari-suzgec"));
       fireEvent.press(screen.getByTestId("cari-suzgec-secici-temizle"));
+      fireEvent.press(screen.getByTestId("cari-suzgec-secici-uygula"));
       await act(async () => {
         jest.advanceTimersByTime(1_000);
       });

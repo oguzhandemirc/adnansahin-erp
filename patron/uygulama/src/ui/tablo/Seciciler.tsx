@@ -1,15 +1,14 @@
 // Tablo seçicileri — düğme DOĞRUDAN alt sayfayı açar (açılır kutu yok): sütun seçimi (göster/gizle + sıra; en az bir,
-// sınırsız; `azami` yalnız tek öğeli tercihlerde) ve süzgeç (grup başına tek seçim, "Tümü" kaldırır). Değişiklik anında uygulanır (ayrı "uygula" yok).
+// sınırsız; `azami` yalnız tek öğeli tercihlerde) ve görünürlük seçimi. Değişiklik anında uygulanır. Süzgeç ayrı: `Suzgec.tsx`.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptic } from "../haptics";
 import { BASMA } from "../hareket/sabitler";
-import { SecimCipi } from "../ortak";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, TOUCH, space, typography } from "../tokens";
-import type { SutunTanimi, SuzgecGrubu } from "./model";
+import type { SutunTanimi } from "./model";
 
 function AltSayfa(p: { visible: boolean; title: string; onClose: () => void; testID: string; children: ReactNode; alt?: ReactNode }) {
   const t = useTokens();
@@ -155,45 +154,6 @@ export function VisibilityPicker(p: {
   );
 }
 
-export function SuzgecSecici(p: {
-  readonly visible: boolean;
-  readonly gruplar: readonly SuzgecGrubu[];
-  readonly secim: Readonly<Record<string, string>>;
-  readonly onSec: (grup: string, deger: string | null) => void;
-  readonly onTemizle: () => void;
-  readonly onClose: () => void;
-  readonly testID: string;
-}) {
-  const t = useTokens();
-  const s = useStyles();
-  const herhangi = p.gruplar.some((g) => p.secim[g.anahtar]);
-  return (
-    <AltSayfa
-      visible={p.visible} title="Süzgeç" onClose={p.onClose} testID={p.testID}
-      alt={herhangi ? (
-        <View style={s.altSatir}>
-          <View />
-          <Pressable onPress={p.onTemizle} hitSlop={8} accessibilityRole="button" testID={`${p.testID}-temizle`}>
-            <Text style={[s.bittiYazi, { color: t.tint }]}>Temizle</Text>
-          </Pressable>
-        </View>
-      ) : undefined}
-    >
-      {p.gruplar.map((g) => (
-        <View key={g.anahtar} style={s.grup}>
-          <Text style={s.grupBaslik} accessibilityRole="header">{g.etiket}</Text>
-          <View style={s.cipler}>
-            <SecimCipi label="Tümü" rol="radio" on={!p.secim[g.anahtar]} onPress={() => p.onSec(g.anahtar, null)} testID={`${p.testID}-${g.anahtar}-tumu`} />
-            {g.secenekler.map((o) => (
-              <SecimCipi key={o.deger} label={o.etiket} rol="radio" on={p.secim[g.anahtar] === o.deger} onPress={() => p.onSec(g.anahtar, o.deger)} testID={`${p.testID}-${g.anahtar}-${o.deger}`} />
-            ))}
-          </View>
-        </View>
-      ))}
-    </AltSayfa>
-  );
-}
-
 const useStyles = makeStyles((t) => ({
   backdrop: { flex: 1, justifyContent: "flex-end" as const },
   scrim: { position: "absolute" as const, top: 0, left: 0, right: 0, bottom: 0 },
@@ -224,7 +184,4 @@ const useStyles = makeStyles((t) => ({
   tasiDugme: { width: 36, height: 36, alignItems: "center" as const, justifyContent: "center" as const, borderRadius: 18 },
   altSatir: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, minHeight: TOUCH, paddingTop: space.s },
   not: { ...typography.footnote, color: t.textMuted },
-  grup: { paddingHorizontal: space.l, paddingVertical: space.m, gap: space.s },
-  grupBaslik: { ...typography.footnote, fontWeight: "600" as const, color: t.textSecondary },
-  cipler: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.s },
 }));

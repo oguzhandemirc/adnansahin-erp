@@ -23,8 +23,9 @@ import { useSnapshot } from "../../src/ui/pano/useSnapshot";
 import {
   CUVAL_KARTLARI, CUVAL_SUTUNLARI, CUVAL_VARSAYILAN_SUTUN, cuvalKartDegistir, cuvalKartlari, cuvalKartSifirla, cuvalTemizle, ETIKET_FARKLI, type CuvalKartKey,
 } from "../../src/ui/cuval/gorunum";
-import { azamiSutun, etkinSuzgecSayisi, siganSutun, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SutunTanimi } from "../../src/ui/tablo/model";
-import { SutunSecici, SuzgecSecici, VisibilityPicker } from "../../src/ui/tablo/Seciciler";
+import { azamiSutun, etkinSuzgecSayisi, gecerliSecim, siganSutun, sonrakiSiralama, suzgecAta, suzgecSec, sutunDegistir, sutunTasi, type SutunTanimi } from "../../src/ui/tablo/model";
+import { SutunSecici, VisibilityPicker } from "../../src/ui/tablo/Seciciler";
+import { EtkinSuzgecler, SuzgecBos, SuzgecSayfasi } from "../../src/ui/tablo/Suzgec";
 import { useCihazTercihi } from "../../src/ui/tablo/useCihazTercihi";
 import type { TabloTercihiDurumu } from "../../src/ui/tablo/useTabloTercihi";
 import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useYatayEksen } from "../../src/ui/tablo/VeriTablosu";
@@ -72,10 +73,10 @@ function Icerik({ d, pref, azami }: { readonly d: CuvalDeposu; readonly pref: Ta
   const kartlar = cuvalKartlari(pref.tercih);
   const gruplar = useMemo(() => cuvalSuzgecGruplari(d), [d]);
   // Yalnız seçeneği hâlâ olan seçimler süzer (çuvalı kalmamış cari listeyi boşaltmaz).
-  const suzgec = useMemo(() => Object.fromEntries(gruplar.flatMap((g) => {
-    const v = pref.tercih.suzgec[g.anahtar];
-    return v && g.secenekler.some((o) => o.deger === v) ? [[g.anahtar, v]] : [];
-  })), [gruplar, pref.tercih.suzgec]);
+  const suzgec = useMemo(() => gecerliSecim(gruplar, pref.tercih.suzgec), [gruplar, pref.tercih.suzgec]);
+  // Temizle kart seçimini silmez (aynı tercihin `kartlar` alanı); yalnız süzgeç grupları.
+  const yalnizKartlar = (v: Readonly<Record<string, string>>) => Object.fromEntries(Object.entries(v).filter(([k]) => !gruplar.some((g) => g.anahtar === k)));
+  const suzgecTemizle = () => pref.degistir((v) => ({ ...v, suzgec: yalnizKartlar(v.suzgec) }));
   const satirlar = useMemo(() => gorunenCuvallar(d, ara, suzgec, pref.tercih.siralama), [d, ara, suzgec, pref.tercih.siralama]);
   const gorunur = pref.tercih.sutunlar.flatMap((k) => CUVAL_SUTUNLARI.filter((c) => c.key === k));
   const yatay = gorunur.length > siganSutun(genislik) ? eksen : null;
@@ -139,11 +140,12 @@ function Icerik({ d, pref, azami }: { readonly d: CuvalDeposu; readonly pref: Ta
         onSuzgec={() => setSuzgecAcik(true)}
         onSutun={() => setSutunAcik(true)}
       />
+      <EtkinSuzgecler gruplar={gruplar} secim={suzgec} onKaldir={(g) => pref.degistir((v) => ({ ...v, suzgec: suzgecAta(v.suzgec, g, []) }))} onTemizle={suzgecTemizle} testID="cuval-suzgec" />
       <TabloBasligi
         testID="cuval" sutunlar={gorunur} siralama={pref.tercih.siralama} yatay={yatay ?? undefined} siralanabilir={CUVAL_SIRALANABILIR}
         onSirala={(alan) => pref.degistir((v) => ({ ...v, siralama: sonrakiSiralama(v.siralama, alan) }))}
       />
-      <CuvalListesi satirlar={satirlar} sutunlar={gorunur as readonly SutunTanimi<Cuval>[]} yatay={yatay} />
+      <CuvalListesi satirlar={satirlar} sutunlar={gorunur as readonly SutunTanimi<Cuval>[]} yatay={yatay} bos={Object.keys(suzgec).length > 0 ? suzgecTemizle : undefined} />
 
       <SutunSecici
         visible={sutunAcik} testID="cuval-sutun-secici" sutunlar={CUVAL_SUTUNLARI} gorunur={pref.tercih.sutunlar} azami={azami}
@@ -152,23 +154,23 @@ function Icerik({ d, pref, azami }: { readonly d: CuvalDeposu; readonly pref: Ta
         onVarsayilan={() => pref.degistir((v) => ({ ...v, sutunlar: CUVAL_VARSAYILAN_SUTUN }))}
         onClose={() => setSutunAcik(false)}
       />
-      <SuzgecSecici
+      {/* Belge (anlık) tam ve istemcide ⇒ sonuç sayısı kesin. */}
+      <SuzgecSayfasi
         visible={suzgecAcik} testID="cuval-suzgec-secici" gruplar={gruplar} secim={suzgec}
-        onSec={(g, deger) => pref.degistir((v) => ({ ...v, suzgec: suzgecSec(v.suzgec, g, deger) }))}
-        // Temizle kart seçimini silmez (aynı tercihin `kartlar` alanı).
-        onTemizle={() => pref.degistir((v) => ({ ...v, suzgec: Object.fromEntries(Object.entries(v.suzgec).filter(([k]) => !gruplar.some((g) => g.anahtar === k))) }))}
+        onUygula={(yeni) => pref.degistir((v) => ({ ...v, suzgec: { ...yalnizKartlar(v.suzgec), ...yeni } }))}
+        sayac={(taslak) => gorunenCuvallar(d, ara, taslak, null).length}
         onClose={() => setSuzgecAcik(false)}
       />
     </View>
   );
 }
 
-function CuvalListesi({ satirlar, sutunlar, yatay }: { readonly satirlar: readonly Cuval[]; readonly sutunlar: readonly SutunTanimi<Cuval>[]; readonly yatay: ReturnType<typeof useYatayEksen> | null }) {
+function CuvalListesi({ satirlar, sutunlar, yatay, bos }: { readonly satirlar: readonly Cuval[]; readonly sutunlar: readonly SutunTanimi<Cuval>[]; readonly yatay: ReturnType<typeof useYatayEksen> | null; readonly bos?: () => void }) {
   const s = useStyles();
   const t = useTokens();
   const [adet, setAdet] = useState(CUVAL_SAYFA);
   const [acik, setAcik] = useState<string | null>(null);
-  if (satirlar.length === 0) return <Text style={s.bos} testID="cuval-bos-suzgec">Aramaya ya da süzgece uyan çuval yok</Text>;
+  if (satirlar.length === 0) return bos ? <SuzgecBos onTemizle={bos} testID="cuval-bos-suzgec" /> : <Text style={s.bos} testID="cuval-bos-arama">Aramaya uyan çuval yok</Text>;
   const kalan = satirlar.length - adet;
   return (
     <View>

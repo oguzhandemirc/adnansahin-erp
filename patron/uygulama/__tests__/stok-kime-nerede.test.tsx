@@ -75,11 +75,18 @@ describe("§1 okuma", () => {
 describe("§2 süzgeç (istemcide)", () => {
   const b = lib.stokBolumu(YENI, "bitmis");
   const g = (s: Record<string, string>, ara = "") => no(lib.gorunenToplar(b, ara, {}, null, s));
-  it("gruplar: yer · etiket müşterisi (+ Müşterisiz) · çuval carisi (+ Carisiz) · yanlış çuval", () => {
+  it("gruplar: müşteri (etiket, + Müşterisiz) · çuval carisi (+ Carisiz) · çuval · yer · yanlış çuval", () => {
     const gs = lib.kimNeredeGruplari(b);
-    expect(gs.map((x) => x.anahtar)).toEqual(["yer", "etiket", "cuvalCari", "fark"]);
-    expect(gs[1]!.secenekler.map((o) => o.etiket)).toEqual(["ALFA TEKSTİL", lib.MUSTERISIZ]);
-    expect(gs[2]!.secenekler.map((o) => o.etiket)).toEqual(["ALFA TEKSTİL", "BETA ÖRME", "Carisiz çuval"]);
+    expect(gs.map((x) => x.anahtar)).toEqual(["etiket", "cuvalCari", "cuval", "yer", "fark"]);
+    expect(gs[0]!.etiket).toBe("Müşteri (etiket)");
+    expect(gs[0]!.secenekler.map((o) => o.etiket)).toEqual(["ALFA TEKSTİL", lib.MUSTERISIZ]);
+    expect(gs[1]!.secenekler.map((o) => o.etiket)).toEqual(["ALFA TEKSTİL", "BETA ÖRME", "Carisiz çuval"]);
+    // Çok seçenekli alanlar çoklu seçimli; iki seçenekli Yer ve tek seçenekli fark tek seçimli.
+    expect(gs.map((x) => !!x.coklu)).toEqual([true, true, true, false, false]);
+  });
+  it("çoklu seçim: aynı alanda VEYA, alanlar arası VE", () => {
+    expect(g({ etiket: ["ALFA TEKSTİL", lib.YOK].join("\n") })).toEqual(["R-1", "R-2", "S-1", "S-2", "S-3"]);
+    expect(g({ etiket: ["ALFA TEKSTİL", lib.YOK].join("\n"), yer: "acikta" })).toEqual(["R-1", "R-2"]);
   });
   it("Hepsi / Çuvalda / Açıkta", () => {
     expect(g({})).toEqual(["R-1", "R-2", "S-1", "S-2", "S-3"]);
@@ -160,8 +167,10 @@ describe("§4 ekran (yeni fabrika)", () => {
     await flush();
     fireEvent.press(screen.getByTestId("stok-kalem-suzgec"));
     await flush();
-    expect(screen.getByTestId("stok-kalem-suzgec-secici-fark-evet")).toBeTruthy();
+    expect(screen.getByTestId("stok-kalem-suzgec-secici-alan-fark")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec-secici-alan-yer"));
     fireEvent.press(screen.getByTestId("stok-kalem-suzgec-secici-yer-cuvalda"));
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec-secici-uygula"));
     await flush();
     expect(screen.queryByTestId(`stok-top-satir-${id(1)}`)).toBeNull();
     expect(screen.getByTestId(`stok-top-satir-${id(3)}`)).toBeTruthy();
@@ -183,7 +192,7 @@ describe("§5 eski fabrika (2.12.3)", () => {
     expect(screen.getByTestId(`stok-top-satir-${id(1)}`)).toBeTruthy();
     fireEvent.press(screen.getByTestId("stok-kalem-suzgec"));
     await flush();
-    expect(screen.queryByTestId("stok-kalem-suzgec-secici-yer-cuvalda")).toBeNull();
-    expect(screen.queryByTestId("stok-kalem-suzgec-secici-fark-evet")).toBeNull();
+    expect(screen.queryByTestId("stok-kalem-suzgec-secici-alan-yer")).toBeNull();
+    expect(screen.queryByTestId("stok-kalem-suzgec-secici-alan-fark")).toBeNull();
   });
 });
