@@ -43,8 +43,17 @@ export interface SutunTanimi<R> {
    * önce esnek sütunlar daralır/sarar, o da yetmezse tablo yatay kayar (`yatayGerekir`).
    */
   readonly kirpilmaz?: number;
-  /** ÇİZİM ANINDA hesaplanır (`sutunlariOlc`), tanımda verilmez: kırpılmaz sütunun pt genişliği. */
+  /**
+   * ROZET sütunu (durum, rol): rozet metni HİÇBİR tabloda kırpılmaz (2026-11-19). `etiketler` o sütunda çıkabilecek
+   * bütün rozet metinleri (ör. "Onay bekliyor", "Gönderilmedi"), `metin` satırın rozet metni (tanınmayan değer de
+   * ölçülsün), `ek` rozetin yanındaki sabit öğe payı (ör. "+1"). Sütun en uzun rozetin genişliğinde SABİT durur
+   * (`flexShrink: 0`, `rozetGenisligi`); sığmayınca tablo yatay kayar.
+   */
+  readonly rozet?: { readonly etiketler: readonly string[]; readonly metin: (r: R) => string; readonly ek?: number };
+  /** ÇİZİM ANINDA hesaplanır (`sutunlariOlc`), tanımda verilmez: kırpılmaz/rozet sütununun SABİT pt genişliği. */
   readonly genislik?: number;
+  /** ÇİZİM ANINDA hesaplanır (`sutunlariOlc`): sütun başlığının kırpılmadan sığdığı asgari genişlik (esnek sütunda `minWidth`). */
+  readonly asgari?: number;
 }
 
 export interface SuzgecSecenegi {
@@ -70,8 +79,16 @@ export const AZAMI_SUTUN = 10;
 export const azamiSutun = (_genislik?: number): number => AZAMI_SUTUN;
 /** Yatay kipte sütun genişliği = ağırlık × birim (pt); kırpılmaz sütun hesaplanan genişliğinden dar olamaz. */
 export const SUTUN_BIRIMI = 80;
-export const sutunGenisligi = (c: { readonly agirlik: number; readonly genislik?: number; readonly kirpilmaz?: number }): number =>
-  Math.max(Math.round(c.agirlik * SUTUN_BIRIMI), asgariGenislik(c) ?? 0);
+export const sutunGenisligi = (c: OlcuAlanlari & { readonly agirlik: number }): number =>
+  Math.max(Math.round(c.agirlik * SUTUN_BIRIMI), asgariGenislik(c) ?? 0, c.asgari ?? 0);
+
+/** Ölçüyü okuyan yardımcıların gördüğü alanlar (sütun tanımının çizimden bağımsız kısmı). */
+type OlcuAlanlari = {
+  readonly genislik?: number;
+  readonly kirpilmaz?: number;
+  readonly asgari?: number;
+  readonly rozet?: { readonly etiketler: readonly string[]; readonly ek?: number };
+};
 
 /**
  * Kırpılmaz sütunun ölçüsü. Hücre yazısı 13 pt (`typography.footnote`), ilk sütunda kalın; numaralar tabular rakamlı.
@@ -86,20 +103,57 @@ export const OLCU_PAYI = 4;
 export const AZAMI_YAZI_OLCEGI = 1.4;
 export const kirpilmazGenislik = (karakter: number, yaziOlcegi = 1): number =>
   Math.ceil(karakter * HUCRE_PUNTO * KARAKTER_EM * Math.min(Math.max(yaziOlcegi, 1), AZAMI_YAZI_OLCEGI)) + HUCRE_IC_BOSLUK + OLCU_PAYI;
-/** Kırpılmaz sütunun asgari genişliği (ölçülmemişse yalnız beyandan); kırpılmaz değilse yok. */
-export const asgariGenislik = (c: { readonly genislik?: number; readonly kirpilmaz?: number }): number | undefined =>
-  c.genislik ?? (c.kirpilmaz ? kirpilmazGenislik(c.kirpilmaz) : undefined);
+/**
+ * Orantılı (tabular olmayan) yazının ölçüsü: başlık 12 pt yarı kalın (`typography.caption` 600), rozet 11 pt yarı
+ * kalın (`typography.micro`). Karakter başına 0,62 em: SF/Roboto yarı kalın küçük harf ≈ 0,50–0,56 em, büyük harf ve
+ * Türkçe geniş harfler (G, Ö, Ş, m) ≈ 0,62–0,85 em → karışık metinde pay ("Gönderilmedi" ölçülen ≈ 72 pt, hesap 82).
+ */
+export const YAZI_EM = 0.62;
+export const BASLIK_PUNTO = 12;
+export const ROZET_PUNTO = 11;
+/** Rozetin yatay iç dolgusu (2 × `space.s`). */
+export const ROZET_IC = 16;
+/** Sıralanan sütunun başlığındaki ok (12) + aralık (2). */
+export const SIRALAMA_OKU = 14;
+const olcek = (yaziOlcegi: number) => Math.min(Math.max(yaziOlcegi, 1), AZAMI_YAZI_OLCEGI);
+const yaziGenisligi = (metin: string, punto: number, yaziOlcegi: number) => Math.ceil([...metin].length * punto * YAZI_EM * olcek(yaziOlcegi));
+
+/** Sütun başlığının tek satırda kırpılmadan sığdığı genişlik (hücre iç boşluğu + pay dahil; sıralıysa ok da). */
+export const baslikGenisligi = (baslik: string, yaziOlcegi = 1, sirali = false): number =>
+  yaziGenisligi(baslik, BASLIK_PUNTO, yaziOlcegi) + HUCRE_IC_BOSLUK + OLCU_PAYI + (sirali ? SIRALAMA_OKU : 0);
+
+/** Rozetin (metin + dolgu) kırpılmadan sığdığı hücre genişliği; `ek` rozet yanındaki sabit öğe payı. */
+export const rozetGenisligi = (metin: string, yaziOlcegi = 1, ek = 0): number =>
+  yaziGenisligi(metin, ROZET_PUNTO, yaziOlcegi) + ROZET_IC + HUCRE_IC_BOSLUK + OLCU_PAYI + ek;
+
+const enUzunMetin = (xs: readonly string[]): string => xs.reduce((a, x) => ([...x].length > [...a].length ? x : a), "");
+
+/** Sabit (kırpılmaz/rozet) sütunun genişliği (ölçülmemişse yalnız beyandan); esnek sütunda yok. */
+export const asgariGenislik = (c: OlcuAlanlari): number | undefined =>
+  c.genislik ?? (c.kirpilmaz ? kirpilmazGenislik(c.kirpilmaz) : c.rozet ? rozetGenisligi(enUzunMetin(c.rozet.etiketler), 1, c.rozet.ek) : undefined);
 
 /** Metnin bölünemez en uzun parçası (boşluk, virgül, satır sonunda sarılabilir): "SIP1, SIP2" → 4. */
 export const enUzunParca = (metin: string): number => metin.split(/[\s,]+/u).reduce((a, p) => Math.max(a, [...p].length), 0);
 
-/** Kırpılmaz sütunlara görünen satırlardan + başlıktan genişlik yazar; diğer sütunlar aynen döner. */
-export function sutunlariOlc<R>(sutunlar: readonly SutunTanimi<R>[], satirlar: readonly R[], yaziOlcegi = 1): readonly SutunTanimi<R>[] {
+/**
+ * Çizim ölçüsü: her sütuna başlığın asgari genişliğini (`asgari`), kırpılmaz sütuna görünen satırlardan + başlıktan,
+ * rozet sütununa bütün etiketlerden + görünen satırlardan SABİT genişlik (`genislik`) yazar. `siraliAlan`: o an
+ * sıralanan alan (başlığında ok çizilir, payı yalnız ona eklenir).
+ */
+export function sutunlariOlc<R>(sutunlar: readonly SutunTanimi<R>[], satirlar: readonly R[], yaziOlcegi = 1, siraliAlan?: string | null): readonly SutunTanimi<R>[] {
   return sutunlar.map((c) => {
-    if (!c.kirpilmaz) return c;
-    let karakter = Math.max(c.kirpilmaz, enUzunParca(c.baslik));
-    for (const r of satirlar) karakter = Math.max(karakter, enUzunParca(c.hucre(r)));
-    return { ...c, genislik: kirpilmazGenislik(karakter, yaziOlcegi) };
+    const asgari = baslikGenisligi(c.baslik, yaziOlcegi, !!c.sirala && c.sirala === siraliAlan);
+    if (c.kirpilmaz) {
+      let karakter = Math.max(c.kirpilmaz, enUzunParca(c.baslik));
+      for (const r of satirlar) karakter = Math.max(karakter, enUzunParca(c.hucre(r)));
+      return { ...c, asgari, genislik: Math.max(kirpilmazGenislik(karakter, yaziOlcegi), asgari) };
+    }
+    if (c.rozet) {
+      let metin = enUzunMetin(c.rozet.etiketler);
+      for (const r of satirlar) metin = enUzunMetin([metin, c.rozet.metin(r)]);
+      return { ...c, asgari, genislik: Math.max(rozetGenisligi(metin, yaziOlcegi, c.rozet.ek), asgari) };
+    }
+    return { ...c, asgari };
   });
 }
 
@@ -112,9 +166,9 @@ export const SATIR_KENARI = 10;
  * Tablo yatay kayar mı: görünür sütun sayısı ekrana sığandan fazlaysa YA DA kırpılmaz sütunların genişliği + esnek
  * sütunların asgarisi kullanılabilir genişliğe sığmıyorsa. Sütun seçimi KORUNUR — sütun gizlenmez, tablo kayar.
  */
-export function yatayGerekir(sutunlar: readonly { readonly genislik?: number; readonly kirpilmaz?: number }[], kullanilabilir: number, ekran: number): boolean {
+export function yatayGerekir(sutunlar: readonly OlcuAlanlari[], kullanilabilir: number, ekran: number): boolean {
   if (sutunlar.length > siganSutun(ekran)) return true;
-  const gerekli = sutunlar.reduce((a, c) => a + (asgariGenislik(c) ?? ESNEK_ASGARI), 0) + SATIR_KENARI;
+  const gerekli = sutunlar.reduce((a, c) => a + (asgariGenislik(c) ?? Math.max(ESNEK_ASGARI, c.asgari ?? 0)), 0) + SATIR_KENARI;
   return gerekli > kullanilabilir;
 }
 

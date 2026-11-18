@@ -56,10 +56,12 @@ export function toplamGenislik<R>(sutunlar: readonly SutunTanimi<R>[]): number {
  * Hücrenin boyu (başlık + satır AYNI): yatay kipte sabit genişlik; oranlı kipte kırpılmaz sütun hesaplanan genişlikte
  * SABİT durur (büyümez, daralmaz), esnek sütunlar kalan alanı ağırlıkla paylaşır.
  */
-export function sutunBoyu(c: SutunTanimi<never>, yatay: boolean): { width: number; flexGrow?: number; flexShrink?: number } | { flex: number } {
+export function sutunBoyu(c: SutunTanimi<never>, yatay: boolean): { width: number; flexGrow?: number; flexShrink?: number } | { flex: number; minWidth?: number } {
   if (yatay) return { width: sutunGenisligi(c) };
   const sabit = asgariGenislik(c);
-  return sabit === undefined ? { flex: c.agirlik } : { width: sabit, flexGrow: 0, flexShrink: 0 };
+  // Esnek sütun başlığının sığdığı genişlikten daralmaz (başlık kırpılmaz; sığmazsa `yatayGerekir` tabloyu kaydırır).
+  if (sabit === undefined) return c.asgari ? { flex: c.agirlik, minWidth: c.asgari } : { flex: c.agirlik };
+  return { width: sabit, flexGrow: 0, flexShrink: 0 };
 }
 
 /**
@@ -67,7 +69,7 @@ export function sutunBoyu(c: SutunTanimi<never>, yatay: boolean): { width: numbe
  * yazar ve tablonun kullanılabilir genişliğini (`onLayout`) ölçüp yatay kaydırma gerekip gerekmediğine karar verir.
  * Ölçülene dek pencere genişliği kullanılır.
  */
-export function useTabloOlcusu<R>(sutunlar: readonly SutunTanimi<R>[], satirlar: readonly R[]): {
+export function useTabloOlcusu<R>(sutunlar: readonly SutunTanimi<R>[], satirlar: readonly R[], siraliAlan?: string | null): {
   readonly sutunlar: readonly SutunTanimi<R>[];
   readonly yatay: YatayEksen | null;
   readonly onLayout: (e: LayoutChangeEvent) => void;
@@ -75,7 +77,7 @@ export function useTabloOlcusu<R>(sutunlar: readonly SutunTanimi<R>[], satirlar:
   const { width, fontScale } = useWindowDimensions();
   const [alan, setAlan] = useState<number | null>(null);
   const eksen = useYatayEksen();
-  const olculen = useMemo(() => sutunlariOlc(sutunlar, satirlar, fontScale), [sutunlar, satirlar, fontScale]);
+  const olculen = useMemo(() => sutunlariOlc(sutunlar, satirlar, fontScale, siraliAlan), [sutunlar, satirlar, fontScale, siraliAlan]);
   const yatay = yatayGerekir(olculen, alan ?? width, width) ? eksen : null;
   const onLayout = useMemo(() => (e: LayoutChangeEvent) => {
     const w = Math.round(e.nativeEvent.layout.width);

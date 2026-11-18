@@ -5,7 +5,7 @@
 import { Text, View } from "react-native";
 import type { ProjectionRecord } from "../../api/wire";
 import { formatDate } from "../../lib/format";
-import { cariRoles, destinationLabel } from "../../lib/labels/siparis";
+import { CARI_ROLES, cariRoles, destinationLabel } from "../../lib/labels/siparis";
 import { Rozet, type RozetTonu } from "../ortak";
 import { asObj, str } from "../siparis/OrderRow";
 import { AZAMI_SUTUN, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../tablo/model";
@@ -35,7 +35,9 @@ export const CARI_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "il", baslik: "İl", agirlik: 1, sirala: "il", hucre: (r) => str(k(r).il) ?? "—" },
   { key: "ilce", baslik: "İlçe", agirlik: 1, sirala: "ilce", hucre: (r) => str(k(r).ilce) ?? "—" },
   { key: "ulke", baslik: "Ülke", agirlik: 1, sirala: "ulke", hucre: (r) => str(k(r).ulke) ?? "—" },
-  { key: "rol", baslik: "Rol", agirlik: 1.3, hucre: (r) => cariRoles(k(r)).map((x) => x.label).join(", ") || "—", ogeler: (r) => <RolHucresi r={r} /> },
+  { key: "rol", baslik: "Rol", agirlik: 1.3, hucre: (r) => cariRoles(k(r)).map((x) => x.label).join(", ") || "—", ogeler: (r) => <RolHucresi r={r} />,
+    // İlk rol rozeti + "+n" (aralık 4 + 12 pt iki karakter ≈ 20 pt pay).
+    rozet: { etiketler: CARI_ROLES.map((x) => x.label), metin: (r) => cariRoles(k(r))[0]?.label ?? "—", ek: 20 } },
   { key: "durum", baslik: "Durum", agirlik: 0.9, hucre: (r) => (k(r).aktif === false ? "Pasif" : "Aktif") },
   // 2026-11-17 eklenenler (KAPALI gelir); bulut bunlara sıralama beyan etmez → sıralanmaz.
   { key: "yon", baslik: "Sevk yönü", ad: "Varsayılan sevk yönü", agirlik: 1, hucre: (r) => (str(k(r).varsayilanYon) ? destinationLabel(k(r).varsayilanYon) : "—") },

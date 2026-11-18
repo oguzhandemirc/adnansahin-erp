@@ -25,7 +25,7 @@ import { stokBolumu } from "../../../src/lib/stok-kalem";
 import { siganSutun as azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
 import { SutunSecici, VisibilityPicker } from "../../../src/ui/tablo/Seciciler";
 import { useTabloTercihi, type TabloTercihiDurumu } from "../../../src/ui/tablo/useTabloTercihi";
-import { AracDugmesi, TabloBasligi, TabloGovdesi, TabloSatiri } from "../../../src/ui/tablo/VeriTablosu";
+import { AracDugmesi, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useTabloOlcusu } from "../../../src/ui/tablo/VeriTablosu";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
 import { TOUCH, space, typography } from "../../../src/ui/tokens";
 
@@ -46,13 +46,15 @@ const STOK_ANAHTARLAR = STOK_SUTUNLARI.map((c) => c.key);
 function UrunTablosu({ items, pref, azami }: { readonly items: readonly Satir[]; readonly pref: TabloTercihiDurumu; readonly azami: number }) {
   const { tercih, degistir } = pref;
   const [acik, setAcik] = useState(false);
-  const gorunur = tercih.sutunlar.flatMap((k) => STOK_SUTUNLARI.filter((c) => c.key === k));
+  const secili = useMemo(() => tercih.sutunlar.flatMap((k) => STOK_SUTUNLARI.filter((c) => c.key === k)), [tercih.sutunlar]);
+  // Başlık asgarisi ölçülür (başlık kırpılmaz); sığmazsa tablo yatay kayar.
+  const { sutunlar: gorunur, yatay, onLayout } = useTabloOlcusu(secili, items);
   return (
-    <View testID="stok-kumaslar">
+    <View testID="stok-kumaslar" onLayout={onLayout}>
       <BlokBasligi baslik="Ürün bazında" sayi={items.length} sag={<AracDugmesi icon="grid-outline" label="Sütunlar" onPress={() => setAcik(true)} testID="stok-sutunlar" />} />
-      <TabloBasligi testID="stok" sutunlar={gorunur} siralama={null} siralanabilir={[]} onSirala={() => undefined} />
-      <TabloGovdesi testID="stok-govde">
-        {items.map((r, n) => <TabloSatiri key={String(r.anahtar)} sutunlar={gorunur} kayit={r} ayrac={n > 0} testID={`stok-satir-${String(r.anahtar)}`} />)}
+      <TabloBasligi testID="stok" sutunlar={gorunur} siralama={null} siralanabilir={[]} onSirala={() => undefined} yatay={yatay ?? undefined} />
+      <TabloGovdesi testID="stok-govde" yatay={yatay ? { eksen: yatay, genislik: toplamGenislik(gorunur) } : undefined}>
+        {items.map((r, n) => <TabloSatiri key={String(r.anahtar)} yatay={!!yatay} sutunlar={gorunur} kayit={r} ayrac={n > 0} testID={`stok-satir-${String(r.anahtar)}`} />)}
       </TabloGovdesi>
       <SutunSecici
         visible={acik} testID="stok-sutun-secici" sutunlar={STOK_SUTUNLARI} gorunur={tercih.sutunlar} azami={azami}

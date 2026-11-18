@@ -84,7 +84,7 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
   const list = useRemoteList(ayar.projeksiyon, sorgu, { enabled: pref.hazir });
   const secili = useMemo(() => pref.tercih.sutunlar.flatMap((k) => ayar.sutunlar.filter((c) => c.key === k)), [pref.tercih.sutunlar, ayar.sutunlar]);
   // Kırpılmaz numara sütunları yüklü satırlardan ölçülür; sığmazsa tablo yatay kayar (sütun seçimi korunur).
-  const olcu = useTabloOlcusu(secili, list.items);
+  const olcu = useTabloOlcusu(secili, list.items, pref.tercih.siralama?.alan);
   const gorunur = olcu.sutunlar;
   return {
     ayar, tercih: pref.tercih, gorunur, gruplar: gs, siralanabilir, aramaVar: !!spec, terim, setTerim, azami, list,

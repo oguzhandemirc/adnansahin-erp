@@ -3,6 +3,7 @@
 // tek kaynaktan (`./durum`) tonlu rozet. Her değer telin kendi alanıdır; burada hesap yok.
 import type { ProjectionRecord } from "../../api/wire";
 import { formatDate, formatNumber, kisaBelgeNo } from "../../lib/format";
+import { ORDER_STATUS_KISA } from "../../lib/labels/siparis";
 import { Rozet } from "../ortak";
 import type { SutunTanimi } from "../tablo/model";
 import { siparisDurumu } from "./durum";
@@ -12,7 +13,7 @@ const k = (r: ProjectionRecord) => asObj(r.kayit);
 const sayi = (v: unknown, birim = "") => (present(v) ? `${formatNumber(v, 0)}${birim}` : "—");
 const YON: Readonly<Record<string, string>> = { DOMESTIC: "Yurtiçi", EXPORT: "İhracat" };
 
-/** Durum hücresi: kısa etiketli hafif zeminli rozet (tam ad erişilebilirlik etiketinde); dar sütunda yazı kesilir. */
+/** Durum hücresi: kısa etiketli hafif zeminli rozet (tam ad erişilebilirlik etiketinde); sütun rozete göre genişler, kesilmez. */
 function DurumHucresi({ durum }: { durum: unknown }) {
   const d = siparisDurumu(durum);
   return <Rozet label={d.kisa} tone={d.ton} accessibilityLabel={`Durum: ${d.label}`} />;
@@ -36,6 +37,8 @@ export const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   {
     key: "durum", baslik: "Durum", agirlik: 1.35, hucre: (r) => siparisDurumu(k(r).durum).label,
     ogeler: (r) => <DurumHucresi durum={k(r).durum} />,
+    // Rozet kırpılmaz: sütun en uzun kısa etiketin ("Onay bekliyor") genişliğinde sabit.
+    rozet: { etiketler: Object.values(ORDER_STATUS_KISA), metin: (r) => siparisDurumu(k(r).durum).kisa },
   },
   // 2026-11-17 ek sütunlar (seçicide KAPALI): telin kendi alanları, biçimlenir — hesap yok. Sevk BRÜT (fabrika).
   { key: "acik", baslik: "Açık m", ad: "Açık miktar (m)", agirlik: 1.1, sayi: true, sirala: "acikMiktar", hucre: (r) => sayi(k(r).acikMiktar) },

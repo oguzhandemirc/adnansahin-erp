@@ -73,7 +73,7 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   const kalemler = kip === "kalem" ? gorunenKalemler(b, ara, suzgec, kalemPref.tercih.siralama) : null;
   const toplar = kip === "top" ? gorunenToplar(b, ara, suzgec, topPref.tercih.siralama, knSuzgec) : null;
   // Kırpılmaz numara sütunları (Top no, Çuval no) görünen satırlardan ölçülür; sığmazsa tablo yatay kayar.
-  const olcu = useTabloOlcusu(secili, (kalemler ?? toplar ?? []) as readonly unknown[]);
+  const olcu = useTabloOlcusu(secili, (kalemler ?? toplar ?? []) as readonly unknown[], pref.tercih.siralama?.alan);
   const gorunur = olcu.sutunlar;
   const yatay = olcu.yatay;
   const sec = (k: "bolum" | "gorunum", v: Bolum | Gorunum) => gorunum.degistir((t) => ({ ...t, suzgec: { ...t.suzgec, [k]: v } }));

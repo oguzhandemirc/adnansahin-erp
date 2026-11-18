@@ -5,7 +5,7 @@
 // No sütunu belge numarasının tamamını taşıyacak genişlikte (1.5 × 80 = 120 pt ≥ "SVK1811260003"): numara KIRPILMAZ.
 import type { ProjectionRecord } from "../../api/wire";
 import { formatDate, formatNumber } from "../../lib/format";
-import { SHIPMENT_DESTINATION, UNIT } from "../../lib/labels/uretim";
+import { SHIPMENT_DESTINATION, SHIPMENT_STATUS, UNIT } from "../../lib/labels/uretim";
 import { Rozet } from "../ortak";
 import { qty } from "../pano/read";
 import { asObj, present, str } from "../siparis/OrderRow";
@@ -30,7 +30,8 @@ export const SEVKIYAT_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "metre", baslik: "Metre", ad: "Sevk (m, brüt)", agirlik: 1.1, sayi: true, sirala: "toplamMetre", hucre: (r) => (present(k(r).toplamMetre) ? `${qty(k(r).toplamMetre)} ${UNIT.metre}` : "—") },
   { key: "kg", baslik: "Kg", ad: "Toplam kg", agirlik: 0.9, sayi: true, sirala: "toplamKg", hucre: (r) => sayi(k(r).toplamKg) },
   { key: "cuval", baslik: "Çuval", ad: "Çuval sayısı", agirlik: 0.8, sayi: true, sirala: "cuvalSayisi", hucre: (r) => sayi(k(r).cuvalSayisi) },
-  { key: "durum", baslik: "Durum", agirlik: 1.3, hucre: (r) => sevkDurumu(k(r).durum).label, ogeler: (r) => <DurumHucresi durum={k(r).durum} /> },
+  { key: "durum", baslik: "Durum", agirlik: 1.3, hucre: (r) => sevkDurumu(k(r).durum).label, ogeler: (r) => <DurumHucresi durum={k(r).durum} />,
+    rozet: { etiketler: Object.values(SHIPMENT_STATUS).map((x) => x.label), metin: (r) => sevkDurumu(k(r).durum).label } },
   // Sütun seçicide KAPALI gelen ekler (eski "Satırda göster" alanları): telin kendi alanları.
   { key: "fatura", baslik: "Fatura", ad: "Fatura no", agirlik: 1.1, kirpilmaz: 16, hucre: (r) => str(k(r).disFaturaNo) ?? "—" },
   { key: "faturaTarihi", baslik: "Fatura tar.", ad: "Fatura tarihi", agirlik: 1.1, hucre: (r) => formatDate(k(r).faturalanma) },

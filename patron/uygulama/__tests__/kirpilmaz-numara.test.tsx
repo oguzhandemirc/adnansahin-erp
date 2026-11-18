@@ -87,7 +87,9 @@ describe("numara sütunları kırpılmaz — model", () => {
 
   it("dikey tablette (ray daraltılmış) 7 sütun sığar; daralan alanda tablo yatay kayar, sütun gizlenmez", () => {
     const yedi = M.sutunlariOlc(s(SEVKIYAT_SUTUNLARI).filter((c) => ["no", "tarih", "musteri", "yon", "top", "metre", "durum"].includes(c.key)), []);
-    expect(M.yatayGerekir(yedi, 510, 600)).toBe(false);
+    // 2026-11-19: durum rozeti (sabit, "Onay bekliyor") ve başlık asgarileri eklendi → 540 pt gerekir; 600 pt tablet alanı 568.
+    expect(M.yatayGerekir(yedi, 568, 600)).toBe(false);
+    expect(M.yatayGerekir(yedi, 530, 600)).toBe(true);
     expect(M.yatayGerekir(yedi, 400, 600)).toBe(true);
     expect(M.yatayGerekir(yedi, 2000, 390)).toBe(true); // telefonda 7 > 4 sütun
   });
