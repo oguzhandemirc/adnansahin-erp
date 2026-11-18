@@ -65,7 +65,9 @@ function searchFilters(name: string, q: ListQuery): Prisma.Sql[] {
       if (!hit) throw badRequest(`Tanınmayan süzgeç: ${v}`);
       if (used.has(hit.group)) throw badRequest("Aynı süzgeç grubundan tek seçim");
       used.add(hit.group);
-      out.push(Prisma.sql`AND (r.data->${hit.opt.alan}) = ${JSON.stringify(hit.opt.esit)}::jsonb`);
+      out.push(hit.opt.degil
+        ? Prisma.sql`AND (r.data->${hit.opt.alan}) IS DISTINCT FROM ${JSON.stringify(hit.opt.esit)}::jsonb`
+        : Prisma.sql`AND (r.data->${hit.opt.alan}) = ${JSON.stringify(hit.opt.esit)}::jsonb`);
     }
   }
   return out;
@@ -107,6 +109,7 @@ export const LIST_CAPABILITIES: ListCapabilities = {
   aranabilir: Object.keys(LIST_SEARCH),
   siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])),
   uyelikSuzgecleri: Object.fromEntries(Object.entries(LIST_MEMBER_FILTERS).map(([k, p]) => [k, Object.keys(p)])),
+  suzgecDegerleri: Object.fromEntries(Object.entries(LIST_SEARCH).map(([p, sp]) => [p, [...(sp.suzgec?.secenekler ?? []), ...(sp.ekSuzgecler ?? []).flatMap((g) => g.secenekler)].map((o) => o.deger)])),
 };
 
 const NUMERIC = "^-?[0-9]+(\\.[0-9]+)?$";

@@ -127,12 +127,16 @@ export interface ProjectionRecord {
 }
 
 // ---------------------------------------------------------------- liste araması (seçiciler)
-/** Tek süzgeç seçeneği: `?suzgec=<deger>` ⇒ kayıttaki `alan` = `esit` (jsonb eşitliği). */
+/**
+ * Tek süzgeç seçeneği: `?suzgec=<deger>` ⇒ kayıttaki `alan` = `esit` (jsonb eşitliği). `degil: true` (2026-11-19) tersidir:
+ * `alan` ≠ `esit` (`IS DISTINCT FROM`; alanı taşımayan kayıt da girer) — örn. "iptaller hariç". Bulut yine hesap yapmaz.
+ */
 export interface ListFilterOption {
   readonly deger: string;
   readonly etiket: string;
   readonly alan: string;
   readonly esit: string | boolean;
+  readonly degil?: true;
 }
 
 /** Ek süzgeç grubu (veri tablosu): grupta en çok BİR seçim; gruplar ve ana süzgeç VE ile birleşir. */
@@ -231,6 +235,8 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
         { deger: "KISMI_SEVK", etiket: "Bir kısmı gönderildi", alan: "durum", esit: "PARTIAL_SHIPPED" },
         { deger: "TAMAMLANDI", etiket: "Hepsi gönderildi ya da elle kapatıldı", alan: "durum", esit: "COMPLETED" },
         { deger: "IPTAL", etiket: "Sipariş iptal edildi", alan: "durum", esit: "CANCELLED" },
+        // 2026-11-19: ters eşitlik (eski bulut tanımaz → 400; istemci `ListCapabilities.suzgecDegerleri` ile kapılar).
+        { deger: "IPTAL_HARIC", etiket: "İptaller hariç", alan: "durum", esit: "CANCELLED", degil: true },
       ],
     },
     ekSuzgecler: [YON_SUZGECI],
@@ -245,6 +251,8 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
         { deger: "PLANLI", etiket: "Onay bekliyor", alan: "durum", esit: "PLANNED" },
         { deger: "SEVK_EDILDI", etiket: "Sevk edildi", alan: "durum", esit: "DISPATCHED" },
         { deger: "IPTAL", etiket: "İptal", alan: "durum", esit: "CANCELLED" },
+        // 2026-11-19: "iptalleri gizle" — ters eşitlik (eski bulut tanımaz → 400; istemci `suzgecDegerleri` ile kapılar).
+        { deger: "IPTAL_HARIC", etiket: "İptaller hariç", alan: "durum", esit: "CANCELLED", degil: true },
       ],
     },
     ekSuzgecler: [YON_SUZGECI],
@@ -347,6 +355,11 @@ export interface ListCapabilities {
   readonly siralama?: Readonly<Record<string, readonly string[]>>;
   /** Üyelik süzgeçleri (`LIST_MEMBER_FILTERS`, anahtar → projeksiyonlar); eski sunucu göndermez ⇒ istemci süzgeci gizler. */
   readonly uyelikSuzgecleri?: Readonly<Partial<Record<ListMemberFilterKey, readonly string[]>>>;
+  /**
+   * (2026-11-19) Projeksiyon → bu sunucunun tanıdığı `?suzgec=` değerleri (`LIST_SEARCH` ana + ek gruplar). Eski sunucu
+   * göndermez ⇒ istemci yalnız eski değerleri (ör. `IPTAL_HARIC` HARİÇ) gönderir; tanınmayan değer FAIL-CLOSED 400'dür.
+   */
+  readonly suzgecDegerleri?: Readonly<Record<string, readonly string[]>>;
 }
 
 // ---------------------------------------------------------------- iş emri sevke hazırlığı (D4-J5)

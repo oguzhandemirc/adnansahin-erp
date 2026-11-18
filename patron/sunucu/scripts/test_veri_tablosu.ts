@@ -3,7 +3,8 @@
 //   §1 ⭐ sıralama (`sirala`/`yon`): metin Türkçe katlamalı · sayı sayısal · tarih; boş değer iki yönde de SONDA
 //   §2 ⭐ sıralı imleç: sayfalar kesişmez, hepsi gelir, sıra sayfalar boyunca korunur (eşit anahtar + boş anahtar dahil)
 //   §3 kapılar: beyansız alan 400 · tek başına `yon` 400 · bilinmeyen `yon` 400 · sıralamasız istek eski sırada
-//   §4 ⭐ çoklu süzgeç: gruplar VE ile birleşir · aynı gruptan iki değer 400 · tanınmayan 400 · tek değer eskisi gibi
+//   §4 ⭐ çoklu süzgeç: gruplar VE ile birleşir · aynı gruptan iki değer 400 · tanınmayan 400 · tek değer eskisi gibi · ters eşitlik `IPTAL_HARIC` (§4i–§4l)
+//      NEGATİF SONDA (2026-11-19): `degil` dalı düz eşitliğe çevrildi → §4i/§4j/§4l ✗; geri alındı.
 //   §5 beyan: `LIST_SORT` + süzgeç alanları fabrika kataloğunda var · `deger` projeksiyonda tekil · `/oturum` `siralama`
 //   §6 ⭐ görünüm tercihi: yazılmamış null · yaz/geri oku · hesap yalnız KENDİ tercihini görür · başka tesis görmez ·
 //      beyaz liste dışı anahtar 404 · nesne olmayan / büyük değer 400 · oturumsuz 401
@@ -45,6 +46,7 @@ async function hepsi(o: Ortam, h: TestHesabi, p: string, sorgu: Record<string, s
 interface Fikstur {
   readonly siparis: Record<string, string>;
   readonly cari: Record<string, string>;
+  readonly sevkiyat: Record<string, string>;
 }
 
 async function fikstur(o: Ortam, k: TestKurulumu): Promise<Fikstur> {
@@ -52,6 +54,8 @@ async function fikstur(o: Ortam, k: TestKurulumu): Promise<Fikstur> {
   const gun = (n: number) => new Date(o.saat.simdi() - n * 86_400_000).toISOString();
   const s = { a: randomUUID(), b: randomUUID(), c: randomUUID(), d: randomUUID(), e: randomUUID() };
   const c = { ozgur: randomUUID(), cagri: randomUUID(), bora: randomUUID(), ilsiz: randomUUID(), pasif: randomUUID() };
+  const v = { planli: randomUUID(), cikti: randomUUID(), iptal: randomUUID() };
+  const sevk = (id: string, no: string, durum: string, yon: string) => ({ id, sevkNo: no, musteriAdi: "Bora Dokuma", durum, yon, olusturulma: gun(1), cariKartId: c.ozgur });
   const sip = (id: string, no: string, ad: string, durum: string, yon: string, acikMiktar: unknown, tarih: string) =>
     ({ id, siparisNo: no, musteriAdi: ad, durum, yon, acikMiktar, siparisTarihi: tarih, cariKartId: c.ozgur });
   const cari = (id: string, ad: string, il: string | null, musteri: boolean, aktif: boolean) =>
@@ -78,10 +82,15 @@ async function fikstur(o: Ortam, k: TestKurulumu): Promise<Fikstur> {
       ],
       yeni: w,
     }),
+    // §4i–§4l "iptaller hariç" (ters eşitlik): planlı + çıkmış + iptal.
+    girdi("sevkiyat", {
+      yaz: [sevk(v.planli, "SV-1", "PLANNED", "EXPORT"), sevk(v.cikti, "SV-2", "DISPATCHED", "DOMESTIC"), sevk(v.iptal, "SV-3", "CANCELLED", "EXPORT")],
+      yeni: w,
+    }),
   ];
   const r = await imzali(o, k, "/v1/esitle", { govde: paket(k, { ufuk: new Date(o.saat.simdi() - 60_000), kayitlar }) });
   if (r.status !== 200 || (r.json as unknown as { ret: unknown[] }).ret.length > 0) throw new Error(`fikstür: ${r.status} ${JSON.stringify(r.json)}`);
-  return { siparis: s, cari: c };
+  return { siparis: s, cari: c, sevkiyat: v };
 }
 
 const sira = (f: Fikstur["siparis"] | Fikstur["cari"], ...adlar: string[]) => adlar.map((a) => f[a]!);
@@ -149,6 +158,14 @@ async function cokluSuzgec(o: Ortam, h: TestHesabi, f: Fikstur): Promise<void> {
   kontrol("§4g cari: müşteri VE pasif", esit(cari.ids, [f.cari.pasif]), `${cari.ids.length}`);
   const sirali = await liste(o, h, "cari-kart", { suzgec: "MUSTERI,AKTIF", sirala: "ad", yon: "azalan", ara: "i" });
   kontrol("§4h süzgeç + arama + sıralama birlikte", esit(sirali.ids, sira(f.cari, "ozgur", "ilsiz", "cagri")), sirali.kayit.map((x) => x.ad).join(","));
+  // 2026-11-19: ters eşitlik (`degil`) — "iptaller hariç" (sevkiyat + sipariş).
+  const haric = await liste(o, h, "sevkiyat", { suzgec: "IPTAL_HARIC" });
+  kontrol("§4i ⭐ sevkiyat IPTAL_HARIC: iptal dışı ikisi (planlı + çıkmış)", haric.status === 200 && esit([...haric.ids].sort(), [f.sevkiyat.planli!, f.sevkiyat.cikti!].sort()), `${haric.status} ${haric.ids.length}`);
+  const haricIhr = await liste(o, h, "sevkiyat", { suzgec: "IPTAL_HARIC,IHRACAT" });
+  kontrol("§4j IPTAL_HARIC VE ihracat: yalnız planlı", esit(haricIhr.ids, [f.sevkiyat.planli!]), `${haricIhr.ids.length}`);
+  kontrol("§4k IPTAL_HARIC + IPTAL aynı grup → 400", (await liste(o, h, "sevkiyat", { suzgec: "IPTAL_HARIC,IPTAL" })).status === 400);
+  const sipHaric = await liste(o, h, "siparis", { suzgec: "IPTAL_HARIC" });
+  kontrol("§4l sipariş IPTAL_HARIC: iptalsiz fikstürde beşi de", sipHaric.status === 200 && sipHaric.ids.length === 5, `${sipHaric.status} ${sipHaric.ids.length}`);
 }
 
 /** Fabrika kataloğunda projeksiyon bloğunun taşıdığı tel adları (`col("x",` · `derived("x",`). */
@@ -182,6 +199,9 @@ async function beyan(o: Ortam, h: TestHesabi): Promise<void> {
   const r = await api(o, "GET", "/api/oturum", { belirtec: h.belirtec });
   const s = (r.json.data as FacilityStatus | undefined)?.liste?.siralama;
   kontrol("§5e `/oturum` `siralama` beyanın kendisi", JSON.stringify(s) === JSON.stringify(Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)]))));
+  const sd = (r.json.data as FacilityStatus | undefined)?.liste?.suzgecDegerleri;
+  const beklenenSd = Object.fromEntries(Object.entries(LIST_SEARCH).map(([p, sp]) => [p, [...(sp.suzgec?.secenekler ?? []), ...(sp.ekSuzgecler ?? []).flatMap((g) => g.secenekler)].map((x) => x.deger)]));
+  kontrol("§5f `/oturum` `suzgecDegerleri` beyanın kendisi (IPTAL_HARIC dahil)", JSON.stringify(sd) === JSON.stringify(beklenenSd) && !!sd?.sevkiyat?.includes("IPTAL_HARIC"), JSON.stringify(sd?.sevkiyat));
 }
 
 async function tercihler(o: Ortam, h: TestHesabi, h2: TestHesabi, yabanci: TestHesabi): Promise<void> {
