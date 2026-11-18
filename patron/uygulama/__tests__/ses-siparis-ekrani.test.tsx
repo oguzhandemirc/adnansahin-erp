@@ -1,29 +1,28 @@
-// Sesli sipariş ekran akışı: düğme yalnız yazma yetkisi + cihazda tanıma varken; iki kip (tek cümle varsayılan, adım
-// adım); belirsiz alan modal adaylardan seçilir; ⭐ SES SİPARİŞİ GÖNDERMEZ ("gönder/kaydet" söylense de): yalnız formu
-// doldurur, gönderim mevcut "Gönder" düğmesi + aynı gövde/işlem kimliği yolundan; izin reddi sade Türkçe, çökme yok;
-// ⭐ mikrofon ön açıklaması ilk dokunuşta bir kez, Vazgeç'te izin istenmez (2026-11-18).
+// Yeni siparişte YERİNDE sesli giriş (2026-11-18): ayrı ses ekranı ve tek cümle kipi YOK; her adımda aynı mikrofon,
+// söz yalnız o adımın seçili alanına gider. Cari adımında en benzer cariler sıralanır, ⭐ sessiz seçim YOK (dokunuşla);
+// zayıf sonuçta "‘X’ adıyla yeni cari oluştur" yerinde alt sayfayı adı dolu açar; yeni cari gelen kutusuna gider ve
+// fabrika işleyince siparişe seçili döner. Miktar/termin/not adım içi; adım değişince dinleme kapanır; ⭐ ses göndermez,
+// gönderim elle girişle aynı gövde/yoldan; ⭐ mikrofon ön açıklaması ilk dokunuşta bir kez.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import type { ReactElement } from "react";
-import { factoryDayKey, fmtDayKey } from "../src/lib/factory-time";
-import { adayIleCoz, adimAtla, adimBaslat, adimCevap, adimSorusu, formaDonustur } from "../src/ses/akis";
-import type { Listeler } from "../src/ses/ayristir";
-import { hazirla } from "../src/ses/eslestir";
-import { adayListesi, listeleriYukle } from "../src/ses/listeler";
-import { sozcuklere } from "../src/ses/metin";
+import { addDaysToKey, factoryDayKey, fmtDayKey } from "../src/lib/factory-time";
+import { adayListesi } from "../src/ses/listeler";
 import { ONBILGI_ANAHTARI } from "../src/ses/onbilgi";
-import { sahteMotor, sesMotoruAyarla } from "../src/ses/tanima";
-import { tarihBul } from "../src/ses/tarih";
+import { sahteMotor, sesMotoruAyarla, type SesMotoru } from "../src/ses/tanima";
 
-const KAYIT: Record<string, { id: string; ad: string; kod?: string }[]> = {
+const KAYIT: Record<string, { id: string; ad: string; kod?: string; birim?: string }[]> = {
   "cari-kart": [{ id: "c1", ad: "Akın Tekstil", kod: "C001" }, { id: "c2", ad: "Akın Örme", kod: "C002" }, { id: "c3", ad: "Metro Tekstil" }],
-  urun: [{ id: "u1", ad: "Ribana" }, { id: "u2", ad: "Süprem" }, { id: "u3", ad: "Penye 30/1" }],
+  urun: [{ id: "u1", ad: "Ribana", birim: "MT" }, { id: "u2", ad: "Süprem", birim: "KG" }, { id: "u3", ad: "Penye 30/1", birim: "MT" }],
   renk: [{ id: "r1", ad: "Siyah" }, { id: "r2", ad: "Lacivert" }, { id: "r3", ad: "Beyaz" }],
 };
 const mockList = jest.fn(async (projection: string) => ({ kayitlar: (KAYIT[projection] ?? []).map((k) => ({ id: k.id, kayit: k, surum: "1" })), sonraki: null }));
+const mockInboxCreate = jest.fn(async (mesajId: string, tur: string, govde: unknown) => ({ mesajId, tur, govde, durum: "BEKLIYOR" }));
+const mockInboxGet = jest.fn();
+const mockCache = { load: jest.fn(async (_k: string, f: () => Promise<unknown>) => ({ data: await f(), offline: false, savedAt: "" })), peek: jest.fn(async () => null) };
 const mockSession = {
-  api: { list: mockList, inboxCreate: jest.fn(async () => ({ mesajId: "m1" })) },
-  cache: null, markOnline: jest.fn(),
+  api: { list: mockList, inboxCreate: mockInboxCreate, inboxGet: mockInboxGet },
+  cache: mockCache, markOnline: jest.fn(),
   permissions: [] as string[],
   offline: false, offlineSince: null, facility: null, switchError: null,
 };
@@ -33,320 +32,348 @@ jest.mock("expo-router", () => ({ useRouter: () => mockRouter, usePathname: () =
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 const NewOrder = (require("../app/(app)/(tabs)/siparisler/yeni") as { default: () => ReactElement }).default;
-const YAZAR = ["bulut:oturum", "bulut:siparis:yaz", "bulut:siparis:oku", "bulut:cari:oku"];
+const YAZAR = ["bulut:oturum", "bulut:siparis:yaz", "bulut:siparis:oku", "bulut:cari:oku", "bulut:cari:yaz"];
 
 let sira: string[] = [];
+let motor: ReturnType<typeof sahteMotor>;
 beforeEach(async () => {
   sira = [];
   mockSession.permissions = [...YAZAR];
-  sesMotoruAyarla(sahteMotor(() => sira.shift()));
-  await AsyncStorage.clear();
+  mockInboxCreate.mockClear();
+  mockInboxGet.mockReset();
+  mockRouter.replace.mockClear();
+  motor = sahteMotor(() => sira.shift());
+  sesMotoruAyarla(motor);
+  await AsyncStorage.setItem(ONBILGI_ANAHTARI, "1");
 });
 afterEach(() => sesMotoruAyarla(null));
 
-/** "Sesle doldur"a basar; ilk kullanımın mikrofon ön açıklaması çıkarsa "Devam" der. */
-function sesAc() {
-  fireEvent.press(screen.getByTestId("ses-ac"));
-  const devam = screen.queryByTestId("ses-onbilgi-devam");
-  if (devam) fireEvent.press(devam);
+async function ac() {
+  render(<NewOrder />);
+  await act(async () => undefined);
 }
 
-async function soyle(metin: string) {
+/** Mikrofona basar, sözü söyler, dinleme bitene kadar bekler. */
+async function soyle(metin: string, mikrofon = "ses-mikrofon") {
   sira.push(metin);
-  await waitFor(() => expect(screen.getByTestId("ses-mikrofon").props.accessibilityState).toEqual(expect.objectContaining({ disabled: false })));
   await act(async () => {
-    fireEvent.press(screen.getByTestId("ses-mikrofon"));
+    fireEvent.press(screen.getByTestId(mikrofon));
   });
-  await waitFor(() => expect(screen.getByTestId("ses-durum").props.children).toBe("Konuşmak için dokunun"));
+  await waitFor(() => expect(screen.queryByTestId("ses-serit")).toBeNull());
 }
 
-describe("düğme görünürlüğü", () => {
-  it("cihazda tanıma yoksa (varsayılan motor, jest = yerel modülsüz) düğme çizilmez; elle giriş aynen", () => {
+const devam = async () => {
+  await act(async () => {
+    fireEvent.press(screen.getByTestId("siparis-adim-ileri"));
+  });
+};
+
+async function cariSec(soz = "Akın Tekstil'e", id = "c1") {
+  await soyle(soz);
+  await act(async () => {
+    fireEvent.press(screen.getByTestId(`ses-aday-${id}`));
+  });
+}
+
+describe("mikrofon görünürlüğü ve ön açıklama", () => {
+  it("cihazda tanıma yoksa (varsayılan motor, jest = yerel modülsüz) mikrofon çizilmez; elle giriş aynen", async () => {
     sesMotoruAyarla(null);
-    render(<NewOrder />);
-    expect(screen.queryByTestId("ses-ac")).toBeNull();
+    await ac();
+    expect(screen.queryByTestId("ses-mikrofon")).toBeNull();
     expect(screen.getByTestId("cari-sec")).toBeTruthy();
   });
-  it("yazma yetkisi yoksa (salt okuma rolü) düğme çizilmez", () => {
+  it("yazma yetkisi yoksa mikrofon ve 'Yeni cari' çizilmez", async () => {
     mockSession.permissions = ["bulut:oturum", "bulut:siparis:oku"];
-    render(<NewOrder />);
-    expect(screen.queryByTestId("ses-ac")).toBeNull();
-  });
-  it("yetki + tanıma varken büyük 'Sesle doldur' düğmesi ilk sayfada", () => {
-    render(<NewOrder />);
-    expect(screen.getByLabelText("Sesle doldur: siparişi konuşarak girin")).toBeTruthy();
-  });
-});
-
-describe("mikrofon ön açıklaması (mağaza kuralı)", () => {
-  function izlenenMotor() {
-    const m = sahteMotor(() => sira.shift());
-    const baslat = jest.spyOn(m, "baslat");
-    sesMotoruAyarla(m);
-    return baslat;
-  }
-  it("⭐ ilk dokunuşta açıklama çıkar, izin istenmez; Vazgeç ses ekranını açmaz ve bayrak yazmaz", async () => {
-    const baslat = izlenenMotor();
-    render(<NewOrder />);
-    await act(async () => undefined);
-    fireEvent.press(screen.getByTestId("ses-ac"));
-    expect(screen.getByTestId("ses-onbilgi-metin").props.children).toMatch(/Android'de Google, iPhone'da Apple.*ses bu hizmete gönderilebilir.*ses kaydı tutmaz/);
+    await ac();
     expect(screen.queryByTestId("ses-mikrofon")).toBeNull();
+    expect(screen.queryByTestId("yeni-cari")).toBeNull();
+  });
+  it("⭐ ilk dokunuşta ön açıklama; Vazgeç dinleme başlatmaz, Devam başlatır ve bayrak yazılır", async () => {
+    await AsyncStorage.clear();
+    const baslat = jest.spyOn(motor, "baslat");
+    await ac();
+    fireEvent.press(screen.getByTestId("ses-mikrofon"));
+    expect(screen.getByTestId("ses-onbilgi")).toBeTruthy();
     fireEvent.press(screen.getByTestId("ses-onbilgi-vazgec"));
-    expect(screen.queryByTestId("ses-mikrofon")).toBeNull();
     expect(baslat).not.toHaveBeenCalled();
     expect(await AsyncStorage.getItem(ONBILGI_ANAHTARI)).toBeNull();
-    fireEvent.press(screen.getByTestId("ses-ac"));
-    expect(screen.getByTestId("ses-onbilgi")).toBeTruthy();
-  });
-  it("⭐ Devam ses ekranını açar (izin yine yalnız mikrofon düğmesinde); sonraki açılışta açıklama bir daha çıkmaz", async () => {
-    const baslat = izlenenMotor();
-    const ilk = render(<NewOrder />);
-    await act(async () => undefined);
-    fireEvent.press(screen.getByTestId("ses-ac"));
-    fireEvent.press(screen.getByTestId("ses-onbilgi-devam"));
-    expect(screen.getByTestId("ses-mikrofon")).toBeTruthy();
-    expect(baslat).not.toHaveBeenCalled();
-    await act(async () => undefined);
+    sira.push("Metro");
+    fireEvent.press(screen.getByTestId("ses-mikrofon"));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-onbilgi-devam"));
+    });
+    await waitFor(() => expect(baslat).toHaveBeenCalledTimes(1));
     expect(await AsyncStorage.getItem(ONBILGI_ANAHTARI)).toBe("1");
-    ilk.unmount();
-    render(<NewOrder />);
-    await act(async () => undefined);
-    fireEvent.press(screen.getByTestId("ses-ac"));
-    expect(screen.queryByTestId("ses-onbilgi-metin")).toBeNull();
-    expect(screen.getByTestId("ses-mikrofon")).toBeTruthy();
   });
 });
 
-describe("tek cümle kipi", () => {
-  it("⭐ 'gönder' dense de göndermez; Forma aktar formu doldurur, gönderim yalnız Gönder düğmesiyle ve aynı gövdeyle", async () => {
-    render(<NewOrder />);
-    sesAc();
-    expect(screen.getByTestId("ses-soru").props.children).toBe("Siparişi tek cümleyle söyleyin.");
-    fireEvent.press(screen.getByTestId("ses-kip-cumle"));
-    await soyle("Akın Tekstil'e 500 metre siyah ribana, 300 metre lacivert teslim cuma gönder kaydet");
-    expect(screen.getByTestId("ses-canli").props.children).toContain("gönder");
-    expect(screen.getByTestId("ses-artik").props.children).toBe("Anlayamadım: “gönder kaydet”");
-    expect(mockSession.api.inboxCreate).not.toHaveBeenCalled();
-
-    fireEvent.press(screen.getByTestId("ses-aktar"));
-    expect(mockSession.api.inboxCreate).not.toHaveBeenCalled();
-    expect(mockRouter.replace).not.toHaveBeenCalled();
-    // Form 2. sayfada: iki kalem sesle doldu.
-    expect(screen.getByLabelText("Adım 2 / 3")).toBeTruthy();
-    expect(screen.getAllByLabelText("Ürün: Ribana")).toHaveLength(2);
-    expect(screen.getByLabelText("Renk: Siyah")).toBeTruthy();
-    expect(screen.getByLabelText("Renk: Lacivert")).toBeTruthy();
-    expect(screen.getByTestId("kalem-1")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("siparis-adim-ileri"));
-    const cuma = fmtDayKey(tarihBul(sozcuklere("cuma"), factoryDayKey())!.gun);
-    expect(screen.getByTestId("termin-metin").props.value).toBe(cuma);
-    expect(mockSession.api.inboxCreate).not.toHaveBeenCalled();
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("siparis-gonder-ileri"));
-    });
-    expect(mockSession.api.inboxCreate).toHaveBeenCalledTimes(1);
-    const [token, tur, govde] = mockSession.api.inboxCreate.mock.calls[0] as unknown as [string, string, { cariKartId: string; kalemler: unknown[] }];
-    expect(typeof token).toBe("string");
-    expect(tur).toBe("SIPARIS");
-    expect(govde.cariKartId).toBe("c1");
-    expect(govde.kalemler).toEqual([{ urunId: "u1", renkId: "r1", miktar: "500" }, { urunId: "u1", renkId: "r2", miktar: "300" }]);
+describe("⭐ tek cümle kipi ve ayrı ses ekranı YOK", () => {
+  it("eski ses ekranı, kip seçici, özet şeridi ve 'Baştan söyle / Forma aktar' hiçbir adımda yok", async () => {
+    await ac();
+    for (const id of ["ses-ac", "ses-kip-cumle", "ses-kip-adim", "ses-ozet", "ses-form-geri-al", "ses-forma-aktar"]) expect(screen.queryByTestId(id)).toBeNull();
+    for (const metin of [/tek cümle/i, /Baştan söyle/, /Forma aktar/, /Sesle doldur$/]) expect(screen.queryByText(metin)).toBeNull();
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 });
 
-describe("tek cümle: düzeltme, ekleme, geri alma (2026-11-18)", () => {
-  async function bastanSoyle(metin: string) {
-    sira.push(metin);
+describe("cari adımı", () => {
+  it("⭐ söz → en benzer cariler sıralı, en iyisi vurgulu; SESSİZ seçim yok, dokununca seçilir", async () => {
+    await ac();
+    await soyle("Akın Tekstil'e");
+    expect(screen.getByTestId("ses-duyulan").props.value).toBe("Akın Tekstil'e");
+    expect(screen.getByTestId("ses-aday-c1")).toBeTruthy();
+    expect(screen.getByTestId("ses-en-yakin")).toBeTruthy();
+    // Henüz seçilmedi: Devam kapalı, seçicide cari yok.
+    expect(screen.getByTestId("siparis-adim-ileri").props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    expect(screen.getByTestId("cari-sec").props.accessibilityLabel).toBe("Cari: seçilmedi");
     await act(async () => {
-      fireEvent.press(screen.getByTestId("ses-bastan-soyle"));
+      fireEvent.press(screen.getByTestId("ses-aday-c1"));
     });
-    await waitFor(() => expect(screen.getByTestId("ses-durum").props.children).toBe("Konuşmak için dokunun"));
-  }
-  const metin = () => screen.getByTestId("ses-canli").props.children as string;
-
-  it("⭐ ikinci söz mevcut kalemlerin ÜZERİNE YAZMAZ: 'Kalem ekle' ekler, 'Baştan söyle' değiştirir, 'Geri al' tek dokunuş", async () => {
-    render(<NewOrder />);
-    sesAc();
-    fireEvent.press(screen.getByTestId("ses-kip-cumle"));
-    await soyle("Akın Tekstil'e 500 metre siyah ribana");
-    expect(screen.getByTestId("ses-kalem-0")).toBeTruthy();
-    // Metin varken mikrofon "Kalem ekle" olur.
-    expect(screen.getByTestId("ses-mikrofon").props.accessibilityLabel).toBe("Kalem ekle");
-    await soyle("300 metre lacivert süprem");
-    expect(metin()).toBe("Akın Tekstil'e 500 metre siyah ribana, 300 metre lacivert süprem");
-    expect(screen.getByTestId("ses-kalem-1")).toBeTruthy();
-    expect(screen.getByTestId("ses-cari")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("ses-geri-al"));
-    expect(metin()).toBe("Akın Tekstil'e 500 metre siyah ribana");
-    expect(screen.queryByTestId("ses-kalem-1")).toBeNull();
-    await bastanSoyle("Metro Tekstil'e 200 metre beyaz penye");
-    expect(metin()).toBe("Metro Tekstil'e 200 metre beyaz penye");
-    expect(screen.queryByTestId("ses-kalem-1")).toBeNull();
+    expect(screen.getByTestId("cari-sec").props.accessibilityLabel).toBe("Cari: Akın Tekstil");
+    expect(screen.getByTestId("ses-isaret")).toBeTruthy();
+    expect(screen.queryByTestId("ses-adaylar")).toBeNull();
   });
-
-  it("⭐ metni düzelt → yeniden yerleştir; adaylardan yapılan seçim düzeltmede KORUNUR", async () => {
-    render(<NewOrder />);
-    sesAc();
-    fireEvent.press(screen.getByTestId("ses-kip-cumle"));
-    await soyle("Akın'a 500 metre siya ribana");
-    fireEvent.press(screen.getByTestId("ses-cari-sec"));
-    fireEvent.press(screen.getByTestId("ses-aday-c2"));
-    expect(screen.queryByTestId("ses-secilmemis")).toBeNull();
-    fireEvent.press(screen.getByTestId("ses-duzelt"));
-    fireEvent.changeText(screen.getByTestId("ses-metin"), "Akın'a 500 metre siyah ribana, 200 metre beyaz ribana");
-    fireEvent.press(screen.getByTestId("ses-yerlestir"));
-    expect(screen.getByTestId("ses-kalem-1")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("ses-aktar"));
-    fireEvent.press(screen.getByTestId("siparis-adim-geri"));
-    expect(screen.getByLabelText("Cari: Akın Örme")).toBeTruthy();
+  it("belirsiz söz ikisini de listeler; duyulan metin düzeltilince liste yeniden sıralanır", async () => {
+    await ac();
+    await soyle("akın");
+    expect(screen.getByTestId("ses-aday-c1")).toBeTruthy();
+    expect(screen.getByTestId("ses-aday-c2")).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId("ses-duyulan"), "metro");
+    expect(screen.queryByTestId("ses-aday-c1")).toBeNull();
+    expect(screen.getByTestId("ses-aday-c3")).toBeTruthy();
   });
-
-  it("seçilmemiş aday sayısı alt şeritte söylenir", async () => {
-    render(<NewOrder />);
-    sesAc();
-    fireEvent.press(screen.getByTestId("ses-kip-cumle"));
-    await soyle("Akın'a 500 metre siyah ribana");
-    expect(screen.getByTestId("ses-secilmemis").props.children).toMatch(/^1 alanda seçim bekleniyor/);
+  it("cari adımında tanımaya yalnız cari adları ipucu verilir", async () => {
+    await ac();
+    await soyle("Metro");
+    expect(motor.sonSecenek?.ipuclari).toEqual(expect.arrayContaining(["Akın Tekstil", "Metro Tekstil"]));
+    expect(motor.sonSecenek?.ipuclari).not.toContain("Ribana");
   });
-
-  it("⭐ forma aktarınca özet şeridi + sesle dolan işareti; not açıklamaya gider; top forma yazılmaz; 'Geri al' formu eski hâline döndürür", async () => {
-    render(<NewOrder />);
-    sesAc();
-    fireEvent.press(screen.getByTestId("ses-kip-cumle"));
-    await soyle("Akın Tekstil'e 500 metre siyah ribana, 3 top beyaz süprem not acil");
-    expect(screen.getByTestId("ses-not")).toBeTruthy();
-    expect(screen.getByTestId("ses-miktar-1")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("ses-aktar"));
-    expect(screen.getByTestId("ses-ozet").props.accessibilityLiveRegion).toBe("polite");
-    expect(screen.getAllByTestId("ses-isaret")).toHaveLength(2);
-    expect(screen.getByLabelText("Ürün: Süprem")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("siparis-adim-ileri"));
-    expect(screen.getByDisplayValue("acil")).toBeTruthy();
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("siparis-gonder-ileri"));
-    });
-    // Top miktarı forma yazılmadığı için AYNI doğrulama yolu reddeder; hiçbir şey gitmez.
-    expect(mockSession.api.inboxCreate).not.toHaveBeenCalled();
-    expect(screen.getByText("2. kalem: miktar geçersiz")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("ses-form-geri-al"));
-    expect(screen.getByLabelText("Adım 1 / 3")).toBeTruthy();
-    expect(screen.queryByTestId("ses-ozet")).toBeNull();
-    expect(screen.getByLabelText("Cari: seçilmedi")).toBeTruthy();
+  it("⛔ negatif sonda: listede olmayan ad seçim yapmaz, 'yeni cari oluştur' kısayolu çıkar", async () => {
+    await ac();
+    await soyle("Ayhan Kardeşler");
+    expect(screen.getByTestId("ses-aday-yok")).toBeTruthy();
+    expect(screen.getByTestId("ses-yeni-cari")).toBeTruthy();
+    expect(screen.getByTestId("siparis-adim-ileri").props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
   });
-
-  it("tanımaya katalog adları ipucu olarak verilir", async () => {
-    const m = sahteMotor(() => sira.shift());
-    sesMotoruAyarla(m);
-    render(<NewOrder />);
-    sesAc();
-    fireEvent.press(screen.getByTestId("ses-kip-cumle"));
-    await soyle("Akın Tekstil");
-    expect(m.sonSecenek?.ipuclari).toEqual(expect.arrayContaining(["Ribana", "Siyah", "Akın Tekstil", "Metro Tekstil"]));
+  it("cari yazma izni yoksa kısayol da yok", async () => {
+    mockSession.permissions = YAZAR.filter((p) => p !== "bulut:cari:yaz");
+    await ac();
+    await soyle("Ayhan Kardeşler");
+    expect(screen.queryByTestId("ses-yeni-cari")).toBeNull();
   });
 });
 
-describe("adım adım kipi", () => {
-  it("sorar, belirsiz müşteride modal adaylar açar, renk 'yok' ile geçer, sonunda forma aktarır", async () => {
-    render(<NewOrder />);
-    sesAc();
-    fireEvent.press(screen.getByTestId("ses-kip-adim"));
-    await soyle("Akın");
-    expect(screen.getByText("Hangi müşteri?")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("ses-aday-c2"));
-    expect(screen.getByTestId("ses-soru").props.children).toBe("Hangi ürün?");
-    await soyle("süprem");
+describe("yeni cari kısayolu (yerinde)", () => {
+  it("⭐ kısayol adı dolu açar; aynı gönderim yolu; fabrika işleyince cari siparişe SEÇİLİ döner", async () => {
+    await ac();
+    await soyle("Ayhan Kardeşler");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-yeni-cari"));
+    });
+    expect(screen.getByTestId("yeni-cari-sayfa")).toBeTruthy();
+    expect(screen.getByTestId("cari-ad").props.value).toBe("Ayhan Kardeşler");
+    // Telefonu sesle doldur.
+    fireEvent.press(screen.getByTestId("ses-hedef-telefon"));
+    await soyle("sıfır beş yüz otuz iki yüz yirmi üç kırk beş altmış yedi", "cari-ses-mikrofon");
+    expect(screen.getByTestId("cari-telefon").props.value).toBe("05321234567");
+
+    let durum: Record<string, unknown> = { durum: "BEKLIYOR", sonuc: null };
+    mockInboxGet.mockImplementation(async (mesajId: string) => ({ mesajId, tur: "CARI", ...durum }));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("yeni-cari-gonder"));
+    });
+    expect(mockInboxCreate).toHaveBeenCalledTimes(1);
+    const [, tur, govde] = mockInboxCreate.mock.calls[0]!;
+    expect(tur).toBe("CARI");
+    expect(govde).toEqual({ ad: "Ayhan Kardeşler", roller: { musteri: true, tedarikci: false }, telefon: "05321234567" });
+    // Sayfa kapandı; fabrika işlemeden siparişe bağlanamaz.
+    expect(screen.queryByTestId("yeni-cari-sayfa")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("yeni-cari-bekliyor")).toBeTruthy());
+    expect(screen.getByTestId("siparis-adim-ileri").props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+
+    durum = { durum: "ISLENDI", sonuc: { varlikId: "c-yeni", belgeNo: "C0099", kod: null, mesaj: "Müşteri kartı oluşturuldu" } };
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("yeni-cari-denetle"));
+    });
+    await waitFor(() => expect(screen.getByTestId("cari-sec").props.accessibilityLabel).toBe("Cari: Ayhan Kardeşler"));
+    expect(screen.queryByTestId("yeni-cari-bekliyor")).toBeNull();
+    expect(screen.getByTestId("siparis-adim-ileri").props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
+  });
+  it("fabrika reddederse neden görünür, cari seçilmez", async () => {
+    await ac();
+    mockInboxGet.mockImplementation(async (mesajId: string) => ({ mesajId, tur: "CARI", durum: "REDDEDILDI", sonuc: { kod: "MUKERRER", mesaj: "Bu adla cari zaten var" } }));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("yeni-cari"));
+    });
+    expect(screen.getByTestId("cari-ad").props.value).toBe("");
+    fireEvent.changeText(screen.getByTestId("cari-ad"), "Akın Tekstil");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("yeni-cari-gonder"));
+    });
+    await waitFor(() => expect(screen.getByText(/Bu adla cari zaten var/)).toBeTruthy());
+    expect(screen.getByTestId("cari-sec").props.accessibilityLabel).toBe("Cari: seçilmedi");
+  });
+  it("⛔ negatif sonda: geçersiz form gönderilmez (ad boş)", async () => {
+    await ac();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("yeni-cari"));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("yeni-cari-gonder"));
+    });
+    expect(mockInboxCreate).not.toHaveBeenCalled();
+    expect(screen.getByTestId("yeni-cari-hata")).toBeTruthy();
+  });
+});
+
+describe("kalem, teslim ve not adımları", () => {
+  it("⭐ ürün → renk ('yok') → miktar; hedef kendiliğinden ilerler; ipucu o alanın kataloğu", async () => {
+    await ac();
+    await cariSec();
+    await devam();
+    expect(screen.getByTestId("ses-hedef-urun").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+    await soyle("ribana");
+    expect(motor.sonSecenek?.ipuclari).toEqual(["Ribana", "Süprem", "Penye 30/1"]);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-aday-u1"));
+    });
+    expect(screen.getByTestId("kalem-urun-0").props.accessibilityLabel).toBe("Ürün: Ribana");
+    expect(screen.getByTestId("ses-hedef-renk").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
     await soyle("yok");
-    expect(screen.getByTestId("ses-soru").props.children).toBe("Kaç metre?");
-    await soyle("bin iki yüz elli metre");
-    await soyle("hayır");
-    expect(screen.getByTestId("ses-soru").props.children).toMatch(/^Teslim ne zaman/);
-    fireEvent.press(screen.getByTestId("ses-gec"));
-    expect(screen.queryByTestId("ses-mikrofon")).toBeNull();
-    fireEvent.press(screen.getByTestId("ses-aktar"));
-    expect(screen.getByLabelText("Adım 2 / 3")).toBeTruthy();
-    expect(screen.getByLabelText("Ürün: Süprem")).toBeTruthy();
-    expect(screen.getByLabelText("Renk: seçilmedi")).toBeTruthy();
-    expect(mockSession.api.inboxCreate).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByTestId("siparis-adim-geri"));
-    expect(screen.getByLabelText("Cari: Akın Örme")).toBeTruthy();
+    expect(screen.getByTestId("ses-bilgi")).toBeTruthy();
+    expect(screen.getByTestId("ses-hedef-miktar").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+    await soyle("iki yüz elli metre");
+    expect(screen.getByTestId("kalem-miktar-0").props.value).toBe("250");
   });
-  it("anlaşılmayan cevapta aynı soruda kalır ve sade açıklama verir; 'gönder' komut değildir", async () => {
-    render(<NewOrder />);
-    sesAc();
-    fireEvent.press(screen.getByTestId("ses-kip-adim"));
+  it("⛔ birim uyuşmazlığında miktar yazılmaz, neden görünür", async () => {
+    await ac();
+    await cariSec();
+    await devam();
+    await soyle("süprem");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-aday-u2"));
+    });
+    fireEvent.press(screen.getByTestId("ses-hedef-miktar"));
+    await soyle("yüz metre");
+    expect(screen.getByTestId("kalem-miktar-0").props.value).toBe("");
+    expect(screen.getByTestId("ses-uyari")).toBeTruthy();
+    expect(screen.getByText(/kilo ile giriliyor/)).toBeTruthy();
+  });
+  it("teslim: 'cuma' yazılır, geçmiş gün yazılmaz; not boşsa yazılır, doluysa Ekle/Değiştir sorulur", async () => {
+    await ac();
+    await cariSec();
+    await devam();
+    await devam();
+    await soyle("10 Ocak 2020");
+    expect(screen.getByTestId("termin-metin").props.value).toBe("");
+    expect(screen.getByTestId("ses-uyari")).toBeTruthy();
+    await soyle("yarın");
+    expect(screen.getByTestId("termin-metin").props.value).toBe(fmtDayKey(addDaysToKey(factoryDayKey(), 1)));
+    expect(screen.getByTestId("ses-hedef-aciklama").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+    await soyle("kenar etiketli olsun");
+    expect(screen.getByTestId("aciklama-metin").props.value).toBe("kenar etiketli olsun");
+    await soyle("acil");
+    expect(screen.getByTestId("aciklama-metin").props.value).toBe("kenar etiketli olsun");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-not-ekle"));
+    });
+    expect(screen.getByTestId("aciklama-metin").props.value).toBe("kenar etiketli olsun acil");
+    await soyle("sadece acil");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-not-degistir"));
+    });
+    expect(screen.getByTestId("aciklama-metin").props.value).toBe("sadece acil");
+  });
+  it("⭐ ses göndermez: 'gönder' söylense de gönderim yalnız Gönder düğmesiyle ve elle girişle aynı gövdeyle", async () => {
+    await ac();
+    await cariSec();
+    await devam();
+    await soyle("ribana");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-aday-u1"));
+    });
+    fireEvent.press(screen.getByTestId("ses-hedef-miktar"));
+    await soyle("beş yüz metre");
+    await devam();
     await soyle("gönder");
-    expect(screen.getByTestId("ses-soru").props.children).toBe("Müşteri kim?");
-    expect(screen.getByTestId("ses-uyari").props.children).toBe("“gönder” müşteri listesinde bulunamadı. Yeniden söyleyin.");
-    expect(mockSession.api.inboxCreate).not.toHaveBeenCalled();
-    expect(screen.getByTestId("ses-aktar").props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
-  });
-});
-
-describe("hatalar çökertmez", () => {
-  it.each([
-    ["!izin-yok", /Mikrofon izni verilmedi/],
-    ["!desteklenmiyor", /Türkçe ses tanıma kullanılamıyor/],
-    ["!ag-yok", /internet gerekiyor/],
-    ["", /Sesinizi duyamadım/],
-  ])("%s → Türkçe açıklama", async (m, re) => {
-    render(<NewOrder />);
-    sesAc();
-    fireEvent.press(screen.getByTestId("ses-kip-cumle"));
-    await soyle(m);
-    expect(screen.getByTestId("ses-hata").props.children).toMatch(re);
-    expect(screen.getByTestId("ses-soru").props.children).toBe("Siparişi tek cümleyle söyleyin.");
-    // Geçici hatada "Tekrar dene"; izin/destek yoksa yeniden denemek anlamsız.
-    expect(!!screen.queryByTestId("ses-tekrar")).toBe(m !== "!izin-yok" && m !== "!desteklenmiyor");
-  });
-  it("liste yüklenemezse açıklar, sayı/tarih yine çalışır", async () => {
-    mockList.mockImplementationOnce(async () => { throw new Error("ağ"); });
-    render(<NewOrder />);
-    sesAc();
-    await waitFor(() => expect(screen.getByTestId("ses-eksik").props.children).toBe("müşteri listesi yüklenemedi; bu alanlar formda elle seçilir."));
-  });
-});
-
-describe("akış çekirdeği ve listeler (saf)", () => {
-  const L: Listeler = {
-    cari: hazirla([{ id: "c1", title: "Akın Tekstil" }, { id: "c2", title: "Akın Örme" }]),
-    urun: hazirla([{ id: "u1", title: "Ribana" }]),
-    renk: hazirla([{ id: "r1", title: "Siyah" }]),
-  };
-  it("soru sırası: müşteri → ürün → renk → miktar → başka? → (evet) ürün … → teslim → bitti", () => {
-    let d = adimBaslat();
-    const yol: string[] = [d.adim];
-    for (const m of ["Akın Tekstil", "ribana", "siyah", "500", "evet", "ribana", "geç", "300", "hayır", "yarın"]) {
-      d = adimCevap(d, m, L, "2026-11-17");
-      yol.push(d.adim);
-    }
-    expect(yol).toEqual(["cari", "urun", "renk", "miktar", "baska", "urun", "renk", "miktar", "baska", "termin", "bitti"]);
-    expect(adimSorusu({ ...d, adim: "urun", kalem: 1 })).toBe("2. kalem: hangi ürün?");
-    expect(formaDonustur(d.taslak)).toEqual({
-      cari: { id: "c1", title: "Akın Tekstil" },
-      kalemler: [{ urun: { id: "u1", title: "Ribana" }, renk: { id: "r1", title: "Siyah" }, miktar: "500" }, { urun: { id: "u1", title: "Ribana" }, renk: null, miktar: "300" }],
-      termin: "18.11.2026",
-      aciklama: null,
+    expect(mockInboxCreate).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("siparis-gonder-ileri"));
     });
+    expect(mockInboxCreate).toHaveBeenCalledTimes(1);
+    const [, tur, govde] = mockInboxCreate.mock.calls[0]!;
+    expect(tur).toBe("SIPARIS");
+    expect(govde).toEqual({ cariKartId: "c1", doviz: "TRY", kalemler: [{ urunId: "u1", miktar: "500" }] });
   });
-  it("zorunlu adım atlanamaz; adaylar seçimle çözülür, seçilmezse forma boş gider", () => {
-    expect(adimAtla(adimBaslat()).adim).toBe("cari");
-    const d = adimCevap(adimBaslat(), "Akın", L, "2026-11-17");
-    expect(d.taslak.cari.durum).toBe("adaylar");
-    expect(formaDonustur(d.taslak).cari).toBeNull();
-    expect(formaDonustur(adayIleCoz(d.taslak, { alan: "cari" }, { id: "c2", title: "Akın Örme" })).cari).toEqual({ id: "c2", title: "Akın Örme" });
+});
+
+describe("dinleme yaşam döngüsü ve hatalar", () => {
+  it("⭐ dinlerken adım değişince ('Devam') şerit kapanır, motor iptalle durur, geç gelen sonuç yazılmaz", async () => {
+    // İlk dinleme sahte motorla (cari seçimi); sonrakiler askıda kalan, elle sürülen oturum.
+    let asili = false;
+    const kapat = jest.fn();
+    let olay: Parameters<SesMotoru["baslat"]>[0] | null = null;
+    sesMotoruAyarla({
+      mevcut: () => true,
+      baslat: async (o, s) => {
+        if (!asili) return motor.baslat(o, s);
+        olay = o;
+        o.evre?.("dinliyor");
+        return kapat;
+      },
+    });
+    await ac();
+    await cariSec();
+    asili = true;
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-mikrofon"));
+    });
+    expect(screen.getByTestId("ses-durum").props.children).toBe("Dinliyorum…");
+    expect(screen.getByTestId("ses-mikrofon").props.accessibilityLabel).toBe("Dinlemeyi durdur");
+    await devam();
+    expect(screen.queryByTestId("ses-serit")).toBeNull();
+    expect(kapat).toHaveBeenCalledWith(true);
+    await act(async () => {
+      olay!.son("ribana");
+      olay!.bitti();
+    });
+    expect(screen.queryByTestId("ses-adaylar")).toBeNull();
+    expect(screen.getByTestId("kalem-urun-0").props.accessibilityLabel).toBe("Ürün: seçilmedi");
   });
-  it("liste yükleyici: seçicinin projeksiyonları, müşteri süzgeci, 200'lük sayfalar, en çok 5 sayfa", async () => {
-    const list = jest.fn(async (_p: string, q: { imlec?: string }) => ({ kayitlar: [{ id: `k${q.imlec ?? 0}`, kayit: { ad: "A", kod: "K" }, surum: "1" }], sonraki: String(Number(q.imlec ?? 0) + 1) }));
-    const r = await adayListesi(list, "cari-kart", "MUSTERI");
+  it("izin reddi yerinde sade Türkçe, çökme yok; ağ hatasında 'Tekrar dene' yeniden dinler", async () => {
+    await ac();
+    sira.push("!izin-yok");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-mikrofon"));
+    });
+    await waitFor(() => expect(screen.getByTestId("ses-hata")).toBeTruthy());
+    expect(screen.getByText(/Mikrofon izni verilmedi/)).toBeTruthy();
+    expect(screen.queryByTestId("ses-tekrar")).toBeNull();
+    sira.push("!ag-yok", "Metro");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-mikrofon"));
+    });
+    await waitFor(() => expect(screen.getByTestId("ses-tekrar")).toBeTruthy());
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("ses-tekrar"));
+    });
+    await waitFor(() => expect(screen.getByTestId("ses-aday-c3")).toBeTruthy());
+  });
+  it("liste yüklenemezse açıklar; miktar/teslim yine çalışır", async () => {
+    mockList.mockRejectedValueOnce(new Error("x")).mockRejectedValueOnce(new Error("x")).mockRejectedValueOnce(new Error("x"));
+    await ac();
+    await soyle("Akın");
+    expect(screen.getByTestId("ses-eksik")).toBeTruthy();
+    expect(screen.getByTestId("ses-aday-yok")).toBeTruthy();
+  });
+});
+
+describe("liste yükleyici (saf)", () => {
+  it("seçicinin projeksiyonları, müşteri süzgeci, 200'lük sayfalar, en çok 5 sayfa; ürün birimi taşınır", async () => {
+    const list = jest.fn(async (_p: string, q: { imlec?: string }) => ({ kayitlar: [{ id: `x${q.imlec ?? 0}`, kayit: { ad: "A", birim: "MT" }, surum: "1" }], sonraki: String(Number(q.imlec ?? 0) + 1) }));
+    const r = await adayListesi(list as never, "cari-kart", "MUSTERI");
     expect(r).toHaveLength(5);
-    expect(list).toHaveBeenNthCalledWith(1, "cari-kart", { limit: 200, suzgec: "MUSTERI" });
-    expect(list).toHaveBeenNthCalledWith(2, "cari-kart", { limit: 200, imlec: "1", suzgec: "MUSTERI" });
-    expect(r[0]).toEqual({ id: "k0", title: "A", kod: "K" });
-    const hepsi = await listeleriYukle(async (p) => {
-      if (p === "renk") throw new Error("403");
-      return { kayitlar: [], sonraki: null };
-    });
-    expect(hepsi.eksik).toEqual(["renk"]);
+    expect(r[0]).toEqual({ id: "x0", title: "A", birim: "MT" });
+    expect(list).toHaveBeenCalledWith("cari-kart", { limit: 200, suzgec: "MUSTERI" });
   });
 });

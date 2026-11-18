@@ -1,7 +1,7 @@
-// Mikrofon ön açıklaması (2026-11-18, mağaza kuralı): mikrofon izni İSTENMEDEN önce, "Sesle doldur"a ilk dokunuşta bir
+// Mikrofon ön açıklaması (2026-11-18, mağaza kuralı): mikrofon izni İSTENMEDEN önce, mikrofona ("Sesle söyle") ilk dokunuşta bir
 // kez kısa açıklama gösterilir. "Devam" denince bu cihazda bir daha gösterilmez (düz depo, cihaz kapsamlı — çıkışta
-// silinmez); "Vazgeç"te bayrak yazılmaz, izin istenmez, bir sonraki dokunuşta yine gösterilir. İzin ancak ses
-// ekranındaki mikrofon düğmesinde (`tanima.ts` `baslat`) istenir. Depo hatası yutulur → açıklama yeniden gösterilir.
+// silinmez); "Vazgeç"te bayrak yazılmaz, izin istenmez, bir sonraki dokunuşta yine gösterilir. İzin ancak "Devam"
+// sonrası yerinde dinleme başlarken (`tanima.ts` `baslat`) istenir. Depo hatası yutulur → açıklama yeniden gösterilir.
 import { plainStore, type KeyValue } from "../state/store";
 
 export const ONBILGI_ANAHTARI = "ses-onbilgi-goruldu";

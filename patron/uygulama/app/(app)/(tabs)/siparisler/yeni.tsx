@@ -1,21 +1,32 @@
 // Yeni sipariş fabrikaya GELEN KUTUSU üzerinden gider: sipariş no, yön, durum fabrikada doğar.
 // Gövde `buildOrder` (forms.ts), gönderim `useWrite` (işlem kimliği kuralı; TEK örnek, adımlar arasında yeniden
 // üretilmez). Üç sayfa (şartname §4.10): Müşteri · Kalemler · Gönder; 1 → 2 cari seçilmeden geçilmez.
-// Sesle doldur (src/ses, 2026-11-17): yalnız formu DOLDURUR, asla göndermez; gönderim aşağıdaki aynı `submit` yolundan.
-// İlk dokunuşta mikrofon ön açıklaması (SesOnBilgi, bir kez); mikrofon izni yalnız ses ekranının mikrofon düğmesinde.
+// SESLİ GİRİŞ YERİNDE (2026-11-18; ayrı ses ekranı ve tek cümle kipi kaldırıldı): her adımın araç satırında aynı
+// mikrofon; söz YALNIZ o adımın seçili alanına uygulanır (`src/ses/alan.ts`). Liste alanlarında en benzer adaylar
+// sıralanır ve kullanıcı dokunarak seçer (sessiz seçim YOK); miktar/termin/not doğrudan yazılır ya da nedeniyle
+// reddedilir. Ses ASLA göndermez: gönderim aşağıdaki aynı `submit` yolundan. Ön açıklama ilk dokunuşta bir kez.
+// Yeni cari: cari adımında yerinde alt sayfa (YeniCariSayfasi) — gelen kutusuna gider; fabrika işleyip kimliği dönene
+// kadar siparişe bağlanamaz (cariKartId fabrikada doğar), işlenince cari kendiliğinden seçilir.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { addDaysToKey, factoryDayKey, fmtDayKey } from "../../../../src/lib/factory-time";
 import { buildOrder, type OrderLineInput } from "../../../../src/lib/forms";
 import { can } from "../../../../src/lib/access";
-import type { FormDoldurma } from "../../../../src/ses/akis";
-import { onbilgiGoruldu, onbilgiIsaretle } from "../../../../src/ses/onbilgi";
+import { resultText } from "../../../../src/lib/inbox";
+import { adaySirala, atlaMi, miktarOku, serbestMetin, terminOku, urunBirimi, zayifMi, type ListeAlani, type Listeler } from "../../../../src/ses/alan";
+import { hazirla } from "../../../../src/ses/eslestir";
+import { listeleriYukle, type HamListeler } from "../../../../src/ses/listeler";
 import { sesMotoru } from "../../../../src/ses/tanima";
 import { useSession } from "../../../../src/state/session";
+import { useRemote } from "../../../../src/state/useRemote";
+import { inboxPending } from "../../../../src/ui/diger/inbox-format";
+import { useSettlePoll } from "../../../../src/ui/diger/useSettlePoll";
 import { SesOnBilgi } from "../../../../src/ui/ses/SesOnBilgi";
-import { SesDugmesi, SesliSiparisModal } from "../../../../src/ui/ses/SesliSiparis";
+import { DinlemeSeridi, SesAdaylari, SesAraci, SesBildirimi, SesIsareti, type HedefSecenegi } from "../../../../src/ui/ses/YerindeSes";
+import { useOnbilgi, useYerindeSes } from "../../../../src/ui/ses/useYerindeSes";
+import { YeniCariSayfasi, type GonderilenCari } from "../../../../src/ui/siparis/YeniCariSayfasi";
 import { Screen } from "../../../../src/ui/Frame";
 import { Banner, Button, Field } from "../../../../src/ui/kit";
 import { Picker, type Picked } from "../../../../src/ui/Picker";
@@ -24,42 +35,38 @@ import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
 import { TOUCH, space, typography } from "../../../../src/ui/tokens";
 import { useWrite } from "../../../../src/ui/useWrite";
 
-/** `ses`: satır sesle doldu ve henüz elle değiştirilmedi (görsel işaret). */
+/** `ses`: satırın bir alanı sesle doldu ve satır henüz elle değiştirilmedi (görsel işaret). */
 interface Line { urun: Picked | null; renk: Picked | null; miktar: string; birimFiyat: string; ses?: boolean }
-/** Sesle doldurmadan ÖNCEKİ form (tek dokunuşla geri al). */
-interface FormAni { cari: Picked | null; sesCari: boolean; lines: Line[]; termin: string; quick: QuickKey; aciklama: string; adim: number }
 const EMPTY: Line = { urun: null, renk: null, miktar: "", birimFiyat: "" };
 /** Hızlı termin: fabrika gününden ileri sayılan takvim günü (metin alanını doldurur; elle de yazılır). */
 const QUICK = [{ key: "0", label: "Bugün", days: 0 }, { key: "7", label: "+7 gün", days: 7 }, { key: "30", label: "+30 gün", days: 30 }] as const;
 type QuickKey = (typeof QUICK)[number]["key"] | "elle";
 const ADIMLAR = ["Müşteri", "Kalemler", "Gönder"] as const;
 
+type KalemAlani = "urun" | "renk" | "miktar";
+type SonAlan = "termin" | "aciklama";
+const KALEM_HEDEF: readonly HedefSecenegi<KalemAlani>[] = [{ key: "urun", label: "Ürün" }, { key: "renk", label: "Renk" }, { key: "miktar", label: "Miktar" }];
+const SON_HEDEF: readonly HedefSecenegi<SonAlan>[] = [{ key: "termin", label: "Teslim tarihi" }, { key: "aciklama", label: "Açıklama" }];
+const ALAN_ADI: Readonly<Record<ListeAlani, string>> = { cari: "Hangi cari?", urun: "Hangi ürün?", renk: "Hangi renk?" };
+
+/** Sesli sonucun yerinde gösterimi. */
+type SesSonucu =
+  | { readonly tur: "liste"; readonly alan: ListeAlani; readonly satir: number; readonly metin: string }
+  | { readonly tur: "bildirim"; readonly ton: "bilgi" | "uyari"; readonly metin: string }
+  | { readonly tur: "not"; readonly metin: string };
+
+const ilkBos = (l: Line | undefined): KalemAlani => (!l?.urun ? "urun" : !l.renk ? "renk" : !l.miktar ? "miktar" : "urun");
+/** Tanımaya yön veren katalog adları: yalnız bulunulan alanın listesi (müşteri adında ilk iki sözcük). */
+const ipucuAdlari = (h: HamListeler | null, alan: ListeAlani | null): string[] =>
+  !h || !alan ? [] : h[alan].map((a) => (alan === "cari" ? a.title.replace(/[.,]/g, " ").split(/\s+/).filter(Boolean).slice(0, 2).join(" ") : a.title));
+
 export default function NewOrder() {
   const { api, permissions } = useSession();
   const router = useRouter();
   const motor = useMemo(() => sesMotoru(), []);
-  // Ses düğmesi yalnız yazma yetkisi VE cihazda tanıma varken (web/Expo Go/izin dışı rolde çizilmez).
+  // Mikrofon yalnız yazma yetkisi VE cihazda tanıma varken (web/Expo Go/izin dışı rolde çizilmez).
   const sesVar = can(permissions, "bulut:siparis:yaz") && motor.mevcut();
-  const [sesAcik, setSesAcik] = useState(false);
-  // Mikrofon ön açıklaması (src/ses/onbilgi.ts): ilk dokunuşta bir kez, izin istenmeden önce. Bayrak okunmadıysa açıklama gösterilir.
-  const [onbilgiTamam, setOnbilgiTamam] = useState(false);
-  const [onbilgiAcik, setOnbilgiAcik] = useState(false);
-  useEffect(() => {
-    if (!sesVar) return;
-    let canli = true;
-    void onbilgiGoruldu().then((g) => canli && g && setOnbilgiTamam(true));
-    return () => {
-      canli = false;
-    };
-  }, [sesVar]);
-  const sesDugmesi = () => (onbilgiTamam ? setSesAcik(true) : setOnbilgiAcik(true));
-  const onbilgiDevam = () => {
-    onbilgiIsaretle();
-    setOnbilgiTamam(true);
-    setOnbilgiAcik(false);
-    setSesAcik(true);
-  };
-  const listeYukle = useCallback((projection: string, p: Parameters<typeof api.list>[1]) => api.list(projection, p), [api]);
+  const cariYazar = can(permissions, "bulut:cari:yaz");
   const t = useTokens();
   const s = useStyles();
   const [cari, setCari] = useState<Picked | null>(null);
@@ -77,58 +84,123 @@ export default function NewOrder() {
   const send = useCallback((id: string) => (built.ok ? api.inboxCreate(id, "SIPARIS", built.body) : Promise.reject(new Error(built.error))), [api, built]);
   const w = useWrite(send);
   const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch, ses: false } : l)));
-  const [sesCari, setSesCari] = useState(false);
-  const [sesOzet, setSesOzet] = useState<{ metin: string; once: FormAni } | null>(null);
+
+  // ---- Sesli giriş (yerinde) ----
+  const ses = useYerindeSes(motor);
+  const kapi = useOnbilgi(sesVar);
+  const [ham, setHam] = useState<HamListeler | null>(null);
+  const listeler = useMemo<Listeler | null>(() => (ham ? { cari: hazirla(ham.cari), urun: hazirla(ham.urun), renk: hazirla(ham.renk) } : null), [ham]);
+  const yukleniyor = useRef<Promise<HamListeler> | null>(null);
+  const [kalemHedef, setKalemHedef] = useState<KalemAlani>("urun");
+  const [sonHedef, setSonHedef] = useState<SonAlan>("termin");
+  const [sonuc, setSonuc] = useState<SesSonucu | null>(null);
+  const [sesle, setSesle] = useState<ReadonlySet<"cari" | "termin" | "aciklama">>(new Set());
+  const isaretle = (k: "cari" | "termin" | "aciklama", on: boolean) =>
+    setSesle((x) => {
+      const y = new Set(x);
+      if (on) y.add(k);
+      else y.delete(k);
+      return y;
+    });
+  const satir = lines.length - 1;
+  // Dinleme bitince sonuç işlenirken formun GÜNCEL hâli okunur (dinlerken elle değişmiş olabilir).
+  const guncel = useRef({ lines, termin, aciklama });
+  guncel.current = { lines, termin, aciklama };
+
+  // Adım değişince (yalnız o zaman) dinleme kapanır, sonuç temizlenir; hedef adımın ilk boş alanıdır.
+  const { iptal } = ses;
+  useEffect(() => {
+    iptal();
+    setSonuc(null);
+    const g = guncel.current;
+    if (adim === 2) setKalemHedef(ilkBos(g.lines[g.lines.length - 1]));
+    if (adim === 3) setSonHedef(g.termin ? "aciklama" : "termin");
+  }, [adim, iptal]);
+
+  const hedefAlan = (): ListeAlani | KalemAlani | SonAlan => (adim === 1 ? "cari" : adim === 2 ? kalemHedef : sonHedef);
+
+  function isle(alan: ListeAlani | KalemAlani | SonAlan, i: number, metin: string, h: HamListeler) {
+    if (alan === "renk" && atlaMi(metin)) {
+      setLines((ls) => ls.map((l, j) => (j === i ? { ...l, renk: null } : l)));
+      setKalemHedef("miktar");
+      return setSonuc({ tur: "bildirim", ton: "bilgi", metin: "Renk boş bırakıldı." });
+    }
+    if (alan === "cari" || alan === "urun" || alan === "renk") return setSonuc({ tur: "liste", alan, satir: i, metin });
+    if (alan === "miktar") {
+      const u = guncel.current.lines[i]?.urun;
+      const r = miktarOku(metin, urunBirimi(u ? h.urun.find((x) => x.id === u.id)?.birim : null));
+      if (!r.tamam) return setSonuc({ tur: "bildirim", ton: "uyari", metin: r.neden });
+      setLines((ls) => ls.map((l, j) => (j === i ? { ...l, miktar: r.deger, ses: true } : l)));
+      return setSonuc({ tur: "bildirim", ton: "bilgi", metin: `Miktar ${r.deger} yazıldı.` });
+    }
+    if (alan === "termin") {
+      if (atlaMi(metin)) {
+        setTermin("");
+        setQuick("elle");
+        isaretle("termin", false);
+        return setSonuc({ tur: "bildirim", ton: "bilgi", metin: "Teslim tarihi boş bırakıldı." });
+      }
+      const r = terminOku(metin, factoryDayKey());
+      if (!r.tamam) return setSonuc({ tur: "bildirim", ton: "uyari", metin: r.neden });
+      setTermin(r.deger);
+      setQuick("elle");
+      isaretle("termin", true);
+      setSonHedef("aciklama");
+      return setSonuc({ tur: "bildirim", ton: "bilgi", metin: `Teslim tarihi ${r.deger} yazıldı.` });
+    }
+    const not = serbestMetin(metin);
+    if (guncel.current.aciklama.trim()) return setSonuc({ tur: "not", metin: not });
+    setAciklama(not.slice(0, 500));
+    isaretle("aciklama", true);
+    setSonuc(null);
+  }
+
+  function mikrofon() {
+    if (ses.dinliyor) return ses.durdur();
+    const alan = hedefAlan();
+    const i = satir;
+    setSonuc(null);
+    kapi.iste(() => {
+      yukleniyor.current ??= listeleriYukle((projection, p) => api.list(projection, p)).catch(() => ({ cari: [], urun: [], renk: [], eksik: ["müşteri", "ürün", "renk"] }));
+      void yukleniyor.current.then((h) => {
+        setHam(h);
+        const listeAlani = alan === "cari" || alan === "urun" || alan === "renk" ? alan : null;
+        ses.baslat(ipucuAdlari(h, listeAlani), (m) => isle(alan, i, m, h));
+      });
+    });
+  }
+
+  function adaySec(alan: ListeAlani, i: number, id: string, title: string) {
+    const v: Picked = { id, title };
+    if (alan === "cari") {
+      setCari(v);
+      isaretle("cari", true);
+    } else {
+      setLines((ls) => ls.map((l, j) => (j === i ? { ...l, [alan]: v, ses: true } : l)));
+      setKalemHedef(alan === "urun" ? "renk" : "miktar");
+    }
+    setSonuc(null);
+  }
+
+  // ---- Yeni cari (yerinde) ----
+  const [yeniCari, setYeniCari] = useState<{ ad: string } | null>(null);
+  const [bekleyen, setBekleyen] = useState<GonderilenCari | null>(null);
+  const yeniCariAc = (ad: string) => {
+    ses.iptal();
+    setYeniCari({ ad });
+  };
+  const cariIslendi = (id: string, ad: string) => {
+    setBekleyen(null);
+    setCari({ id, title: ad });
+    isaretle("cari", false);
+    setSonuc({ tur: "bildirim", ton: "bilgi", metin: `Yeni cari “${ad}” fabrikada işlendi ve seçildi.` });
+  };
 
   function pickQuick(k: QuickKey) {
     setQuick(k);
+    isaretle("termin", false);
     const q = QUICK.find((x) => x.key === k);
     if (q) setTermin(fmtDayKey(addDaysToKey(factoryDayKey(), q.days)));
-  }
-
-  /**
-   * Sesten gelen değerleri forma yazar; GÖNDERMEZ. Kalemler dolu satırların ARDINA eklenir (üzerine yazılmaz), not
-   * açıklamaya eklenir. Önceki form saklanır: özet şeridindeki "Geri al" tek dokunuşla döndürür.
-   */
-  function sesleDoldur(f: FormDoldurma) {
-    const once: FormAni = { cari, sesCari, lines, termin, quick, aciklama, adim };
-    const parca: string[] = [];
-    if (f.cari) {
-      setCari(f.cari);
-      setSesCari(true);
-      parca.push(`müşteri ${f.cari.title}`);
-    }
-    if (f.kalemler.length) {
-      const yeni: Line[] = f.kalemler.map((k) => ({ urun: k.urun, renk: k.renk, miktar: k.miktar, birimFiyat: "", ses: true }));
-      setLines((ls) => [...ls.filter((l) => l.urun || l.renk || l.miktar || l.birimFiyat), ...yeni]);
-      parca.push(`${f.kalemler.length} kalem`);
-    }
-    if (f.termin) {
-      setTermin(f.termin);
-      setQuick("elle");
-      parca.push(`teslim ${f.termin}`);
-    }
-    if (f.aciklama) {
-      const ek = f.aciklama;
-      setAciklama((a) => (a.trim() ? `${a.trim()} ${ek}` : ek).slice(0, 500));
-      parca.push("not");
-    }
-    setSesAcik(false);
-    setSesOzet({ metin: `Sesle dolduruldu: ${parca.join(", ")}. Kontrol edip “Gönder”e siz basın.`, once });
-    if (f.cari || cari) setAdim(2);
-  }
-
-  function sesiGeriAl() {
-    if (!sesOzet) return;
-    const o = sesOzet.once;
-    setCari(o.cari);
-    setSesCari(o.sesCari);
-    setLines(o.lines);
-    setTermin(o.termin);
-    setQuick(o.quick);
-    setAciklama(o.aciklama);
-    setAdim(o.adim);
-    setSesOzet(null);
   }
 
   async function submit() {
@@ -140,6 +212,37 @@ export default function NewOrder() {
 
   const ileri = () => setAdim((a) => Math.min(3, a + 1));
   const geri = () => setAdim((a) => Math.max(1, a - 1));
+
+  const liste = sonuc?.tur === "liste" && listeler ? adaySirala(sonuc.metin, listeler[sonuc.alan]) : null;
+  const sesPaneli = (
+    <>
+      <DinlemeSeridi durum={ses.durum} onTekrar={ses.tekrar} onKapat={ses.iptal} />
+      {ham?.eksik.length ? <Text style={s.eksik} testID="ses-eksik">{`${ham.eksik.join(", ")} listesi yüklenemedi; bu alanlar elle seçilir.`}</Text> : null}
+      {sonuc?.tur === "liste" && liste ? (
+        <SesAdaylari
+          baslik={ALAN_ADI[sonuc.alan]}
+          metin={sonuc.metin}
+          onMetin={(m) => setSonuc({ ...sonuc, metin: m })}
+          sirali={liste.sirali}
+          guclu={liste.guclu}
+          onSec={(id, title) => adaySec(sonuc.alan, sonuc.satir, id, title)}
+          onKapat={() => setSonuc(null)}
+          alt={sonuc.alan === "cari" && cariYazar && liste.duyulan && zayifMi(liste) ? (
+            <Button label={`“${liste.duyulan}” adıyla yeni cari oluştur`} tone="secondary" icon="person-add-outline" onPress={() => yeniCariAc(liste.duyulan)} testID="ses-yeni-cari" />
+          ) : undefined}
+        />
+      ) : null}
+      {sonuc?.tur === "bildirim" ? <SesBildirimi ton={sonuc.ton} metin={sonuc.metin} onKapat={() => setSonuc(null)} /> : null}
+      {sonuc?.tur === "not" ? (
+        <SesBildirimi ton="uyari" metin={`Açıklama dolu. “${sonuc.metin}” eklensin mi, yerine mi yazılsın?`} onKapat={() => setSonuc(null)}>
+          <View style={s.notEylem}>
+            <Button label="Ekle" tone="secondary" onPress={() => { setAciklama((a) => `${a.trim()} ${sonuc.metin}`.slice(0, 500)); isaretle("aciklama", true); setSonuc(null); }} testID="ses-not-ekle" />
+            <Button label="Değiştir" tone="secondary" onPress={() => { setAciklama(sonuc.metin.slice(0, 500)); isaretle("aciklama", true); setSonuc(null); }} testID="ses-not-degistir" />
+          </View>
+        </SesBildirimi>
+      ) : null}
+    </>
+  );
 
   return (
     <Screen
@@ -157,31 +260,31 @@ export default function NewOrder() {
       }
     >
       <AdimCubugu adim={adim} toplam={3} etiket={ADIMLAR[adim - 1]!} />
-
-      {adim <= 2 && sesVar ? <SesDugmesi onPress={sesDugmesi} /> : null}
-      {sesOzet ? (
-        <View style={s.sesOzet} testID="ses-ozet" accessibilityLiveRegion="polite">
-          <Ionicons name="mic" size={20} color={t.color.text} />
-          <Text style={s.sesOzetMetin}>{sesOzet.metin}</Text>
-          <Pressable onPress={sesiGeriAl} accessibilityRole="button" accessibilityLabel="Sesle doldurmayı geri al" testID="ses-form-geri-al" hitSlop={8} style={s.sesGeri}>
-            <Text style={s.sesGeriMetin}>Geri al</Text>
-          </Pressable>
-        </View>
-      ) : null}
-      {sesVar ? <SesOnBilgi visible={onbilgiAcik} onDevam={onbilgiDevam} onVazgec={() => setOnbilgiAcik(false)} /> : null}
-      {sesVar ? (
-        <SesliSiparisModal visible={sesAcik} onKapat={() => setSesAcik(false)} onAktar={sesleDoldur} motor={motor} listeYukle={listeYukle} bugun={factoryDayKey()} />
-      ) : null}
+      {sesVar ? <SesOnBilgi visible={kapi.acik} onDevam={kapi.devam} onVazgec={kapi.vazgec} /> : null}
 
       {adim === 1 ? (
-        <FormKarti>
-          <Picker label="Cari" projection="cari-kart" value={cari} onChange={(v) => { setCari(v); setSesCari(false); }} testID="cari-sec" />
-          {sesCari && cari ? <SesIsareti /> : null}
-        </FormKarti>
+        <>
+          {sesVar ? (
+            <SesAraci ipucu="Cari adını söyleyin; en benzer cariler üstte listelenir." dinliyor={ses.dinliyor} onMikrofon={mikrofon} hazir>
+              {sesPaneli}
+            </SesAraci>
+          ) : null}
+          <FormKarti>
+            <Picker label="Cari" projection="cari-kart" value={cari} onChange={(v) => { setCari(v); isaretle("cari", false); }} testID="cari-sec" />
+            {sesle.has("cari") && cari ? <SesIsareti /> : null}
+          </FormKarti>
+          {cariYazar ? <Button label="Yeni cari" tone="secondary" icon="person-add-outline" onPress={() => yeniCariAc("")} testID="yeni-cari" /> : null}
+          {bekleyen ? <BekleyenCari c={bekleyen} onIslendi={cariIslendi} onKapat={() => setBekleyen(null)} /> : null}
+        </>
       ) : null}
 
       {adim === 2 ? (
         <>
+          {sesVar ? (
+            <SesAraci ipucu={`${satir + 1}. kalem — sesle doldurulacak alan:`} secenekler={KALEM_HEDEF} hedef={kalemHedef} onHedef={(k) => { ses.iptal(); setSonuc(null); setKalemHedef(k); }} dinliyor={ses.dinliyor} onMikrofon={mikrofon} hazir>
+              {sesPaneli}
+            </SesAraci>
+          ) : null}
           {lines.map((l, i) => (
             <FormKarti key={i} testID={`kalem-${i}`}>
               <View style={s.lineHead}>
@@ -194,26 +297,31 @@ export default function NewOrder() {
                 ) : null}
               </View>
               {l.ses ? <SesIsareti /> : null}
-              <Picker label="Ürün" projection="urun" value={l.urun} onChange={(v) => setLine(i, { urun: v })} />
-              <Picker label="Renk" projection="renk" value={l.renk} onChange={(v) => setLine(i, { renk: v })} optional />
-              <View style={s.pair}>
-                <View style={s.flex}><Field label="Miktar" value={l.miktar} onChangeText={(v) => setLine(i, { miktar: v })} keyboardType="decimal-pad" placeholder="0" /></View>
-              </View>
+              <Picker label="Ürün" projection="urun" value={l.urun} onChange={(v) => setLine(i, { urun: v })} testID={`kalem-urun-${i}`} />
+              <Picker label="Renk" projection="renk" value={l.renk} onChange={(v) => setLine(i, { renk: v })} optional testID={`kalem-renk-${i}`} />
+              <Field label="Miktar" value={l.miktar} onChangeText={(v) => setLine(i, { miktar: v })} keyboardType="decimal-pad" placeholder="0" testID={`kalem-miktar-${i}`} />
             </FormKarti>
           ))}
-          <Button label="Kalem ekle" tone="secondary" icon="add-circle-outline" onPress={() => setLines((ls) => [...ls, EMPTY])} testID="kalem-ekle" />
+          <Button label="Kalem ekle" tone="secondary" icon="add-circle-outline" onPress={() => { setLines((ls) => [...ls, EMPTY]); ses.iptal(); setSonuc(null); setKalemHedef("urun"); }} testID="kalem-ekle" />
         </>
       ) : null}
 
       {adim === 3 ? (
         <>
+          {sesVar ? (
+            <SesAraci ipucu="Sesle doldurulacak alan:" secenekler={SON_HEDEF} hedef={sonHedef} onHedef={(k) => { ses.iptal(); setSonuc(null); setSonHedef(k); }} dinliyor={ses.dinliyor} onMikrofon={mikrofon} hazir>
+              {sesPaneli}
+            </SesAraci>
+          ) : null}
           <FormKarti>
             <AlanEtiketi>Teslim tarihi (isteğe bağlı)</AlanEtiketi>
             <View style={s.cipler}>
               {QUICK.map((q) => <SecimCipi key={q.key} label={q.label} on={quick === q.key} rol="radio" onPress={() => pickQuick(q.key)} testID={`termin-${q.key}`} />)}
             </View>
-            <Field label="Tarih" value={termin} onChangeText={(v) => { setTermin(v); setQuick("elle"); }} keyboardType="numbers-and-punctuation" placeholder="GG.AA.YYYY" testID="termin-metin" />
-            <Field label="Açıklama (isteğe bağlı)" value={aciklama} onChangeText={setAciklama} multiline />
+            <Field label="Tarih" value={termin} onChangeText={(v) => { setTermin(v); setQuick("elle"); isaretle("termin", false); }} keyboardType="numbers-and-punctuation" placeholder="GG.AA.YYYY" testID="termin-metin" />
+            {sesle.has("termin") && termin ? <SesIsareti /> : null}
+            <Field label="Açıklama (isteğe bağlı)" value={aciklama} onChangeText={(v) => { setAciklama(v); isaretle("aciklama", false); }} multiline testID="aciklama-metin" />
+            {sesle.has("aciklama") && aciklama ? <SesIsareti /> : null}
           </FormKarti>
           <FormKarti testID="siparis-ozet">
             <AlanEtiketi>Özet</AlanEtiketi>
@@ -223,36 +331,67 @@ export default function NewOrder() {
           {formError || w.error ? <Banner tone="error" text={formError ?? w.error ?? ""} /> : null}
         </>
       ) : null}
+
+      <YeniCariSayfasi
+        visible={yeniCari !== null}
+        ad={yeniCari?.ad ?? ""}
+        motor={motor}
+        sesVar={sesVar}
+        onKapat={() => setYeniCari(null)}
+        onGonderildi={(c) => {
+          setYeniCari(null);
+          setBekleyen(c);
+          setSonuc(null);
+        }}
+      />
     </Screen>
   );
 }
 
-/** Sesle dolan alanın işareti (elle değişince kalkar). */
-function SesIsareti() {
+/**
+ * Gönderilen yeni carinin fabrika durumu (gelen kutusu mesajı, kısa yoklamayla). İşlenince fabrika kimliğiyle seçilir;
+ * reddedilirse fabrikanın nedeni gösterilir. İşlenmeden siparişe BAĞLANAMAZ (cariKartId fabrikada doğar).
+ */
+function BekleyenCari(p: { readonly c: GonderilenCari; readonly onIslendi: (id: string, ad: string) => void; readonly onKapat: () => void }) {
+  const { api } = useSession();
   const s = useStyles();
-  const t = useTokens();
+  const r = useRemote(`mesaj:${p.c.mesajId}`, () => api.inboxGet(p.c.mesajId), { tags: ["gelen-kutusu"] });
+  const m = r.data;
+  useSettlePoll(!m || inboxPending(m.durum), r.reload);
+  const { onIslendi } = p;
+  const varlik = m?.durum === "ISLENDI" ? (m.sonuc as { varlikId?: unknown } | null)?.varlikId : null;
+  useEffect(() => {
+    if (typeof varlik === "string" && varlik) onIslendi(varlik, p.c.ad);
+  }, [varlik, onIslendi, p.c.ad]);
+  if (m?.durum === "REDDEDILDI" || m?.durum === "IPTAL") {
+    return (
+      <SesBildirimi ton="uyari" metin={`Yeni cari “${p.c.ad}” ${m.durum === "IPTAL" ? "iptal edildi" : `fabrikada reddedildi: ${resultText(m.sonuc) ?? "neden bildirilmedi"}`}. Cariyi listeden seçin ya da yeniden oluşturun.`} onKapat={p.onKapat} />
+    );
+  }
   return (
-    <View style={s.sesIsaret} testID="ses-isaret">
-      <Ionicons name="mic" size={14} color={t.color.onPrimarySoft} />
-      <Text style={s.sesIsaretMetin}>Sesle dolduruldu — kontrol edin</Text>
+    <View style={s.bekleyen} testID="yeni-cari-bekliyor" accessibilityLiveRegion="polite">
+      <View style={s.bekleyenBas}>
+        <ActivityIndicator size="small" />
+        <Text style={s.bekleyenMetin}>{`Yeni cari “${p.c.ad}” fabrikaya gönderildi; işlenmesi bekleniyor. İşlenince bu siparişe kendiliğinden seçilir — o zamana kadar siparişe bağlanamaz.`}</Text>
+      </View>
+      <View style={s.notEylem}>
+        <Button label="Yeniden denetle" tone="secondary" icon="refresh" onPress={r.reload} testID="yeni-cari-denetle" />
+      </View>
     </View>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  sesOzet: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, padding: space.m, marginBottom: space.m, borderRadius: 12, backgroundColor: t.color.primarySoft },
-  sesOzetMetin: { ...typography.body, color: t.color.text, flex: 1 },
-  sesGeri: { minHeight: TOUCH - 8, justifyContent: "center" as const, paddingHorizontal: space.s },
-  sesGeriMetin: { ...typography.headline, color: t.color.primary },
-  sesIsaret: { flexDirection: "row" as const, alignItems: "center" as const, gap: 4, alignSelf: "flex-start" as const, paddingHorizontal: space.s, paddingVertical: 2, borderRadius: 8, backgroundColor: t.color.primarySoft, marginBottom: space.s },
-  sesIsaretMetin: { ...typography.footnote, color: t.color.onPrimarySoft },
   cipler: { flexDirection: "row" as const, gap: space.s, marginBottom: space.m, flexWrap: "wrap" as const },
   lineHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginBottom: space.m },
   lineNo: { width: 26, height: 26, borderRadius: 13, backgroundColor: t.color.primarySoft, alignItems: "center" as const, justifyContent: "center" as const },
   lineNoText: { ...typography.footnote, fontWeight: "700" as const, color: t.color.onPrimarySoft },
   lineTitle: { ...typography.headline, color: t.color.text, flex: 1 },
   remove: { width: TOUCH - 12, height: TOUCH - 12, alignItems: "center" as const, justifyContent: "center" as const },
-  pair: { flexDirection: "row" as const, gap: space.m },
-  flex: { flex: 1 },
   ozet: { ...typography.body, color: t.color.text },
+  eksik: { ...typography.footnote, color: t.textSecondary },
+  notEylem: { flexDirection: "row" as const, gap: space.s, flexWrap: "wrap" as const },
+  bekleyen: { padding: space.m, borderRadius: 12, gap: space.s, marginTop: space.m, backgroundColor: t.color.primarySoft },
+  bekleyenBas: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
+  bekleyenMetin: { ...typography.body, color: t.color.text, flex: 1 },
 }));
