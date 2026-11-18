@@ -1,5 +1,6 @@
 // Jenerik kayıt ayrıntısı: kök alanlar + izinliyse kişisel alt satırı (sunucu süzer). Adnan'da finans buluta gitmez:
-// tutar bölümü yoktur. Tarih fabrika diliminden.
+// tutar bölümü yoktur. Tarih fabrika diliminden. Sevkiyatta (2026-11-19) üstte kompakt künye özeti (`ui/sevkiyat/KunyeOzeti`);
+// tam künye varsayılan kapalı, ok ile açılır.
 import { useLocalSearchParams } from "expo-router";
 import { Text, View } from "react-native";
 import { RECORD_ENUMS } from "../../../../src/lib/labels/rapor";
@@ -12,6 +13,9 @@ import { Screen } from "../../../../src/ui/Frame";
 import { KademeliGiris } from "../../../../src/ui/hareket";
 import type { IconName } from "../../../../src/ui/icons";
 import { BlokBasligi, IconTile, Iskelet } from "../../../../src/ui/ortak";
+import { useAcikKapali } from "../../../../src/ui/ortak/useAcikKapali";
+import { obj } from "../../../../src/ui/pano/read";
+import { KunyeOzeti } from "../../../../src/ui/sevkiyat/KunyeOzeti";
 import { makeStyles } from "../../../../src/ui/theme-context";
 import { DOMAIN_TONE, FONT_SCALE, space, typography, type Domain } from "../../../../src/ui/tokens";
 
@@ -32,13 +36,22 @@ export default function RecordDetail() {
   const kind = KIND[p] ?? { label: humanize(p), domain: "genel" as Domain, icon: "document-outline" as IconName };
   const d = r.data;
   const title = d ? recordTitle(d.kayit) : "Kayıt";
+  // Sevkiyat: üstte kompakt künye özeti; tam künye (bugünkü alanların hepsi) varsayılan KAPALI, ok ile açılır;
+  // açık/kapalı cihazda hatırlanır.
+  const sevk = p === "sevkiyat";
+  const kunye = useAcikKapali("sevkiyat.kunye", false);
   return (
     <Screen title={title === "Kayıt" ? kind.label : title} back onRefresh={r.reload} refreshing={r.refreshing}>
       {r.loading && !d ? <Iskelet bicim="metin" satir={5} /> : null}
       {r.error && !d ? <ErrorBox text={r.error} onRetry={r.reload} /> : null}
+      {d && sevk ? (
+        <KademeliGiris sira={0}>
+          <KunyeOzeti kayit={obj(d.kayit)} acik={kunye.acik} onDegistir={kunye.degistir} />
+        </KademeliGiris>
+      ) : null}
       {d ? (
         <>
-          <KademeliGiris sira={0}>
+          {sevk && !kunye.acik ? null : <KademeliGiris sira={0}>
             <View style={s.kart} testID="kayit-ozet">
               <View style={s.head}>
                 <IconTile icon={kind.icon} tone={DOMAIN_TONE[kind.domain]} size="md" />
@@ -51,7 +64,7 @@ export default function RecordDetail() {
                 <Fields value={d.kayit} enums={RECORD_ENUMS[p]} />
               </View>
             </View>
-          </KademeliGiris>
+          </KademeliGiris>}
           {d.kisisel !== undefined && d.kisisel !== null ? (
             <>
               <BlokBasligi baslik="İletişim" />
