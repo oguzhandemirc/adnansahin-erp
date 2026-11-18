@@ -15,7 +15,7 @@
 //   §4 sertlik (güvenlik denetimi D11/D13): patron + proxy compose'unda her servis read_only · cap_drop ALL ·
 //      no-new-privileges · root DEĞİL (Caddy hariç: yeteneksiz root, yalnız NET_BIND_SERVICE) · dış imajlar özetle
 //      sabit · dışa port yalnız caddy 80/443; Caddy `guvenlik` parçası HSTS/nosniff/-Server taşır ve patron bloğu
-//      yalnız /api /v1 /saglik'i geçirir. Sondalar: read_only düşer · imaj etiketle · db'ye ports: → ❌
+//      yalnız /api /v1 /saglik + hukuk sayfalarını (/gizlilik /privacy /hesap-silme) geçirir; CSP varsayılanı `?`. Sondalar: read_only düşer · imaj etiketle · db'ye ports: → ❌
 // NEGATİF SONDA (2026-10-09, dosya DIŞI, origin/main'deki patron-baslat.sh yerine konup geri alındı): §1 sondaları ❌.
 // Ana ürünün Traefik compose'u, compose-denetle ⑩ ve duman.sh Adnan reposuna alınmadı (2026-11-12; §2–§4 yeniden).
 // §1/§2 anlık bildirim (2026-11-17): Expo belirteci isteğe bağlı sır; kip/konu/telefon push'u `.env`ten, varsayılan
@@ -225,7 +225,10 @@ function sertlik(compose: string, izinliPort: Record<string, true> = {}): string
   const portlar = [...PROXY.matchAll(/^\s+- "(\d+:\d+(?:\/udp)?)"$/gm)].map((m) => m[1]).sort().join(",");
   kontrol("§4 dışa yalnız caddy 80/443 (+443/udp) yayınlar", portlar === "443:443,443:443/udp,80:80", portlar);
   kontrol("§4 Caddy `guvenlik` parçası: HSTS · nosniff · Referrer-Policy · -Server; patron bloğu onu alır", /\(guvenlik\) \{/.test(CADDY) && /Strict-Transport-Security/.test(CADDY) && /X-Content-Type-Options "nosniff"/.test(CADDY) && /Referrer-Policy/.test(CADDY) && /-Server/.test(CADDY) && /import guvenlik/.test(PATRON_SITE) && /import \/etc\/caddy\/patron\.caddy/.test(CADDY));
-  kontrol("§4 patron bloğu yalnız /api /v1 /saglik'i geçirir, gerisi 404", /@api path \/api\/\* \/v1\/\* \/saglik/.test(PATRON_SITE) && /handle \{\s*respond 404\s*\}/.test(PATRON_SITE));
+  // Geçen yollar TAM küme: yeni yol bilinçli eklenir (hukuk sayfaları 2026-11-18, `src/http/legal/sayfa.ts` LEGAL_PATHS).
+  const gecen = /@api path ([^\n]+)/.exec(PATRON_SITE)?.[1]?.trim() ?? "";
+  kontrol("§4 patron bloğu yalnız /api /v1 /saglik + hukuk sayfalarını geçirir, gerisi 404", gecen === "/api/* /v1/* /saglik /gizlilik /privacy /hesap-silme" && /handle \{\s*respond 404\s*\}/.test(PATRON_SITE), gecen);
+  kontrol("§4 Caddy CSP varsayılanı yalnız yanıtta CSP yoksa konur (`?`; hukuk sayfası kendi CSP'sini taşır), değer en dar", /\?Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"/.test(CADDY) && !/^\s+Content-Security-Policy /m.test(CADDY));
   kontrol("§4 sonda: api'den sertlik çapası düşer → ❌", sertlik(COMPOSE.replace("  api:\n    <<: *sertlik\n", "  api:\n")).some((x) => x.startsWith("api: read_only")));
   kontrol("§4 sonda: db imajı etiketle → ❌", sertlik(COMPOSE.replace(/postgres:17-alpine@sha256:[0-9a-f]{64}/, "postgres:17-alpine")).some((x) => x.startsWith("db: imaj")));
   kontrol("§4 sonda: db'ye ports: → ❌", sertlik(COMPOSE.replace("    container_name: patron-db\n", '    container_name: patron-db\n    ports: ["5432:5432"]\n')).some((x) => x.startsWith("db: ports")));

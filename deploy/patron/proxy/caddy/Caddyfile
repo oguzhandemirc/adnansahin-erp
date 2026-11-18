@@ -7,15 +7,16 @@
 	admin localhost:2019
 }
 
-# Güvenlik başlıkları — her site bloğu `import guvenlik` ile alır. Yalnız JSON API sunulur (HTML yok), bu yüzden
-# CSP en dar hâlidir; HSTS 1 yıl (alt alan adı/preload bilinçli olarak YOK: başka alt alan adlarını bağlamasın).
+# Güvenlik başlıkları — her site bloğu `import guvenlik` ile alır. JSON API için CSP en dar hâlidir ve YALNIZ yanıt
+# kendi CSP'sini taşımıyorsa konur (`?`): tek HTML yüzeyi hukuk sayfalarıdır (sunucu satır içi CSS'in özetini izinleyen
+# kendi dar CSP'sini yollar). HSTS 1 yıl (alt alan adı/preload bilinçli olarak YOK: başka alt alan adlarını bağlamasın).
 (guvenlik) {
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "no-referrer"
 		X-Frame-Options "DENY"
-		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		?Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
 		Cross-Origin-Resource-Policy "same-origin"
 		Permissions-Policy "interest-cohort=()"
 		-Server

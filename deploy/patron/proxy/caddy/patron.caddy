@@ -6,8 +6,9 @@
 {$PATRON_ALAN_ADI} {
 	import guvenlik
 	encode zstd gzip
-	# Yalnız bilinen ad alanları sunucuya geçer; iç/yönetim yolu ya da başka her şey kenarda 404.
-	@api path /api/* /v1/* /saglik
+	# Yalnız bilinen ad alanları sunucuya geçer; iç/yönetim yolu ya da başka her şey kenarda 404. Hukuk sayfaları
+	# (gizlilik politikası TR/EN + hesap silme; oturumsuz statik HTML, 2026-11-18) TAM yol olarak geçer.
+	@api path /api/* /v1/* /saglik /gizlilik /privacy /hesap-silme
 	handle @api {
 		reverse_proxy patron-api:4620
 	}

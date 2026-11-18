@@ -94,6 +94,20 @@ Patron uygulamasının destek talepleri bulut üzerinden Etkili Destek merkezine
 - Webhook adresi (merkez paneline): `https://<alan>/api/destek/webhook`.
 - Kapatmak: `.env`ten üç satırı sil → `docker compose up -d api` (tek ayar; veri yok, geri alınacak bir şey yok).
 
+## Gizlilik politikası ve hesap silme sayfaları (2026-11-18)
+
+Mağaza bağlantıları: `https://<alan>/gizlilik` (TR, asıl) · `/privacy` (EN) · `/hesap-silme` (Google Play hesap silme
+bağlantısı; ayrıca `/gizlilik#hesap-silme`). Sayfaları api sunar (`patron/sunucu/src/http/legal/`; metin TS kaynağında,
+imaja `dist` ile girer, ayrı dosya kopyası YOK): oturumsuz, yalnız GET/HEAD (başka yöntem 405), statik HTML, kendi dar
+CSP'si (satır içi CSS özetle izinli), `Cache-Control: public, max-age=3600`, IP başına `API_HIZ_DK`. Süreler yapılandırmadan
+okunur (budamayla aynı değer). Göç YOK. Bekçi `scripts/test_gizlilik_sayfasi.ts`.
+
+VDS'te bir kez (yeni imajla birlikte): `proxy/caddy/patron.caddy` (`@api` satırına `/gizlilik /privacy /hesap-silme`) ve
+`proxy/caddy/Caddyfile` (`guvenlik` parçasında `?Content-Security-Policy` — varsayılan CSP yalnız yanıt kendi CSP'sini
+taşımıyorsa konur) dosyalarını repodakiyle birebir yap → § Güncelleme 5 (validate + reload) →
+`curl -sI https://<alan>/gizlilik` 200 `text/html` ve `content-security-policy` içinde `style-src 'sha256-`.
+Sıra önemsiz: Caddy önce güncellenirse eski api bu yollara 404 döner (zararsız).
+
 ## Anlık bildirim (isteğe bağlı; varsayılan KAPALI)
 
 Kip `.env`ten okunur; yoksa `kapali` (bildirim işi kurulmaz, kuyruk satırı ve dış istek yok — bugünkü davranış). Göç YOK.
