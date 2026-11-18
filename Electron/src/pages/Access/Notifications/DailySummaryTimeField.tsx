@@ -3,10 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { notificationAssignmentService } from "./service";
+import { DAILY_SUMMARY_TIME_QK, notificationAssignmentService } from "./service";
 import { dailySummaryTimePayloadSchema } from "./schema";
-
-const QUERY_KEY = ["bildirim-atamalari", "gun-sonu-saati"] as const;
 
 /**
  * Gün sonu özeti saati (D6b): sayfa başlığında tek saat alanı + Kaydet. Uç `bildirim:yonet` (sayfanın izni);
@@ -14,7 +12,7 @@ const QUERY_KEY = ["bildirim-atamalari", "gun-sonu-saati"] as const;
  */
 export function DailySummaryTimeField() {
   const qc = useQueryClient();
-  const query = useQuery({ queryKey: QUERY_KEY, queryFn: notificationAssignmentService.dailySummaryTime });
+  const query = useQuery({ queryKey: DAILY_SUMMARY_TIME_QK, queryFn: notificationAssignmentService.dailySummaryTime });
   const saved = query.data?.data.time ?? "";
   const [value, setValue] = useState(saved);
   useEffect(() => setValue(saved), [saved]);
@@ -22,7 +20,7 @@ export function DailySummaryTimeField() {
   const save = useMutation({
     mutationFn: (time: string) => notificationAssignmentService.setDailySummaryTime(time),
     onSuccess: (r) => {
-      qc.setQueryData(QUERY_KEY, r);
+      qc.setQueryData(DAILY_SUMMARY_TIME_QK, r);
       toast.success(`Gün sonu özeti her gün ${r.data.time}'da gönderilecek.`);
     },
   });

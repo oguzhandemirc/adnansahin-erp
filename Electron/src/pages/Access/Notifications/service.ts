@@ -9,8 +9,12 @@ import type {
   UserAssignments,
 } from "./types";
 import { dailySummaryTimePayloadSchema, kindsPayloadSchema } from "./schema";
+import { NOTIFICATIONS_ENABLED_KEY } from "./notification-switch";
 
 const BASE = "/api/bildirim-atamalari";
+
+/** Gün sonu özeti saati sorgusu — saat alanı ve bildirim şalteri kartı aynı önbelleği okur. */
+export const DAILY_SUMMARY_TIME_QK = ["bildirim-atamalari", "gun-sonu-saati"] as const;
 
 /** Bildirim atama uçları (izin `bildirim:yonet`). Gövde şemadan geçer: yalnız `kinds` gider. */
 export const notificationAssignmentService = {
@@ -45,5 +49,14 @@ export const notificationAssignmentService = {
   setDailySummaryTime: (time: string): Promise<ApiResponse<DailySummaryTime>> =>
     apiClient
       .put<ApiResponse<DailySummaryTime>>(`${BASE}/gun-sonu-saati`, dailySummaryTimePayloadSchema.parse({ time }))
+      .then((r) => r.data),
+
+  /**
+   * Bildirim ana şalteri — mevcut ham ayar ucu; backend YALNIZ sistem hesabına açar (403 `SUPERADMIN_ONLY`).
+   * Genel toast bastırılır: hata cümlesini kart kendisi Türkçe ve kalıcı gösterir (`switchErrorMessage`).
+   */
+  setNotificationsEnabled: (on: boolean): Promise<unknown> =>
+    apiClient
+      .put(`/api/admin/settings/${NOTIFICATIONS_ENABLED_KEY}`, { value: on ? "true" : "false" }, { suppressErrorToast: true })
       .then((r) => r.data),
 };
