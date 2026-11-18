@@ -2,10 +2,10 @@
 // sayfa düzenini bozuyor"). İçerik genişliği kadar (tam genişliğe yayılmaz), yükseklik 32; dokunma alanı hitSlop ile
 // ≥ 44. Seçim TEK satırda araç şeridiyle yan yana durur. Çok seçenekli seçiciler modal kalır; bu yalnız iki seçenek için.
 import { Pressable, Text, View } from "react-native";
-import { haptic } from "../haptics";
-import { BASMA } from "../hareket/sabitler";
-import { makeStyles } from "../theme-context";
-import { FONT_SCALE, space, typography } from "../tokens";
+import { haptic } from "./haptics";
+import { BASMA } from "./hareket/sabitler";
+import { makeStyles } from "./theme-context";
+import { FONT_SCALE, space, typography } from "./tokens";
 
 export interface KompaktSecenek<K extends string> {
   readonly key: K;

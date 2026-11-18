@@ -8,7 +8,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { can } from "../../../../src/lib/access";
-import { fmtFactoryDateTime } from "../../../../src/lib/factory-time";
 import { formatDate } from "../../../../src/lib/format";
 import { CARI_KARTLARI, DONEMLI_KARTLAR, TOPLAM_KARTLARI, cariKartDegistir, cariKartSifirla, cariKartlari, type CariKartKey } from "../../../../src/ui/cari/kartlar";
 import { cariTemizle } from "../../../../src/ui/cari/sutunlar";
@@ -23,12 +22,15 @@ import { KademeliGiris } from "../../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../../src/ui/icons";
 import { AcikSiparislerBolumu, EnCokUrunBolumu, IadelerBolumu, ToplamlarBolumu, useCariOzeti, type Donem } from "../../../../src/ui/cari/OzetBolumleri";
 import { openRecord } from "../../../../src/ui/nav";
-import { AltSekmeler, HataDurumu, Iskelet, ListeBlogu, ListeSatiri, Rozet } from "../../../../src/ui/ortak";
+import { AltSekmeler, BlokBasligi, HataDurumu, Iskelet, ListeBlogu, ListeSatiri, Rozet } from "../../../../src/ui/ortak";
 import { useListCapability } from "../../../../src/ui/siparis/capabilities";
-import { ShipmentRow, cariRowText } from "../../../../src/ui/siparis/CustomerRow";
-import { OrderRow, asObj, str } from "../../../../src/ui/siparis/OrderRow";
-import { ListStates, StaleNote } from "../../../../src/ui/siparis/parts";
-import { SegmentedControl } from "../../../../src/ui/SegmentedControl";
+import { cariRowText } from "../../../../src/ui/siparis/CustomerRow";
+import { asObj, str } from "../../../../src/ui/siparis/OrderRow";
+import { FabrikaVeriAni, ListStates, StaleNote } from "../../../../src/ui/siparis/parts";
+import { CARI_SIPARIS_SUTUNLARI, SIPARIS_SUTUNLARI } from "../../../../src/ui/siparis/sutunlar";
+import { CARI_SEVK_SUTUNLARI, SEVKIYAT_SUTUNLARI } from "../../../../src/ui/sevkiyat/sutunlar";
+import { KisaTablo, sutunSec } from "../../../../src/ui/tablo/KisaTablo";
+import { KompaktSecim } from "../../../../src/ui/KompaktSecim";
 import { useRemoteList } from "../../../../src/ui/siparis/useRemoteList";
 import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
 import { TOUCH, space, tabularNums, typography } from "../../../../src/ui/tokens";
@@ -37,6 +39,9 @@ type Sekme = "ozet" | "siparisler" | "sevkiyatlar" | "bilgi";
 type SiparisGorunum = "tumu" | "ACIK";
 const SIPARIS_GORUNUMLERI = [{ key: "tumu" as const, label: "Tümü" }, { key: "ACIK" as const, label: "Açık" }];
 const OZET_SATIR = 5;
+// Satırlar ortak tablonun sütun tanımlarından (liste ekranlarıyla aynı biçim/hücre; elle kopya yok), hepsi sola dayalı.
+const SIPARIS_TABLO = sutunSec(SIPARIS_SUTUNLARI, CARI_SIPARIS_SUTUNLARI);
+const SEVK_TABLO = sutunSec(SEVKIYAT_SUTUNLARI, CARI_SEVK_SUTUNLARI);
 
 export default function CustomerDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -67,6 +72,7 @@ export default function CustomerDetail() {
   const ozet = useCariOzeti(cariId, orders && hazir && ozetGorunur);
   const acik = useRemoteList("siparis", { cariKartId: cariId ?? undefined, suzgec: "ACIK" }, { enabled: acikDestek && hazir && (ozetGorunur || acikGorunum), limit: 25 });
   const iadeIzni = can(permissions, "bulut:sevkiyat:oku");
+  const acikSayi = ozet.data?.ozet?.acik.siparisSayisi;
   const k = asObj(r.data?.kayit);
   const kisisel = r.data?.kisisel === undefined || r.data.kisisel === null ? null : asObj(r.data.kisisel);
   const kimlik = r.data ? cariRowText(r.data) : null;
@@ -84,8 +90,8 @@ export default function CustomerDetail() {
     ...(shipments ? [{ key: "sevkiyatlar" as const, etiket: "Sevkiyatlar" }] : []),
     { key: "bilgi" as const, etiket: "Bilgi" },
   ];
-  const siparisSatirlari = (n: number) => recent.items.slice(0, n).map((o, i) => <OrderRow key={o.id} r={o} showCustomer={false} ayrac={i > 0} onPress={() => openRecord(router, "siparis", o.id)} />);
-  const sevkSatirlari = (n: number) => sevk.items.slice(0, n).map((x, i) => <ShipmentRow key={x.id} r={x} ayrac={i > 0} onPress={() => openRecord(router, "sevkiyat", x.id)} />);
+  const siparisAc = (o: { id: string }) => openRecord(router, "siparis", o.id);
+  const sevkAc = (x: { id: string }) => openRecord(router, "sevkiyat", x.id);
   const bilgiler = [
     { key: "kod", etiket: "Kod", deger: str(k.kod) },
     { key: "yer", etiket: "Adres", deger: place || null },
@@ -131,48 +137,45 @@ export default function CustomerDetail() {
               {iadeIzni && cariId && goster("iadeler") ? <IadelerBolumu cariKartId={cariId} destek={cap.idFilter("iade", "cariKartId")} enabled={ozetGorunur} iade={ozet.data?.ozet?.tumZamanlar.iade} /> : null}
               {orders && goster("sonSiparisler") && recent.loading && recent.items.length === 0 ? <Iskelet bicim="liste" satir={2} testID="cari-siparisler-yukleniyor" /> : null}
               {orders && goster("sonSiparisler") && recent.items.length > 0 ? (
-                <ListeBlogu baslik="Son siparişler" sag={<Text style={s.tumu} onPress={() => setSekme("siparisler")} accessibilityRole="link">Tümü</Text>} testID="cari-siparisler">
-                  {siparisSatirlari(OZET_SATIR)}
-                </ListeBlogu>
+                <View style={s.bolum}>
+                  <BlokBasligi baslik="Son siparişler" sag={<Text style={s.tumu} onPress={() => setSekme("siparisler")} accessibilityRole="link">Tümü</Text>} />
+                  <KisaTablo sutunlar={SIPARIS_TABLO} satirlar={recent.items.slice(0, OZET_SATIR)} onPress={siparisAc} testID="cari-siparisler" />
+                </View>
               ) : null}
               {shipments && goster("sonSevkiyatlar") && sevk.loading && sevk.items.length === 0 ? <Iskelet bicim="liste" satir={2} testID="cari-sevkiyatlar-yukleniyor" /> : null}
               {shipments && goster("sonSevkiyatlar") && sevk.items.length > 0 ? (
-                <ListeBlogu baslik="Son sevkiyatlar" sag={<Text style={s.tumu} onPress={() => setSekme("sevkiyatlar")} accessibilityRole="link">Tümü</Text>} testID="cari-sevkiyatlar">
-                  {sevkSatirlari(OZET_SATIR)}
-                </ListeBlogu>
+                <View style={s.bolum}>
+                  <BlokBasligi baslik="Son sevkiyatlar" sag={<Text style={s.tumu} onPress={() => setSekme("sevkiyatlar")} accessibilityRole="link">Tümü</Text>} />
+                  <KisaTablo sutunlar={SEVK_TABLO} satirlar={sevk.items.slice(0, OZET_SATIR)} onPress={sevkAc} testID="cari-sevkiyatlar" />
+                </View>
               ) : null}
             </KademeliGiris>
           ) : null}
 
           {sekme === "siparisler" ? (
             <KademeliGiris sira={1}>
+              {/* Sekme adı başlığı tekrarlamaz: bölüm başlığı yok; kompakt seçim (içerik genişliği, sola dayalı) tablonun üstünde. */}
               {acikDestek ? (
-                <View style={s.gorunum}>
-                  <SegmentedControl items={SIPARIS_GORUNUMLERI} value={gorunum} onChange={setGorunum} testIDPrefix="cari-siparis-gorunum-" accessibilityLabel="Sipariş görünümü" />
+                <View style={s.aracSatiri}>
+                  <KompaktSecim items={SIPARIS_GORUNUMLERI} value={gorunum} onChange={setGorunum} testIDPrefix="cari-siparis-gorunum-" accessibilityLabel="Sipariş görünümü" />
+                  {acikGorunum && acikSayi !== undefined ? <Text style={s.sayi} testID="cari-siparis-acik-sayi">{`${acikSayi} açık sipariş`}</Text> : null}
                 </View>
               ) : null}
               {acikGorunum ? (
-                <>
-                  {acik.items.length > 0 ? (
-                    <ListeBlogu baslik="Açık siparişler" sayi={ozet.data?.ozet?.acik.siparisSayisi} testID="cari-siparis-acik">
-                      {acik.items.map((o, i) => <OrderRow key={o.id} r={o} showCustomer={false} ayrac={i > 0} onPress={() => openRecord(router, "siparis", o.id)} />)}
-                    </ListeBlogu>
-                  ) : null}
-                  <ListStates list={acik} empty="Açık sipariş yok" icon={MODULE_ICON.siparisler.icon} testID="cari-siparis-acik" />
-                </>
+                <KisaTablo sutunlar={SIPARIS_TABLO} satirlar={acik.items} onPress={siparisAc} testID="cari-siparis-acik"
+                  alt={<ListStates list={acik} empty="Açık sipariş yok" icon={MODULE_ICON.siparisler.icon} testID="cari-siparis-acik" />} />
               ) : (
-                <>
-                  {recent.items.length > 0 ? <ListeBlogu baslik="Siparişler" testID="cari-siparis-tumu">{siparisSatirlari(recent.items.length)}</ListeBlogu> : null}
-                  <ListStates list={recent} empty="Bu cariye ait sipariş yok" icon={MODULE_ICON.siparisler.icon} testID="cari-siparis" />
-                </>
+                <KisaTablo sutunlar={SIPARIS_TABLO} satirlar={recent.items} onPress={siparisAc} testID="cari-siparis-tumu"
+                  alt={<ListStates list={recent} empty="Bu cariye ait sipariş yok" icon={MODULE_ICON.siparisler.icon} testID="cari-siparis" />} />
               )}
             </KademeliGiris>
           ) : null}
 
           {sekme === "sevkiyatlar" ? (
             <KademeliGiris sira={1}>
-              {sevk.items.length > 0 ? <ListeBlogu baslik="Sevkiyatlar" testID="cari-sevk-tumu">{sevkSatirlari(sevk.items.length)}</ListeBlogu> : null}
-              <ListStates list={sevk} empty="Bu cariye sevkiyat yok" icon={MODULE_ICON.sevkiyat.icon} testID="cari-sevk" />
+              <View style={s.ustBosluk} />
+              <KisaTablo sutunlar={SEVK_TABLO} satirlar={sevk.items} onPress={sevkAc} testID="cari-sevk-tumu"
+                alt={<ListStates list={sevk} empty="Bu cariye sevkiyat yok" icon={MODULE_ICON.sevkiyat.icon} testID="cari-sevk" />} />
             </KademeliGiris>
           ) : null}
 
@@ -190,7 +193,7 @@ export default function CustomerDetail() {
             </KademeliGiris>
           ) : null}
 
-          <Text style={s.foot}>{`Fabrika verisi ${fmtFactoryDateTime(r.data.surum)}`}</Text>
+          <FabrikaVeriAni />
         </>
       ) : null}
       <VisibilityPicker
@@ -207,8 +210,10 @@ export default function CustomerDetail() {
 const useStyles = makeStyles((t) => ({
   kimlik: { flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, columnGap: space.s, rowGap: space.xs },
   kod: { ...typography.footnote, ...tabularNums, color: t.color.textMuted, flexShrink: 1 },
-  gorunum: { marginTop: space.m },
+  aracSatiri: { flexDirection: "row" as const, alignItems: "center" as const, flexWrap: "wrap" as const, gap: space.m, marginTop: space.m, marginBottom: space.s },
+  ustBosluk: { height: space.m },
+  sayi: { ...typography.footnote, ...tabularNums, color: t.color.textMuted },
+  bolum: { marginTop: space.m },
   tumu: { fontSize: 15, lineHeight: 20, fontWeight: "600" as const, color: t.color.link, paddingVertical: space.xs, paddingLeft: space.m },
-  foot: { ...typography.footnote, color: t.color.textMuted, textAlign: "center" as const, marginTop: space.l },
   kartDugmesi: { minWidth: TOUCH, minHeight: TOUCH, alignItems: "center" as const, justifyContent: "center" as const },
 }));

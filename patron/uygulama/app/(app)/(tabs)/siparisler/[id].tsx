@@ -11,7 +11,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { moduleVisible } from "../../../../src/lib/access";
-import { fmtFactoryDateTime } from "../../../../src/lib/factory-time";
 import { formatDate, formatNumber } from "../../../../src/lib/format";
 import { destinationLabel, isOpenOrder } from "../../../../src/lib/labels/siparis";
 import { useSession } from "../../../../src/state/session";
@@ -24,7 +23,7 @@ import { siparisDurumu } from "../../../../src/ui/siparis/durum";
 import { useListCapability } from "../../../../src/ui/siparis/capabilities";
 import { OrderLines, useOrderLines } from "../../../../src/ui/siparis/OrderLines";
 import { OrderWorkOrders, useOrderWorkOrders } from "../../../../src/ui/siparis/OrderWorkOrders";
-import { StaleNote } from "../../../../src/ui/siparis/parts";
+import { FabrikaVeriAni, StaleNote } from "../../../../src/ui/siparis/parts";
 import { DETAY_ANAHTARI, DETAY_OGELERI, detayDegistir, detayOgeleri, detaySifirla, detayTemizle, type DetayKey } from "../../../../src/ui/siparis/gorunum";
 import { VisibilityPicker } from "../../../../src/ui/tablo/Seciciler";
 import { useCihazTercihi } from "../../../../src/ui/tablo/useCihazTercihi";
@@ -154,7 +153,7 @@ export default function OrderDetail() {
           <KademeliGiris sira={4}>
             <OrderWorkOrders list={isEmirleri} tick={tick} />
           </KademeliGiris>
-          <Text style={s.foot} testID="fabrika-veri-ani">{`Fabrika verisi ${fmtFactoryDateTime(r.data.surum)}`}</Text>
+          <FabrikaVeriAni />
         </>
       ) : null}
     </Screen>
@@ -171,5 +170,4 @@ const useStyles = makeStyles((t) => ({
   ikili: { flexDirection: "row" as const, gap: space.m, marginTop: space.m },
   yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
   secDugmesi: { minWidth: TOUCH, minHeight: TOUCH, alignItems: "center" as const, justifyContent: "center" as const },
-  foot: { ...typography.footnote, color: t.color.textMuted, textAlign: "center" as const, marginTop: space.l },
 }));

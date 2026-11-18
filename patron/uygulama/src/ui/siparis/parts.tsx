@@ -2,11 +2,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { ARAMA_AZAMI } from "../../api/wire";
-import { fmtFactoryTime } from "../../lib/factory-time";
+import { fmtFactoryDateTime, fmtFactoryTime } from "../../lib/factory-time";
 import { formatAgo } from "../../lib/format";
 import type { IconName } from "../icons";
 import { Basilabilir } from "../hareket";
 import { BosDurum, HataDurumu, Iskelet } from "../ortak";
+import { useSession } from "../../state/session";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, TOUCH, space, tabularNums, typography, type Domain } from "../tokens";
 import type { RemoteList } from "./useRemoteList";
@@ -101,6 +102,19 @@ export function ListStates(p: { list: RemoteList; empty: string; aciklama?: stri
   );
 }
 
+/**
+ * Ayrıntı ekranının altındaki "Fabrika verisi <tarih saat>" damgası (2026-11-19). Kaynak: son kabul edilen paketin ufku
+ * (`esitleme.ufuk` → `factoryStamp`; başlıktaki "… önce" göstergesiyle AYNI an). Kaydın `surum`u KULLANILMAZ: o, satırın
+ * buluta en son gönderildiği paketin ufkudur; fabrika değişmeyen satırı yeniden göndermediği için kayıt değişmedikçe eski
+ * kalır (cari kartı 16.11'de dururken siparişleri 18.11'e gelmişti). Bulutta duran her satır ufuk anına kadar günceldir.
+ */
+export function FabrikaVeriAni({ testID = "fabrika-veri-ani" }: { readonly testID?: string }) {
+  const { factoryStamp } = useSession();
+  const s = useStyles();
+  if (!factoryStamp) return null;
+  return <Text style={s.veriAni} testID={testID}>{`Fabrika verisi ${fmtFactoryDateTime(factoryStamp)}`}</Text>;
+}
+
 /** "Fabrika verisi HH:MM" — saklı kopya gösteriliyorsa ne zamandan olduğu (bayat ≠ çevrimdışı). */
 export function StaleNote({ stale, savedAt }: { stale: boolean; savedAt: string | null }) {
   const s = useStyles();
@@ -143,6 +157,7 @@ export const useStyles = makeStyles((t) => ({
   capsuleText: { ...typography.subhead, fontWeight: "600" as const, color: t.onTint },
   stale: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, marginBottom: space.s },
   staleText: { ...typography.footnote, color: t.textMuted },
+  veriAni: { ...typography.footnote, color: t.textMuted, textAlign: "center" as const, marginTop: space.l },
   group: { backgroundColor: t.surface, borderRadius: t.radius.card, overflow: "hidden" as const, marginBottom: space.m, ...t.cardShadow },
   sep: { height: 1, backgroundColor: t.separator, marginLeft: space.l },
   fact: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.l, paddingVertical: space.s },

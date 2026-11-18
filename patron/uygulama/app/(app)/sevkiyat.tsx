@@ -10,15 +10,15 @@ import { useState, type ReactElement } from "react";
 import { Text, View } from "react-native";
 import { can } from "../../src/lib/access";
 import { formatDate, keepPhrases } from "../../src/lib/format";
-import { PERIODS, PERIOD_LABEL, SHIPMENT_DESTINATION, SHIPMENT_STATUS, UNIT, recordStatus, type PeriodKey } from "../../src/lib/labels/uretim";
+import { PERIODS, PERIOD_LABEL, SHIPMENT_DESTINATION, UNIT, type PeriodKey } from "../../src/lib/labels/uretim";
 import { useSession } from "../../src/state/session";
 import { Screen } from "../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../src/ui/hareket";
 import { EMPTY_ICON, MODULE_ICON } from "../../src/ui/icons";
 import { openRecord } from "../../src/ui/nav";
-import { AltSekmeler, ListeSatiri, StatCard } from "../../src/ui/ortak";
+import { AltSekmeler, ListeSatiri, Rozet, StatCard } from "../../src/ui/ortak";
 import { obj, period, qty, str } from "../../src/ui/pano/read";
-import { KayitDurumRozeti } from "../../src/ui/pano/KayitDurumRozeti";
+import { sevkDurumu } from "../../src/ui/sevkiyat/durum";
 import { RemoteList, useRecordPage } from "../../src/ui/pano/RemoteList";
 import { SnapshotGate } from "../../src/ui/pano/SnapshotGate";
 import { combine, useSnapshot } from "../../src/ui/pano/useSnapshot";
@@ -97,7 +97,7 @@ export default function Shipments() {
           testID="sevkler"
           renderRow={(r, i) => {
             const k = obj(r.kayit);
-            const st = recordStatus(SHIPMENT_STATUS, k.durum);
+            const st = sevkDurumu(k.durum);
             const tarih = formatDate(str(k.cikisTarihi) ?? str(k.olusturulma));
             const yurtdisi = k.yon === "EXPORT" ? ` · ${SHIPMENT_DESTINATION.EXPORT}` : "";
             // Sevk edilmiş satır yalnız metreyi taşır; onay bekleyen/iptal satırında durum rozeti de çizilir.
@@ -115,7 +115,7 @@ export default function Shipments() {
                 birincil={musteri ?? no}
                 ikincil={ikincil}
                 deger={metre}
-                rozet={gitti ? undefined : <KayitDurumRozeti entry={st} testID={`durum-${r.id}`} />}
+                rozet={gitti ? undefined : <Rozet label={st.label} tone={st.ton} icon={st.icon} testID={`durum-${r.id}`} accessibilityLabel={`Durum: ${st.label}`} />}
                 ikiSatir
                 ayrac={i > 0}
                 ok={false}

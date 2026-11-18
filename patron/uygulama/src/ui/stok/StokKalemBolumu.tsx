@@ -22,7 +22,7 @@ import { space, tabularNums, typography } from "../tokens";
 import {
   bolumOf, gorunumOf, gorunumTemizle, kalemTemizle, KALEM_SIRALANABILIR, KALEM_SUTUNLARI, topTemizle, TOP_SIRALANABILIR, TOP_SUTUNLARI, VARSAYILAN_SUTUN,
 } from "./sutunlar";
-import { KompaktSecim } from "./KompaktSecim";
+import { KompaktSecim } from "../KompaktSecim";
 
 /** Saklı seçimden yalnız bu gruplarda geçerli olan değerler (seçeneği kalmamış değer süzmez). */
 function gecerliSecim(gs: readonly SuzgecGrubu[], secim: Readonly<Record<string, string>>): Record<string, string> {
