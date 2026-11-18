@@ -123,6 +123,21 @@
       ]
     },
     {
+      "name": "sevkiyat-icerigi",
+      "kind": "OLGU",
+      "permissions": [
+        "bulut:sevkiyat:oku"
+      ],
+      "retentionFields": [
+        "cikisTarihi",
+        "olusturulma"
+      ],
+      "sortFields": [
+        "cikisTarihi",
+        "olusturulma"
+      ]
+    },
+    {
       "name": "dogrudan-sevk",
       "kind": "OLGU",
       "permissions": [
@@ -313,6 +328,9 @@
       "bulut:siparis:oku"
     ],
     "sevkiyat": [
+      "bulut:sevkiyat:oku"
+    ],
+    "sevkiyat-icerigi": [
       "bulut:sevkiyat:oku"
     ],
     "dogrudan-sevk": [

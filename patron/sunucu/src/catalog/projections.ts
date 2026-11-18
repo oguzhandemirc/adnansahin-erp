@@ -67,6 +67,9 @@ export const ROOT_PROJECTIONS: readonly RootProjection[] = [
     parent: parentOf("siparis-kalemi"),
   },
   { name: "sevkiyat", kind: "OLGU", permissions: ["bulut:sevkiyat:oku"], retentionFields: ["cikisTarihi", "olusturulma"], sortFields: ["cikisTarihi", "olusturulma"] },
+  // Adnan'a özgü (2026-11-19): sevkiyatın çuval → top kırılımı (fabrika `getShipmentById` ile panelle aynı, BRÜT); uygulama
+  // sevkiyat ayrıntısında tek kaydı `GET /veri/sevkiyat-icerigi/:sevkiyatId` ile okur. Bulut hesap yapmaz.
+  { name: "sevkiyat-icerigi", kind: "OLGU", permissions: ["bulut:sevkiyat:oku"], retentionFields: ["cikisTarihi", "olusturulma"], sortFields: ["cikisTarihi", "olusturulma"] },
   { name: "dogrudan-sevk", kind: "OLGU", permissions: ["bulut:sevkiyat:oku"], retentionFields: ["cikisTarihi", "olusturulma"], sortFields: ["cikisTarihi", "olusturulma"] },
   { name: "cuval", kind: "OLGU", permissions: ["bulut:sevkiyat:oku"], retentionFields: ["olusturulma"], sortFields: ["olusturulma"] },
   { name: "is-emri", kind: "OLGU", permissions: ["bulut:uretim:oku"], retentionFields: ["olusturulma"], sortFields: ["olusturulma"] },
