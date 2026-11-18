@@ -5,7 +5,8 @@
 //  §1 Katalog: yeni alanlar türetilmiş olarak var, sürüm 3, finans sözcüğü yok; yeni ad/fason kaynakları değişiklik
 //     tespitinde (müşteri · ürün · renk · istasyon · fason firma · kategori) ve top kaynağı PARTİ yolunu kapsar.
 //  §2 Fixture: elle kurulan İE'lerde açık/kapanış/müşteri/sipariş/aşama/fason alanları elle beklenen değere eşit.
-//  §3 Bağımsız SQL: DB'deki HER İE için kurucunun `asamaTop`u ve fason firması kurucudan bağımsız SQL ile aynı.
+//  §3 Bağımsız SQL: DB'deki HER İE için kurucunun `asamaTop`u ve fason firması kurucudan bağımsız SQL ile aynı;
+//     `fasonFirmaPayi` (katalog 4) toplamı her İE'de `asamaTop` "fason" satırına eşit (top + metre).
 //  §4 `fason-acik`: fixture firmalarının müşteri/ürün kırılımı ve en eski gönderimi bağımsız SQL ile aynı; kategori
 //     listesi aktif kategorilerin hepsi (0'lı dahil); katı şema tanımadığı alanda fırlar.
 //
@@ -13,6 +14,8 @@
 //  S1 `work-order-facts` STATUS_STAGE'den `WAREHOUSE: "depo"` silindi → 2 ✗ (§2 asamaTop + §3 bağımsız SQL).
 //  S2 `loadOpenFasonOfWorkOrders` sıralaması ters çevrildi (az topu olan firma) → 2 ✗ (§2 + §3).
 //  S3 `primaryWorkOrderOfRoll` yalnız `producedInStep`e daraltıldı (fason topunun müşterisi kayboldu) → 4 ✗ (§4).
+//  S4 (2026-11-19) firma payında açık kalemsiz fason topu atlandı → 2 ✗ (§2 null satırı + §3 toplam eşitliği).
+//  S5 (2026-11-19) her top ilk kalemin firmasına yazıldı → 1 ✗ (§2 firma başına pay).
 // =============================================================================
 import { randomUUID } from "node:crypto";
 import { RollStatus } from "@prisma/client";
@@ -90,7 +93,7 @@ async function setup() {
   const a3 = await step(woA, 3, sKursun, "PENDING");
   const a4 = await step(woA, 4, sTambur, "PENDING");
   await step(woB, 1, sTambur, "COMPLETED");
-  await step(woD, 1, sOtherQc, "PENDING");
+  const d1 = await step(woD, 1, sOtherQc, "PENDING");
   // Bağlar: önce O2 (C2) sonra O1 (C1) → bağlanma sırası C2, C1.
   await prisma.workOrderToOrderLine.create({ data: { workOrderId: woA, orderLineId: o2.lineId, createdAt: new Date(now - 3 * DAY) } });
   await prisma.workOrderToOrderLine.create({ data: { workOrderId: woA, orderLineId: o1.lineId, createdAt: new Date(now - 1 * DAY) } });
@@ -118,6 +121,7 @@ async function setup() {
   await roll("R7", 10, RollStatus.SHIPPED, { batchId: batch }); // yalnız parti yolu
   await roll("R8", 999, RollStatus.CANCELLED, { currentStepId: a3 }); // ölü küme sayılmaz
   await roll("R9", 5, RollStatus.STOCK, { currentStepId: a1 }); // bitmiş KK1 adımı → diğer
+  await roll("R10", 12.5, RollStatus.AT_SUBCONTRACTOR, { currentStepId: d1 }); // açık kalemi YOK → firma payı null satırı
 
   const cat = async (n: string) => (await prisma.subcontractorCategory.create({ data: { code: `${S}${n}`, name: `${S}Kategori ${n}` }, select: { id: true } })).id;
   const catDye = await cat("BOYA");
@@ -209,10 +213,10 @@ async function main(): Promise<void> {
   console.log("\n§1 Katalog");
   const p = findRecordProjection("is-emri")!;
   const NEW = ["acik", "kapanisTarihi", "musteriAdi", "musteriAdlari", "siparisIdleri", "siparisNolari", "urunAdi", "renkAdi", "asama", "asamaTop",
-    "topSayisi", "metre", "fasonFirmaId", "fasonFirmaAdi", "fasonKategoriler", "fasonGonderim", "fasonFirmaIdleri"];
+    "topSayisi", "metre", "fasonFirmaId", "fasonFirmaAdi", "fasonKategoriler", "fasonGonderim", "fasonFirmaIdleri", "fasonFirmaPayi"];
   const wires = p.derived.map((d) => d.wire);
   check("yeni alanların hepsi türetilmiş olarak var; eskiler duruyor", [...NEW, "cariKartIdleri", "aktifIstasyonId", "uretilenMetre"].every((w) => wires.includes(w)), wires.join(","));
-  check("katalog sürümü 3", p.catalogVersion === 3, `${p.catalogVersion}`);
+  check("katalog sürümü 4 (fasonFirmaPayi eki)", p.catalogVersion === 4, `${p.catalogVersion}`);
   check("finans sözcüğü yok", !wires.some((w) => FINANCE.test(w)));
   const srcTables = new Set(p.sources.map((s) => s.table));
   const needSrc = ["rolls", "customers", "items", "colors", "stations", "subcontractors", "subcontractor_categories", "orders", "work_order_to_order_lines"];
@@ -256,7 +260,14 @@ async function main(): Promise<void> {
     check("fason: en çok topu olan firma (F1: 2 top), gönderim = F1'in en eski açık sevki",
       A.fasonFirmaId === fxIds.f1 && A.fasonFirmaAdi === `${S}Firma F1` && A.fasonGonderim === fxIds.sent1.toISOString() && j(A.fasonKategoriler) === j([`${S}Kategori BOYA`]));
     check("fasonFirmaIdleri: tekil, sıralı", j(A.fasonFirmaIdleri) === j([fxIds.f1, fxIds.f2].sort()), j(A.fasonFirmaIdleri));
-    check("fasonsuz İE: null/[]", B.fasonFirmaId === null && j(B.fasonFirmaIdleri) === "[]" && j(B.fasonKategoriler) === "[]" && B.fasonGonderim === null);
+    check("fasonsuz İE: null/[]", B.fasonFirmaId === null && j(B.fasonFirmaIdleri) === "[]" && j(B.fasonKategoriler) === "[]" && B.fasonGonderim === null && j(B.fasonFirmaPayi) === "[]");
+    check("fasonFirmaPayi: firma başına top/metre + kategori kodları (F1 2 top 170 m, F2 1 top 50 m)",
+      j(A.fasonFirmaPayi) === j([
+        { fasonFirmaId: fxIds.f1, kategoriKodlari: [`${S}BOYA`], top: 2, metre: 170 },
+        { fasonFirmaId: fxIds.f2, kategoriKodlari: [`${S}BOYA`], top: 1, metre: 50 },
+      ]), j(A.fasonFirmaPayi));
+    check("fasonFirmaPayi: açık kalemi olmayan fason topu null firma satırında (toplam kaybolmaz)",
+      j(D.fasonFirmaPayi) === j([{ fasonFirmaId: null, kategoriKodlari: [], top: 1, metre: 12.5 }]) && j(D.asamaTop) === j([{ anahtar: "fason", top: 1, metre: 12.5 }]), `${j(D.fasonFirmaPayi)} ${j(D.asamaTop)}`);
 
     console.log("\n§3 Bağımsız SQL ↔ kurucu (DB'deki HER iş emri)");
     const allIds = (await prisma.workOrder.findMany({ select: { id: true } })).map((w) => w.id);
@@ -271,6 +282,17 @@ async function main(): Promise<void> {
       return (r.fasonFirmaId ?? null) !== (e?.id ?? null) || (r.fasonGonderim ?? null) !== (e?.at ?? null) || j(r.fasonFirmaIdleri) !== j(e?.ids ?? []);
     });
     check("fason firması + gönderim + firma listesi eşit", fasonDiff.length === 0, fasonDiff.slice(0, 3).map((r) => r.id).join(","));
+    // fasonFirmaPayi toplamı = asamaTop "fason" satırı (top birebir, metre 3 hane; mili-metre tamsayısıyla toplanır).
+    const mm = (x: unknown): number => Math.round(Number(x) * 1000);
+    const shareDiff = allRows.filter((r) => {
+      const fs = r.asamaTop.find((a) => a.anahtar === "fason");
+      const pay = Array.isArray(r.fasonFirmaPayi) ? (r.fasonFirmaPayi as Array<{ top: number; metre: number }>) : null;
+      if (!pay) return true;
+      return pay.reduce((n, x) => n + x.top, 0) !== (fs?.top ?? 0) || pay.reduce((n, x) => n + mm(x.metre), 0) !== mm(fs?.metre ?? 0) || pay.some((x) => x.top <= 0);
+    });
+    const fasonWos = allRows.filter((r) => r.asamaTop.some((a) => a.anahtar === "fason")).length;
+    check(`fasonFirmaPayi toplamı = asamaTop "fason" (${allRows.length} İE, ${fasonWos} fasonlu)`, fasonWos >= 2 && shareDiff.length === 0,
+      shareDiff.slice(0, 3).map((r) => `${r.id}: ${j(r.fasonFirmaPayi)} ≠ ${j(r.asamaTop.find((a) => a.anahtar === "fason"))}`).join(" | "));
 
     console.log("\n§4 fason-acik kırılımı");
     const snap = await buildSubcontractOpenData();

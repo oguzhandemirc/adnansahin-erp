@@ -212,7 +212,7 @@ async function workOrderDerived(rows: readonly RawRow[]): Promise<DerivedValues>
   const meters: MetersFn = service["withProductionMeters"].bind(service);
   const withMeters = await meters(wos);
   const woIds = ids(rows);
-  const stages = await loadRollStagesOfWorkOrders(woIds);
+  const { stages, fasonShares } = await loadRollStagesOfWorkOrders(woIds);
   const fason = await loadOpenFasonOfWorkOrders(woIds);
   const closeDates = await loadCloseDates(rows.map((r) => ({ id: r.id, status: r.status as WorkOrderStatus, cancelledAt: (r.cancelledAt as Date | null) ?? null })));
   const items = await displayNames("item", rows.map((r) => r.targetItemId));
@@ -245,6 +245,7 @@ async function workOrderDerived(rows: readonly RawRow[]): Promise<DerivedValues>
       topSayisi: asamaTop.reduce((n, a) => n + a.top, 0),
       metre: metreNumber(asamaTop.reduce((m, a) => m.plus(a.metre), D0())),
       ...(fason.get(w.id) ?? NO_FASON),
+      fasonFirmaPayi: fasonShares.get(w.id) ?? [],
     });
   }
   return out;

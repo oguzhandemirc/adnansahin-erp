@@ -93,3 +93,17 @@ Anlıklar ilk pakette gider; sınır 4 MB gzip / 32 MB açık. Tur süresi: cari
 
 **Provada bakılacak:** eşitleme turu log'unda anlık süreleri (`cari-ozeti`, `stok-kalem`) ve hata satırı yok;
 bulut `projection_rows`ta `stok-kalem` ve `cari-ozeti` boyutu; uygulamada stok süzgeci + cari dönemleri.
+
+## Ek 2 — iş emrinin fason firma payı (E, 2026-11-19; sürüm 2.13.1 kalır, migration YOK)
+
+- **`is-emri` katalog 3 → 4:** satıra YALNIZ `fasonFirmaPayi: [{fasonFirmaId, kategoriKodlari, top, metre}]` eklendi
+  (mevcut alanlar aynen). Küme `asamaTop` "fason" satırının AYNI topları; firma topun açık kaleminden
+  (`outstandingItemOfOpenDispatch`, birden çoksa en son sevk), işlem = firmanın hizmet kategori KODLARI (`fason-acik` ile
+  aynı kod), açık kalemi olmayan fason topu `fasonFirmaId: null` satırında. Toplam her İE'de "fason" satırına eşit (bekçi
+  `test_patron_bulut_is_emri` §3, DB'deki her İE). Fasonsuz İE'de `[]`.
+- **Uyumluluk:** sürüm artışı kurulumdan sonraki ilk turda `is-emri` için bir kez TAM gönderim başlatır (eski bulut da
+  `KATALOG_SURUMU` ile TAM ister); bulut satırı şemasız saklar, bulut değişmedi. Eski uygulama alanı görmez; yeni uygulama
+  dizi yoksa (eski fabrika) bugünkü gibi davranır.
+- **Yük:** fasonlu İE başına 1–2 satır × ≈ 110 bayt; bir kerelik TAM gönderim `is-emri`nin bütün satırları kadardır.
+- **Provada bakılacak:** ilk turda `is-emri` TAM gönderimi bitti mi; uygulamada iki firmaya bölünmüş iş emri firma süzgecinde
+  Top/Metre payı ve alt şerit toplamı.

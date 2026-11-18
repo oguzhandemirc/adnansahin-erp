@@ -224,6 +224,8 @@ export const FACTS: readonly RecordProjection[] = [
       derived("fasonKategoriler", "loadOpenFasonOfWorkOrders: firmanın hizmet kategori adları", ["subcontractor_dispatch_items", "subcontractor_dispatches", "subcontractor_category_links", "subcontractor_categories"]),
       derived("fasonGonderim", "loadOpenFasonOfWorkOrders: o firmadaki en eski açık sevk dispatchedAt", ["subcontractor_dispatch_items", "subcontractor_dispatches"]),
       derived("fasonFirmaIdleri", "loadOpenFasonOfWorkOrders: AT_SUBCONTRACTOR topların açık kalemlerinin firmaları (tekil, sıralı)", ["subcontractor_dispatch_items", "subcontractor_dispatches", "rolls"]),
+      // 4 (2026-11-19): YALNIZ EKLENDİ — "fason" satırının firma payı; toplamı asamaTop "fason" satırına eşit (bekçi).
+      derived("fasonFirmaPayi", "work-order-facts loadRollStagesOfWorkOrders: asamaTop \"fason\" topları × topun outstandingItemOfOpenDispatch kaleminin firması (en son sevk) + firma kategori kodları; kalemsiz top fasonFirmaId null", ["rolls", "batches", "subcontractor_dispatch_items", "subcontractor_dispatches", "subcontractor_receipt_items", "subcontractor_receipts", "subcontractor_category_links", "subcontractor_categories"]),
     ],
     sources: [self("work_orders"),
       via("work_order_steps", "workOrderId"),
@@ -241,6 +243,7 @@ export const FACTS: readonly RecordProjection[] = [
     deletion: "YOK", permission: "bulut:uretim:oku", module: "production.enabled",
     // 2 (2026-11-06): TAM gönderim; `cariKartIdleri` yalnız açık sipariş bağından (≤5), bağsız İE'de boş.
     // 3 (2026-11-13): patron İE ekranı alanları EKLENDİ (açık, kapanış, müşteri/sipariş, aşama, fason) — TAM gönderim.
-    retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 3,
+    // 4 (2026-11-19, backend 2.13.1): `fasonFirmaPayi` EKLENDİ — sürüm artışı bir kez TAM gönderim ister.
+    retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 4,
   },
 ];

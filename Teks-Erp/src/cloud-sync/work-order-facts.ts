@@ -72,10 +72,42 @@ const STATUS_STAGE: Partial<Record<RollStatus, FlowStageKey>> = {
   [RollStatus.SHIPPED]: "sevkEdildi",
 };
 
+/**
+ * İE'nin fasondaki toplarının firma payı (`fasonFirmaPayi`). Küme `asamaTop` "fason" satırının AYNI topları
+ * (aynı sorgu, `AT_SUBCONTRACTOR`); firma topun AÇIK + outstanding kaleminden (`outstandingItemOfOpenDispatch`, TEK
+ * kaynak). İşlem = firmanın hizmet kategori KODLARI (`fason-acik` firma satırıyla aynı seçim, ad sırası). Açık kalemi
+ * olmayan fason topu `fasonFirmaId: null` satırına düşer ⇒ dizinin toplamı DAİMA "fason" satırına eşittir.
+ */
+export interface FasonFirmShare { fasonFirmaId: string | null; kategoriKodlari: string[]; top: number; metre: number }
+export interface RollStagesOfWorkOrders {
+  stages: Map<string, StageCount[]>;
+  /** Yalnız fasonda topu olan İE'ler; sıra: top azalan → metre azalan → firma kimliği (null sonda). */
+  fasonShares: Map<string, FasonFirmShare[]>;
+}
+
+/** Fasondaki topun firması: açık kalemlerinden en son gönderilen (eşitlikte sevk kimliği); kalem yoksa null. */
+async function loadFirmOfFasonRolls(rollIds: readonly string[]): Promise<Map<string, { id: string; codes: string[] }>> {
+  const out = new Map<string, { id: string; codes: string[]; at: Date; dispatchId: string }>();
+  if (rollIds.length === 0) return out;
+  const items = await prisma.subcontractorDispatchItem.findMany({
+    where: { ...outstandingItemOfOpenDispatch(), rollId: { in: [...rollIds] } },
+    select: { rollId: true, dispatch: { select: { id: true, subcontractorId: true, dispatchedAt: true, subcontractor: { select: FIRM_SELECT } } } },
+  });
+  for (const it of items) {
+    if (!it.rollId) continue;
+    const d = it.dispatch;
+    const prev = out.get(it.rollId);
+    if (prev && (prev.at > d.dispatchedAt || (prev.at.getTime() === d.dispatchedAt.getTime() && prev.dispatchId > d.id))) continue;
+    const codes = [...d.subcontractor.categories].sort((a, b) => a.category.name.localeCompare(b.category.name, "tr")).map((c) => c.category.code);
+    out.set(it.rollId, { id: d.subcontractorId, codes, at: d.dispatchedAt, dispatchId: d.id });  }
+  return out;
+}
+
 /** İE başına canlı top aşama kırılımı (sıfır satır yok, sıra `FLOW_STAGE_KEYS`); ölü küme (`K18_DEAD_STATUSES`) sayılmaz. */
-export async function loadRollStagesOfWorkOrders(woIds: readonly string[]): Promise<Map<string, StageCount[]>> {
+export async function loadRollStagesOfWorkOrders(woIds: readonly string[]): Promise<RollStagesOfWorkOrders> {
   const out = new Map<string, StageCount[]>();
-  if (woIds.length === 0) return out;
+  const fasonShares = new Map<string, FasonFirmShare[]>();
+  if (woIds.length === 0) return { stages: out, fasonShares };
   const asked = new Set(woIds);
   const rolls = await prisma.roll.findMany({
     where: { AND: [whereRollsOfWorkOrders([...woIds]), { status: { notIn: K18_DEAD_STATUSES } }] },
@@ -86,7 +118,9 @@ export async function loadRollStagesOfWorkOrders(woIds: readonly string[]): Prom
     queued.length === 0 ? new Set() : new Set((await prisma.roll.findMany({ where: { id: { in: queued }, currentStep: stepWhere }, select: { id: true } })).map((r) => r.id));
   const kursun = await inQueue(KURSUN_FLOW_STEP_WHERE);
   const tambur = await inQueue(TAMBUR_FLOW_STEP_WHERE);
+  const fasonFirm = await loadFirmOfFasonRolls(rolls.filter((r) => STATUS_STAGE[r.status] === "fason").map((r) => r.id));
   const acc = new Map<string, Map<FlowStageKey, { top: number; metre: Prisma.Decimal }>>();
+  const shareAcc = new Map<string, Map<string, { firm: { id: string; codes: string[] } | null; top: number; metre: Prisma.Decimal }>>();
   for (const r of rolls) {
     const stage: FlowStageKey = STATUS_STAGE[r.status] ?? (kursun.has(r.id) ? "kursun" : tambur.has(r.id) ? "tambur" : "diger");
     for (const wo of workOrdersOfRoll(r)) {
@@ -97,12 +131,25 @@ export async function loadRollStagesOfWorkOrders(woIds: readonly string[]): Prom
       c.metre = c.metre.plus(r.currentQty);
       m.set(stage, c);
       acc.set(wo, m);
+      if (stage !== "fason") continue;
+      const firm = fasonFirm.get(r.id) ?? null;
+      const sm = shareAcc.get(wo) ?? new Map();
+      const s = sm.get(firm?.id ?? "") ?? { firm, top: 0, metre: new Prisma.Decimal(0) };
+      s.top++;
+      s.metre = s.metre.plus(r.currentQty);
+      sm.set(firm?.id ?? "", s);
+      shareAcc.set(wo, sm);
     }
   }
   for (const [wo, m] of acc) {
     out.set(wo, FLOW_STAGE_KEYS.filter((k) => m.has(k)).map((k) => ({ anahtar: k, top: m.get(k)!.top, metre: metreNumber(m.get(k)!.metre) })));
   }
-  return out;
+  for (const [wo, sm] of shareAcc) {
+    fasonShares.set(wo, [...sm.values()]
+      .sort((a, b) => b.top - a.top || b.metre.comparedTo(a.metre) || (a.firm ? 0 : 1) - (b.firm ? 0 : 1) || (a.firm?.id ?? "").localeCompare(b.firm?.id ?? ""))
+      .map((s) => ({ fasonFirmaId: s.firm?.id ?? null, kategoriKodlari: s.firm?.codes ?? [], top: s.top, metre: metreNumber(s.metre) })));
+  }
+  return { stages: out, fasonShares };
 }
 
 export interface WorkOrderFason {
