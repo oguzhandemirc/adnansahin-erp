@@ -1,4 +1,4 @@
-// Sesli sipariş — konuşma tanıma sarmalayıcısı. Telefonun KENDİ tanıma hizmeti (Android Google, iOS Apple), dil tr-TR,
+// Sesli giriş — konuşma tanıma sarmalayıcısı. Telefonun KENDİ tanıma hizmeti (Android Google, iOS Apple), dil tr-TR,
 // `expo-speech-recognition` üstünden. Ses kaydı tutulmaz (`recordingOptions` verilmez); `requiresOnDeviceRecognition`
 // verilmez → tanıma AĞ tabanlı olabilir (iOS Apple, Android Google sunucuları; gizlilik politikası § izinler bunu söyler).
 // Çıkan metin yalnız telefonda formu doldurur; bulutumuza ses gitmez. Yerel modül yoksa (web, Expo Go, eski paket) motor "kullanılamaz" döner — düğme çizilmez.
@@ -111,8 +111,8 @@ function yerelModul(): YerelModul | null {
   return yerelOnbellek;
 }
 
-/** Son sonuçtan sonra bu kadar sessizlik → konuşma bitti sayılır. */
-export const SESSIZLIK_MS = 3000;
+/** Son sonuçtan sonra bu kadar sessizlik → konuşma bitti sayılır. Adım içi tek alanlık kısa söz için 1,8 sn (2026-11-18; tek cümle kipinde 3 sn idi). */
+export const SESSIZLIK_MS = 1800;
 /** Başladıktan sonra hiç sonuç gelmezse. */
 export const ILK_MS = 8000;
 /** Tek dinlemenin üst sınırı. */

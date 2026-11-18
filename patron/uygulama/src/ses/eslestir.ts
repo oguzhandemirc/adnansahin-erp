@@ -1,12 +1,14 @@
-// Sesli sipariş — listeyle YAKLAŞIK eşleştirme (SAF). Söylenen sözcük aralığı, seçicinin kullandığı kayıtlarla
-// (cari / ürün / renk: başlık + kod) karşılaştırılır. Kesin seçim yalnız eşik üstü VE açık ara öndeyse yapılır; aksi
-// hâlde adaylar döner (kullanıcı modal listeden seçer), hiçbiri yoksa "bulunamadı".
+// Sesli giriş — listeyle YAKLAŞIK eşleştirme (SAF). Söylenen sözcük aralığı, seçicinin kullandığı kayıtlarla
+// (cari / ürün / renk: başlık + kod) karşılaştırılır. "Güçlü" eşleşme yalnız eşik üstü VE açık ara öndeyse sayılır;
+// adım içi girişte güçlü eşleşme bile SESSİZCE seçilmez, yalnız en üstte vurgulanır (`alan.ts`).
 import { benzerlik, govdeler, katla, sozcuklere, sozcukBenzerligi, type Sozcuk } from "./metin";
 
 export interface Aday {
   readonly id: string;
   readonly title: string;
   readonly kod?: string;
+  /** Ürünün fabrika birimi (`urun` projeksiyonu `birim`, ör. "MT", "KG"); diğer listelerde yok. */
+  readonly birim?: string;
 }
 
 /** Alan sonucu: kesin değer · birden çok aday · bulunamadı. `duyulan` eşleşmede kullanılan söz. */

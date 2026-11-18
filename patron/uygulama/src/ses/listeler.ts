@@ -1,4 +1,4 @@
-// Sesli sipariş — eşleştirme listeleri: seçicinin (Picker) kullandığı projeksiyonların AYNISI (cari-kart müşteri
+// Sesli giriş — eşleştirme listeleri: seçicinin (Picker) kullandığı projeksiyonların AYNISI (cari-kart müşteri
 // süzgeciyle, ürün, renk). Bulut yalnız okunur; sözleşme değişmez. Sayfa başı 200 (sunucu üst sınırı), liste başına en
 // çok 5 sayfa; bir listenin hatası yalnız o listeyi boş bırakır.
 import type { ListParams } from "../api/endpoints";
@@ -14,7 +14,8 @@ const EN_COK_SAYFA = 5;
 export function kayittanAday(r: ProjectionRecord): Aday {
   const o = (typeof r.kayit === "object" && r.kayit !== null ? r.kayit : {}) as Record<string, unknown>;
   const kod = typeof o.kod === "string" && o.kod !== "" ? o.kod : undefined;
-  return { id: r.id, title: recordTitle(r.kayit), ...(kod ? { kod } : {}) };
+  const birim = typeof o.birim === "string" && o.birim !== "" ? o.birim : undefined;
+  return { id: r.id, title: recordTitle(r.kayit), ...(kod ? { kod } : {}), ...(birim ? { birim } : {}) };
 }
 
 export async function adayListesi(list: ListeCagrisi, projection: string, suzgec?: string): Promise<Aday[]> {
