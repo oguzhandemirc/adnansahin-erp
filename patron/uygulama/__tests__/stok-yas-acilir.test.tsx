@@ -1,5 +1,6 @@
 // Stok › yaş dağılımı açılır-kapanır: §1 varsayılan kapalı (gövde erişilebilirlikten gizli, özet görünür) · §2 başlığa
 // dokununca açılır/kapanır ve durum cihaza yazılır · §3 saklı "açık" okunur · §4 hesap/tesis kapsamlı anahtar.
+// 2026-11-18: Stok kartları varsayılan KAPALI → yaş kartı burada yerel tercihle (`tablo.stok` › kartlar=yas) seçili açılır.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import type React from "react";
@@ -41,6 +42,7 @@ async function flush() {
 
 beforeEach(async () => {
   await AsyncStorage.clear();
+  await AsyncStorage.setItem("tablo-tercihi:t1:h1:tablo.stok", JSON.stringify({ deger: { surum: 1, sutunlar: ["urun"], siralama: null, suzgec: { kartlar: "yas" } }, kirli: false }));
   mockApi.snapshot.mockReset();
   mockApi.snapshot.mockImplementation(async (p: string) => ({ projeksiyon: p, veri: p === "stok-karnesi" ? KARNE : { toplam: null, cariler: [] }, surum: "2026-11-08T08:55:00.000Z" }));
 });

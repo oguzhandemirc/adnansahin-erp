@@ -1,7 +1,7 @@
 // Stok › kart seçimi (2026-11-16): §1 saf model (tanım sırası, en az bir, varsayılan, bozuk değer) · §2 başlıktaki
 // "Kartları seç" simgesi seçiciyi açar; kapatılan kart çizilmez; son kart kapatılamaz; "Varsayılana dön" · §3 seçim
 // MEVCUT `tablo.stok` tercihine yazılır (yeni anahtar/uç yok) ve ürün tablosunun sütun seçimini EZMEZ · §4 tercih ucu
-// başarısızken yerelde çalışır.
+// başarısızken yerelde çalışır. 2026-11-18: varsayılan HİÇ kart (kullanıcı: "kartlar default olarak kapalı gelsin").
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import type React from "react";
@@ -51,22 +51,24 @@ beforeEach(async () => {
 });
 
 describe("§1 model", () => {
-  it("varsayılan hepsi; bozuk/boş/bilinmeyen değer varsayılana düşer; çıktı tanım sırasında", () => {
-    expect(shownCards(T())).toEqual(["ham", "yari", "bitmis", "olu", "cuval", "yas"]);
-    expect(shownCards(T({ kartlar: "" }))).toEqual(["ham", "yari", "bitmis", "olu", "cuval", "yas"]);
-    expect(shownCards(T({ kartlar: "xyz,,foo" }))).toEqual(["ham", "yari", "bitmis", "olu", "cuval", "yas"]);
+  it("varsayılan hiç kart; bozuk/boş/bilinmeyen değer varsayılana düşer; çıktı tanım sırasında", () => {
+    expect(shownCards(T())).toEqual([]);
+    expect(shownCards(T({ kartlar: "" }))).toEqual([]);
+    expect(shownCards(T({ kartlar: "xyz,,foo" }))).toEqual([]);
+    expect(shownCards(T({ kartlar: "ham,yari,bitmis,olu,cuval,yas" }))).toEqual(["ham", "yari", "bitmis", "olu", "cuval", "yas"]);
     expect(shownCards(T({ kartlar: "olu,ham,ham,xyz" }))).toEqual(["ham", "olu"]);
   });
 
-  it("aç/kapa; son kart da kapatılır ('-' = hiç); hepsi açılınca alan silinir; varsayılan yalnız kart alanını siler", () => {
+  it("aç/kapa; son kart da kapatılır (hiç = varsayılan → alan silinir); hepsi açık açıkça yazılır; varsayılan yalnız kart alanını siler", () => {
     const yalnizHam = T({ kartlar: "ham", diger: "x" });
     const hic = toggleCard(yalnizHam, "ham");
-    expect(hic.suzgec).toEqual({ kartlar: "-", diger: "x" });
+    expect(hic.suzgec).toEqual({ diger: "x" });
     expect(shownCards(hic)).toEqual([]);
+    expect(shownCards(T({ kartlar: "-" }))).toEqual([]);
     expect(shownCards(toggleCard(hic, "olu"))).toEqual(["olu"]);
     expect(shownCards(toggleCard(yalnizHam, "olu"))).toEqual(["ham", "olu"]);
     const hepsiEksikBir = T({ kartlar: "ham,yari,bitmis,olu,cuval" });
-    expect(toggleCard(hepsiEksikBir, "yas").suzgec).toEqual({});
+    expect(toggleCard(hepsiEksikBir, "yas").suzgec).toEqual({ kartlar: "ham,yari,bitmis,olu,cuval,yas" });
     const r = resetCards(T({ kartlar: "ham", diger: "x" }));
     expect(r.suzgec).toEqual({ diger: "x" });
     expect(r.sutunlar).toEqual(["urun", "miktar"]);
@@ -74,31 +76,29 @@ describe("§1 model", () => {
 });
 
 describe("§2 ekran", () => {
-  it("başlıkta 'Kartları seç' simgesi; kapatılan kart çizilmez, son kart da kapanır, varsayılana dön", async () => {
+  it("ilk açılışta hiç kart yok; seçiciden açılan kart çizilir, kapatılan kaybolur, varsayılan hepsini kapatır", async () => {
     render(<Stock />);
     await flush();
     const dugme = screen.getByTestId("stok-kart-sec");
     expect(dugme.props.accessibilityLabel).toBe("Kartları seç");
-    expect(screen.getByTestId("kpi-ham")).toBeTruthy();
+    for (const id of ["kpi-ham", "kpi-yari", "kpi-bitmis", "olu-stok", "bolum-yas"]) expect(screen.queryByTestId(id)).toBeNull();
     fireEvent.press(dugme);
     await flush();
     fireEvent.press(screen.getByTestId("stok-kart-secici-ham"));
-    await flush();
-    expect(screen.queryByTestId("kpi-ham")).toBeNull();
-    expect(screen.getByTestId("kpi-yari")).toBeTruthy();
-    for (const k of ["yari", "bitmis", "olu", "cuval", "yas"]) {
-      fireEvent.press(screen.getByTestId(`stok-kart-secici-${k}`));
-      await flush();
-    }
-    // Hepsi kapatıldı (2026-11-17): son kart da kapanır, hiçbir kart çizilmez; seçici bunu söyler.
-    expect(screen.getByTestId("stok-kart-secici-yas").props.accessibilityState).toMatchObject({ checked: false, disabled: false });
-    expect(screen.queryByTestId("bolum-yas")).toBeNull();
-    expect(screen.getByText("Hepsi kapatılabilir")).toBeTruthy();
-    expect(screen.queryByTestId("olu-stok")).toBeNull();
-    fireEvent.press(screen.getByTestId("stok-kart-secici-varsayilan"));
+    fireEvent.press(screen.getByTestId("stok-kart-secici-yari"));
+    fireEvent.press(screen.getByTestId("stok-kart-secici-olu"));
     await flush();
     expect(screen.getByTestId("kpi-ham")).toBeTruthy();
+    expect(screen.getByTestId("kpi-yari")).toBeTruthy();
     expect(screen.getByTestId("olu-stok")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("stok-kart-secici-ham"));
+    await flush();
+    expect(screen.queryByTestId("kpi-ham")).toBeNull();
+    expect(screen.getByText("Hepsi kapatılabilir")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("stok-kart-secici-varsayilan"));
+    await flush();
+    expect(screen.queryByTestId("kpi-yari")).toBeNull();
+    expect(screen.queryByTestId("olu-stok")).toBeNull();
   });
 });
 
@@ -120,7 +120,7 @@ describe("§3 saklama: mevcut `tablo.stok` tercihi", () => {
       const [anahtar, deger] = mockApi.viewPrefSet.mock.calls[0] as [string, TabloTercihi];
       expect(anahtar).toBe("tablo.stok");
       expect(deger.sutunlar).toEqual(["urun", "siparissiz"]);
-      expect(deger.suzgec).toEqual({ kartlar: "ham,yari,bitmis,cuval,yas" });
+      expect(deger.suzgec).toEqual({ kartlar: "olu" });
     } finally {
       jest.useRealTimers();
     }
@@ -135,9 +135,9 @@ describe("§3 saklama: mevcut `tablo.stok` tercihi", () => {
     fireEvent.press(screen.getByTestId("stok-kart-sec"));
     fireEvent.press(screen.getByTestId("stok-kart-secici-ham"));
     await flush();
-    expect(screen.queryByTestId("kpi-ham")).toBeNull();
+    expect(screen.getByTestId("kpi-ham")).toBeTruthy();
     const yerel = JSON.parse((await AsyncStorage.getItem(YEREL)) ?? "null") as { deger: TabloTercihi; kirli: boolean };
-    expect(yerel.deger.suzgec.kartlar).toBe("yari,bitmis,olu,cuval,yas");
+    expect(yerel.deger.suzgec.kartlar).toBe("ham");
     expect(yerel.kirli).toBe(true);
   });
 });

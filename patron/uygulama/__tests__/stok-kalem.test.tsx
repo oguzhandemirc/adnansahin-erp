@@ -1,6 +1,6 @@
 // Stok › kalem listesi (anlık `stok-kalem`): §1 saf okuma — kalem adı, Türkçe katlamalı arama, süzgeç grupları, yaş kovası,
 // boş değer sonda sıralama · §2 ekran — varsayılan Bitmiş + Kalem bazında; Ham segmenti; kaleme dokununca topları; Top
-// bazında; arama; eski fabrika (anlık yok) boş durum, kutular yerinde · §3 görünüm hesap yapmaz (rakam fabrikanınki).
+// bazında; arama; eski fabrika (anlık yok) boş durum, alt toplam satırı yok · §3 görünüm hesap yapmaz (rakam fabrikanınki).
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import type React from "react";
 
@@ -118,10 +118,12 @@ describe("§2 ekran", () => {
     expect(screen.getByTestId("stok-kalem-bolumu")).toBeTruthy();
     expect(screen.getByText("ÖRNEK PANOS 330 · BEYAZ · 4 Kat")).toBeTruthy();
     expect(screen.getByText("ÖRNEK SATEN 280 · KREM")).toBeTruthy();
-    expect(screen.getByTestId("stok-kalem-ozet").props.children).toBe("4 top · 151,2 m");
+    // Bölüm toplamı ALTTA sabit satırda (2026-11-18); üstte sayı yok.
+    expect(screen.getByTestId("stok-toplam-toplam-deger").props.children).toBe("4 top · 151,2 m");
+    expect(screen.queryByTestId("stok-kalem-ozet")).toBeNull();
     expect(screen.getByText("101,2")).toBeTruthy();
-    // Kutular yerinde.
-    expect(screen.getByTestId("kpi-bitmis")).toBeTruthy();
+    // Kartlar varsayılan kapalı (2026-11-18).
+    expect(screen.queryByTestId("kpi-bitmis")).toBeNull();
   });
 
   it("kaleme dokununca o kalemin topları açılır, yeniden dokununca kapanır", async () => {
@@ -154,11 +156,12 @@ describe("§2 ekran", () => {
     expect(screen.getByText("T-004")).toBeTruthy();
   });
 
-  it("eski fabrika (anlık yok): kalem bölümü boş durum, kutular çizilir", async () => {
+  it("eski fabrika (anlık yok): kalem bölümü boş durum, alt toplam satırı çizilmez, ekran çökmez", async () => {
     delete DATA["stok-kalem"];
     render(<Stock />);
     await flush();
     expect(screen.getByTestId("stok-kalem-bos")).toBeTruthy();
-    expect(screen.getByTestId("kpi-ham")).toBeTruthy();
+    expect(screen.queryByTestId("stok-toplam-satiri")).toBeNull();
+    expect(screen.getByTestId("stok-kart-sec")).toBeTruthy();
   });
 });

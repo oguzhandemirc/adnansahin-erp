@@ -1,19 +1,18 @@
-// Stok ekranının kalem listesi (anlık `stok-kalem`): HAM | BİTMİŞ segmenti, "Kalem bazında" (aynı ürün+en+renk(+kat)
-// tek satır: top sayısı · toplam metre · en eski yaş) ve "Top bazında" (toplar tek tek). Kaleme dokununca o kalemin
+// Stok ekranının kalem listesi (anlık `stok-kalem`): Ham | Bitmiş ve Kalem | Top küçük bölmeli seçimleri araç satırında
+// (2026-11-18), "Kalem bazında" (aynı ürün+en+renk(+kat) tek satır: top sayısı · toplam metre · en eski yaş) ve "Top
+// bazında" (toplar tek tek). Bölüm toplamları ALTTA sabit satırda (`StokToplamSatiri`). Kaleme dokununca o kalemin
 // topları satırın altında açılır. Belge istemcide tek parça ⇒ arama/süzgeç/sıralama istemcide (`lib/stok-kalem`);
 // seçimler profilde (`stok.gorunum` · `tablo.stok-kalem` · `tablo.stok-top`). Sayıları fabrika hesaplar.
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import {
-  gorunenKalemler, gorunenToplar, kaleminToplari, kgVar, KIM_NEREDE_ANAHTARLARI, kimNeredeGruplari, stokBolumu, stokSuzgecGruplari, tumToplar,
+  gorunenKalemler, gorunenToplar, kaleminToplari, kgVar, KIM_NEREDE_ANAHTARLARI, kimNeredeGruplari, stokBolumu, stokSuzgecGruplari,
   type Bolum, type Gorunum, type Kalem, type StokBolumu,
 } from "../../lib/stok-kalem";
 import { UNIT } from "../../lib/labels/uretim";
-import { BlokBasligi } from "../ortak";
 import { qty } from "../pano/read";
 import { SnapshotGate } from "../pano/SnapshotGate";
 import { useSnapshot } from "../pano/useSnapshot";
-import { SegmentedControl } from "../SegmentedControl";
 import { azamiSutun, etkinSuzgecSayisi, siganSutun, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SuzgecGrubu, type SutunTanimi } from "../tablo/model";
 import { SuzgecSecici, SutunSecici } from "../tablo/Seciciler";
 import { useTabloTercihi } from "../tablo/useTabloTercihi";
@@ -23,6 +22,7 @@ import { space, tabularNums, typography } from "../tokens";
 import {
   bolumOf, gorunumOf, gorunumTemizle, kalemTemizle, KALEM_SIRALANABILIR, KALEM_SUTUNLARI, topTemizle, TOP_SIRALANABILIR, TOP_SUTUNLARI, VARSAYILAN_SUTUN,
 } from "./sutunlar";
+import { KompaktSecim } from "./KompaktSecim";
 
 /** Saklı seçimden yalnız bu gruplarda geçerli olan değerler (seçeneği kalmamış değer süzmez). */
 function gecerliSecim(gs: readonly SuzgecGrubu[], secim: Readonly<Record<string, string>>): Record<string, string> {
@@ -76,30 +76,29 @@ function Icerik({ veri }: { readonly veri: unknown }) {
 
   return (
     <View testID="stok-kalem-bolumu">
-      <View style={s.segment}>
-        <SegmentedControl
-          items={[{ key: "ham", label: "Ham" }, { key: "bitmis", label: "Bitmiş" }]} value={bolum} onChange={(v) => sec("bolum", v)}
-          testIDPrefix="stok-bolum-" accessibilityLabel="Stok bölümü"
-        />
+      {/* Tek araç satırı: iki küçük bölmeli seçim + arama/süzgeç/sütun. Dar ekranda sıkı iki satıra sarar. Sayılar ALTTA
+          sabit toplam satırında (`StokToplamSatiri`); burada sayı gösterilmez (çift gösterim yok). */}
+      <View style={s.aracSatiri} testID="stok-arac-satiri">
+        <View style={s.secimler}>
+          <KompaktSecim
+            items={[{ key: "ham", label: "Ham" }, { key: "bitmis", label: "Bitmiş" }]} value={bolum} onChange={(v) => sec("bolum", v)}
+            testIDPrefix="stok-bolum-" accessibilityLabel="Stok bölümü"
+          />
+          <KompaktSecim
+            items={[{ key: "kalem", label: "Kalem", ad: "Kalem bazında" }, { key: "top", label: "Top", ad: "Top bazında" }]} value={kip} onChange={(v) => sec("gorunum", v)}
+            testIDPrefix="stok-gorunum-" accessibilityLabel="Liste görünümü"
+          />
+        </View>
+        <View style={s.araclar}>
+          <TabloAraclari
+            testID="stok-kalem"
+            ara={{ value: ara, onChangeText: setAra, placeholder: kip === "top" ? (b.cuval ? "Top no, parti, kalem, müşteri, çuval ara" : "Top no, parti, kalem ara") : bolum === "ham" ? "Ürün ara" : "Ürün, en, renk ara" }}
+            suzgecSayisi={etkinSuzgecSayisi(tumSecim)}
+            onSuzgec={tumGruplar.length > 0 ? () => setSuzgecAcik(true) : undefined}
+            onSutun={() => setSutunAcik(true)}
+          />
+        </View>
       </View>
-      <BlokBasligi
-        baslik={kip === "kalem" ? "Kalemler" : "Toplar"}
-        sayi={kip === "kalem" ? b.kalemler.length : tumToplar(b).length}
-        sag={<Text style={s.ozet} testID="stok-kalem-ozet">{`${qty(b.toplamTop)} ${UNIT.top} · ${qty(b.toplamMetre)} ${UNIT.metre}`}</Text>}
-      />
-      <View style={s.segment}>
-        <SegmentedControl
-          items={[{ key: "kalem", label: "Kalem bazında" }, { key: "top", label: "Top bazında" }]} value={kip} onChange={(v) => sec("gorunum", v)}
-          testIDPrefix="stok-gorunum-" accessibilityLabel="Liste görünümü"
-        />
-      </View>
-      <TabloAraclari
-        testID="stok-kalem"
-        ara={{ value: ara, onChangeText: setAra, placeholder: kip === "top" ? (b.cuval ? "Top no, parti, kalem, müşteri, çuval ara" : "Top no, parti, kalem ara") : bolum === "ham" ? "Ürün ara" : "Ürün, en, renk ara" }}
-        suzgecSayisi={etkinSuzgecSayisi(tumSecim)}
-        onSuzgec={tumGruplar.length > 0 ? () => setSuzgecAcik(true) : undefined}
-        onSutun={() => setSutunAcik(true)}
-      />
       <TabloBasligi
         testID="stok-kalem" sutunlar={gorunur} siralama={pref.tercih.siralama} yatay={yatay ?? undefined}
         siralanabilir={kip === "kalem" ? KALEM_SIRALANABILIR : TOP_SIRALANABILIR}
@@ -192,8 +191,10 @@ function KalemToplari({ b, kalem }: { readonly b: StokBolumu; readonly kalem: Ka
 }
 
 const useStyles = makeStyles((t) => ({
-  segment: { marginBottom: space.m },
-  ozet: { ...typography.footnote, color: t.color.textMuted, ...tabularNums },
+  // Seçimler + araçlar tek satır; sığmazsa araçlar alt satıra sarar (telefon: iki sıkı satır).
+  aracSatiri: { flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, columnGap: space.m, rowGap: 0, marginBottom: space.xs },
+  secimler: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingVertical: space.xs },
+  araclar: { flexGrow: 1, flexBasis: 260, minWidth: 0 },
   not: { ...typography.footnote, color: t.color.textMuted, marginBottom: space.m },
   bos: { ...typography.footnote, color: t.color.textMuted, paddingVertical: space.l, textAlign: "center" as const },
   dahaFazla: { minHeight: 44, alignItems: "center" as const, justifyContent: "center" as const, marginBottom: space.m },

@@ -124,7 +124,10 @@ async function flush() {
 const gorunumTop = async (k: string) =>
   k === "stok.gorunum"
     ? { anahtar: k, deger: { surum: 1, sutunlar: ["-"], siralama: null, suzgec: { bolum: "bitmis", gorunum: "top" } }, guncelleme: null }
-    : { anahtar: k, deger: null, guncelleme: null };
+    // Stok kartları 2026-11-18'den beri varsayılan KAPALI: "Çuvalda · Açıkta" kartı burada saklı seçimle açık.
+    : k === "tablo.stok"
+      ? { anahtar: k, deger: { surum: 1, sutunlar: ["urun"], siralama: null, suzgec: { kartlar: "cuval" } }, guncelleme: null }
+      : { anahtar: k, deger: null, guncelleme: null };
 const veriIle = (veri: unknown) => async (p: string) => ({ projeksiyon: p, veri: p === "stok-karnesi" ? KARNE : veri, surum: "2026-11-17T08:55:00.000Z" });
 
 beforeEach(() => {
@@ -146,6 +149,10 @@ describe("§4 ekran (yeni fabrika)", () => {
     expect(screen.getByTestId(`stok-top-satir-${id(4)}`)).toBeTruthy();
     expect(screen.getByTestId("stok-kalem-sutun-etiket")).toBeTruthy();
     expect(screen.getByTestId("stok-kalem-sutun-cuvalCari")).toBeTruthy();
+    // Alt sabit toplam satırı aynı fabrika sayılarını etiketiyle yazar (top bazında: listedeki top sayısı).
+    expect(screen.getByTestId("stok-toplam-satir-deger").props.children).toBe("5 top");
+    expect(screen.getByTestId("stok-toplam-cuval")).toBeTruthy();
+    expect(screen.getByTestId("stok-toplam-toplam")).toHaveTextContent("Açıkta:", { exact: false });
   });
   it("süzgeçte Yer › Çuvalda seçilince açıktaki top kaybolur; seçim tablo.stok-top'a yazılır", async () => {
     mockApi.snapshot.mockImplementation(veriIle(YENI));

@@ -3,8 +3,9 @@
 // tablo. Kutular ve ürün tablosu `stok-karnesi`nden (eşitleme aralığında yeniden hesaplanan anlık; tazelik başlıkta).
 // Ürün tablosu tek belgenin içidir (sayfasız, bulut sıralamaz/süzmez) → başlık sıralamasız, süzgeç/arama yok; yalnız sütun
 // seçimi profilde (`tablo.stok`). Yaş dağılımı açılır-kapanır: varsayılan kapalı, durum cihazda (`useAcikKapali`).
-// Kart seçimi (2026-11-16; sıfır kart 2026-11-17): başlıktaki simge → hangi özet kartları görünsün (aç/kapa; hepsi kapatılabilir). Seçim aynı `tablo.stok`
+// Kart seçimi (2026-11-16; sıfır kart 2026-11-17; 2026-11-18 varsayılan HİÇ kart): başlıktaki simge → hangi özet kartları görünsün (aç/kapa). Seçim aynı `tablo.stok`
 // tercihinde (`src/ui/stok/kartlar.ts`); bu yüzden tercih kancası TEK ve burada — ürün tablosu ona prop'la bağlanır.
+// Kalem listesinin bölüm toplamları ekranın ALTINDA sabit satırda (`StokToplamSatiri`, 2026-11-18).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState, type ReactElement } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
@@ -19,6 +20,7 @@ import { SnapshotGate } from "../../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { STOCK_CARDS, resetCards, shownCards, toggleCard, type StockCardKey } from "../../../src/ui/stok/kartlar";
 import { StokKalemBolumu } from "../../../src/ui/stok/StokKalemBolumu";
+import { StokToplamSatiri } from "../../../src/ui/stok/StokToplamSatiri";
 import { stokBolumu } from "../../../src/lib/stok-kalem";
 import { siganSutun as azamiSutun, sutunDegistir, sutunTasi, tercihiTemizle, type SutunTanimi, type TabloTercihi } from "../../../src/ui/tablo/model";
 import { SutunSecici, VisibilityPicker } from "../../../src/ui/tablo/Seciciler";
@@ -78,7 +80,7 @@ export default function Stock() {
     </Basilabilir>
   );
   return (
-    <Screen module="stok" onRefresh={card.reload} refreshing={card.refreshing} headerRight={kartDugmesi}>
+    <Screen module="stok" onRefresh={card.reload} refreshing={card.refreshing} headerRight={kartDugmesi} footer={<StokToplamSatiri />}>
       <SnapshotGate remote={card} domain="stok" rows={3} empty="Fabrikadan stok karnesi henüz gelmedi" testID="stok-karnesi">
         {(veri) => <StockBody data={veri} shown={shown} pref={pref} azami={azami} />}
       </SnapshotGate>

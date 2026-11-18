@@ -1,7 +1,8 @@
 // Stok › SIFIR KART (2026-11-17, kullanıcı: "kart görmek istemeyebilir patron"): §1 saklı "-" açılışta hiç kart
 // çizdirmez, kart satırı/boşluk artığı kalmaz, kalem listesi ve ürün tablosu yerinde · §2 seçiciden hepsini kapatmak
 // "-" olarak mevcut `tablo.stok` tercihine yazılır ve sütun seçimini ezmez · §3 ortak model başka ekranın varsayılan
-// kümesini (yeni kartlar KAPALI) doğru uygular.
+// kümesini (yeni kartlar KAPALI) doğru uygular. 2026-11-18: Stok'un varsayılanı da HİÇ kart → hepsini kapatmak alanı
+// siler ("-" yazılmaz, aynı anlam); saklı "-" yine hiç kart.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import type React from "react";
@@ -62,8 +63,14 @@ describe("§1 saklı hiç-kart", () => {
     expect(screen.getByTestId("stok-kart-sec")).toBeTruthy();
   });
 
-  it("negatif sonda: alan yoksa bütün kartlar (bugünkü varsayılan) çizilir", async () => {
+  it("alan yoksa (varsayılan, 2026-11-18) hiç kart; negatif sonda: açık liste saklıysa bütün kartlar çizilir", async () => {
     mockApi.viewPref.mockResolvedValue({ anahtar: "tablo.stok", deger: null, guncelleme: null });
+    const ilk = render(<Stock />);
+    await flush();
+    for (const id of KARTLAR) expect(screen.queryByTestId(id)).toBeNull();
+    ilk.unmount();
+    await AsyncStorage.clear();
+    mockApi.viewPref.mockResolvedValue({ anahtar: "tablo.stok", deger: { surum: 1, sutunlar: ["urun"], siralama: null, suzgec: { kartlar: "ham,yari,bitmis,olu,cuval,yas" } }, guncelleme: null });
     render(<Stock />);
     await flush();
     for (const id of KARTLAR) expect(screen.getByTestId(id)).toBeTruthy();
@@ -71,13 +78,14 @@ describe("§1 saklı hiç-kart", () => {
 });
 
 describe("§2 seçiciden hepsini kapatmak", () => {
-  it("'-' olarak aynı anahtara yazılır, sütun seçimi korunur", async () => {
+  it("alan silinerek (varsayılan = hiç) aynı anahtara yazılır, sütun seçimi korunur", async () => {
     jest.useFakeTimers();
     try {
-      mockApi.viewPref.mockResolvedValue({ anahtar: "tablo.stok", deger: { surum: 1, sutunlar: ["urun", "siparissiz"], siralama: null, suzgec: {} }, guncelleme: null });
+      mockApi.viewPref.mockResolvedValue({ anahtar: "tablo.stok", deger: { surum: 1, sutunlar: ["urun", "siparissiz"], siralama: null, suzgec: { kartlar: "ham,yari,bitmis,olu,cuval,yas" } }, guncelleme: null });
       mockApi.viewPrefSet.mockResolvedValue({});
       render(<Stock />);
       await flush();
+      expect(screen.getByTestId("kpi-ham")).toBeTruthy();
       fireEvent.press(screen.getByTestId("stok-kart-sec"));
       for (const k of ["ham", "yari", "bitmis", "olu", "cuval", "yas"]) fireEvent.press(screen.getByTestId(`stok-kart-secici-${k}`));
       await act(async () => {
@@ -85,7 +93,7 @@ describe("§2 seçiciden hepsini kapatmak", () => {
       });
       const son = mockApi.viewPrefSet.mock.calls.at(-1) as [string, TabloTercihi];
       expect(son[0]).toBe("tablo.stok");
-      expect(son[1].suzgec).toEqual({ kartlar: "-" });
+      expect(son[1].suzgec).toEqual({});
       expect(son[1].sutunlar).toEqual(["urun", "siparissiz"]);
       for (const id of KARTLAR) expect(screen.queryByTestId(id)).toBeNull();
     } finally {

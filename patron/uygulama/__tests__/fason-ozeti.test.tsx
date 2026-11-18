@@ -1,5 +1,6 @@
 // Fason anlığı: §1 Stok emanet bölümü çizmez (Adnan'da emanet modülü kapalı, anlık bulutta yok) · §2 Üretim ›
 // fasondaki işler (F10 kokpit özeti) · §4 pano stok satırı yalnız fabrikanın sayısı.
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import type React from "react";
 
@@ -60,6 +61,11 @@ function serve(missing: readonly string[] = []) {
   });
 }
 
+/** Stok kartları 2026-11-18'den beri varsayılan KAPALI: bu testler kartları yerel tercihle açar (hepsi). */
+async function stokKartlariAcik() {
+  await AsyncStorage.setItem("tablo-tercihi:-:-:tablo.stok", JSON.stringify({ deger: { surum: 1, sutunlar: ["urun"], siralama: null, suzgec: { kartlar: "ham,yari,bitmis,olu,cuval,yas" } }, kirli: false }));
+}
+
 beforeEach(() => {
   for (const f of Object.values(mockApi)) f.mockReset();
   mockApi.list.mockImplementation(async () => ({ kayitlar: [], sonraki: null }));
@@ -70,6 +76,7 @@ beforeEach(() => {
 describe("§1 Stok › emanet bölümü yok", () => {
   it("emanet anlığı istenmez, bölüm çizilmez, çökme yok", async () => {
     mockSession.permissions = ["bulut:stok:oku"];
+    await stokKartlariAcik();
     render(<Stock />);
     await flush();
     expect(screen.getByTestId("kpi-bitmis")).toBeTruthy();
@@ -138,6 +145,7 @@ describe("stok ↔ akış etiketleri", () => {
   it("stoktaki bitmiş sayı serbest stok olarak adlanır", async () => {
     mockSession.permissions = ["bulut:stok:oku"];
     serve([]);
+    await stokKartlariAcik();
     render(<Stock />);
     await flush();
     expect(screen.getByText("Serbest stok")).toBeTruthy();
