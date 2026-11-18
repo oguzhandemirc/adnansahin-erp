@@ -150,12 +150,15 @@ describe("Üretim", () => {
   });
 });
 
-describe("☰ menü (Diğer sekme değil)", () => {
-  it("pano başlığında menü düğmesi /diger'i açar", async () => {
+describe("☰ menü: sol üstte, soldan çekmece (2026-11-19)", () => {
+  it("sağdaki eski menü düğmesi yok; sol üstteki ≡ çekmeceyi açar, öğe rotaya gider", async () => {
     mockSession.permissions = ["bulut:oturum", "bulut:ozet:oku", "bulut:uretim:oku"];
     render(<Dashboard />);
-    fireEvent.press(await screen.findByTestId("pano-menu"));
-    expect(mockRouter.push).toHaveBeenCalledWith("/diger");
+    fireEvent.press(await screen.findByTestId("baslik-menu"));
+    expect(screen.queryByTestId("pano-menu")).toBeNull();
+    expect(screen.getByTestId("cekmece")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("menu-uretim"));
+    expect(mockRouter.navigate).toHaveBeenCalledWith("/uretim");
   });
 });
 

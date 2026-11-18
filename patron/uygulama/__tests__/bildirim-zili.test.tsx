@@ -47,7 +47,9 @@ describe("başlık zili", () => {
 describe("yerleşim (kaynak)", () => {
   it("⭐ zil her ekran başlığında: Screen eylemine headerRight'tan sonra, sorun bildirden önce girer (dar + ray aynı Screen)", () => {
     const src = kaynak("src/ui/Frame.tsx");
-    expect(src).toMatch(/action=\{<>\{headerRight\}<BildirimZili \/>\{sorunBildir \? <SorunBildirDugmesi \/> : null\}<\/>\}/);
+    // 2026-11-19: zil birincil eylemden sonra, ikinciller (sorun bildir dahil) ondan sonra — telefonda "⋯" menüsünde.
+    expect(src).toMatch(/action=\{<>\{headerRight\}<BildirimZili \/>\{dar \? <TasmaMenusu eylemler=\{ikinciller\} \/> : <AcikEylemler eylemler=\{ikinciller\} \/>\}<\/>\}/);
+    expect(src).not.toMatch(/<SorunBildirDugmesi \/>/); // NEGATİF: eski açık simge kalıbı geri gelmez
   });
   it("⭐ liste ekranı: NotificationHistory + 'Ayarlar' bağlantısı; ayar ekranı listeyi çizmez, listeye bağlanır", () => {
     const liste = kaynak("app/(app)/bildirim-listesi.tsx");

@@ -4,7 +4,8 @@
 // eşitleme göstergesine döner. Kabul edilince fabrika damgası birkaç kez yoklanır; değişince bütün veri tazelenir.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text } from "react-native";
+import { KisaBildirim } from "../KisaBildirim";
 import type { SyncNowResponse } from "../../api/wire";
 import { formatSince } from "../../lib/format";
 import { AFTER_SYNC_NOW_MS, syncNowAvailable, syncNowErrorFeedback, syncNowFeedback, type SyncNowFeedback } from "../../lib/simdi-guncelle";
@@ -88,7 +89,8 @@ export function SyncNowIndicator({ last, offline = false, busy, onPress }: {
   const s = useStyles();
   const now = useMinuteClock();
   const since = last ? formatSince(last, now) : null;
-  const text = busy ? "İsteniyor…" : since ?? "Şimdi güncelle";
+  // İstek sürerken metin DEĞİŞMEZ (genişlik zıplamaz); yalnız simgenin yerinde küçük çark döner.
+  const text = since ?? "Şimdi güncelle";
   const state = since ? `${offline ? "Çevrimdışı · son eşitleme" : "Son eşitleme"} ${since}` : null;
   return (
     <Pressable
@@ -110,22 +112,15 @@ export function SyncNowIndicator({ last, offline = false, busy, onPress }: {
   );
 }
 
-/** Yanıtın kısa cümlesi; yokken hiçbir şey çizilmez (başlık altında krom şerit kalmaz). */
-export function SyncNowFeedbackText({ feedback }: { readonly feedback: SyncNowFeedback | null }) {
-  const t = useTokens();
-  const s = useStyles();
-  if (!feedback) return null;
-  const color = feedback.tone === "error" ? t.color.danger.solid : t.textSecondary;
-  return (
-    <View testID="simdi-guncelle-satiri">
-      <Text style={[s.feedback, { color }]} accessibilityLiveRegion="polite" testID="simdi-guncelle-bildirim">{feedback.text}</Text>
-    </View>
-  );
-}
 
 const useStyles = makeStyles(() => ({
   button: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs },
   spinner: { width: 15, height: 15, transform: [{ scale: 0.75 }] },
   text: { ...typography.footnote, fontWeight: "500" as const },
-  feedback: { ...typography.footnote, paddingTop: space.xs },
+
 }));
+
+/** Yanıtın kısa cümlesi: düzeni itmeyen kısa bildirim (toast); yokken hiçbir şey çizilmez. */
+export function SyncNowFeedbackText({ feedback }: { readonly feedback: SyncNowFeedback | null }) {
+  return <KisaBildirim metin={feedback?.text ?? null} ton={feedback?.tone === "error" ? "hata" : "bilgi"} />;
+}

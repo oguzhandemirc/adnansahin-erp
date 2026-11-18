@@ -41,7 +41,8 @@ export function SearchField(p: { value: string; onChangeText: (v: string) => voi
 }
 
 /** Kapsül eylem düğmesi (başlık sağ yuvası / satır içi): tint zemin, ikon + kısa etiket. */
-export function CapsuleButton(p: { label: string; icon?: IconName; onPress: () => void; disabled?: boolean; testID?: string }) {
+/** Başlığın birincil düğmesi: KISA ad ("+ Sipariş"); `erisim` tam ad ("Yeni sipariş") ekran okuyucuda okunur. */
+export function CapsuleButton(p: { label: string; erisim?: string; icon?: IconName; onPress: () => void; disabled?: boolean; testID?: string }) {
   const t = useTokens();
   const s = useStyles();
   return (
@@ -50,7 +51,7 @@ export function CapsuleButton(p: { label: string; icon?: IconName; onPress: () =
       disabled={p.disabled}
       testID={p.testID}
       accessibilityRole="button"
-      accessibilityLabel={p.label}
+      accessibilityLabel={p.erisim ?? p.label}
       accessibilityState={{ disabled: !!p.disabled }}
       hitSlop={6}
       style={({ pressed }) => [s.capsule, p.disabled && s.capsuleOff, pressed && { opacity: 0.85 }]}

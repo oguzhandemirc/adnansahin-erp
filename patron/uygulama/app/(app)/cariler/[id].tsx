@@ -18,6 +18,7 @@ import { destinationLabel } from "../../../src/lib/labels/siparis";
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { Screen } from "../../../src/ui/Frame";
+import { kartSecEylemi } from "../../../src/ui/BaslikMenusu";
 import { KademeliGiris } from "../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../src/ui/icons";
 import { AcikSiparislerBolumu, EnCokUrunBolumu, IadelerBolumu, ToplamlarBolumu, useCariOzeti, type Donem } from "../../../src/ui/cari/OzetBolumleri";
@@ -103,11 +104,7 @@ export default function CustomerDetail() {
     { key: "yon", etiket: "Varsayılan sevk yönü", deger: str(k.varsayilanYon) ? destinationLabel(k.varsayilanYon) : null },
     { key: "kayit", etiket: "Kayıt tarihi", deger: goster("kayitTarihi") && str(k.olusturulma) ? formatDate(k.olusturulma) : null },
   ].filter((x) => x.deger !== null);
-  const kartDugmesi = (
-    <Basilabilir onPress={() => setSecici(true)} style={s.kartDugmesi} accessibilityRole="button" accessibilityLabel="Kartları seç" testID="cari-kart-sec">
-      <Ionicons name="options-outline" size={22} color={t.color.link} />
-    </Basilabilir>
-  );
+  const kartlarEylemi = kartSecEylemi(() => setSecici(true), "cari-kart-sec");
   // Kimlik başlıkla TEK satırda (2026-11-16): ad · "kod · il" · tür rozeti (ardından ortak tazelik öğesi). Dar ekranda ad sarılırsa bu öğe
   // adın altına küçük alt yazı olarak düşer; ayrı kimlik bloğu ve büyük simge yok.
   const kodIl = [str(k.kod), str(k.il)].filter(Boolean).join(" · ");
@@ -120,7 +117,7 @@ export default function CustomerDetail() {
   );
 
   return (
-    <Screen title={str(k.ad) ?? "Cari"} module="cariler" back onRefresh={refresh} refreshing={r.refreshing} meta={meta} subtitle={<StaleNote stale={r.stale} savedAt={r.savedAt} />} headerRight={kartDugmesi}>
+    <Screen title={str(k.ad) ?? "Cari"} module="cariler" back onRefresh={refresh} refreshing={r.refreshing} meta={meta} subtitle={<StaleNote stale={r.stale} savedAt={r.savedAt} />} headerSecondary={[kartlarEylemi]}>
       {r.loading && !r.data ? <Iskelet bicim="liste" satir={4} /> : null}
       {r.error && !r.data ? <HataDurumu mesaj={r.error} onTekrar={r.reload} /> : null}
       {r.data && kimlik ? (

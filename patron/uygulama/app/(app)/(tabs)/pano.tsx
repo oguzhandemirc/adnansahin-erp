@@ -14,6 +14,7 @@ import { rozetMetni, useOkunmamisRet } from "../../../src/state/okunmamis-ret";
 import { useSession } from "../../../src/state/session";
 import { useOpenRefresh } from "../../../src/state/useOpenRefresh";
 import { Screen, useWide } from "../../../src/ui/Frame";
+import type { BaslikEylemi } from "../../../src/ui/BaslikMenusu";
 import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../src/ui/icons";
 import { BosDurum, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
@@ -85,49 +86,24 @@ export default function Dashboard() {
   const baglam: KutuBaglami = { anlik, liste, donem, router, permissions };
   const donemli = duzen.kutular.some((a) => kutu(a).donemli);
 
-  // Tazelik + "Şimdi güncelle" ortak başlıkta TEK öğedir (`Screen`); ayrı satır yok, tesis adı Menü/Profil/rayda.
-  // ☰ menü (Sevkiyat · Raporlar · Gönderdiklerim · Profil): yalnız telefonda; geniş ekranda aynı gruplar raydadır.
-  // Okunmamış ret (fabrikanın kabul etmediği gönderim) rozeti burada; kayıt açılınca söner.
+  // Tazelik + "Şimdi güncelle" ortak başlıkta TEK öğedir (`Screen`); ayrı satır yok, tesis adı çekmecede/rayda.
+  // Telefonda menü sol üstteki ortak "≡" (soldan çekmece, 2026-11-19); okunmamış ret (fabrikanın kabul etmediği
+  // gönderim) ya da destek yanıtı rozeti o düğmede — ret öncelikli (kırmızı). Okunmamış bildirim rozeti zildedir.
   const okunmamis = useOkunmamisRet();
   const retRozeti = rozetMetni(okunmamis);
-  // Destek yanıtı rozeti (destek kapalıyken depo hep sıfır → çizilmez); ret rozeti öncelikli (kırmızı).
   const destekOkunmamis = useDestekOkunmamis();
   const destekRozeti = destekRozetMetni(destekOkunmamis);
-  // Okunmamış bildirim rozeti başlık zilindedir (`BildirimZili`), Menü'de değil.
-  const menuEtiketi = ["Menü", retRozeti ? `${okunmamis} okunmamış hata` : null, destekRozeti ? `${destekOkunmamis.tickets} talepte yeni destek yanıtı` : null].filter(Boolean).join(", ");
-  const duzenleDugmesi = ozetVar && !duzenle ? (
-    <Basilabilir onPress={() => setDuzenle(true)} style={s.duzenle} accessibilityRole="button" accessibilityLabel="Panoyu düzenle" testID="pano-duzenle">
-      <Ionicons name="create-outline" size={18} color={t.color.link} />
-      <Text style={[s.duzenleYazi, { color: t.color.link }]}>Düzenle</Text>
-    </Basilabilir>
-  ) : null;
-  const menuDugmesi = !wide && !duzenle ? (
-    <Basilabilir
-      onPress={() => router.push("/diger" as never)}
-      style={s.menu}
-      accessibilityRole="button"
-      accessibilityLabel={menuEtiketi}
-      testID="pano-menu"
-    >
-      <Ionicons name="menu" size={24} color={t.color.link} />
-      {retRozeti ? (
-        <View style={[s.menuRozet, { backgroundColor: t.color.danger.solid }]} testID="pano-menu-rozet">
-          <Text style={[s.menuRozetYazi, { color: t.color.onPrimary }]}>{retRozeti}</Text>
-        </View>
-      ) : destekRozeti ? (
-        <View style={[s.menuRozet, { backgroundColor: t.color.primary }]} testID="pano-menu-destek-rozet">
-          <Text style={[s.menuRozetYazi, { color: t.color.onPrimary }]}>{destekRozeti}</Text>
-        </View>
-      ) : null}
-    </Basilabilir>
-  ) : null;
-  const basliktaEylem = duzenleDugmesi || menuDugmesi ? <View style={s.eylemler}>{duzenleDugmesi}{menuDugmesi}</View> : null;
+  const etiket = [retRozeti ? `${okunmamis} okunmamış hata` : null, destekRozeti ? `${destekOkunmamis.tickets} talepte yeni destek yanıtı` : null].filter(Boolean).join(", ");
+  const menuRozeti = retRozeti ? { metin: retRozeti, ton: "danger" as const, etiket } : destekRozeti ? { metin: destekRozeti, ton: "primary" as const, etiket } : null;
+  // "Panoyu düzenle" ikincil eylemdir: telefonda "⋯" menüsünde, tablette açık simge.
+  const ikinciller: readonly BaslikEylemi[] = ozetVar && !duzenle ? [{ key: "duzenle", label: "Panoyu düzenle", icon: "create-outline", onPress: () => setDuzenle(true), testID: "pano-duzenle" }] : [];
 
   return (
     <Screen
       title="Pano"
       back={false}
-      headerRight={basliktaEylem}
+      headerSecondary={ikinciller}
+      menuRozeti={duzenle ? null : menuRozeti}
       onRefresh={duzenle ? undefined : reloadAll}
       refreshing={hepsi.some((r) => r.refreshing)}
       footer={duzenle ? <DuzenCubugu onEkle={() => setEkleAcik(true)} onBitti={() => setDuzenle(false)} /> : null}

@@ -73,8 +73,8 @@ describe("Şimdi güncelle", () => {
     const request = jest.fn(() => new Promise<SyncNowResponse>((r) => (resolve = r)));
     render(<Harness request={request} />);
     await press();
+    expect(screen.queryByText("İsteniyor…")).toBeNull(); // metin değişmez (genişlik zıplamaz), yalnız çark döner
     expect(screen.getByTestId("simdi-guncelle-cark")).toBeTruthy();
-    expect(screen.getByText("İsteniyor…")).toBeTruthy();
     expect(screen.getByTestId("simdi-guncelle").props.accessibilityState).toMatchObject({ disabled: true, busy: true });
     await press();
     expect(request).toHaveBeenCalledTimes(1);

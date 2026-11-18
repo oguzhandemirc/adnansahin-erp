@@ -93,7 +93,7 @@ describe("§3–§4 ekran", () => {
     expect(screen.queryByTestId("stok-top-govde-kaydirma")).toBeNull();
   });
 
-  it("14 sütun saklıysa 10'u çizilir, başlık ve gövde yatay kaydırılır; seçicide 11. kilitli", async () => {
+  it("14 sütun saklıysa HEPSİ çizilir (sınır yok, 2026-11-19), başlık ve gövde yatay kaydırılır; seçicide hiçbiri kilitli değil", async () => {
     const hepsi = TOP_SUTUNLARI.map((c) => c.key);
     expect(hepsi.length).toBe(14);
     mockApi.viewPref.mockImplementation(pref(hepsi));
@@ -102,9 +102,9 @@ describe("§3–§4 ekran", () => {
     expect(screen.getByTestId("stok-top-govde-kaydirma")).toBeTruthy();
     expect(screen.getByTestId("stok-kalem-baslik-kaydirma")).toBeTruthy();
     expect(screen.getByTestId("stok-kalem-sutun-renk")).toBeTruthy();
-    expect(screen.queryByTestId("stok-kalem-sutun-kat")).toBeNull();
+    expect(screen.getByTestId("stok-kalem-sutun-kat")).toBeTruthy();
     fireEvent.press(screen.getByTestId("stok-kalem-sutunlar"));
     await flush();
-    expect(screen.getByTestId("stok-kalem-sutun-secici-kat").props.accessibilityState).toMatchObject({ checked: false, disabled: true });
+    expect(screen.getByTestId("stok-kalem-sutun-secici-kat").props.accessibilityState).toMatchObject({ checked: true, disabled: false });
   });
 });

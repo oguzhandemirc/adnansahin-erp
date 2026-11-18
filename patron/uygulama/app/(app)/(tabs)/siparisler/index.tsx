@@ -13,6 +13,7 @@ import { formatNumber } from "../../../../src/lib/format";
 import { useSession } from "../../../../src/state/session";
 import { useRemote } from "../../../../src/state/useRemote";
 import { Screen } from "../../../../src/ui/Frame";
+import { kartSecEylemi } from "../../../../src/ui/BaslikMenusu";
 import { MODULE_ICON } from "../../../../src/ui/icons";
 import { openRecord } from "../../../../src/ui/nav";
 import { Basilabilir } from "../../../../src/ui/hareket";
@@ -79,12 +80,8 @@ export default function Orders() {
   const summary = useRemote(ozetAcik ? "anlik:ozet.siparis" : null, () => api.snapshot("ozet.siparis"), { tags: ["ozet", "ozet.siparis"] });
   const [kartSecici, setKartSecici] = useState(false);
   const kartlar = siparisKartlari(tablo.tercih);
-  const yeni = canWrite ? <CapsuleButton label="Yeni sipariş" icon="add" disabled={offline} onPress={() => router.push("/siparisler/yeni")} testID="yeni-siparis" /> : null;
-  const kartDugmesi = ozetAcik ? (
-    <Basilabilir onPress={() => setKartSecici(true)} style={{ minWidth: TOUCH, minHeight: TOUCH, alignItems: "center", justifyContent: "center" }} accessibilityRole="button" accessibilityLabel="Kartları seç" testID="siparis-kart-sec">
-      <Ionicons name="options-outline" size={22} color={t.color.link} />
-    </Basilabilir>
-  ) : null;
+  const yeni = canWrite ? <CapsuleButton label="Sipariş" erisim="Yeni sipariş" icon="add" disabled={offline} onPress={() => router.push("/siparisler/yeni")} testID="yeni-siparis" /> : null;
+  const kartlarEylemi = ozetAcik ? kartSecEylemi(() => setKartSecici(true), "siparis-kart-sec") : null;
   const refresh = () => {
     list.reload();
     summary.reload();
@@ -100,7 +97,8 @@ export default function Orders() {
           {summary.data && kartlar.length > 0 ? <View style={{ marginTop: space.xs }}><Ozet veri={summary.data.veri} kartlar={kartlar} /></View> : null}
         </View>
       }
-      headerRight={yeni || kartDugmesi ? <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>{kartDugmesi}{yeni}</View> : undefined}
+      headerRight={yeni ?? undefined}
+      headerSecondary={kartlarEylemi ? [kartlarEylemi] : undefined}
       sticky={<TabloUstu tablo={tablo} />}
     >
       <TabloListesi tablo={tablo} onPress={(r) => openRecord(router, "siparis", r.id)} bos="Henüz sipariş yok" bosSuzgecli="Bu süzgeçte sipariş yok" icon={MODULE_ICON.siparisler.icon} />

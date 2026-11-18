@@ -24,6 +24,7 @@ import { can } from "../../../src/lib/access";
 import { UNIT } from "../../../src/lib/labels/uretim";
 import { useSession } from "../../../src/state/session";
 import { Screen } from "../../../src/ui/Frame";
+import { kartSecEylemi } from "../../../src/ui/BaslikMenusu";
 import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { asamaMetni, kumasMetni, musteriMetni, topMetni, type Kayit } from "../../../src/ui/is-emri/gorunum";
 import { openRecord } from "../../../src/ui/nav";
@@ -63,11 +64,7 @@ export default function Production() {
   const ieAcik = read && ieArama !== null && pref.hazir && goster("isEmirleri");
   const isEmirleri = useRemoteList("is-emri", { suzgec: "ACIK" }, { limit: ILK_IS_EMRI, enabled: ieAcik });
   const t = useTokens();
-  const kartDugmesi = (
-    <Basilabilir onPress={() => setSecici(true)} style={s.kartDugmesi} accessibilityRole="button" accessibilityLabel="Kartları seç" testID="uretim-kart-sec">
-      <Ionicons name="options-outline" size={22} color={t.color.link} />
-    </Basilabilir>
-  );
+  const kartlarEylemi = kartSecEylemi(() => setSecici(true), "uretim-kart-sec");
   const fasonVeri = obj(fason.data?.veri);
   const kategoriler = arr(fasonVeri.kategoriler);
   const all = combine([today, flow, fason]);
@@ -92,7 +89,7 @@ export default function Production() {
   const ilk = (Object.keys(gorunur) as (keyof typeof gorunur)[]).find((k) => gorunur[k]) ?? null;
 
   return (
-    <Screen module="uretim" onRefresh={() => { all.reload(); if (ieAcik) isEmirleri.reload(); }} refreshing={all.refreshing || isEmirleri.refreshing} headerRight={kartDugmesi}>
+    <Screen module="uretim" onRefresh={() => { all.reload(); if (ieAcik) isEmirleri.reload(); }} refreshing={all.refreshing || isEmirleri.refreshing} headerSecondary={[kartlarEylemi]}>
       {gorunur.nerede ? (
       <KademeliGiris sira={0}>
         <SnapshotGate remote={flow} variant="list" rows={4} empty="Fabrikadan üretim verisi henüz gelmedi" testID="uretim-akisi">

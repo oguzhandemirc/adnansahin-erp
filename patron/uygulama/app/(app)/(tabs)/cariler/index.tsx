@@ -22,7 +22,7 @@ export default function Customers() {
       onRefresh={list.reload} refreshing={list.refreshing}
       onEndReached={list.loadMore}
       subtitle={<StaleNote stale={list.stale} savedAt={list.savedAt} />}
-      headerRight={canWrite ? <CapsuleButton label="Yeni cari" icon="add" disabled={offline} onPress={() => router.push("/cariler/yeni")} testID="yeni-cari" /> : undefined}
+      headerRight={canWrite ? <CapsuleButton label="Cari" erisim="Yeni cari" icon="add" disabled={offline} onPress={() => router.push("/cariler/yeni")} testID="yeni-cari" /> : undefined}
       sticky={<TabloUstu tablo={tablo} />}
     >
       <TabloListesi

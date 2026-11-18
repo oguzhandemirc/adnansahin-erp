@@ -144,7 +144,7 @@ describe("Tek tazelik + Şimdi güncelle (2026-11-16)", () => {
     expect(screen.queryByTestId("baslik-alt-satiri")).toBeNull();
   });
 
-  it("dokununca ekran tazelenir + fabrikadan istenir; yanıt cümlesi başlık altında", async () => {
+  it("dokununca ekran tazelenir + fabrikadan istenir; yanıt cümlesi KISA BİLDİRİM (toast): başlık altına satır eklenmez", async () => {
     const yenile = jest.fn();
     mockSession.factoryStamp = minutesAgo(5);
     mockSession.facility = BEYANLI;
@@ -155,7 +155,10 @@ describe("Tek tazelik + Şimdi güncelle (2026-11-16)", () => {
     });
     expect(yenile).toHaveBeenCalledTimes(1);
     expect(mockSession.api.syncNow).toHaveBeenCalledTimes(1);
-    expect(within(screen.getByTestId("baslik-alt-satiri")).getByTestId("simdi-guncelle-bildirim")).toBeTruthy();
+    expect(screen.getByTestId("kisa-bildirim")).toBeTruthy();
+    expect(screen.getByTestId("simdi-guncelle-bildirim")).toBeTruthy();
+    expect(screen.queryByTestId("baslik-alt-satiri")).toBeNull(); // düzen itilmez
+    expect(flat("kisa-bildirim")).toMatchObject({ position: "absolute" });
   });
 
   it("eski bulut (beyan yok): bugünkü gösterge, istek yok", async () => {

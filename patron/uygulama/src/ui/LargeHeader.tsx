@@ -45,13 +45,18 @@ export function useHeaderScroll(onEndReached?: () => void): { scrollY: SharedVal
  * kısalır/sarılır, eylem sarılmaz (`flexShrink: 0`). `meta` başlığın hemen yanında (eşitleme göstergesi).
  * Alt çizgi: `seamless` (altında krom zeminli alt satır kaydırılan içerikte devam ediyor) iken kaydırınca belirir.
  */
-export function ScreenHeader({ title, topInset, gutter, scrollY, seamless = false, onBack, action, meta }: {
+export function ScreenHeader({ title, topInset, gutter, scrollY, seamless = false, onBack, onMenu, menuRozeti, dar = false, action, meta }: {
   readonly title: string;
   readonly topInset: number;
   readonly gutter: number;
   readonly scrollY: SharedValue<number>;
   readonly seamless?: boolean;
   readonly onBack?: () => void;
+  /** Telefon kök ekranı: sol üstte "≡" (soldan çekmece). Geri düğmesiyle aynı yerde; ikisi birlikte verilmez. */
+  readonly onMenu?: () => void;
+  readonly menuRozeti?: { readonly metin: string; readonly ton: "danger" | "primary"; readonly etiket: string } | null;
+  /** Telefon düzeni: başlık bir kademe küçük, tazelik başlığın ALTINDA küçük tek satır. */
+  readonly dar?: boolean;
   readonly action?: ReactNode;
   readonly meta?: ReactNode;
 }) {
@@ -66,10 +71,32 @@ export function ScreenHeader({ title, topInset, gutter, scrollY, seamless = fals
             <Pressable accessibilityRole="button" accessibilityLabel="Geri" testID="geri" onPress={onBack} style={({ pressed }) => [s.back, pressed && { opacity: BASMA.opaklik }]}>
               <Ionicons name="chevron-back" size={26} color={t.tint} />
             </Pressable>
+          ) : onMenu ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={menuRozeti ? `Menü, ${menuRozeti.etiket}` : "Menü"} testID="baslik-menu" onPress={onMenu} style={({ pressed }) => [s.back, pressed && { opacity: BASMA.opaklik }]}>
+              <Ionicons name="menu" size={26} color={t.tint} />
+              {menuRozeti ? (
+                <View style={[s.menuRozet, { backgroundColor: menuRozeti.ton === "danger" ? t.color.danger.solid : t.color.primary }]} testID="baslik-menu-rozet">
+                  <Text style={[s.menuRozetYazi, { color: t.color.onPrimary }]} maxFontSizeMultiplier={1}>{menuRozeti.metin}</Text>
+                </View>
+              ) : null}
+            </Pressable>
           ) : null}
-          <View style={s.titleBox} testID="baslik-kutusu">
-            <Text style={s.title} accessibilityRole="header" numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE.title}>{title}</Text>
-            {meta ? <View style={s.meta}>{meta}</View> : null}
+          {/* Başlık HER ZAMAN tek satır (kelime ortasından kırılmaz): sığmazsa önce küçülür (en çok %70), sonra sonda
+              "…" ile kısalır. Telefonda tazelik başlığın altında küçük tek satır. */}
+          <View style={[s.titleBox, dar && s.titleBoxDar]} testID="baslik-kutusu">
+            <Text
+              style={[s.title, dar && s.titleDar]}
+              accessibilityRole="header"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              ellipsizeMode="tail"
+              maxFontSizeMultiplier={FONT_SCALE.title}
+              testID="baslik-yazisi"
+            >
+              {title}
+            </Text>
+            {meta ? <View style={[s.meta, dar && s.metaDar]}>{meta}</View> : null}
           </View>
           {action ? <View style={s.action} testID="baslik-eylemi">{action}</View> : null}
         </View>
@@ -87,7 +114,14 @@ const useStyles = makeStyles((t) => ({
   // Simge kutunun ortasında: görsel hizayı oluğa çekmek için kutu sola taşar (dokunma hedefi daralmaz).
   back: { width: BACK_SIZE, height: BACK_SIZE, marginLeft: -space.m, marginRight: -space.s, alignItems: "center" as const, justifyContent: "center" as const },
   titleBox: { flex: 1, minWidth: 0, flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, columnGap: space.s },
+  // Telefon: başlık + altında tazelik (sütun); başlık kutusu en az 120 pt (öncelik: başlık > birincil > zil > ⋯).
+  titleBoxDar: { flexDirection: "column" as const, flexWrap: "nowrap" as const, alignItems: "flex-start" as const, minWidth: 120 },
   title: { ...typography.largeTitle, fontSize: 24, lineHeight: 30, color: t.text, flexShrink: 1 },
+  titleDar: { fontSize: 22, lineHeight: 28, flexShrink: 0, maxWidth: "100%" as const },
   meta: { flexShrink: 0 },
+  menuRozet: { position: "absolute" as const, top: 4, right: 2, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, alignItems: "center" as const, justifyContent: "center" as const },
+  menuRozetYazi: { fontSize: 10, lineHeight: 12, fontWeight: "700" as const },
+  // Tazelik düğmesinin dokunma hedefi 44 pt; telefonda başlığın altında satır yüksekliği şişmesin (hedef payla korunur).
+  metaDar: { marginTop: -space.s, marginBottom: -space.s },
   action: { flexShrink: 0, flexDirection: "row" as const, alignItems: "center" as const },
 }));

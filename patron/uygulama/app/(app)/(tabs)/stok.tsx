@@ -12,6 +12,7 @@ import { Text, useWindowDimensions, View } from "react-native";
 import { DEAD_STOCK_STATUS, FREE_STOCK_HINT, FREE_STOCK_LABEL, STOCK_AGE_TONE, UNIT } from "../../../src/lib/labels/uretim";
 import { AgingBar } from "../../../src/ui/charts";
 import { Screen } from "../../../src/ui/Frame";
+import { kartSecEylemi } from "../../../src/ui/BaslikMenusu";
 import { Basilabilir, KademeliGiris } from "../../../src/ui/hareket";
 import { AcilirKart, BlokBasligi, StatCard } from "../../../src/ui/ortak";
 import { useAcikKapali } from "../../../src/ui/ortak/useAcikKapali";
@@ -76,13 +77,9 @@ export default function Stock() {
   const pref = useTabloTercihi("tablo.stok", temizle);
   const [secici, setSecici] = useState(false);
   const shown = shownCards(pref.tercih);
-  const kartDugmesi = (
-    <Basilabilir onPress={() => setSecici(true)} style={s.kartDugmesi} accessibilityRole="button" accessibilityLabel="Kartları seç" testID="stok-kart-sec">
-      <Ionicons name="options-outline" size={22} color={t.color.link} />
-    </Basilabilir>
-  );
+  const kartlarEylemi = kartSecEylemi(() => setSecici(true), "stok-kart-sec");
   return (
-    <Screen module="stok" onRefresh={card.reload} refreshing={card.refreshing} headerRight={kartDugmesi} footer={<StokToplamSatiri />}>
+    <Screen module="stok" onRefresh={card.reload} refreshing={card.refreshing} headerSecondary={[kartlarEylemi]} footer={<StokToplamSatiri />}>
       <SnapshotGate remote={card} domain="stok" rows={3} empty="Fabrikadan stok karnesi henüz gelmedi" testID="stok-karnesi">
         {(veri) => <StockBody data={veri} shown={shown} pref={pref} azami={azami} />}
       </SnapshotGate>

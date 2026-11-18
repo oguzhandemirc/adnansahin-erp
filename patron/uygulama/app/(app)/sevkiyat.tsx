@@ -13,6 +13,7 @@ import { can } from "../../src/lib/access";
 import { PERIODS, PERIOD_LABEL, UNIT, type PeriodKey } from "../../src/lib/labels/uretim";
 import { useSession } from "../../src/state/session";
 import { Screen } from "../../src/ui/Frame";
+import { kartSecEylemi } from "../../src/ui/BaslikMenusu";
 import { Basilabilir } from "../../src/ui/hareket";
 import { MODULE_ICON } from "../../src/ui/icons";
 import { openRecord } from "../../src/ui/nav";
@@ -53,11 +54,7 @@ export default function Shipments() {
     tablo.list.reload();
     summary.reload();
   };
-  const kartDugmesi = ozetAcik ? (
-    <Basilabilir onPress={() => setKartSecici(true)} style={s.kartDugmesi} accessibilityRole="button" accessibilityLabel="Kartları seç" testID="sevk-kart-sec">
-      <Ionicons name="options-outline" size={22} color={t.color.link} />
-    </Basilabilir>
-  ) : undefined;
+  const kartlarEylemi = ozetAcik ? kartSecEylemi(() => setKartSecici(true), "sevk-kart-sec") : undefined;
   // Kartlar başlık alt satırında; hiç kart yoksa alt satır hiç çizilmez (boş bant yok).
   const ozet = ozetAcik && kartlar.length > 0 ? (
     <View style={s.ozet}>
@@ -89,7 +86,7 @@ export default function Shipments() {
   return (
     <Screen module="sevkiyat"
       onRefresh={refresh} refreshing={tablo.list.refreshing || summary.refreshing}
-      onEndReached={tablo.list.loadMore} headerRight={kartDugmesi} subtitle={ozet}
+      onEndReached={tablo.list.loadMore} headerSecondary={kartlarEylemi ? [kartlarEylemi] : undefined} subtitle={ozet}
       sticky={<TabloUstu tablo={tablo} />}
     >
       <TabloListesi tablo={tablo} onPress={(r) => openRecord(router, "sevkiyat", r.id)} bos="Henüz sevkiyat yok" bosSuzgecli="Bu süzgeçte sevkiyat yok" icon={MODULE_ICON.sevkiyat.icon} />

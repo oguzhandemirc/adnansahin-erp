@@ -12,6 +12,7 @@ import { cariAnahtari, cuvalDeposu, CUVAL_SIRALANABILIR, cuvalSuzgecGruplari, go
 import { UNIT } from "../../src/lib/labels/uretim";
 import { useSession } from "../../src/state/session";
 import { Screen } from "../../src/ui/Frame";
+import { kartSecEylemi } from "../../src/ui/BaslikMenusu";
 import { Basilabilir, KademeliGiris } from "../../src/ui/hareket";
 import { MODULE_ICON } from "../../src/ui/icons";
 import { CuvalToplari, type TopIsareti } from "../../src/ui/cuval/CuvalToplari";
@@ -43,13 +44,9 @@ export default function Cuvallar() {
   const azami = azamiSutun();
   const pref = useCihazTercihi("tablo.cuval", useMemo(() => cuvalTemizle(azami), [azami]));
   const [kartSecici, setKartSecici] = useState(false);
-  const kartDugmesi = (
-    <Basilabilir onPress={() => setKartSecici(true)} style={s.kartDugmesi} accessibilityRole="button" accessibilityLabel="Kartları seç" testID="cuval-kart-sec">
-      <Ionicons name="options-outline" size={22} color={t.color.link} />
-    </Basilabilir>
-  );
+  const kartlarEylemi = kartSecEylemi(() => setKartSecici(true), "cuval-kart-sec");
   return (
-    <Screen module="cuvallar" onRefresh={snap.reload} refreshing={snap.refreshing} headerRight={kartDugmesi}>
+    <Screen module="cuvallar" onRefresh={snap.reload} refreshing={snap.refreshing} headerSecondary={[kartlarEylemi]}>
       <SnapshotGate remote={snap} variant="list" rows={4} empty={CUVAL_BOS} testID="cuval">
         {(veri) => <Icerik d={cuvalDeposu(veri)} pref={pref} azami={azami} />}
       </SnapshotGate>

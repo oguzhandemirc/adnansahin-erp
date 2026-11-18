@@ -8,25 +8,25 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming, type S
 import { useHareketAzalt } from "./hareket/azalt";
 import { EGRI, SURE } from "./hareket/sabitler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MODULES, moduleNavTitle, moduleTitle, moduleVisible, type ModuleKey } from "../lib/access";
+import { moduleTitle, moduleVisible, type ModuleKey } from "../lib/access";
 import { useSession } from "../state/session";
 import { StatusBands } from "./data";
 import { IconTile, Rozet } from "./ortak";
-import { DOMAIN_TONE } from "./tokens";
-import { MODULE_ICON } from "./icons";
 import { Banner } from "./kit";
 import { ScreenHeader, useHeaderScroll } from "./LargeHeader";
 import { BildirimZili } from "./BildirimZili";
 import { SyncIndicator } from "./SyncIndicator";
 import { SyncNowFeedbackText, SyncNowIndicator, useSyncNow } from "./pano/SimdiGuncelle";
 import { ROLE_LABEL, roleOf } from "./RoleBadge";
-import { RAIL_GROUPS, TABS } from "./tabs";
+import { TABS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
 import { useAcikKapali } from "./ortak/useAcikKapali";
 import { CONTENT_MAX, RAIL_COLLAPSED_WIDTH, RAIL_WIDTH, TOUCH, WIDE_MIN, ekranOlugu, space, typography } from "./tokens";
 import { UYGULAMA_ADI } from "../lib/kimlik";
-import { destekRozetMetni, useDestekEtkin, useDestekOkunmamis } from "../destek/gorunurluk";
-import { SorunBildirDugmesi } from "./destek/SorunBildirDugmesi";
+import { useDestekEtkin } from "../destek/gorunurluk";
+import { SORUN_BILDIR_ETIKETI, useSorunBildir } from "./destek/SorunBildirDugmesi";
+import { AcikEylemler, DAR_BASLIK, TasmaMenusu, type BaslikEylemi } from "./BaslikMenusu";
+import { MenuCekmecesi, cekmeceGenisligi, useRayGruplari } from "./Cekmece";
 
 export function useWide(): boolean {
   return useWindowDimensions().width >= WIDE_MIN;
@@ -145,9 +145,7 @@ export function SideNav() {
   const basHarf = hesapAdi.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p.charAt(0).toLocaleUpperCase("tr-TR")).join("") || "?";
   const rolAdi = ROLE_LABEL[roleOf(permissions)];
   const profilAktif = path === "/profil";
-  const destekEtkin = useDestekEtkin();
-  const destekRozeti = destekRozetMetni(useDestekOkunmamis());
-  const destekAktif = path === "/destek" || path.startsWith("/destek/");
+  const gruplar = useRayGruplari();
   const ray = useAcikKapali(RAY_TERCIHI, true);
   const acik = ray.acik;
   // Ray ekranın tepesine ve sol kenarına oturur: durum çubuğu (saat/tarih) ve yatay çentik payı burada uygulanır.
@@ -240,39 +238,19 @@ export function SideNav() {
       </View>
       {/* Yalnız öğe listesi kayar; başlık ve hesap kartı sabit (kısa/yatay ekranda da her öğeye ulaşılır). */}
       <ScrollView style={s.railListe} contentContainerStyle={s.railListeIc} testID="yan-ray-liste">
-      {RAIL_GROUPS.map((g, gi) => {
-        const items = g.modules.flatMap((k) => {
-          const m = MODULES.find((x) => x.key === k);
-          return m && moduleVisible(permissions, k) ? [m] : [];
-        });
-        if (items.length === 0) return null;
-        return (
-          <View key={g.title ?? `grup-${gi}`}>
-            {g.title ? bolum(g.title) : null}
-            {items.map((m) => {
-              const icon = MODULE_ICON[m.key];
-              return (
-                <RayOgesi
-                  key={m.key} acik={etiket} opaklik={opaklik} active={path === m.route || path.startsWith(`${m.route}/`)}
-                  icon={icon.icon} tone={DOMAIN_TONE[icon.domain]} title={moduleNavTitle(m.key)}
-                  onPress={() => router.navigate(m.route as never)} testID={`menu-${m.key}`}
-                />
-              );
-            })}
-          </View>
-        );
-      })}
-      {destekEtkin ? (
-        <View>
-          {bolum("Yardım")}
-          <RayOgesi
-            acik={etiket} opaklik={opaklik} active={destekAktif} icon="help-buoy-outline" tone={DOMAIN_TONE.genel} title="Destek"
-            label={destekRozeti ? `Destek, ${destekRozeti} talepte yeni yanıt` : "Destek"}
-            rozet={destekRozeti} rozetTestID="ray-destek-okunmamis"
-            onPress={() => router.navigate("/destek" as never)} testID="menu-destek"
-          />
+      {/* Öğeler telefon çekmecesiyle TEK kaynaktan (`useRayGruplari`). */}
+      {gruplar.map((g, gi) => (
+        <View key={g.title ?? `grup-${gi}`}>
+          {g.title ? bolum(g.title) : null}
+          {g.items.map((o) => (
+            <RayOgesi
+              key={o.key} acik={etiket} opaklik={opaklik} active={path === o.route || path.startsWith(`${o.route}/`)}
+              icon={o.icon} tone={o.tone} title={o.title} label={o.label} rozet={o.rozet} rozetTestID={o.rozetTestID}
+              onPress={() => router.navigate(o.route as never)} testID={o.testID}
+            />
+          ))}
         </View>
-      ) : null}
+      ))}
       </ScrollView>
       <Pressable
         onPress={() => router.navigate("/profil" as never)}
@@ -308,8 +286,12 @@ export interface ScreenProps {
   /** Aşağı çekip yenileme (verilirse). */
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
-  /** Başlık eylemi (ör. "Yeni sipariş"): büyük başlıkla AYNI satırda, dikey ortalı, sağa yaslı. */
+  /** BİRİNCİL başlık eylemi (ör. "+ Sipariş"): başlıkla AYNI satırda, sağa yaslı; telefonda da açık kalır. */
   readonly headerRight?: ReactNode;
+  /** İKİNCİL başlık eylemleri (ör. "Kartları seç"): telefonda "⋯" menüsünde, tablette açık simge (`BaslikMenusu`). */
+  readonly headerSecondary?: readonly BaslikEylemi[];
+  /** Telefon "≡" düğmesinin rozeti ve erişilebilirlik adı (ör. pano: okunmamış ret / destek yanıtı). */
+  readonly menuRozeti?: { readonly metin: string; readonly ton: "danger" | "primary"; readonly etiket: string } | null;
   /** Kaydırınca üstte yapışık kalan şerit (ör. veri tablosunun araç + sütun başlığı şeridi). */
   readonly sticky?: ReactNode;
   /** Kaydırma sona yaklaşınca (sonsuz kaydırma). */
@@ -344,7 +326,7 @@ export function useUserPull(refreshing: boolean | undefined, onRefresh: (() => v
   };
 }
 
-export function Screen({ title: titleProp, module, children, back, onRefresh, refreshing, headerRight, subtitle, footer, sticky, onEndReached, meta }: ScreenProps) {
+export function Screen({ title: titleProp, module, children, back, onRefresh, refreshing, headerRight, headerSecondary, menuRozeti, subtitle, footer, sticky, onEndReached, meta }: ScreenProps) {
   const title = titleProp ?? (module ? moduleTitle(module) : "");
   const t = useTokens();
   const s = useStyles();
@@ -358,6 +340,15 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   // "Sorun bildir" yalnız destek AÇIKKEN ve destek ekranlarının dışında (kapalıyken başlık bugünküyle aynı).
   const sorunBildir = useDestekEtkin() && !path.startsWith("/destek");
   const showBack = !wide && (back ?? !TABS.some((tab) => tab.route === path));
+  // Telefon düzeni (2026-11-19): kökte sol üstte "≡" (soldan çekmece), ayrıntıda aynı yerde geri oku; ikinciller "⋯".
+  const { width } = useWindowDimensions();
+  const dar = width < DAR_BASLIK;
+  const [cekmece, setCekmece] = useState(false);
+  const bildir = useSorunBildir();
+  const ikinciller: readonly BaslikEylemi[] = [
+    ...(headerSecondary ?? []),
+    ...(sorunBildir ? [{ key: "destek", label: "Destek", icon: "help-buoy-outline" as const, hint: `${SORUN_BILDIR_ETIKETI}: bu ekranın görüntüsüyle destek talebi açar`, onPress: () => void bildir(), testID: "sorun-bildir" }] : []),
+  ];
   const pad = ekranOlugu(wide);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/pano"));
   const pull = useUserPull(refreshing, onRefresh);
@@ -378,8 +369,8 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   ) : (
     <SyncIndicator last={factoryStamp} offline={offline} onPress={onRefresh} />
   );
-  const feedback = syncNow.feedback ? <SyncNowFeedbackText feedback={syncNow.feedback} /> : null;
-  const sub = subtitle || feedback ? <>{subtitle}{feedback}</> : null;
+  // Yanıt cümlesi kısa bildirim (toast): düzeni itmez (eskiden başlık altına yeni satır olarak giriyordu).
+  const sub = subtitle ? <>{subtitle}</> : null;
   const seamless = !!sub && subFilled;
   return (
     <View style={s.screen}>
@@ -390,9 +381,13 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         scrollY={scrollY}
         seamless={seamless}
         onBack={showBack ? goBack : undefined}
-        action={<>{headerRight}<BildirimZili />{sorunBildir ? <SorunBildirDugmesi /> : null}</>}
+        onMenu={!wide && !showBack ? () => setCekmece(true) : undefined}
+        menuRozeti={menuRozeti}
+        dar={dar}
+        action={<>{headerRight}<BildirimZili />{dar ? <TasmaMenusu eylemler={ikinciller} /> : <AcikEylemler eylemler={ikinciller} />}</>}
         meta={meta ? <View style={s.meta}>{meta}{freshness}</View> : freshness}
       />
+      {!wide ? <MenuCekmecesi acik={cekmece} onKapat={() => setCekmece(false)} genislik={cekmeceGenisligi(width)} pay={insets} /> : null}
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -421,6 +416,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         <View>{allowed ? children : <Banner tone="error" icon="lock-closed-outline" text="Bu bölümü görme yetkiniz yok" />}</View>
       </Animated.ScrollView>
       {footer}
+      <SyncNowFeedbackText feedback={syncNow.feedback} />
     </View>
   );
 }

@@ -97,11 +97,7 @@ export default function OrderDetail() {
         r.reload();
         setTick((n) => n + 1);
       }} refreshing={r.refreshing} subtitle={<StaleNote stale={r.stale} savedAt={r.savedAt} />}
-      headerRight={
-        <Basilabilir onPress={() => setSecici(true)} style={s.secDugmesi} accessibilityRole="button" accessibilityLabel="Gösterilecekleri seç" testID="siparis-ayrinti-sec">
-          <Ionicons name="options-outline" size={22} color={t.color.link} />
-        </Basilabilir>
-      }>
+      headerSecondary={[{ key: "sec", label: "Gösterilecekleri seç", icon: "options-outline", onPress: () => setSecici(true), testID: "siparis-ayrinti-sec" }]}>
       <VisibilityPicker
         visible={secici} title="Ayrıntıda göster" testID="siparis-ayrinti-secici"
         items={DETAY_OGELERI} shown={ogeler} enAz={0}

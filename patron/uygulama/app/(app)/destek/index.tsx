@@ -50,7 +50,7 @@ export default function Taleplerim() {
       onRefresh={l.yenile}
       refreshing={l.yenileniyor}
       onEndReached={l.sonrakiVar ? () => void l.devam() : undefined}
-      headerRight={<CapsuleButton label="Yeni talep" icon="add" onPress={yeniTalep} testID="destek-yeni-talep" />}
+      headerRight={<CapsuleButton label="Talep" erisim="Yeni talep" icon="add" onPress={yeniTalep} testID="destek-yeni-talep" />}
     >
       <AltSekmeler sekmeler={SEKMELER} secili={kapsam} onSec={setKapsam} testID="destek-kapsam" />
       {l.items === null ? (
