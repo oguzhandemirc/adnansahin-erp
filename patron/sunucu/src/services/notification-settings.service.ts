@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import type { SessionContext } from "../auth/session.service";
-import { DEFAULT_SETTINGS, KIND_RULES, kindPermitted, parseStored } from "../catalog/notifications";
+import { DEFAULT_SETTINGS, KIND_RULES, cloudManagedKinds, kindPermitted, parseStored } from "../catalog/notifications";
 import { accountActor, recordAudit } from "../lib/audit";
 import type { Tx } from "../lib/db";
 import { forbidden, notFound, stateConflict } from "../lib/errors";
@@ -45,7 +45,7 @@ export async function getSettingsView(ctx: CloudContext, s: SessionContext, webP
     kaynak: r.source,
     hesap: parseStored(own),
     tesis: parseStored(facility),
-    turler: NOTIFICATION_KINDS.map((k) => ({ tur: k, ad: KIND_RULES[k].label, aciklama: KIND_RULES[k].description, izinli: kindPermitted(k, s.permissions) })),
+    turler: cloudManagedKinds(ctx.config.BILDIRIM_KAYNAGI).map((k) => ({ tur: k, ad: KIND_RULES[k].label, aciklama: KIND_RULES[k].description, izinli: kindPermitted(k, s.permissions) })),
     gonderim: ctx.config.BILDIRIM_KIPI,
     webPushAnahtari: webPushKey,
     fabrika,

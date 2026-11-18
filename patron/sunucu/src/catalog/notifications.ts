@@ -3,7 +3,7 @@
 // izinlerini KAPSAR (bildirim, okunamayan veriyi sızdırmaz). Adnan'da finans içerikli tür YOKTUR.
 // Ayar şeması (`SettingsSchema`) KATIDIR; tanınmayan anahtar 400. Saat dilimi fabrika günüyle aynı: İstanbul.
 import { z } from "zod";
-import { NOTIFICATION_KINDS, type NotificationKind, type NotificationSettings } from "../wire/api";
+import { FACTORY_NOTIFICATION_KINDS, NOTIFICATION_KINDS, type NotificationKind, type NotificationSettings } from "../wire/api";
 import { type CloudPermission } from "./permissions";
 import { projectionDef } from "./projections";
 
@@ -157,6 +157,17 @@ export function catalogProblems(rules: Readonly<Record<string, KindRule>> = KIND
 
 const problems = catalogProblems();
 if (problems.length > 0) throw new Error(`Bildirim kataloğu tutarsız: ${problems.join("; ")}`);
+
+/**
+ * Ayar formunda BULUT ayarıyla yönetilen türler (`GET /bildirim/ayarlar` `turler`). Fabrika kaynaklı türler
+ * (`FACTORY_NOTIFICATION_KINDS`) kişisel bulut ayarı DEĞİLDİR: fabrika kipinde yalnız ataması aynada görünür, ayna
+ * yokken hiç görünmez (saha kusuru 2026-11-18). Bulut kipinde `yeni-siparis`i bulut türettiği için bulut türüdür.
+ * Saklı ayarın `turler` anahtarları bundan ETKİLENMEZ (şema bütün türleri taşır; gizli tür ayarı korunur).
+ */
+export function cloudManagedKinds(source: "bulut" | "fabrika"): NotificationKind[] {
+  const factory = new Set(FACTORY_NOTIFICATION_KINDS);
+  return NOTIFICATION_KINDS.filter((k) => !factory.has(k) || (source === "bulut" && k === "yeni-siparis"));
+}
 
 /** Hesap bu türü alabilir mi (izin kümesi ⊇ türün izinleri). */
 export function kindPermitted(kind: NotificationKind, permissions: ReadonlySet<string>): boolean {

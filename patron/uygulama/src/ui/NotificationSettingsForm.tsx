@@ -1,12 +1,12 @@
 // Bildirim ayarları formu (görünüm): ana anahtar ("bildirim yok" dahil), KONU başlıklı tür satırları (başlık başına
 // tümünü aç/kapat), sessiz saatler, eşikler. İzni yetmeyen tür gösterilir ama açıklanır (sunucu zaten göndermez).
 // Fabrika aynası varsa fabrika türleri yalnız ATANMIŞSA görünür; değişiklik ANINDA fabrikaya istek olur (Kaydet
-// beklemez, nihai durum fabrikadan döner); tercih yetkisi yoksa kilitli. Ayna yoksa bugünkü form.
+// beklemez, nihai durum fabrikadan döner); tercih yetkisi yoksa kilitli. Ayna yoksa tek blok, yalnız bulutun kendi türleri.
 import { Pressable, Text, View } from "react-native";
 import type { FactoryNotificationPrefs, FactoryPreferenceChange, NotificationKindInfo } from "../api/wire";
 import { notificationKind } from "../lib/labels/diger";
 import { DUE_DATE_KIND, type NotificationForm } from "../lib/notification-form";
-import { changeableRows, settingsGroups, type TopicGroup } from "../lib/notification-topics";
+import { changeableRows, legacyKinds, settingsGroups, type TopicGroup } from "../lib/notification-topics";
 import { GroupNote, ToggleRow } from "./diger/parts";
 import { Field } from "./kit";
 import { ListeBlogu } from "./ortak";
@@ -49,9 +49,9 @@ export function NotificationSettingsForm(p: {
           icon={f.acik ? "notifications" : "notifications-off-outline"} domain="gelenKutusu" />
       </ListeBlogu>
       {!p.factory ? (
-        // Ayna yok (eski bulut / bulut kipi): bugünkü form AYNEN — tek blok, bütün türler bulut ayarında.
+        // Ayna yok (atama henüz gelmedi / bulut kipi): tek blok, yalnız bulutun KENDİ türleri (fabrika türü çizilmez).
         <ListeBlogu baslik="Bildirim türleri" ayracli testID="bildirim-turleri">
-          {kinds.map((k) => {
+          {legacyKinds(kinds).map((k) => {
             const look = notificationKind(k.tur);
             return (
               <ToggleRow key={k.tur} label={k.ad} testID={`tur-${k.tur}`} icon={look.icon} domain={look.domain}

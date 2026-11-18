@@ -48,6 +48,16 @@ export interface TopicGroup {
   readonly rows: readonly SettingsRow[];
 }
 
+/**
+ * Ayna YOKKEN eski formun türleri: fabrika kaynaklı türler kişisel bulut ayarı değildir, çizilmez (saha kusuru
+ * 2026-11-18 — eski bulut bütün türleri `turler`de yollıyordu). `yeni-siparis` bulut kipinde bulut türüdür; sunucu
+ * fabrika kipinde onu zaten listeden çıkarır (`cloudManagedKinds`), burada yalnız eski sunucuya karşı sedde.
+ */
+export function legacyKinds(cloudKinds: readonly NotificationKindInfo[]): NotificationKindInfo[] {
+  const factory = new Set(FACTORY_NOTIFICATION_KINDS);
+  return cloudKinds.filter((k) => !factory.has(k.tur) || k.tur === "yeni-siparis");
+}
+
 /** Formun konu grupları (boş konu çizilmez). */
 export function settingsGroups(cloudKinds: readonly NotificationKindInfo[], factory: FactoryNotificationPrefs | null | undefined): TopicGroup[] {
   const managed = factory ? new Set(FACTORY_NOTIFICATION_KINDS) : new Set<string>();

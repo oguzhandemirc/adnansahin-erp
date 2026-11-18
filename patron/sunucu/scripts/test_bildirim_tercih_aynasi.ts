@@ -3,7 +3,7 @@
 // + yanıt `tercihler`/`ayna`; hesap API'si `GET /api/bildirim/ayarlar` `fabrika` · `POST /api/bildirim/fabrika-tercih`.
 //   §1 eski fabrika (ayna alanı yok) aynen kabul; yanıt `ayna: true`, `tercihler: []` · kökte bozuk ayna 400.
 //   §2 ayna: hesap satırı TAM yerine konur; bulutta olmayan hesap sayılmaz · `fabrika` görünümü yalnız
-//      `BILDIRIM_KAYNAGI=fabrika` ∧ ayna varken.
+//      `BILDIRIM_KAYNAGI=fabrika` ∧ ayna varken · `turler` fabrika türü taşımaz (bulut kipinde yeni-siparis hariç).
 //   §3 tercih gidiş-dönüşü: telefon isteği bekleyen olur (görünen = istenen) → köprü yanıtında fabrikaya gider →
 //      fabrika teyit + gerçek ayna → bekleyen kapanır · teyitten önce yeniden istenirse YENİ kimlik açık kalır.
 //   §4 telefonda erken ret (otorite değil): tercih yetkisi yok 403 · atanmamış tür 409 · bulut kipinde 409 ·
@@ -23,7 +23,7 @@ import type { SessionContext } from "../src/auth/session.service";
 import type { CloudContext } from "../src/services/context";
 import { deliverDue } from "../src/services/notification-sender";
 import { getSettingsView, requestFactoryPreferences } from "../src/services/notification-settings.service";
-import type { NotificationSettingsView } from "../src/wire/api";
+import { FACTORY_NOTIFICATION_KINDS, type NotificationSettingsView } from "../src/wire/api";
 import { ayar, ayarYaz, cihazKaydet, tur } from "./lib/bildirim-fikstur";
 import { api, hesapKur, imzali, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
 
@@ -64,6 +64,13 @@ async function ayna(o: Ortam, k: TestKurulumu, a: TestHesabi): Promise<void> {
   await kopru(o, k, { atamalar: [{ hesapId: a.accountId, tercihYetkisi: true, turler: [{ tur: "yeni-is-emri", kapali: false }] }] });
   kontrol("§2d ayna TAM yerine konur (düşen tür görünmez)", (await gorunum(o, a)).fabrika?.turler.length === 1);
   kontrol("§2e bulut kipinde fabrika görünümü yok (bugünkü form)", (await getSettingsView(bulutKipi(o), oturum(a), null)).fabrika === null);
+  // Saha kusuru 2026-11-18: fabrika kaynaklı türler kişisel bulut ayarı değildir — `turler` (eski formun listesi) onları
+  // fabrika kipinde ayna olsa da olmasa da TAŞIMAZ; bulut kipinde yalnız `yeni-siparis` (bulut türetir) kalır.
+  const fabrikaTurleri = new Set(FACTORY_NOTIFICATION_KINDS);
+  const fk = (await gorunum(o, a)).turler.map((t) => t.tur);
+  kontrol("§2f fabrika kipi: turler yalnız bulutun kendi türleri", fk.length > 0 && fk.every((t) => !fabrikaTurleri.has(t)), JSON.stringify(fk));
+  const bk = (await getSettingsView(bulutKipi(o), oturum(a), null)).turler.map((t) => t.tur);
+  kontrol("§2g bulut kipi: yeni-siparis bulut türü, diğer fabrika türleri yok", bk.includes("yeni-siparis") && bk.every((t) => t === "yeni-siparis" || !fabrikaTurleri.has(t)), JSON.stringify(bk));
 }
 
 async function gidisDonus(o: Ortam, k: TestKurulumu, a: TestHesabi): Promise<void> {

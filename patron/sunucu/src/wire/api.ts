@@ -631,6 +631,10 @@ export interface NotificationSettingsView {
   readonly kaynak: "HESAP" | "TESIS" | "VARSAYILAN";
   readonly hesap: NotificationSettings | null;
   readonly tesis: NotificationSettings | null;
+  /**
+   * Formda BULUT ayarıyla yönetilen türler: fabrika kaynaklılar (`FACTORY_NOTIFICATION_KINDS`) hariç; bulut kipinde
+   * `yeni-siparis` dahil (bulut türetir). Saklı ayarın `turler` anahtarları yine bütün türleri taşır.
+   */
   readonly turler: readonly NotificationKindInfo[];
   /** Sunucunun gönderim kipi: `kapali` iken kuyruk birikir, hiçbir şey gönderilmez. */
   readonly gonderim: "kapali" | "sahte" | "gercek";
