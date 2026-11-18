@@ -101,6 +101,7 @@ Fabrika verisinin patron bulutuna (Adnan'a özel VDS) eşitlenmesi; bağlantıy�
 ### Hukuk sayfaları (bulut)
 
 - Bulutta oturumsuz yüzey yalnız `/saglik`, Etkili Destek webhook'u ve hukuk sayfalarıdır (`/gizlilik` · `/privacy` · `/hesap-silme`, `src/http/legal/`): yalnız GET/HEAD, açılışta bir kez kurulan statik HTML (süreler yapılandırmadan), kişisel/iş verisi, sır, betik ve dış kaynak dönmez; Caddy yalnız bu tam yolları geçirir. [bekçi: test_gizlilik_sayfasi · test_compose_sirlari §4]
+- Mağaza koşulları (2026-11-18): politika başlığında "Privacy Policy" + uygulama ve geliştirici adı; Profil › "Hesap silme talebi" `/hesap-silme`yi açar; mikrofon izni yalnız ses ekranının mikrofon düğmesinde istenir ve ilk "Sesle doldur"da bir kez ön açıklama (`src/ses/onbilgi.ts`) gösterilir; destek formunda gönderen adı görünür. [bekçi: test_gizlilik_sayfasi · jest gizlilik · ses-siparis-ekrani · destek]
 
 ### Etkili Destek (bulut + patron uygulaması)
 

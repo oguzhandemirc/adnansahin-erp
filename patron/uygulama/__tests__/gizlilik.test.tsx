@@ -1,6 +1,7 @@
 // Gizlilik politikası bağlantısı (2026-11-18): adres bulut kökeninden türetilir (`<kök>/gizlilik`, alan adı kodda yok) ·
 // profilde "Hakkında › Gizlilik politikası" ve giriş ekranının altında bağlantı tarayıcıda açar · bulut adresi yoksa
-// (bulutsuz derleme) iki bağlantı da çizilmez · açma hatası yutulur.
+// (bulutsuz derleme) bağlantılar çizilmez · açma hatası yutulur · Profil › "Hesap silme talebi" `/hesap-silme`i açar ·
+// mikrofon ön açıklamasında gizlilik bağlantısı (2026-11-18).
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Linking } from "react-native";
 
@@ -17,7 +18,8 @@ jest.mock("expo-router", () => ({ useRouter: () => ({ push: jest.fn(), replace: 
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 // mock'lar kurulduktan SONRA yüklenir.
-const { gizlilikAc, gizlilikAdresi } = require("../src/lib/gizlilik") as typeof import("../src/lib/gizlilik");
+const { gizlilikAc, gizlilikAdresi, hesapSilmeAdresi } = require("../src/lib/gizlilik") as typeof import("../src/lib/gizlilik");
+const { SesOnBilgi } = require("../src/ui/ses/SesOnBilgi") as typeof import("../src/ui/ses/SesOnBilgi");
 const Profile = (require("../app/(app)/profil") as typeof import("../app/(app)/profil")).default;
 const Login = (require("../app/giris") as { default: () => React.JSX.Element }).default;
 
@@ -49,11 +51,32 @@ describe("profil › Hakkında", () => {
     fireEvent.press(screen.getByTestId("gizlilik-politikasi"));
     expect(acilan).toHaveBeenCalledWith("https://bulut.ornek.test/gizlilik");
   });
-  it("bulut adresi yoksa satır çizilmez", async () => {
+  it("⭐ Hesap silme talebi satırı tarayıcıda bulutun /hesap-silme sayfasını açar", async () => {
+    render(<Profile />);
+    await act(async () => undefined);
+    fireEvent.press(screen.getByTestId("hesap-silme-talebi"));
+    expect(acilan).toHaveBeenCalledWith("https://bulut.ornek.test/hesap-silme");
+    expect(hesapSilmeAdresi(null)).toBeNull();
+  });
+  it("bulut adresi yoksa satırlar çizilmez", async () => {
     mockKok = null;
     render(<Profile />);
     await act(async () => undefined);
     expect(screen.queryByTestId("gizlilik-politikasi")).toBeNull();
+    expect(screen.queryByTestId("hesap-silme-talebi")).toBeNull();
+  });
+});
+
+describe("mikrofon ön açıklaması › gizlilik bağlantısı", () => {
+  it("açıklamadaki bağlantı gizlilik politikasını açar; Devam/Vazgeç çağrılır", () => {
+    const onDevam = jest.fn();
+    const onVazgec = jest.fn();
+    render(<SesOnBilgi visible onDevam={onDevam} onVazgec={onVazgec} />);
+    fireEvent.press(screen.getByTestId("ses-onbilgi-gizlilik"));
+    expect(acilan).toHaveBeenCalledWith("https://bulut.ornek.test/gizlilik");
+    fireEvent.press(screen.getByTestId("ses-onbilgi-vazgec"));
+    fireEvent.press(screen.getByTestId("ses-onbilgi-devam"));
+    expect([onVazgec.mock.calls.length, onDevam.mock.calls.length]).toEqual([1, 1]);
   });
 });
 

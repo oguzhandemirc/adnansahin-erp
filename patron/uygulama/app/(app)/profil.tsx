@@ -1,13 +1,14 @@
 // Profil: tema renkli kimlik kartı (ad, fabrika kullanıcı adı, rol, tesis), Görünüm'e geçiş (kip, renk, zemin, köşe,
 // kareler — `gorunum.tsx`), bildirimlere geçiş, güvenlik, çıkış (iki adım). Hesap fabrikanın malıdır: parola, ad ve
-// yetkiler fabrikada değişir (parola satırı yalnız bilgi verir; hesap silme yok). İki adımlı doğrulama bulutta, İSTEĞE
+// yetkiler fabrikada değişir (parola satırı yalnız bilgi verir). "Hakkında" altında gizlilik politikası ve hesap silme
+// talebi (bulutun `/hesap-silme` sayfası, tarayıcıda; mağaza kuralı). İki adımlı doğrulama bulutta, İSTEĞE
 // BAĞLI ve buradan açılıp kapanır.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { moduleTitle } from "../../src/lib/access";
-import { gizlilikAc, gizlilikAdresi } from "../../src/lib/gizlilik";
+import { gizlilikAc, gizlilikAdresi, hesapSilmeAdresi } from "../../src/lib/gizlilik";
 import { MODULE_ICON } from "../../src/ui/icons";
 import { ROLE_LABEL, roleOf } from "../../src/ui/RoleBadge";
 import { useSession } from "../../src/state/session";
@@ -81,7 +82,9 @@ export default function Profile() {
       {gizlilik ? (
         <ListeBlogu baslik="Hakkında">
           <ListeSatiri birincil="Gizlilik politikası" ikincil="Hangi veriler işlenir · hesap silme" accessibilityLabel="Gizlilik politikası, tarayıcıda açılır"
-            icon="document-text-outline" ton="sky" ayrac={false} onPress={() => gizlilikAc(gizlilik)} testID="gizlilik-politikasi" />
+            icon="document-text-outline" ton="sky" onPress={() => gizlilikAc(gizlilik)} testID="gizlilik-politikasi" />
+          <ListeSatiri birincil="Hesap silme talebi" ikincil="Hesabınızın ve verilerinizin silinmesini isteyin" accessibilityLabel="Hesap silme talebi, tarayıcıda açılır"
+            icon="person-remove-outline" ton="rose" ayrac={false} onPress={() => gizlilikAc(hesapSilmeAdresi())} testID="hesap-silme-talebi" />
         </ListeBlogu>
       ) : null}
       <View style={s.logout}>

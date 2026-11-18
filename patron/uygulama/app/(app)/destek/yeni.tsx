@@ -1,6 +1,7 @@
 // Yeni destek talebi: tür (Hata · Soru · İstek) · konu · mesaj; "Sorun bildir"den gelindiyse ekran görüntüsü önizlemesi
 // (üzerine çiz / kaldır). Bağlam otomatik (ekran, sürüm + yapı, platform, cihaz) — kullanıcıya sorulmaz, sır içermez.
-// clientToken form açılınca BİR KEZ üretilir; çift dokunuş ikinci istek atmaz (kilit); ağ/5xx/429 hatasında form
+// Formun başında gönderen hesap (ad + kullanıcı adı) görünür (App Store koşulu). clientToken form açılınca BİR KEZ
+// üretilir; çift dokunuş ikinci istek atmaz (kilit); ağ/5xx/429 hatasında form
 // KAPANMAZ ve aynı token'la yeniden denenir (bulut aynı talebi döner). Başarıda talep ayrıntısına geçilir.
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
@@ -21,7 +22,8 @@ import { makeStyles } from "../../../src/ui/theme-context";
 import { space, typography } from "../../../src/ui/tokens";
 
 export default function YeniDestekTalebi() {
-  const { api } = useSession();
+  const { api, facility } = useSession();
+  const gonderen = facility?.hesap ? `${facility.hesap.ad} (${facility.hesap.kullaniciAdi})` : null;
   const router = useRouter();
   const s = useStyles();
   const taslak = useDestekTaslagi();
@@ -73,6 +75,7 @@ export default function YeniDestekTalebi() {
   return (
     <Screen title="Sorun bildir" back>
       <FormKarti testID="destek-form">
+        {gonderen ? <Text style={s.gonderen} testID="destek-gonderen">Gönderen: {gonderen}</Text> : null}
         <AlanEtiketi>Talep türü</AlanEtiketi>
         <View style={s.cipler} accessibilityRole="radiogroup">
           {TUR_SIRASI.map((k) => <SecimCipi key={k} label={TUR_ETIKET[k]} on={tur === k} rol="radio" onPress={() => setTur(k)} testID={`destek-tur-${k}`} />)}
@@ -102,6 +105,7 @@ export default function YeniDestekTalebi() {
 }
 
 const useStyles = makeStyles((t) => ({
+  gonderen: { ...typography.subhead, color: t.color.text, fontWeight: "600" as const, marginBottom: space.m },
   cipler: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.s, marginBottom: space.m },
   hata: { ...typography.caption, color: t.color.danger.fg, marginBottom: space.s },
   mesaj: { minHeight: 120, textAlignVertical: "top" as const },

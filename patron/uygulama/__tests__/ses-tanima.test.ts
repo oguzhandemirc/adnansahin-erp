@@ -132,9 +132,12 @@ describe("derleme kapısı ve izin metinleri", () => {
     expect(e).toBeDefined();
     const o = e![1];
     expect(o.microphonePermission).toMatch(/mikrofon/i);
-    expect(o.speechRecognitionPermission).toMatch(/ses tanıma/);
+    expect(o.speechRecognitionPermission).toMatch(/konuşma tanıma/);
     // Gizlilik (2026-11-18): iOS tanıması ağ tabanlıdır (requiresOnDeviceRecognition verilmez) → metin Apple'a iletimi söyler.
-    expect(o.speechRecognitionPermission).toMatch(/Apple'a iletilebilir/);
+    expect(o.speechRecognitionPermission).toMatch(/Apple'a gönderebilir/);
+    // Mağaza (2026-11-18): tek, etken cümle + somut örnek; mikrofon metni ses kaydı tutulmadığını söyler.
+    for (const m of [o.microphonePermission, o.speechRecognitionPermission] as string[]) expect([m.split(/[.!?](\s|$)/).filter((x) => x?.trim()).length, /örneğin/.test(m)]).toEqual([1, true]);
+    expect(o.microphonePermission).toMatch(/ses kaydı tutmaz/);
     expect(o.androidSpeechServicePackages).toEqual(["com.google.android.googlequicksearchbox"]);
   });
   it("mağaza metni mikrofon kullanımını beyan eder (tr + en)", () => {

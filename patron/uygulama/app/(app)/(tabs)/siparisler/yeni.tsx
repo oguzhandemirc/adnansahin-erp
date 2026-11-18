@@ -2,16 +2,19 @@
 // Gövde `buildOrder` (forms.ts), gönderim `useWrite` (işlem kimliği kuralı; TEK örnek, adımlar arasında yeniden
 // üretilmez). Üç sayfa (şartname §4.10): Müşteri · Kalemler · Gönder; 1 → 2 cari seçilmeden geçilmez.
 // Sesle doldur (src/ses, 2026-11-17): yalnız formu DOLDURUR, asla göndermez; gönderim aşağıdaki aynı `submit` yolundan.
+// İlk dokunuşta mikrofon ön açıklaması (SesOnBilgi, bir kez); mikrofon izni yalnız ses ekranının mikrofon düğmesinde.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { addDaysToKey, factoryDayKey, fmtDayKey } from "../../../../src/lib/factory-time";
 import { buildOrder, type OrderLineInput } from "../../../../src/lib/forms";
 import { can } from "../../../../src/lib/access";
 import type { FormDoldurma } from "../../../../src/ses/akis";
+import { onbilgiGoruldu, onbilgiIsaretle } from "../../../../src/ses/onbilgi";
 import { sesMotoru } from "../../../../src/ses/tanima";
 import { useSession } from "../../../../src/state/session";
+import { SesOnBilgi } from "../../../../src/ui/ses/SesOnBilgi";
 import { SesDugmesi, SesliSiparisModal } from "../../../../src/ui/ses/SesliSiparis";
 import { Screen } from "../../../../src/ui/Frame";
 import { Banner, Button, Field } from "../../../../src/ui/kit";
@@ -35,6 +38,24 @@ export default function NewOrder() {
   // Ses düğmesi yalnız yazma yetkisi VE cihazda tanıma varken (web/Expo Go/izin dışı rolde çizilmez).
   const sesVar = can(permissions, "bulut:siparis:yaz") && motor.mevcut();
   const [sesAcik, setSesAcik] = useState(false);
+  // Mikrofon ön açıklaması (src/ses/onbilgi.ts): ilk dokunuşta bir kez, izin istenmeden önce. Bayrak okunmadıysa açıklama gösterilir.
+  const [onbilgiTamam, setOnbilgiTamam] = useState(false);
+  const [onbilgiAcik, setOnbilgiAcik] = useState(false);
+  useEffect(() => {
+    if (!sesVar) return;
+    let canli = true;
+    void onbilgiGoruldu().then((g) => canli && g && setOnbilgiTamam(true));
+    return () => {
+      canli = false;
+    };
+  }, [sesVar]);
+  const sesDugmesi = () => (onbilgiTamam ? setSesAcik(true) : setOnbilgiAcik(true));
+  const onbilgiDevam = () => {
+    onbilgiIsaretle();
+    setOnbilgiTamam(true);
+    setOnbilgiAcik(false);
+    setSesAcik(true);
+  };
   const listeYukle = useCallback((projection: string, p: Parameters<typeof api.list>[1]) => api.list(projection, p), [api]);
   const t = useTokens();
   const s = useStyles();
@@ -102,7 +123,8 @@ export default function NewOrder() {
     >
       <AdimCubugu adim={adim} toplam={3} etiket={ADIMLAR[adim - 1]!} />
 
-      {adim === 1 && sesVar ? <SesDugmesi onPress={() => setSesAcik(true)} /> : null}
+      {adim === 1 && sesVar ? <SesDugmesi onPress={sesDugmesi} /> : null}
+      {sesVar ? <SesOnBilgi visible={onbilgiAcik} onDevam={onbilgiDevam} onVazgec={() => setOnbilgiAcik(false)} /> : null}
       {sesVar ? (
         <SesliSiparisModal visible={sesAcik} onKapat={() => setSesAcik(false)} onAktar={sesleDoldur} motor={motor} listeYukle={listeYukle} bugun={factoryDayKey()} />
       ) : null}

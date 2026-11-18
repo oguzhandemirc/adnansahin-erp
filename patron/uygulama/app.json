@@ -69,8 +69,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Yeni sipariş formunu sesle doldurabilmeniz için mikrofon yalnız siz mikrofon düğmesine bastığınızda dinler. Uygulama ses kaydı tutmaz.",
-          "speechRecognitionPermission": "Konuşmanız yeni sipariş formuna yazılmak için Apple'ın ses tanıma hizmetiyle yazıya çevrilir; bunun için ses Apple'a iletilebilir. Uygulama sesi saklamaz; sipariş yalnız siz Gönder'e bastığınızda gider.",
+          "microphonePermission": "Uygulama, siz mikrofon düğmesine bastığınızda konuşmanızı dinleyerek yeni sipariş formunu doldurur; örneğin \"Akın Tekstil, 500 metre siyah ribana\" dediğinizde müşteri, ürün, renk ve miktar alanlarına yazar ve ses kaydı tutmaz.",
+          "speechRecognitionPermission": "Uygulama, konuşmanızı yeni sipariş formuna yazmak için Apple'ın konuşma tanıma hizmetini kullanır ve bunun için sesinizi Apple'a gönderebilir; örneğin \"500 metre siyah ribana\" dediğinizde ürün, renk ve miktar alanlarını doldurur.",
           "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
         }
       ]

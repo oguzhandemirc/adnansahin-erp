@@ -1,6 +1,8 @@
 // Sesli sipariş ekran akışı: düğme yalnız yazma yetkisi + cihazda tanıma varken; iki kip (adım adım varsayılan, tek
 // cümle); belirsiz alan modal adaylardan seçilir; ⭐ SES SİPARİŞİ GÖNDERMEZ ("gönder/kaydet" söylense de): yalnız formu
-// doldurur, gönderim mevcut "Gönder" düğmesi + aynı gövde/işlem kimliği yolundan; izin reddi sade Türkçe, çökme yok.
+// doldurur, gönderim mevcut "Gönder" düğmesi + aynı gövde/işlem kimliği yolundan; izin reddi sade Türkçe, çökme yok;
+// ⭐ mikrofon ön açıklaması ilk dokunuşta bir kez, Vazgeç'te izin istenmez (2026-11-18).
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import type { ReactElement } from "react";
 import { factoryDayKey, fmtDayKey } from "../src/lib/factory-time";
@@ -9,6 +11,7 @@ import type { Listeler } from "../src/ses/ayristir";
 import { hazirla } from "../src/ses/eslestir";
 import { adayListesi, listeleriYukle } from "../src/ses/listeler";
 import { sozcuklere } from "../src/ses/metin";
+import { ONBILGI_ANAHTARI } from "../src/ses/onbilgi";
 import { sahteMotor, sesMotoruAyarla } from "../src/ses/tanima";
 import { tarihBul } from "../src/ses/tarih";
 
@@ -33,12 +36,20 @@ const NewOrder = (require("../app/(app)/(tabs)/siparisler/yeni") as { default: (
 const YAZAR = ["bulut:oturum", "bulut:siparis:yaz", "bulut:siparis:oku", "bulut:cari:oku"];
 
 let sira: string[] = [];
-beforeEach(() => {
+beforeEach(async () => {
   sira = [];
   mockSession.permissions = [...YAZAR];
   sesMotoruAyarla(sahteMotor(() => sira.shift()));
+  await AsyncStorage.clear();
 });
 afterEach(() => sesMotoruAyarla(null));
+
+/** "Sesle doldur"a basar; ilk kullanımın mikrofon ön açıklaması çıkarsa "Devam" der. */
+function sesAc() {
+  fireEvent.press(screen.getByTestId("ses-ac"));
+  const devam = screen.queryByTestId("ses-onbilgi-devam");
+  if (devam) fireEvent.press(devam);
+}
 
 async function soyle(metin: string) {
   sira.push(metin);
@@ -67,10 +78,50 @@ describe("düğme görünürlüğü", () => {
   });
 });
 
+describe("mikrofon ön açıklaması (mağaza kuralı)", () => {
+  function izlenenMotor() {
+    const m = sahteMotor(() => sira.shift());
+    const baslat = jest.spyOn(m, "baslat");
+    sesMotoruAyarla(m);
+    return baslat;
+  }
+  it("⭐ ilk dokunuşta açıklama çıkar, izin istenmez; Vazgeç ses ekranını açmaz ve bayrak yazmaz", async () => {
+    const baslat = izlenenMotor();
+    render(<NewOrder />);
+    await act(async () => undefined);
+    fireEvent.press(screen.getByTestId("ses-ac"));
+    expect(screen.getByTestId("ses-onbilgi-metin").props.children).toMatch(/Android'de Google, iPhone'da Apple.*ses bu hizmete gönderilebilir.*ses kaydı tutmaz/);
+    expect(screen.queryByTestId("ses-mikrofon")).toBeNull();
+    fireEvent.press(screen.getByTestId("ses-onbilgi-vazgec"));
+    expect(screen.queryByTestId("ses-mikrofon")).toBeNull();
+    expect(baslat).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem(ONBILGI_ANAHTARI)).toBeNull();
+    fireEvent.press(screen.getByTestId("ses-ac"));
+    expect(screen.getByTestId("ses-onbilgi")).toBeTruthy();
+  });
+  it("⭐ Devam ses ekranını açar (izin yine yalnız mikrofon düğmesinde); sonraki açılışta açıklama bir daha çıkmaz", async () => {
+    const baslat = izlenenMotor();
+    const ilk = render(<NewOrder />);
+    await act(async () => undefined);
+    fireEvent.press(screen.getByTestId("ses-ac"));
+    fireEvent.press(screen.getByTestId("ses-onbilgi-devam"));
+    expect(screen.getByTestId("ses-mikrofon")).toBeTruthy();
+    expect(baslat).not.toHaveBeenCalled();
+    await act(async () => undefined);
+    expect(await AsyncStorage.getItem(ONBILGI_ANAHTARI)).toBe("1");
+    ilk.unmount();
+    render(<NewOrder />);
+    await act(async () => undefined);
+    fireEvent.press(screen.getByTestId("ses-ac"));
+    expect(screen.queryByTestId("ses-onbilgi-metin")).toBeNull();
+    expect(screen.getByTestId("ses-mikrofon")).toBeTruthy();
+  });
+});
+
 describe("tek cümle kipi", () => {
   it("⭐ 'gönder' dense de göndermez; Forma aktar formu doldurur, gönderim yalnız Gönder düğmesiyle ve aynı gövdeyle", async () => {
     render(<NewOrder />);
-    fireEvent.press(screen.getByTestId("ses-ac"));
+    sesAc();
     expect(screen.getByTestId("ses-soru").props.children).toBe("Müşteri kim?");
     fireEvent.press(screen.getByTestId("ses-kip-cumle"));
     await soyle("Akın Tekstil'e 500 metre siyah ribana, 300 metre lacivert teslim cuma gönder kaydet");
@@ -107,7 +158,7 @@ describe("tek cümle kipi", () => {
 describe("adım adım kipi (varsayılan)", () => {
   it("sorar, belirsiz müşteride modal adaylar açar, renk 'yok' ile geçer, sonunda forma aktarır", async () => {
     render(<NewOrder />);
-    fireEvent.press(screen.getByTestId("ses-ac"));
+    sesAc();
     await soyle("Akın");
     expect(screen.getByText("Hangi müşteri?")).toBeTruthy();
     fireEvent.press(screen.getByTestId("ses-aday-c2"));
@@ -130,7 +181,7 @@ describe("adım adım kipi (varsayılan)", () => {
   });
   it("anlaşılmayan cevapta aynı soruda kalır ve sade açıklama verir; 'gönder' komut değildir", async () => {
     render(<NewOrder />);
-    fireEvent.press(screen.getByTestId("ses-ac"));
+    sesAc();
     await soyle("gönder");
     expect(screen.getByTestId("ses-soru").props.children).toBe("Müşteri kim?");
     expect(screen.getByTestId("ses-uyari").props.children).toBe("“gönder” müşteri listesinde bulunamadı. Yeniden söyleyin.");
@@ -147,7 +198,7 @@ describe("hatalar çökertmez", () => {
     ["", /Sesinizi duyamadım/],
   ])("%s → Türkçe açıklama", async (m, re) => {
     render(<NewOrder />);
-    fireEvent.press(screen.getByTestId("ses-ac"));
+    sesAc();
     await soyle(m);
     expect(screen.getByTestId("ses-hata").props.children).toMatch(re);
     expect(screen.getByTestId("ses-soru").props.children).toBe("Müşteri kim?");
@@ -155,7 +206,7 @@ describe("hatalar çökertmez", () => {
   it("liste yüklenemezse açıklar, sayı/tarih yine çalışır", async () => {
     mockList.mockImplementationOnce(async () => { throw new Error("ağ"); });
     render(<NewOrder />);
-    fireEvent.press(screen.getByTestId("ses-ac"));
+    sesAc();
     await waitFor(() => expect(screen.getByTestId("ses-eksik").props.children).toBe("müşteri listesi yüklenemedi; bu alanlar formda elle seçilir."));
   });
 });

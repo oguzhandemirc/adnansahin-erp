@@ -117,6 +117,10 @@ describe("talep formu ekranı: clientToken ve çift dokunuş", () => {
     fireEvent.changeText(screen.getByTestId("destek-konu"), "Liste açılmıyor");
     fireEvent.changeText(screen.getByTestId("destek-mesaj"), "Siparişler boş geliyor");
   }
+  it("⭐ formun başında gönderen hesabın adı ve kullanıcı adı görünür (App Store koşulu)", async () => {
+    await doldur();
+    expect(screen.getByTestId("destek-gonderen")).toHaveTextContent("Gönderen: Ayşe Yılmaz (ayse)");
+  });
   it("ağ hatasında form kapanmaz, ikinci deneme AYNI token'la; başarıda ayrıntıya geçilir", async () => {
     mockApi.supportCreate.mockRejectedValueOnce(ag());
     await doldur();
