@@ -2,7 +2,7 @@
 // Menü yalnız izinli bölümleri gösterir (karar yine sunucuda; izinsiz uç 403 döner).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Image, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from "react-native-reanimated";
 import { useHareketAzalt } from "./hareket/azalt";
@@ -43,12 +43,49 @@ export function FacilityName() {
 export const RAY_TERCIHI = "yan-ray.acik";
 const LOGO = require("../../assets/icon.png") as number;
 /**
- * Ray daralırken/açılırken genişlik reanimated ile canlanır (2026-11-18). `LayoutAnimation` bu yapıda ÇALIŞMAZ: yeni
- * mimaride (Fabric) Reanimated 4 açılışta Fabric'in animasyon sürücüsünü söker (`setAnimationDelegate(nullptr)`),
- * `configureNext` sessizce yutulur. Etiketler genişliğin son yarısında solar/belirir; simgeler iki durumda aynı yerde
- * durur (sabit sol dolgu) → geçişte zıplama yok. Kapanırken etiketler animasyon BİTİNCE sökülür.
+ * Ray aç/kapa geçişi YALNIZ transform ile canlanır (2026-11-18, ikinci tur). İlk tur rayın `width`ini her karede
+ * değiştiriyordu: genişlik yerleşim (layout) özelliğidir, her karede gölge ağacı yeniden yerleşir ve sağdaki içerik
+ * (tablolar, listeler) her karede yeniden ölçülüp çiziliyordu → tablette takılma (%24 takılan kare). `LayoutAnimation`
+ * bu yapıda ÇALIŞMAZ (Fabric'te Reanimated 4 animasyon sürücüsünü söker), geri gelmez.
+ *
+ * Düzen: rayın paneli HEP tam genişlikte çizilir; görünen kenar (`gorunen`) bir kırpma penceresiyle gelir — pencere
+ * `translateX(gorunen − tam)` ile kayar, panel ters yönde aynı kadar kayar (net sıfır: simgeler yerinden oynamaz).
+ * Yerleşimde ray yer tutucusunun genişliği (`yerlesim`) geçiş boyunca DAR değerdedir ve yalnız TEK adımda değişir
+ * (kapanışta başta, açılışta sonda): içerik o an hep geniş düzendedir, aradaki fark içerik kabının
+ * `translateX(gorunen − yerlesim)` kaymasıyla örtülür → boş şerit yok, ara genişlikte yerleşim yok.
+ * Etiketler genişliğin son yarısında solar/belirir; kapanırken animasyon BİTİNCE sökülür.
  */
 const ETIKET_ESIK = (RAIL_WIDTH + RAIL_COLLAPSED_WIDTH) / 2;
+/** Daraltılmış rayın iç genişliği (yatay dolgular hariç): dinlenen dar hâlde vurgu kutuları buna oturur. */
+const DAR_IC = RAIL_COLLAPSED_WIDTH - 2 * space.s;
+
+interface RayGecisiDegerleri {
+  /** Rayın GÖRÜNEN kenarı (sol pay hariç); yalnız transform/opaklık bunu okur, animasyon bunu sürer. */
+  readonly gorunen: SharedValue<number>;
+  /** Rayın YERLEŞİMDEKİ genişliği (sol pay hariç); yalnız uç değerler alır, animasyonla sürülmez. */
+  readonly yerlesim: SharedValue<number>;
+}
+const RayGecisiBaglami = createContext<RayGecisiDegerleri | null>(null);
+
+function useYerelRayGecisi(): RayGecisiDegerleri {
+  const gorunen = useSharedValue(RAIL_WIDTH);
+  const yerlesim = useSharedValue(RAIL_WIDTH);
+  return useMemo(() => ({ gorunen, yerlesim }), [gorunen, yerlesim]);
+}
+
+/** Ray ile içerik kabının ortak geçiş değerleri (geniş düzen kökünde bir kez). */
+export function RayGecisi({ children }: { readonly children: ReactNode }) {
+  const d = useYerelRayGecisi();
+  return <RayGecisiBaglami.Provider value={d}>{children}</RayGecisiBaglami.Provider>;
+}
+
+/** Rayın yanındaki içerik kabı: geçişte yalnız kayar (yeniden boyutlanmaz); dar düzende (etkin=false) kayma yok. */
+export function RayIcerik({ etkin, children }: { readonly etkin: boolean; readonly children: ReactNode }) {
+  const yerel = useYerelRayGecisi();
+  const { gorunen, yerlesim } = useContext(RayGecisiBaglami) ?? yerel;
+  const kayma = useAnimatedStyle(() => ({ transform: [{ translateX: etkin ? gorunen.value - yerlesim.value : 0 }] }));
+  return <Animated.View style={[{ flex: 1 }, kayma]} testID="ray-icerik">{children}</Animated.View>;
+}
 
 /** Etiket opaklığı: genişlik eşiğin altında 0, tam açıkta 1 (worklet; jest mock'unda da düz hesap). */
 function useEtiketOpakligi(w: SharedValue<number>) {
@@ -78,7 +115,7 @@ function RayOgesi(p: {
       accessibilityLabel={p.label ?? p.title}
       testID={p.testID}
       onPress={p.onPress}
-      style={({ pressed }) => [s.railItem, p.active && { backgroundColor: t.tintContainer }, pressed && !p.active && { backgroundColor: t.surfaceAlt }]}
+      style={({ pressed }) => [s.railItem, !p.acik && s.dar, p.active && { backgroundColor: t.tintContainer }, pressed && !p.active && { backgroundColor: t.surfaceAlt }]}
     >
       <View>
         <IconTile icon={p.icon} tone={p.tone} size="sm" />
@@ -117,41 +154,63 @@ export function SideNav() {
   const insets = useSafeAreaInsets();
   const azalt = useHareketAzalt();
   const hedef = acik ? RAIL_WIDTH : RAIL_COLLAPSED_WIDTH;
-  const w = useSharedValue(hedef);
-  // Etiketler (ad, rozet, grup başlığı, hesap adı) açılırken HEMEN çizilir, kapanırken geçiş BİTİNCE sökülür.
+  const yerel = useYerelRayGecisi();
+  const { gorunen, yerlesim } = useContext(RayGecisiBaglami) ?? yerel;
+  // Etiketler (ad, rozet, grup başlığı, hesap adı) açılırken HEMEN çizilir, kapanırken geçiş BİTİNCE sökülür. Açılışta
+  // durum çizim sırasında ayarlanır (ayrı bir efekt turu/ikinci commit yok); geçiş boyunca React güncellemesi yok.
   const [etiket, setEtiket] = useState(acik);
+  const [oncekiAcik, setOncekiAcik] = useState(acik);
+  if (acik !== oncekiAcik) {
+    setOncekiAcik(acik);
+    if (acik) setEtiket(true);
+  }
   const oncekiHazir = useRef(ray.hazir);
   useEffect(() => {
     // Saklı durum ilk okunduğunda (açılış) ve "hareketi azalt" açıkken geçiş yok: doğrudan hedefe.
     const anlik = azalt || !oncekiHazir.current;
     oncekiHazir.current = ray.hazir;
-    if (acik) setEtiket(true);
     if (anlik) {
-      w.value = hedef;
+      gorunen.value = hedef;
+      yerlesim.value = hedef;
       if (!acik) setEtiket(false);
       return;
     }
-    const kapaniyor = !acik;
-    w.value = withTiming(hedef, { duration: SURE.uzun, easing: EGRI.standart }, (bitti) => {
-      if (bitti && kapaniyor) runOnJS(setEtiket)(false);
+    // Yerleşim geçiş boyunca dar (tek adım): kapanışta hemen, açılışta geçiş BİTİNCE genişler. İçeriğin genişlik
+    // değişimine kendi tepkisi (ör. bölümlü düğmenin `onLayout` → yeniden çizimi) böylece geçiş başına BİR kez olur;
+    // açılışta hareketten sonra, kapanışta hareketin başında (cihazda ölçüldü 2026-11-18; geciktirmek ölçülebilir
+    // fayda vermedi, çünkü tepki JS'ten birkaç kare sonra gelir).
+    yerlesim.value = RAIL_COLLAPSED_WIDTH;
+    const aciliyor = acik;
+    gorunen.value = withTiming(hedef, { duration: SURE.uzun, easing: EGRI.standart }, (bitti) => {
+      if (!bitti) return;
+      if (aciliyor) yerlesim.value = RAIL_WIDTH;
+      else runOnJS(setEtiket)(false);
     });
-  }, [acik, hedef, ray.hazir, azalt, w]);
+  }, [acik, hedef, ray.hazir, azalt, gorunen, yerlesim]);
   const solPay = insets.left;
-  const genislikStili = useAnimatedStyle(() => ({ width: w.value + solPay }));
-  const opaklik = useEtiketOpakligi(w);
-  const cizgiOpakligi = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, Math.max(0, (w.value - ETIKET_ESIK) / (RAIL_WIDTH - ETIKET_ESIK))) }));
+  const tam = RAIL_WIDTH + solPay;
+  const yerStili = useAnimatedStyle(() => ({ width: yerlesim.value + solPay }));
+  // Pencere/zemin/düğme görünen kenarla kayar; panel ters yönde (net sıfır) → yalnız transform, yerleşim yok.
+  const kenarKaymasi = useAnimatedStyle(() => ({ transform: [{ translateX: gorunen.value - RAIL_WIDTH }] }));
+  const panelKaymasi = useAnimatedStyle(() => ({ transform: [{ translateX: RAIL_WIDTH - gorunen.value }] }));
+  const opaklik = useEtiketOpakligi(gorunen);
+  const cizgiOpakligi = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, Math.max(0, (gorunen.value - ETIKET_ESIK) / (RAIL_WIDTH - ETIKET_ESIK))) }));
   // Grup başlığı iki durumda AYNI yükseklikte (geçişte liste zıplamaz): ad ile ince çizgi çapraz solar.
   const bolum = (baslik: string) => (
-    <View style={s.railSectionKutu} accessibilityRole={etiket ? "header" : undefined} accessibilityLabel={etiket ? undefined : baslik}>
+    <View style={[s.railSectionKutu, !etiket && s.dar]} accessibilityRole={etiket ? "header" : undefined} accessibilityLabel={etiket ? undefined : baslik}>
       <Animated.View style={[s.railRule, etiket ? cizgiOpakligi : null]} />
       {etiket ? <Animated.Text style={[s.railSection, opaklik]} numberOfLines={1}>{baslik}</Animated.Text> : null}
     </View>
   );
   return (
-    <Animated.View
-      style={[s.rail, { paddingTop: insets.top + space.l, paddingLeft: insets.left + space.s }, genislikStili]}
-      testID="yan-ray"
-    >
+    <Animated.View style={[s.railYer, yerStili]} testID="yan-ray">
+      {/* Zemin + sağ çizgi görünen kenarla kayar; pencere sağ dolgu kadar içeride kırpar (vurgular çizgiye değmez). */}
+      <Animated.View style={[s.railZemin, { width: tam }, kenarKaymasi]} />
+      <Animated.View style={[s.railPencere, { width: tam - space.s }, kenarKaymasi]} testID="yan-ray-pencere">
+      <Animated.View
+        style={[s.rail, { width: tam, paddingTop: insets.top + space.l, paddingLeft: insets.left + space.s }, panelKaymasi]}
+        testID="yan-ray-panel"
+      >
       <View style={s.railHead}>
         <Animated.View style={[s.railMarka, opaklik]}>
           {etiket ? (
@@ -164,17 +223,20 @@ export function SideNav() {
             </>
           ) : null}
         </Animated.View>
-        <Pressable
-          onPress={ray.degistir}
-          hitSlop={4}
-          accessibilityRole="button"
-          accessibilityLabel={acik ? "Menüyü daralt" : "Menüyü genişlet"}
-          accessibilityState={{ expanded: acik }}
-          style={({ pressed }) => [s.railToggle, pressed && { backgroundColor: t.surfaceAlt }]}
-          testID="yan-ray-dugme"
-        >
-          <Ionicons name={acik ? "chevron-back" : "menu"} size={22} color={t.textSecondary} />
-        </Pressable>
+        {/* Düğme görünen kenara yapışık kayar (panelin ters kaymasını geri alır). */}
+        <Animated.View style={kenarKaymasi}>
+          <Pressable
+            onPress={ray.degistir}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel={acik ? "Menüyü daralt" : "Menüyü genişlet"}
+            accessibilityState={{ expanded: acik }}
+            style={({ pressed }) => [s.railToggle, pressed && { backgroundColor: t.surfaceAlt }]}
+            testID="yan-ray-dugme"
+          >
+            <Ionicons name={acik ? "chevron-back" : "menu"} size={22} color={t.textSecondary} />
+          </Pressable>
+        </Animated.View>
       </View>
       {/* Yalnız öğe listesi kayar; başlık ve hesap kartı sabit (kısa/yatay ekranda da her öğeye ulaşılır). */}
       <ScrollView style={s.railListe} contentContainerStyle={s.railListeIc} testID="yan-ray-liste">
@@ -216,7 +278,7 @@ export function SideNav() {
         onPress={() => router.navigate("/profil" as never)}
         accessibilityRole="button"
         accessibilityLabel={`Profil: ${hesapAdi}, ${rolAdi}`}
-        style={({ pressed }) => [s.railHesap, { marginBottom: insets.bottom + space.s }, profilAktif && { backgroundColor: t.tintContainer }, pressed && !profilAktif && { backgroundColor: t.surfaceAlt }]}
+        style={({ pressed }) => [s.railHesap, !etiket && s.dar, { marginBottom: insets.bottom + space.s }, profilAktif && { backgroundColor: t.tintContainer }, pressed && !profilAktif && { backgroundColor: t.surfaceAlt }]}
         testID="ray-hesap"
       >
         <View style={[s.railAvatar, { backgroundColor: t.tintContainer }]}>
@@ -229,6 +291,8 @@ export function SideNav() {
           </Animated.View>
         ) : null}
       </Pressable>
+      </Animated.View>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -367,8 +431,13 @@ const useStyles = makeStyles((t) => ({
   content: { maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },
   // Ray geometrisi iki durumda da AYNI: simge kutusu (28) rayın solundan 20, avatar (36) 16 piksel içeride; daraltılmış
-  // genişlikte (68) ikisi de tam ortada kalır → genişlik geçişinde simgeler yerinden oynamaz, yalnız etiketler kırpılır.
-  rail: { width: RAIL_WIDTH, borderRightWidth: 1, borderColor: t.separator, backgroundColor: t.surface, paddingTop: space.l, paddingHorizontal: space.s, overflow: "hidden" as const },
+  // genişlikte (68) ikisi de tam ortada kalır → geçişte simgeler yerinden oynamaz, yalnız etiketler kırpılır.
+  // Yer tutucu yalnız yerleşimde yer kaplar (taşan zemin/pencere geçişte içeriğin ÜSTÜNDE çizilir).
+  railYer: { zIndex: 1 },
+  railZemin: { position: "absolute" as const, top: 0, bottom: 0, left: 0, borderRightWidth: 1, borderColor: t.separator, backgroundColor: t.surface },
+  railPencere: { position: "absolute" as const, top: 0, bottom: 0, left: 0, overflow: "hidden" as const },
+  rail: { flex: 1, paddingTop: space.l, paddingHorizontal: space.s },
+  dar: { width: DAR_IC },
   railHead: { flexDirection: "row" as const, alignItems: "center" as const, marginBottom: space.m },
   railMarka: { flex: 1, minWidth: 0, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, overflow: "hidden" as const },
   railLogo: { width: 36, height: 36, borderRadius: 9, marginLeft: space.s },

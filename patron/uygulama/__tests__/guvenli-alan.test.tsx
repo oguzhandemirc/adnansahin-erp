@@ -45,7 +45,7 @@ describe("geniş düzen güvenli alan", () => {
   });
   it("ray üst güvenli alanı ve yatay sol payı uygular", async () => {
     await draw(<SideNav />);
-    const rail = flat("yan-ray");
+    const rail = flat("yan-ray-panel"); // paylar tam genişlikteki panelde (yer tutucu yalnız yerleşim genişliği)
     expect(rail.paddingTop).toBeGreaterThanOrEqual(INSETS.top);
     expect(rail.paddingLeft).toBeGreaterThanOrEqual(INSETS.left);
   });
