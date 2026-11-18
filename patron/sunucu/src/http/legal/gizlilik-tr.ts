@@ -17,7 +17,7 @@ ${satir("Bildirim cihazı: bildirim anahtarı (push token), cihaz türü (iOS/An
 ${satir("Bildirim geçmişi: başlık, metin (örneğin müşteri adı, sipariş numarası, metre), okundu bilgisi", "Bildirim listesini göstermek ve aynı bildirimin iki kez gitmesini önlemek.", "Sonuçlanan bildirim " + esc(f.bildirimGun) + " gün sonra silinir.")}
 ${satir("Tercihler: bildirim tercihleri, tablo/görünüm tercihleri", "Uygulamayı sizin seçtiğiniz düzende göstermek.", "Hesap açık olduğu sürece.")}
 ${satir("Telefondan girdiğiniz kayıtlar (yeni sipariş, yeni müşteri) ve gönderenin adı", "Kaydı fabrikaya iletmek ve sonucunu size göstermek. Asıl kayıt fabrikanın sisteminde tutulur.", "Bulutta, fabrikanın seçtiği saklama süresince (varsayılan 13 ay); işlem tekrar koruması kaydı " + esc(f.islemGun) + " gün. Hesap kapatılınca gönderen adı anonimleştirilir.")}
-${satir("Destek talepleri (yalnız Destek özelliği açıksa): konu, mesaj, sizin eklediğiniz ekran görüntüsü, çizim ya da dosya; ad ve hesap kimliği; uygulama sürümü, telefon modeli ve işletim sistemi sürümü", "Bildirdiğiniz sorunu çözmek.", "Bulutta saklanmaz; doğrudan " + SAGLAYICI.ad + "'ın destek sistemine iletilir.")}
+${satir("Destek talepleri (yalnız Destek özelliği açıksa): konu, mesaj, sizin eklediğiniz ekran görüntüsü, çizim ya da dosya; ad ve hesap kimliği; uygulama sürümü, telefon modeli ve işletim sistemi sürümü", "Bildirdiğiniz sorunu çözmek.", "Bulutta saklanmaz; doğrudan " + SAGLAYICI.ad + "'ın destek sistemine iletilir ve orada talep kapandıktan sonra 1 yıl tutulur.")}
 </tbody></table></div>`;
 }
 

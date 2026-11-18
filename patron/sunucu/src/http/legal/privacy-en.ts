@@ -16,7 +16,7 @@ ${row("Notification device: push token, device type (iOS/Android), the phone's d
 ${row("Notification history: title, text (e.g. customer name, order number, meters), read status", "To show the notification list and prevent the same notification from being sent twice.", "Completed notifications are deleted after " + esc(f.bildirimGun) + " days.")}
 ${row("Preferences: notification preferences, table/view preferences", "To show the app in the layout you chose.", "While the account is open.")}
 ${row("Records you enter on the phone (new order, new customer) and the sender's name", "To forward the record to the mill and show you the result. The original record is kept in the mill's system.", "In the cloud for the retention period chosen by the mill (13 months by default); the duplicate-protection receipt " + esc(f.islemGun) + " days. The sender's name is anonymized when the account is closed.")}
-${row("Support requests (only if the Support feature is enabled): subject, message, screenshot, drawing or file you attach; name and account ID; app version, phone model and operating system version", "To resolve the issue you report.", "Not stored in the cloud; forwarded directly to " + SAGLAYICI.ad + "'s support system.")}
+${row("Support requests (only if the Support feature is enabled): subject, message, screenshot, drawing or file you attach; name and account ID; app version, phone model and operating system version", "To resolve the issue you report.", "Not stored in the cloud; forwarded directly to " + SAGLAYICI.ad + "'s support system, where it is kept for 1 year after the request is closed.")}
 </tbody></table></div>`;
 }
 
