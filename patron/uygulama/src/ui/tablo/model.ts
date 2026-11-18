@@ -50,7 +50,7 @@ export interface SutunTanimi<R> {
    * (`flexShrink: 0`, `rozetGenisligi`); sığmayınca tablo yatay kayar.
    */
   readonly rozet?: { readonly etiketler: readonly string[]; readonly metin: (r: R) => string; readonly ek?: number };
-  /** ÇİZİM ANINDA hesaplanır (`sutunlariOlc`), tanımda verilmez: kırpılmaz/rozet sütununun SABİT pt genişliği. */
+  /** ÇİZİM ANINDA hesaplanır (`sutunlariOlc`), tanımda verilmez: kırpılmaz/rozet/sayı sütununun SABİT pt genişliği. */
   readonly genislik?: number;
   /** ÇİZİM ANINDA hesaplanır (`sutunlariOlc`): sütun başlığının kırpılmadan sığdığı asgari genişlik (esnek sütunda `minWidth`). */
   readonly asgari?: number;
@@ -212,6 +212,13 @@ export function sutunlariOlc<R>(sutunlar: readonly SutunTanimi<R>[], satirlar: r
       let metin = enUzunMetin(c.rozet.etiketler);
       for (const r of satirlar) metin = enUzunMetin([metin, c.rozet.metin(r)]);
       return { ...c, asgari, genislik: Math.max(rozetGenisligi(metin, yaziOlcegi, c.rozet.ek), asgari) };
+    }
+    // SAYI sütunu (2026-11-19, tablette "Sevk / Toplam" gereğinden genişti): içerik genişliğinde SABİT durur; artan alan
+    // yalnız esnek metin sütunlarına (Müşteri, Üretim) gider. Görünen satır yoksa esnek kalır.
+    if (c.sayi) {
+      let karakter = 0;
+      for (const r of satirlar) karakter = Math.max(karakter, [...c.hucre(r)].length);
+      return karakter > 0 ? { ...c, asgari, genislik: Math.max(kirpilmazGenislik(karakter, yaziOlcegi), asgari) } : { ...c, asgari };
     }
     return { ...c, asgari };
   });
