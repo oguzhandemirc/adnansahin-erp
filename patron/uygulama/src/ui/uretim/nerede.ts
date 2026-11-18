@@ -156,3 +156,12 @@ export function stageOfParams(p: { readonly asama?: string; readonly fasonFirmaI
   if (p.asama === "TAMBUR") return "tambur";
   return null;
 }
+
+/**
+ * Satıra dokununca gidilen yer: fason satırları (toplam + firma) TEK fason tablosuna (`/fason`, firma satırında o firma
+ * ön seçili, 2026-11-19); Kurşun/Tambur konum listesine.
+ */
+export function locationRoute(r: Pick<LocationRow, "location" | "params">): { readonly pathname: string; readonly params: Readonly<Record<string, string>> } {
+  if (r.location === "fason") return { pathname: "/fason", params: r.params.fasonFirmaId ? { firma: r.params.fasonFirmaId } : {} };
+  return { pathname: "/is-emirleri/konum", params: r.params };
+}

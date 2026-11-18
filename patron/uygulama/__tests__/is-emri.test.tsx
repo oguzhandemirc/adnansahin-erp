@@ -148,7 +148,7 @@ describe("§3 ayrıntı", () => {
     fireEvent.press(screen.getByTestId("is-emri-siparis-0"));
     expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/siparisler/[id]", params: { id: "s1" } });
     fireEvent.press(yer);
-    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/fason/[firmaId]", params: { firmaId: "f1", ad: "Örnek Boyahane" } });
+    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/fason", params: { firma: "f1" } });
   });
 
   it("'Üretim ayrıntıları' KAPALI başlar; dokununca aşama başına top · metre ve üretim alanları görünür", async () => {
@@ -224,7 +224,7 @@ describe("§4 Üretim: üretimdeki toplar nerede? + açık iş emirleri", () => 
     expect(y2.map((r) => [r.label, r.value, r.detail])).toEqual([["Kurşun + KK2", "94 top", "54.478 m · 4 gündür"]]);
   });
 
-  it("blok ilk sırada; firma satırına dokununca o firmaya süzülü konum listesi", async () => {
+  it("blok ilk sırada; firma satırına dokununca fason tablosu o firma ön seçili", async () => {
     mockList.mockResolvedValue(page());
     render(<Production />);
     await settle();
@@ -233,7 +233,7 @@ describe("§4 Üretim: üretimdeki toplar nerede? + açık iş emirleri", () => 
     expect(screen.queryByTestId("nerede-fason:f4")).toBeNull();
     expect(screen.queryByTestId("nerede-hamStok")).toBeNull();
     fireEvent.press(screen.getByTestId("nerede-fason:f2"));
-    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/is-emirleri/konum", params: { fasonFirmaId: "f2", firma: "Deneme Boya" } });
+    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/fason", params: { firma: "f2" } });
     fireEvent.press(screen.getByTestId("nerede-tambur"));
     expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/is-emirleri/konum", params: { asama: "TAMBUR" } });
   });

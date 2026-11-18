@@ -100,7 +100,7 @@ export default function WorkOrderDetail() {
                 deger={buradaTop}
                 icon={fasonda ? "business-outline" : "location-outline"} ton={fasonda ? "orange" : "violet"}
                 ayrac={false}
-                onPress={fasonda && firmaIdleri.length >= 1 ? () => router.push({ pathname: "/fason/[firmaId]", params: { firmaId: firmaIdleri[0]!, ad: metin(k.fasonFirmaAdi)! } } as never) : undefined}
+                onPress={fasonda && firmaIdleri.length >= 1 ? () => router.push({ pathname: "/fason", params: { firma: firmaIdleri[0]! } } as never) : undefined}
                 testID={fasonda ? "is-emri-fason-firma" : "is-emri-yer"}
               />
             </ListeBlogu>

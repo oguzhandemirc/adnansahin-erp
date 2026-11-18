@@ -35,7 +35,7 @@ import { combine, useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { useListCapability } from "../../../src/ui/siparis/capabilities";
 import { ListStates } from "../../../src/ui/siparis/parts";
 import { useRemoteList } from "../../../src/ui/siparis/useRemoteList";
-import { productionLocations } from "../../../src/ui/uretim/nerede";
+import { locationRoute, productionLocations } from "../../../src/ui/uretim/nerede";
 import { Iskelet } from "../../../src/ui/ortak";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
 import { TOUCH, space, typography } from "../../../src/ui/tokens";
@@ -109,7 +109,7 @@ export default function Production() {
                       ton={r.tone}
                       girinti={r.firm}
                       ayrac={i > 0}
-                      onPress={() => router.push({ pathname: "/is-emirleri/konum", params: r.params } as never)}
+                      onPress={() => router.push(locationRoute(r) as never)}
                       testID={`nerede-${r.key}`}
                     />
                   ))}
@@ -212,6 +212,8 @@ export default function Production() {
                 key={str(x.kod) ?? String(i)} birincil={str(x.ad) ?? str(x.kod) ?? "—"}
                 ikincil={num(x.kalanMiktar) !== null ? `${formatNumber(x.kalanMiktar, 0)} m` : undefined}
                 deger={`${formatNumber(x.acikTop, 0)} top`} ayrac={i > 0} testID={`fason-kategori-${str(x.kod) ?? i}`}
+                // Kategoriye dokununca fason tablosu o işlem ön seçili (2026-11-19).
+                onPress={str(x.kod) ? () => router.push({ pathname: "/fason", params: { islem: str(x.kod)! } } as never) : undefined}
               />
             ))}
           </ListeBlogu>

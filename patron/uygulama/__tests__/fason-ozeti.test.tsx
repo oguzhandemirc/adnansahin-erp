@@ -1,7 +1,7 @@
 // Fason anlığı: §1 Stok emanet bölümü çizmez (Adnan'da emanet modülü kapalı, anlık bulutta yok) · §2 Üretim ›
 // fasondaki işler (F10 kokpit özeti) · §4 pano stok satırı yalnız fabrikanın sayısı.
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, render, screen } from "@testing-library/react-native";
 import type React from "react";
 
 const mockApi = { snapshot: jest.fn(), list: jest.fn(), record: jest.fn() };
@@ -24,8 +24,6 @@ jest.mock("expo-router", () => ({
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 const Stock = (require("../app/(app)/(tabs)/stok") as { default: () => React.ReactElement }).default;
-const Subcontract = (require("../app/(app)/fason/index") as { default: () => React.ReactElement }).default;
-const Firm = (require("../app/(app)/fason/[firmaId]") as { default: () => React.ReactElement }).default;
 const { areaSummary } = require("../src/ui/pano/read") as typeof import("../src/ui/pano/read");
 const { ApiError } = require("../src/api/client") as typeof import("../src/api/client");
 
@@ -85,48 +83,7 @@ describe("§1 Stok › emanet bölümü yok", () => {
   });
 });
 
-describe("§2 Fason ekranı › fasonda ne var, kimde", () => {
-  it("toplam top/metre, iş emri/müşteri sayısı, kategoriler 0'lılar dahil, firma 'X gündür' (gecikme/termin yok)", async () => {
-    mockSession.permissions = ["bulut:uretim:oku"];
-    render(<Subcontract />);
-    await flush();
-    expect(screen.getByTestId("fason-top")).toHaveTextContent("30", { exact: false });
-    expect(screen.getByTestId("fason-metre")).toHaveTextContent("3.456", { exact: false });
-    expect(screen.getByTestId("fason-kimler")).toHaveTextContent("4 iş emri · 3 müşteri", { exact: false });
-    expect(screen.getByTestId("fason-kategori-APRE")).toHaveTextContent("0 top", { exact: false });
-    expect(screen.getByTestId(`fason-firma-${F1}`)).toHaveTextContent("9 gündür", { exact: false });
-    expect(screen.queryByText(/gecik|termin/i)).toBeNull();
-    fireEvent.press(screen.getByTestId(`fason-firma-${F1}`));
-    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: "/fason/[firmaId]", params: { firmaId: F1, ad: "Boyahane A" } });
-  });
-
-  it("firma ayrıntısı: müşteriler (müşterisiz satır adıyla) ve kumaşlar fabrikanın kırılımı; eski sunucuda İş emirleri sekmesi yok", async () => {
-    mockSession.permissions = ["bulut:uretim:oku"];
-    jest.spyOn(require("expo-router") as { useLocalSearchParams: () => unknown }, "useLocalSearchParams").mockReturnValue({ firmaId: F1, ad: "Boyahane A" });
-    render(<Firm />);
-    await flush();
-    expect(screen.getByTestId("fason-firma-bilgi")).toHaveTextContent("Boyahane · 2 iş emri · en eskisi 9 gündür", { exact: false });
-    expect(screen.getByTestId("fason-musteri-0")).toHaveTextContent("Akın Tekstil", { exact: false });
-    expect(screen.getByTestId("fason-musteri-1")).toHaveTextContent("Müşterisiz", { exact: false });
-    expect(screen.queryByText("İş emirleri")).toBeNull();
-    fireEvent.press(screen.getByText("Kumaşlar"));
-    expect(screen.getByTestId("fason-kumas-0")).toHaveTextContent("Saten 280 · Krem", { exact: false });
-  });
-
-  it("izinsiz hesapta istenmez; eski fabrika (kırılımsız şekil) çökmez", async () => {
-    mockSession.permissions = [];
-    const first = render(<Subcontract />);
-    await flush();
-    expect(mockApi.snapshot).not.toHaveBeenCalledWith("fason-acik");
-    first.unmount();
-    mockSession.permissions = ["bulut:uretim:oku"];
-    DATA["fason-acik"] = { acikSevk: 7, kalanMiktar: "3456.000", firmalar: [] };
-    render(<Subcontract />);
-    await flush();
-    expect(screen.getByText("Fabrika güncellenince gelir")).toBeTruthy();
-    DATA["fason-acik"] = FASON;
-  });
-});
+// §2 Fason ekranı: tek veri tablosu (2026-11-19) — `__tests__/fason-tablo.test.tsx`.
 
 describe("§4 pano stok satırı", () => {
   it("yalnız serbest ve ölü stok; emanet eki yazılmaz", () => {
