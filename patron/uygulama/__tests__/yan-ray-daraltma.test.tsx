@@ -70,6 +70,63 @@ describe("§2 daraltma", () => {
   });
 });
 
+describe("§4 kaydırma (2026-11-18)", () => {
+  const ScrollView = (require("react-native") as typeof import("react-native")).ScrollView;
+  const icinde = (kap: ReturnType<typeof screen.getByTestId>, id: string) => kap.findAll((n: { props: { testID?: string } }) => n.props.testID === id).length > 0;
+
+  it.each([true, false])("öğe listesi ScrollView içinde, başlık düğmesi ve hesap kartı DIŞINDA (açık=%s)", async (acik) => {
+    if (!acik) await plainStore.set(ANAHTAR, "0");
+    await draw(<SideNav />);
+    const liste = screen.UNSAFE_getByType(ScrollView);
+    expect(liste.props.testID).toBe("yan-ray-liste");
+    expect(icinde(liste, "menu-stok")).toBe(true);
+    expect(icinde(liste, "menu-siparisler")).toBe(true);
+    expect(icinde(liste, "yan-ray-dugme")).toBe(false);
+    expect(icinde(liste, "ray-hesap")).toBe(false);
+    // Liste kalan yüksekliği doldurur (sabit başlık + sabit hesap kartı arasında kayar).
+    expect(StyleSheet.flatten(liste.props.style)).toMatchObject({ flex: 1 });
+  });
+});
+
+describe("§5 geçiş (2026-11-18)", () => {
+  const reanimated = require("react-native-reanimated") as typeof import("react-native-reanimated");
+  const { AccessibilityInfo } = require("react-native") as typeof import("react-native");
+  const { SURE } = require("../src/ui/hareket/sabitler") as typeof import("../src/ui/hareket/sabitler");
+  afterEach(() => jest.restoreAllMocks());
+
+  it("aç/kapa genişliği zamanlı geçişle değiştirir; kapanışta etiketler geçiş bitince sökülür", async () => {
+    const spy = jest.spyOn(reanimated, "withTiming");
+    await draw(<SideNav />);
+    expect(spy).not.toHaveBeenCalled(); // açılışta (saklı durum okunurken) geçiş oynamaz
+    fireEvent.press(screen.getByTestId("yan-ray-dugme"));
+    await act(async () => undefined);
+    expect(spy).toHaveBeenCalledWith(RAIL_COLLAPSED_WIDTH, expect.objectContaining({ duration: SURE.uzun }), expect.any(Function));
+    expect(genislik()).toBe(RAIL_COLLAPSED_WIDTH);
+    expect(screen.queryByText("Stok")).toBeNull();
+    fireEvent.press(screen.getByTestId("yan-ray-dugme"));
+    await act(async () => undefined);
+    expect(spy).toHaveBeenLastCalledWith(RAIL_WIDTH, expect.objectContaining({ duration: SURE.uzun }), expect.any(Function));
+    expect(genislik()).toBe(RAIL_WIDTH);
+    expect(screen.getByText("Stok")).toBeTruthy();
+  });
+
+  it("'hareketi azalt' açıkken geçiş oynamaz, doğrudan hedefe", async () => {
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(true);
+    const spy = jest.spyOn(reanimated, "withTiming");
+    await draw(<SideNav />);
+    fireEvent.press(screen.getByTestId("yan-ray-dugme"));
+    await act(async () => undefined);
+    expect(spy).not.toHaveBeenCalled();
+    expect(genislik()).toBe(RAIL_COLLAPSED_WIDTH);
+    expect(screen.queryByText("Stok")).toBeNull();
+  });
+
+  it("Fabric'te etkisiz LayoutAnimation kullanılmaz", () => {
+    const src = require("fs").readFileSync(require("path").join(__dirname, "../src/ui/Frame.tsx"), "utf8") as string;
+    expect(src).not.toMatch(/LayoutAnimation\.(configureNext|create)/);
+  });
+});
+
 describe("§3 dar düzen", () => {
   it("telefon genişliğinde uygulama yerleşimi rayı çizmez (useWide yanlış)", () => {
     const { useWide } = require("../src/ui/Frame") as typeof import("../src/ui/Frame");

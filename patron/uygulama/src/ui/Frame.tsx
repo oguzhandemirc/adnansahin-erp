@@ -2,9 +2,11 @@
 // Menü yalnız izinli bölümleri gösterir (karar yine sunucuda; izinsiz uç 403 döner).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
-import { useEffect, useState, type ReactNode } from "react";
-import { Image, LayoutAnimation, Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native";
-import Animated from "react-native-reanimated";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Image, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from "react-native-reanimated";
+import { useHareketAzalt } from "./hareket/azalt";
+import { EGRI, SURE } from "./hareket/sabitler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MODULES, moduleNavTitle, moduleTitle, moduleVisible, type ModuleKey } from "../lib/access";
 import { useSession } from "../state/session";
@@ -39,13 +41,24 @@ export function FacilityName() {
 
 /** Rayın açık/daraltılmış durumu: YALNIZ cihazda (`useAcikKapali`, tesis + hesap kapsamlı); varsayılan açık (bugünkü). */
 export const RAY_TERCIHI = "yan-ray.acik";
-/** Ray daralırken/açılırken genişlik ve içerik yumuşak geçer (kullanıcı isteği 2026-11-17). */
 const LOGO = require("../../assets/icon.png") as number;
-const RAY_GECISI = LayoutAnimation.create(280, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity);
+/**
+ * Ray daralırken/açılırken genişlik reanimated ile canlanır (2026-11-18). `LayoutAnimation` bu yapıda ÇALIŞMAZ: yeni
+ * mimaride (Fabric) Reanimated 4 açılışta Fabric'in animasyon sürücüsünü söker (`setAnimationDelegate(nullptr)`),
+ * `configureNext` sessizce yutulur. Etiketler genişliğin son yarısında solar/belirir; simgeler iki durumda aynı yerde
+ * durur (sabit sol dolgu) → geçişte zıplama yok. Kapanırken etiketler animasyon BİTİNCE sökülür.
+ */
+const ETIKET_ESIK = (RAIL_WIDTH + RAIL_COLLAPSED_WIDTH) / 2;
+
+/** Etiket opaklığı: genişlik eşiğin altında 0, tam açıkta 1 (worklet; jest mock'unda da düz hesap). */
+function useEtiketOpakligi(w: SharedValue<number>) {
+  return useAnimatedStyle(() => ({ opacity: Math.min(1, Math.max(0, (w.value - ETIKET_ESIK) / (RAIL_WIDTH - ETIKET_ESIK))) }));
+}
 
 /** Ray öğesi: açıkken simge + ad (+ rozet), daraltılmışken yalnız simge (ad erişilebilirlik etiketinde; rozet nokta). */
 function RayOgesi(p: {
   readonly acik: boolean;
+  readonly opaklik: ReturnType<typeof useEtiketOpakligi>;
   readonly active: boolean;
   readonly icon: React.ComponentProps<typeof IconTile>["icon"];
   readonly tone: React.ComponentProps<typeof IconTile>["tone"];
@@ -65,14 +78,18 @@ function RayOgesi(p: {
       accessibilityLabel={p.label ?? p.title}
       testID={p.testID}
       onPress={p.onPress}
-      style={({ pressed }) => [s.railItem, !p.acik && s.railItemDar, p.active && { backgroundColor: t.tintContainer }, pressed && !p.active && { backgroundColor: t.surfaceAlt }]}
+      style={({ pressed }) => [s.railItem, p.active && { backgroundColor: t.tintContainer }, pressed && !p.active && { backgroundColor: t.surfaceAlt }]}
     >
       <View>
         <IconTile icon={p.icon} tone={p.tone} size="sm" />
         {!p.acik && p.rozet ? <View style={[s.railDot, { backgroundColor: t.tint, borderColor: t.surface }]} testID={p.rozetTestID} /> : null}
       </View>
-      {p.acik ? <Text style={[s.railText, p.active && { color: t.tint, fontWeight: "600" }]} numberOfLines={1}>{p.title}</Text> : null}
-      {p.acik && p.rozet ? <Rozet label={p.rozet} tone="primary" testID={p.rozetTestID} /> : null}
+      {p.acik ? (
+        <Animated.View style={[s.railEtiket, p.opaklik]}>
+          <Text style={[s.railText, p.active && { color: t.tint, fontWeight: "600" }]} numberOfLines={1}>{p.title}</Text>
+          {p.rozet ? <Rozet label={p.rozet} tone="primary" testID={p.rozetTestID} /> : null}
+        </Animated.View>
+      ) : null}
     </Pressable>
   );
 }
@@ -98,25 +115,57 @@ export function SideNav() {
   const acik = ray.acik;
   // Ray ekranın tepesine ve sol kenarına oturur: durum çubuğu (saat/tarih) ve yatay çentik payı burada uygulanır.
   const insets = useSafeAreaInsets();
-  const bolum = (baslik: string) =>
-    acik ? <Text style={s.railSection} accessibilityRole="header">{baslik}</Text> : <View style={s.railRule} accessibilityLabel={baslik} />;
+  const azalt = useHareketAzalt();
+  const hedef = acik ? RAIL_WIDTH : RAIL_COLLAPSED_WIDTH;
+  const w = useSharedValue(hedef);
+  // Etiketler (ad, rozet, grup başlığı, hesap adı) açılırken HEMEN çizilir, kapanırken geçiş BİTİNCE sökülür.
+  const [etiket, setEtiket] = useState(acik);
+  const oncekiHazir = useRef(ray.hazir);
+  useEffect(() => {
+    // Saklı durum ilk okunduğunda (açılış) ve "hareketi azalt" açıkken geçiş yok: doğrudan hedefe.
+    const anlik = azalt || !oncekiHazir.current;
+    oncekiHazir.current = ray.hazir;
+    if (acik) setEtiket(true);
+    if (anlik) {
+      w.value = hedef;
+      if (!acik) setEtiket(false);
+      return;
+    }
+    const kapaniyor = !acik;
+    w.value = withTiming(hedef, { duration: SURE.uzun, easing: EGRI.standart }, (bitti) => {
+      if (bitti && kapaniyor) runOnJS(setEtiket)(false);
+    });
+  }, [acik, hedef, ray.hazir, azalt, w]);
+  const solPay = insets.left;
+  const genislikStili = useAnimatedStyle(() => ({ width: w.value + solPay }));
+  const opaklik = useEtiketOpakligi(w);
+  const cizgiOpakligi = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, Math.max(0, (w.value - ETIKET_ESIK) / (RAIL_WIDTH - ETIKET_ESIK))) }));
+  // Grup başlığı iki durumda AYNI yükseklikte (geçişte liste zıplamaz): ad ile ince çizgi çapraz solar.
+  const bolum = (baslik: string) => (
+    <View style={s.railSectionKutu} accessibilityRole={etiket ? "header" : undefined} accessibilityLabel={etiket ? undefined : baslik}>
+      <Animated.View style={[s.railRule, etiket ? cizgiOpakligi : null]} />
+      {etiket ? <Animated.Text style={[s.railSection, opaklik]} numberOfLines={1}>{baslik}</Animated.Text> : null}
+    </View>
+  );
   return (
-    <View
-      style={[s.rail, { width: (acik ? RAIL_WIDTH : RAIL_COLLAPSED_WIDTH) + insets.left, paddingTop: insets.top + space.l, paddingLeft: insets.left + space.s }]}
+    <Animated.View
+      style={[s.rail, { paddingTop: insets.top + space.l, paddingLeft: insets.left + space.s }, genislikStili]}
       testID="yan-ray"
     >
-      <View style={[s.railHead, !acik && s.railHeadDar]}>
-        {acik ? (
-          <>
-            <Image source={LOGO} style={s.railLogo} accessibilityIgnoresInvertColors />
-            <View style={s.railKimlik}>
-              <FacilityName />
-              <Text style={s.railUrun} numberOfLines={1}>TeksERP</Text>
-            </View>
-          </>
-        ) : null}
+      <View style={s.railHead}>
+        <Animated.View style={[s.railMarka, opaklik]}>
+          {etiket ? (
+            <>
+              <Image source={LOGO} style={s.railLogo} accessibilityIgnoresInvertColors />
+              <View style={s.railKimlik}>
+                <FacilityName />
+                <Text style={s.railUrun} numberOfLines={1}>TeksERP</Text>
+              </View>
+            </>
+          ) : null}
+        </Animated.View>
         <Pressable
-          onPress={() => { LayoutAnimation.configureNext(RAY_GECISI); ray.degistir(); }}
+          onPress={ray.degistir}
           hitSlop={4}
           accessibilityRole="button"
           accessibilityLabel={acik ? "Menüyü daralt" : "Menüyü genişlet"}
@@ -127,6 +176,8 @@ export function SideNav() {
           <Ionicons name={acik ? "chevron-back" : "menu"} size={22} color={t.textSecondary} />
         </Pressable>
       </View>
+      {/* Yalnız öğe listesi kayar; başlık ve hesap kartı sabit (kısa/yatay ekranda da her öğeye ulaşılır). */}
+      <ScrollView style={s.railListe} contentContainerStyle={s.railListeIc} testID="yan-ray-liste">
       {RAIL_GROUPS.map((g, gi) => {
         const items = g.modules.flatMap((k) => {
           const m = MODULES.find((x) => x.key === k);
@@ -140,7 +191,7 @@ export function SideNav() {
               const icon = MODULE_ICON[m.key];
               return (
                 <RayOgesi
-                  key={m.key} acik={acik} active={path === m.route || path.startsWith(`${m.route}/`)}
+                  key={m.key} acik={etiket} opaklik={opaklik} active={path === m.route || path.startsWith(`${m.route}/`)}
                   icon={icon.icon} tone={DOMAIN_TONE[icon.domain]} title={moduleNavTitle(m.key)}
                   onPress={() => router.navigate(m.route as never)} testID={`menu-${m.key}`}
                 />
@@ -153,32 +204,32 @@ export function SideNav() {
         <View>
           {bolum("Yardım")}
           <RayOgesi
-            acik={acik} active={destekAktif} icon="help-buoy-outline" tone={DOMAIN_TONE.genel} title="Destek"
+            acik={etiket} opaklik={opaklik} active={destekAktif} icon="help-buoy-outline" tone={DOMAIN_TONE.genel} title="Destek"
             label={destekRozeti ? `Destek, ${destekRozeti} talepte yeni yanıt` : "Destek"}
             rozet={destekRozeti} rozetTestID="ray-destek-okunmamis"
             onPress={() => router.navigate("/destek" as never)} testID="menu-destek"
           />
         </View>
       ) : null}
-      <View style={s.railBosluk} />
+      </ScrollView>
       <Pressable
         onPress={() => router.navigate("/profil" as never)}
         accessibilityRole="button"
         accessibilityLabel={`Profil: ${hesapAdi}, ${rolAdi}`}
-        style={({ pressed }) => [s.railHesap, !acik && s.railHesapDar, { marginBottom: insets.bottom + space.s }, profilAktif && { backgroundColor: t.tintContainer }, pressed && !profilAktif && { backgroundColor: t.surfaceAlt }]}
+        style={({ pressed }) => [s.railHesap, { marginBottom: insets.bottom + space.s }, profilAktif && { backgroundColor: t.tintContainer }, pressed && !profilAktif && { backgroundColor: t.surfaceAlt }]}
         testID="ray-hesap"
       >
         <View style={[s.railAvatar, { backgroundColor: t.tintContainer }]}>
           <Text style={[s.railAvatarText, { color: t.tint }]} maxFontSizeMultiplier={1}>{basHarf}</Text>
         </View>
-        {acik ? (
-          <View style={s.railKimlik}>
+        {etiket ? (
+          <Animated.View style={[s.railKimlik, opaklik]}>
             <Text style={s.railHesapAd} numberOfLines={1}>{hesapAdi}</Text>
             <Text style={s.railUrun} numberOfLines={1} testID="ray-rol">{rolAdi}</Text>
-          </View>
+          </Animated.View>
         ) : null}
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -315,23 +366,26 @@ const useStyles = makeStyles((t) => ({
   meta: { flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, columnGap: space.s, rowGap: space.xs },
   content: { maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },
-  rail: { width: RAIL_WIDTH, borderRightWidth: 1, borderColor: t.separator, backgroundColor: t.surface, paddingTop: space.l, paddingHorizontal: space.s },
-  railHead: { flexDirection: "row" as const, alignItems: "center" as const, paddingLeft: space.s, marginBottom: space.m, gap: space.s },
-  railLogo: { width: 36, height: 36, borderRadius: 9 },
+  // Ray geometrisi iki durumda da AYNI: simge kutusu (28) rayın solundan 20, avatar (36) 16 piksel içeride; daraltılmış
+  // genişlikte (68) ikisi de tam ortada kalır → genişlik geçişinde simgeler yerinden oynamaz, yalnız etiketler kırpılır.
+  rail: { width: RAIL_WIDTH, borderRightWidth: 1, borderColor: t.separator, backgroundColor: t.surface, paddingTop: space.l, paddingHorizontal: space.s, overflow: "hidden" as const },
+  railHead: { flexDirection: "row" as const, alignItems: "center" as const, marginBottom: space.m },
+  railMarka: { flex: 1, minWidth: 0, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, overflow: "hidden" as const },
+  railLogo: { width: 36, height: 36, borderRadius: 9, marginLeft: space.s },
   railUrun: { ...typography.caption, color: t.textMuted },
-  railBosluk: { flex: 1, minHeight: space.m },
-  railHesap: { minHeight: TOUCH + 8, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingHorizontal: space.s, paddingVertical: space.xs, borderRadius: t.radius.control, borderTopWidth: 1, borderColor: t.separator },
-  railHesapDar: { justifyContent: "center" as const, paddingHorizontal: 0 },
+  railListe: { flex: 1 },
+  railListeIc: { paddingBottom: space.m },
+  railHesap: { minHeight: TOUCH + 8, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingHorizontal: space.s, paddingVertical: space.xs, borderRadius: t.radius.control, borderTopWidth: 1, borderColor: t.separator, overflow: "hidden" as const },
   railAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center" as const, justifyContent: "center" as const },
   railAvatarText: { ...typography.callout, fontWeight: "700" as const },
   railHesapAd: { ...typography.callout, color: t.text, fontWeight: "600" as const },
-  railHeadDar: { paddingLeft: 0, justifyContent: "center" as const },
   railKimlik: { flex: 1, minWidth: 0, gap: 1 },
-  railToggle: { width: 44, height: 44, alignItems: "center" as const, justifyContent: "center" as const, borderRadius: t.radius.control },
-  railRule: { height: 1, backgroundColor: t.separator, marginVertical: space.s, marginHorizontal: space.s },
-  railItemDar: { justifyContent: "center" as const, paddingHorizontal: 0, gap: 0 },
+  railToggle: { width: 44, height: 44, alignItems: "center" as const, justifyContent: "center" as const, borderRadius: t.radius.control, marginRight: space.xs },
+  railSectionKutu: { height: space.m + 16 + space.xs, justifyContent: "flex-end" as const, paddingBottom: space.xs },
+  railRule: { position: "absolute" as const, left: space.s, right: space.s, top: 15, height: 1, backgroundColor: t.separator },
   railDot: { position: "absolute" as const, top: -3, right: -3, width: 10, height: 10, borderRadius: 5, borderWidth: 2 },
-  railSection: { ...typography.caption, color: t.textMuted, paddingHorizontal: space.s, marginTop: space.m, marginBottom: space.xs },
-  railItem: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingHorizontal: space.s, borderRadius: t.radius.control, marginBottom: 2 },
+  railSection: { ...typography.caption, color: t.textMuted, paddingHorizontal: space.s, backgroundColor: t.surface },
+  railItem: { minHeight: TOUCH, flexDirection: "row" as const, alignItems: "center" as const, gap: space.m, paddingLeft: space.m, paddingRight: space.s, borderRadius: t.radius.control, marginBottom: 2, overflow: "hidden" as const },
+  railEtiket: { flex: 1, minWidth: 0, flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
   railText: { ...typography.callout, color: t.text, flex: 1 },
 }));
