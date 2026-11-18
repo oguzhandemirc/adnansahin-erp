@@ -3,7 +3,7 @@
 **Paket:** `(paketleme yazar)`
 **SHA256:** `(paketleme yazar)`
 **Commit:** `(paketleme yazar)`
-**İçerik:** 2.13.0 paketinin bütün içeriği + bildirim metinlerinde miktar (saha kusuru 2026-11-18). Panel kodunda değişiklik yok.
+**İçerik:** 2.13.0 paketinin bütün içeriği + bildirim metinlerinde miktar (saha kusuru 2026-11-18) + patron telefonuna giden anlıklarda yeni alanlar (Ek — patron verisi, 2026-11-19). Panel kodunda değişiklik yok.
 **Önceki saha sürümü:** **2.13.0** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.13.0 ve 371 migration olduğunu ÖLÇER — farklıysa DUR).
 
 Paketleme **`-Surum 2.13.1`** ile koşulur.
@@ -46,7 +46,7 @@ Metin varlığın durum tablosundan okunur; sipariş yaratma kodu DEĞİŞMEDİ.
 ## 5. Kurulum notu
 
 - **Beklenen kesinti:** ≈ 70 sn (migration yok).
-- **KURULUM SIRASI:** serbest — bulut ve patron uygulamasıyla sıra bağı yok (yalnız metin içeriği değişti).
+- **KURULUM SIRASI:** ÖNCE patron bulutu imajı (Ek — patron verisi, D maddesi + cari özeti yanıtı), SONRA bu paket; eski bulut yeni alanları zararsız saklar (bkz. Ek), ters sıra da veri bozmaz.
 - **Kurulum yöntemi:** 2.13.0 ile aynı (paketin kendi `kur.ps1` + `uzaktan-kos.ps1`i).
 - **Bu sürüme özel:** yeni ayar anahtarı yok; `.env`e DOKUNMAZ; `notifications.enabled` değeri korunur.
 - **Sınırlar (her sürümde geçerli):** `migrate reset`/reseed/DB drop YOK · uygulanmış migration'a dokunma ·
@@ -64,3 +64,32 @@ Metin varlığın durum tablosundan okunur; sipariş yaratma kodu DEĞİŞMEDİ.
   `SELECT body FROM notification_events ORDER BY "createdAt" DESC LIMIT 3;`)
 - `backend-err-*.log` (en yenisi) — yeni hata yok
 - ölçülen kesinti
+
+## Ek — patron verisi: süzülmüş stok toplamı, hazır dönemler, carinin depodaki malı (2026-11-19; sürüm 2.13.1 kalır, migration YOK)
+
+Kullanıcı kararı 2026-11-19 ("bunların hepsini yap"). Yalnız eşitleme işinin anlık turunda çalışır; kapatma düğmesi
+kapalıyken hiçbiri koşmaz. Sipariş/müşteri yaratma kodu, migration, npm paketi, `lisans-protokol` ve bayt-eşit tel
+dosyaları DEĞİŞMEDİ. Commit'ler: `4512b768` (A) · `ee4567a2` (B+C) · `6b11c8e5` (D, yalnız bulut).
+
+- **A · `stok-kalem`:** her top satırı (`ham.toplar`, `bitmis.toplar`, `bitmis.cuvaldakiToplar`) `depodaTop`/`depodaMetre`
+  (raf) · `cuvaldaTop`/`cuvaldaMetre` (çuval) hazır katkısını taşır; metre kesin 3 hane. Uygulama süzgeç etkinken yalnız
+  süzülen topların bu alanlarını toplar; süzgeçsiz toplam bölüm toplamıyla birebir (bekçi). Rapor servisi top satırına
+  `exactQty` + `labelCustomerId` ekledi (panel ucuna yalnız ek alan).
+- **B · `cari-ozeti` hazır dönemler:** `tumZamanlar` · `son12Ay` (mevcut) + `buAy` · `gecenAy` · `son3Ay` · `son6Ay` · `buYil` ·
+  `gecenYil` (yalnız sayı; "en çok alınan" yalnız ilk ikisinde); anlık kökünde `uretimGunu` + `donemler` (sınırlar).
+- **C · cari başına:** `acik.enEskiSiparisTarihi` + `acik.enEskiSiparisYasGun` · `enCokUrun[].sonSiparisTarihi` ·
+  `depodakiMal {depodaTop, depodaMetre, cuvaldaTop, cuvaldaMetre}` (yalnız ETİKET müşterisi). Termini geçen sipariş sayısı
+  EKLENMEDİ (anlık kuralı termin/gecikme türevini yasaklar — kullanıcı kararı bekliyor).
+- **D · bulut (fabrika değil):** sipariş + sevkiyat liste süzgecinde `IPTAL_HARIC` (ters eşitlik); `/oturum`
+  `liste.suzgecDegerleri` beyanı; `GET /api/cari-ozeti/:id` yanıtına `uretimGunu` + `donemler`.
+
+**Uyumluluk:** bulut anlık içeriğini şemasız jsonb saklar → eski bulut yeni alanları saklar ve cari özetinin müşteri
+girdisini aynen döner (yalnız `uretimGunu`/`donemler` dönmez). Yeni bulut + eski fabrika: yeni alanlar yok, yanıtta null.
+Eski uygulama yeni alanları görmezden gelir; yeni uygulama `IPTAL_HARIC`ı yalnız `suzgecDegerleri` beyanlıysa gönderir.
+
+**Yük (tahmin; kesin sayı provada):** `stok-kalem` top başına ≈ 70 bayt (≈ 3.500 top → ≈ +0,25 MB ham, gzip ≈ +25 KB);
+`cari-ozeti` cari başına ≈ +1,3 KB sayı + "en çok" satırı başına ≈ +45 bayt (≈ 190 cari → ≈ +0,4 MB ham, gzip ≈ +50 KB).
+Anlıklar ilk pakette gider; sınır 4 MB gzip / 32 MB açık. Tur süresi: cari özeti dönem sorguları 2 → 8 dönem (sırayla).
+
+**Provada bakılacak:** eşitleme turu log'unda anlık süreleri (`cari-ozeti`, `stok-kalem`) ve hata satırı yok;
+bulut `projection_rows`ta `stok-kalem` ve `cari-ozeti` boyutu; uygulamada stok süzgeci + cari dönemleri.
