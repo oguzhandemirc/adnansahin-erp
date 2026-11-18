@@ -407,9 +407,12 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         <View>
           {/* Alt satır (ör. tesis adı, özet şeridi) başlığın krom zemininde devam eder ama kaydırmayla gider. */}
           {sub ? (
-            <View style={[subFilled ? s.subtitle : s.subtitleEmpty, { marginHorizontal: -pad, paddingHorizontal: pad }]} testID="baslik-alt-satiri">
-              {/* Alt satır boş çizilebilir (ör. taze veride `StaleNote`): boşken krom şerit bırakmaz. */}
-              <View onLayout={(e) => setSubFilled(e.nativeEvent.layout.height > 0)}>{sub}</View>
+            <View style={[subFilled && s.subtitle, { marginHorizontal: -pad, paddingHorizontal: pad }]} testID="baslik-alt-satiri">
+              {/* Alt satır boş çizilebilir (ör. taze veride `StaleNote`): boşken krom şerit bırakmaz. Boş ölçülen satır
+                  YÜKSEKLİĞE KİLİTLENMEZ (2026-11-18): eskiden `height: 0` + `overflow: hidden` veriliyordu; özet geç
+                  gelince (ilk ölçüm 0) Android'de kartlar o sıfır kutuda kalıyor, yapışkan şeridin altından taşıyordu.
+                  Boş içerik zaten 0 yükseklik çizer; ölçüm yalnız krom zemini/dolguyu seçer, içeriği asla gizlemez. */}
+              <View onLayout={(e) => setSubFilled(e.nativeEvent.layout.height > 0)} testID="baslik-alt-satiri-icerik">{sub}</View>
             </View>
           ) : null}
           <StatusBands />
@@ -426,7 +429,6 @@ const useStyles = makeStyles((t) => ({
   screen: { flex: 1, backgroundColor: t.bg },
   sticky: { backgroundColor: t.bg, zIndex: 2 },
   subtitle: { backgroundColor: t.color.chrome, borderBottomWidth: 1, borderBottomColor: t.color.chromeBorder, paddingBottom: space.m, marginBottom: space.l },
-  subtitleEmpty: { height: 0, overflow: "hidden" as const },
   meta: { flexDirection: "row" as const, flexWrap: "wrap" as const, alignItems: "center" as const, columnGap: space.s, rowGap: space.xs },
   content: { maxWidth: CONTENT_MAX, width: "100%" as const, alignSelf: "center" as const },
   facility: { ...typography.headline, color: t.text, flexShrink: 1 },

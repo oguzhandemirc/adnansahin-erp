@@ -6,6 +6,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
 import type { ReactElement } from "react";
+import { StyleSheet } from "react-native";
 import type { TabloTercihi } from "../src/ui/tablo/model";
 
 const mockList = jest.fn();
@@ -166,3 +167,38 @@ describe("§4 sipariş ayrıntısı", () => {
     expect(screen.getByTestId("siparis-baslik")).toBeTruthy();
   });
 });
+
+// §5 (2026-11-18, cihazda görüldü): özet sonradan gelince alt satır ilk ölçümde boştur (0); eskiden kap `height: 0` +
+// `overflow: hidden`a kilitleniyor, seçili kartlar o sıfır kutuda kalıyordu. Kart ağaçta olmak yetmez: hiçbir atası
+// sıfır yüksekliğe kıstırılmamalı.
+describe("§5 seçili kart gerçekten görünür", () => {
+  const kistirilmis = (id: string): boolean => {
+    type Dugum = { readonly props: { readonly style?: unknown }; readonly parent: Dugum | null };
+    let n: Dugum | null = screen.getByTestId(id) as unknown as Dugum;
+    while (n) {
+      const st = StyleSheet.flatten(n.props.style as never) as { height?: number } | undefined;
+      if (st?.height === 0) return true;
+      n = n.parent;
+    }
+    return false;
+  };
+
+  it("özet geç gelir, alt satır önce 0 ölçülür: seçili kartlar yine sıfır kutuda kalmaz; seçilmeyen çizilmez", async () => {
+    pref({ surum: 1, sutunlar: ["no", "musteri"], siralama: null, suzgec: { kartlar: "acik,enCokCari" } });
+    let ozetVer: (v: unknown) => void = () => undefined;
+    mockSnapshot.mockImplementation(() => new Promise((r) => { ozetVer = r; }));
+    render(<Orders />);
+    await settle();
+    expect(screen.queryByTestId("siparis-ozet")).toBeNull();
+    fireEvent(screen.getByTestId("baslik-alt-satiri-icerik"), "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 600, height: 0 } } });
+    await act(async () => ozetVer({ projeksiyon: "ozet.siparis", veri: OZET, surum: "x" }));
+    await settle();
+    expect(screen.getByTestId("siparis-ozet-acik")).toBeTruthy();
+    expect(screen.getByTestId("siparis-en-cok-cari")).toBeTruthy();
+    expect(kistirilmis("siparis-ozet-acik")).toBe(false);
+    expect(kistirilmis("siparis-en-cok-cari")).toBe(false);
+    expect(screen.queryByTestId("siparis-ozet-miktar")).toBeNull();
+    expect(screen.queryByTestId("siparis-ozet-karsilanmayan")).toBeNull();
+  });
+});
+
