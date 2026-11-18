@@ -89,6 +89,17 @@ describe("Pano", () => {
     expect(mockApi.snapshot).not.toHaveBeenCalledWith("ozet.uretim");
   });
 
+  it("§2 dönem seçimi küçük bölmeli seçim (tam genişlik büyük düğme değil, 2026-11-19); seçim kutuya geçer", async () => {
+    mockSession.permissions = ["bulut:oturum", "bulut:ozet:oku", "bulut:sevkiyat:oku"];
+    render(<Dashboard />);
+    expect(await screen.findByTestId("kutu-sevk")).toBeTruthy();
+    const secim = screen.getByTestId("donem-secim");
+    expect(secim.props.accessibilityRole).toBe("tablist");
+    expect(screen.getByTestId("donem-bugun").props.accessibilityState).toEqual({ selected: true });
+    fireEvent.press(screen.getByTestId("donem-buAy"));
+    expect(screen.getByTestId("donem-buAy").props.accessibilityState).toEqual({ selected: true });
+  });
+
   it("§3 çalışan (özet izni yok): 'Görebildiğin alanlar', kutu ve istek yok", async () => {
     mockSession.permissions = ["bulut:oturum", "bulut:siparis:oku"];
     render(<Dashboard />);

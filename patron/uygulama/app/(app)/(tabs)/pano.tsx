@@ -23,10 +23,13 @@ import { KUTU_CIZICI, type KutuBaglami } from "../../../src/ui/pano/KutuCizici";
 import { istenenKaynaklar, izinliKutular, kutu, satirlar } from "../../../src/ui/pano/kutular";
 import { useSnapshot } from "../../../src/ui/pano/useSnapshot";
 import { SectionHeader } from "../../../src/ui/SectionHeader";
-import { SegmentedControl } from "../../../src/ui/SegmentedControl";
+import { KompaktSecim } from "../../../src/ui/KompaktSecim";
 import { useRemoteList } from "../../../src/ui/siparis/useRemoteList";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
 import { DOMAIN_TONE, TOUCH, space, typography } from "../../../src/ui/tokens";
+
+/** Dönem seçimi küçük bölmeli seçimle (2026-11-19, kullanıcı: tam genişlik büyük düğmeler değil; Stok/cari özetiyle aynı). */
+const DONEM_SECENEKLERI = PERIODS.map((p) => ({ key: p.key, label: p.label }));
 
 /** Çalışan hesabındaki alan satırlarının kısa açıklaması. */
 const MODULE_HINT: Readonly<Partial<Record<ModuleKey, string>>> = {
@@ -138,7 +141,7 @@ export default function Dashboard() {
       ) : (
         <View style={s.kutular} testID="pano-kutular">
           {donemli ? (
-            <SegmentedControl items={PERIODS.map((p) => ({ key: p.key, label: p.label }))} value={donem} onChange={setDonem} testIDPrefix="donem-" accessibilityLabel="Dönem" />
+            <KompaktSecim items={DONEM_SECENEKLERI} value={donem} onChange={setDonem} testIDPrefix="donem-" accessibilityLabel="Dönem" />
           ) : null}
           {satirlar(duzen.kutular).map((satir, i) => (
             <KademeliGiris key={satir.join("+")} sira={i} style={satir.length > 1 ? s.ikili : undefined}>
