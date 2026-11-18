@@ -24,7 +24,10 @@ import { makeStyles, useTokens } from "../../../../src/ui/theme-context";
 import { TOUCH, space, typography } from "../../../../src/ui/tokens";
 import { useWrite } from "../../../../src/ui/useWrite";
 
-interface Line { urun: Picked | null; renk: Picked | null; miktar: string; birimFiyat: string }
+/** `ses`: satır sesle doldu ve henüz elle değiştirilmedi (görsel işaret). */
+interface Line { urun: Picked | null; renk: Picked | null; miktar: string; birimFiyat: string; ses?: boolean }
+/** Sesle doldurmadan ÖNCEKİ form (tek dokunuşla geri al). */
+interface FormAni { cari: Picked | null; sesCari: boolean; lines: Line[]; termin: string; quick: QuickKey; aciklama: string; adim: number }
 const EMPTY: Line = { urun: null, renk: null, miktar: "", birimFiyat: "" };
 /** Hızlı termin: fabrika gününden ileri sayılan takvim günü (metin alanını doldurur; elle de yazılır). */
 const QUICK = [{ key: "0", label: "Bugün", days: 0 }, { key: "7", label: "+7 gün", days: 7 }, { key: "30", label: "+30 gün", days: 30 }] as const;
@@ -73,7 +76,9 @@ export default function NewOrder() {
   });
   const send = useCallback((id: string) => (built.ok ? api.inboxCreate(id, "SIPARIS", built.body) : Promise.reject(new Error(built.error))), [api, built]);
   const w = useWrite(send);
-  const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch, ses: false } : l)));
+  const [sesCari, setSesCari] = useState(false);
+  const [sesOzet, setSesOzet] = useState<{ metin: string; once: FormAni } | null>(null);
 
   function pickQuick(k: QuickKey) {
     setQuick(k);
@@ -81,19 +86,49 @@ export default function NewOrder() {
     if (q) setTermin(fmtDayKey(addDaysToKey(factoryDayKey(), q.days)));
   }
 
-  /** Sesten gelen değerleri forma yazar (boş kalem satırları değişir, dolu olanların ardına eklenir); GÖNDERMEZ. */
+  /**
+   * Sesten gelen değerleri forma yazar; GÖNDERMEZ. Kalemler dolu satırların ARDINA eklenir (üzerine yazılmaz), not
+   * açıklamaya eklenir. Önceki form saklanır: özet şeridindeki "Geri al" tek dokunuşla döndürür.
+   */
   function sesleDoldur(f: FormDoldurma) {
-    if (f.cari) setCari(f.cari);
+    const once: FormAni = { cari, sesCari, lines, termin, quick, aciklama, adim };
+    const parca: string[] = [];
+    if (f.cari) {
+      setCari(f.cari);
+      setSesCari(true);
+      parca.push(`müşteri ${f.cari.title}`);
+    }
     if (f.kalemler.length) {
-      const yeni: Line[] = f.kalemler.map((k) => ({ urun: k.urun, renk: k.renk, miktar: k.miktar, birimFiyat: "" }));
+      const yeni: Line[] = f.kalemler.map((k) => ({ urun: k.urun, renk: k.renk, miktar: k.miktar, birimFiyat: "", ses: true }));
       setLines((ls) => [...ls.filter((l) => l.urun || l.renk || l.miktar || l.birimFiyat), ...yeni]);
+      parca.push(`${f.kalemler.length} kalem`);
     }
     if (f.termin) {
       setTermin(f.termin);
       setQuick("elle");
+      parca.push(`teslim ${f.termin}`);
+    }
+    if (f.aciklama) {
+      const ek = f.aciklama;
+      setAciklama((a) => (a.trim() ? `${a.trim()} ${ek}` : ek).slice(0, 500));
+      parca.push("not");
     }
     setSesAcik(false);
+    setSesOzet({ metin: `Sesle dolduruldu: ${parca.join(", ")}. Kontrol edip “Gönder”e siz basın.`, once });
     if (f.cari || cari) setAdim(2);
+  }
+
+  function sesiGeriAl() {
+    if (!sesOzet) return;
+    const o = sesOzet.once;
+    setCari(o.cari);
+    setSesCari(o.sesCari);
+    setLines(o.lines);
+    setTermin(o.termin);
+    setQuick(o.quick);
+    setAciklama(o.aciklama);
+    setAdim(o.adim);
+    setSesOzet(null);
   }
 
   async function submit() {
@@ -123,7 +158,16 @@ export default function NewOrder() {
     >
       <AdimCubugu adim={adim} toplam={3} etiket={ADIMLAR[adim - 1]!} />
 
-      {adim === 1 && sesVar ? <SesDugmesi onPress={sesDugmesi} /> : null}
+      {adim <= 2 && sesVar ? <SesDugmesi onPress={sesDugmesi} /> : null}
+      {sesOzet ? (
+        <View style={s.sesOzet} testID="ses-ozet" accessibilityLiveRegion="polite">
+          <Ionicons name="mic" size={20} color={t.color.text} />
+          <Text style={s.sesOzetMetin}>{sesOzet.metin}</Text>
+          <Pressable onPress={sesiGeriAl} accessibilityRole="button" accessibilityLabel="Sesle doldurmayı geri al" testID="ses-form-geri-al" hitSlop={8} style={s.sesGeri}>
+            <Text style={s.sesGeriMetin}>Geri al</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {sesVar ? <SesOnBilgi visible={onbilgiAcik} onDevam={onbilgiDevam} onVazgec={() => setOnbilgiAcik(false)} /> : null}
       {sesVar ? (
         <SesliSiparisModal visible={sesAcik} onKapat={() => setSesAcik(false)} onAktar={sesleDoldur} motor={motor} listeYukle={listeYukle} bugun={factoryDayKey()} />
@@ -131,7 +175,8 @@ export default function NewOrder() {
 
       {adim === 1 ? (
         <FormKarti>
-          <Picker label="Cari" projection="cari-kart" value={cari} onChange={setCari} testID="cari-sec" />
+          <Picker label="Cari" projection="cari-kart" value={cari} onChange={(v) => { setCari(v); setSesCari(false); }} testID="cari-sec" />
+          {sesCari && cari ? <SesIsareti /> : null}
         </FormKarti>
       ) : null}
 
@@ -148,6 +193,7 @@ export default function NewOrder() {
                   </Pressable>
                 ) : null}
               </View>
+              {l.ses ? <SesIsareti /> : null}
               <Picker label="Ürün" projection="urun" value={l.urun} onChange={(v) => setLine(i, { urun: v })} />
               <Picker label="Renk" projection="renk" value={l.renk} onChange={(v) => setLine(i, { renk: v })} optional />
               <View style={s.pair}>
@@ -181,7 +227,25 @@ export default function NewOrder() {
   );
 }
 
+/** Sesle dolan alanın işareti (elle değişince kalkar). */
+function SesIsareti() {
+  const s = useStyles();
+  const t = useTokens();
+  return (
+    <View style={s.sesIsaret} testID="ses-isaret">
+      <Ionicons name="mic" size={14} color={t.color.onPrimarySoft} />
+      <Text style={s.sesIsaretMetin}>Sesle dolduruldu — kontrol edin</Text>
+    </View>
+  );
+}
+
 const useStyles = makeStyles((t) => ({
+  sesOzet: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, padding: space.m, marginBottom: space.m, borderRadius: 12, backgroundColor: t.color.primarySoft },
+  sesOzetMetin: { ...typography.body, color: t.color.text, flex: 1 },
+  sesGeri: { minHeight: TOUCH - 8, justifyContent: "center" as const, paddingHorizontal: space.s },
+  sesGeriMetin: { ...typography.headline, color: t.color.primary },
+  sesIsaret: { flexDirection: "row" as const, alignItems: "center" as const, gap: 4, alignSelf: "flex-start" as const, paddingHorizontal: space.s, paddingVertical: 2, borderRadius: 8, backgroundColor: t.color.primarySoft, marginBottom: space.s },
+  sesIsaretMetin: { ...typography.footnote, color: t.color.onPrimarySoft },
   cipler: { flexDirection: "row" as const, gap: space.s, marginBottom: space.m, flexWrap: "wrap" as const },
   lineHead: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginBottom: space.m },
   lineNo: { width: 26, height: 26, borderRadius: 13, backgroundColor: t.color.primarySoft, alignItems: "center" as const, justifyContent: "center" as const },

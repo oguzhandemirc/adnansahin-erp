@@ -1,6 +1,7 @@
 // Sesli sipariş — ekran akışının SAF çekirdeği: adım adım soru sırası, aday seçimiyle çözme ve forma aktarılacak
 // değerler. Burada GÖNDERİM YOKTUR: çıktı yalnız formun alanlarıdır; gönderim mevcut "Gönder" düğmesindedir.
 import { fmtDayKey } from "../lib/factory-time";
+import { katla } from "./metin";
 import { FORM_BIRIMI } from "./sayi";
 import { alanAyristir, atlaMi, evetHayir, miktarBirimi, type Alan, type Aday, type KalemTaslagi, type Listeler, type SiparisTaslagi } from "./ayristir";
 
@@ -121,6 +122,26 @@ export function adayIleCoz(t: SiparisTaslagi, yol: AlanYolu, aday: Aday): Sipari
     ...t,
     kalemler: t.kalemler.map((k, i) => (i === yol.kalem || (yol.alan === "urun" && k.urun === eski) ? { ...k, [yol.alan]: secildi(k[yol.alan]) } : k)),
   };
+}
+
+/** Kullanıcının adaylardan seçimi, söylenen sözle anahtarlı: metin düzeltilip yeniden ayrıştırılınca seçim KAYBOLMAZ. */
+export type Secimler = ReadonlyMap<string, Aday>;
+export const secimAnahtari = (alan: "cari" | "urun" | "renk", duyulan: string) => `${alan}|${katla(duyulan).trim()}`;
+
+/** Adaylı alanlara daha önce yapılmış seçimleri uygular (yalnız seçilen aday hâlâ adaylar arasındaysa). */
+export function secimleriUygula(t: SiparisTaslagi, secimler: Secimler): SiparisTaslagi {
+  if (secimler.size === 0) return t;
+  const uygula = (alan: "cari" | "urun" | "renk", a: Alan<Aday>): Alan<Aday> => {
+    if (a.durum !== "adaylar") return a;
+    const s = secimler.get(secimAnahtari(alan, a.duyulan));
+    return s && a.adaylar.some((x) => x.id === s.id) ? { durum: "bulundu", deger: s, duyulan: a.duyulan } : a;
+  };
+  return { ...t, cari: uygula("cari", t.cari), kalemler: t.kalemler.map((k) => ({ ...k, urun: uygula("urun", k.urun), renk: uygula("renk", k.renk) })) };
+}
+
+/** Taslakta kullanıcının seçmesi gereken (adaylı) alan sayısı. */
+export function secilmemisSayisi(t: SiparisTaslagi): number {
+  return [t.cari, ...t.kalemler.flatMap((k) => [k.urun, k.renk])].filter((a) => a.durum === "adaylar").length;
 }
 
 export interface FormSecimi {
