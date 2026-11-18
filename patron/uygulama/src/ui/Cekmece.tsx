@@ -1,13 +1,14 @@
 // Telefon menü ÇEKMECESİ (kullanıcı kararı 2026-11-19): her kök ekranın sol üstündeki "≡" düğmesi soldan kayan
 // çekmeceyi açar (eski sağdaki "≡" → `/diger` kalktı). İçerik tablet rayıyla AYNI öğe ve grup kaynağından
-// (`useRayGruplari` ← `RAIL_GROUPS`): üstte logo + tesis adı + "TeksERP", altta hesap kartı. Kenar kaydırma hareketi
-// YOK (iOS geri hareketiyle çakışır); yalnız düğme, perde ve Android geri tuşu kapatır. Yalnız transform/opaklık
-// canlanır; "hareketi azalt" açıkken geçiş anlıktır.
+// (`useRayGruplari` ← `RAIL_GROUPS`): üstte logo + tesis adı + "TeksERP", altta "Son veri" + hesap kartı. Kök ekranda
+// sol kenardan sağa kaydırma da açar (yalnız iOS; ayrıntıda o kenar iOS "geri"sidir — `KenarKaydirma.ts`); sola kaydırma,
+// düğme, perde ve Android geri tuşu kapatır. Yalnız transform/opaklık canlanır; "hareketi azalt" açıkken geçiş anlıktır.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from "react-native-reanimated";
+import { solaMi, useCekmeceSuruklemesi } from "./KenarKaydirma";
 import { MODULES, moduleNavTitle, moduleVisible, type ModuleKey } from "../lib/access";
 import { UYGULAMA_ADI } from "../lib/kimlik";
 import { destekRozetMetni, useDestekEtkin, useDestekOkunmamis } from "../destek/gorunurluk";
@@ -68,12 +69,16 @@ const LOGO = require("../../assets/icon.png") as number;
 /** Çekmecenin genişliği: tablet rayıyla aynı (dar telefonda ekranın %85'i). */
 export const cekmeceGenisligi = (ekran: number): number => Math.min(RAIL_WIDTH + 32, Math.round(ekran * 0.85));
 
-export function MenuCekmecesi({ acik, onKapat, genislik, pay }: {
+export function MenuCekmecesi({ acik, onKapat, genislik, pay, konum: disKonum, surukleniyor = false }: {
   readonly acik: boolean;
   readonly onKapat: () => void;
   readonly genislik: number;
   /** Güvenli alan payları (çağıran `useSafeAreaInsets`ten verir; Modal kökünde bağlam garanti değil). */
   readonly pay: { readonly top: number; readonly bottom: number; readonly left: number };
+  /** Açıklık değeri (0–1) dışarıdan: kenardan kaydırmada parmak bunu sürer (`KenarKaydirma.ts`). */
+  readonly konum?: SharedValue<number>;
+  /** Parmak çekmeceyi sürüklüyor: geçiş canlanması bekler, bırakınca kalan yolu tamamlar. */
+  readonly surukleniyor?: boolean;
 }) {
   const t = useTokens();
   const s = useStyles();
@@ -84,9 +89,26 @@ export function MenuCekmecesi({ acik, onKapat, genislik, pay }: {
   const azalt = useHareketAzalt();
   // Modal kapanış canlanması bitene dek açık kalır (sonra sökülür).
   const [gorunur, setGorunur] = useState(acik);
-  const konum = useSharedValue(acik ? 1 : 0);
+  const yerelKonum = useSharedValue(acik ? 1 : 0);
+  const konum = disKonum ?? yerelKonum;
+  // Açıkken sola kaydırma çekmeceyi parmakla kapatır (her iki platformda; sistem kenar hareketiyle çakışmaz).
+  const [kapatiliyor, setKapatiliyor] = useState(false);
+  const elle = surukleniyor || kapatiliyor;
+  const kapatma = useCekmeceSuruklemesi({
+    etkin: acik && !surukleniyor,
+    genislik: genislik + pay.left,
+    konum,
+    baslangic: 1,
+    devral: solaMi,
+    onBasla: () => setKapatiliyor(true),
+    onBirak: (kalsin) => {
+      setKapatiliyor(false);
+      if (!kalsin) onKapat();
+    },
+  });
   if (acik && !gorunur) setGorunur(true);
   useEffect(() => {
+    if (elle) return;
     const hedef = acik ? 1 : 0;
     if (azalt) {
       konum.value = hedef;
@@ -96,7 +118,7 @@ export function MenuCekmecesi({ acik, onKapat, genislik, pay }: {
     konum.value = withTiming(hedef, { duration: SURE.uzun, easing: EGRI.standart }, (bitti) => {
       if (bitti && hedef === 0) runOnJS(setGorunur)(false);
     });
-  }, [acik, azalt, konum]);
+  }, [acik, azalt, konum, elle]);
   const panel = useAnimatedStyle(() => ({ transform: [{ translateX: (konum.value - 1) * (genislik + pay.left) }] }));
   const perde = useAnimatedStyle(() => ({ opacity: konum.value * (t.scheme === "dark" ? 0.7 : 0.4) }));
   const hesapAdi = facility?.hesap?.ad?.trim() || facility?.hesap?.kullaniciAdi || "";
@@ -107,6 +129,7 @@ export function MenuCekmecesi({ acik, onKapat, genislik, pay }: {
   if (!gorunur) return null;
   return (
     <Modal visible transparent animationType="none" onRequestClose={onKapat} statusBarTranslucent>
+      <View style={s.tam} {...kapatma} testID="cekmece-kok">
       <Animated.View style={[s.perde, { backgroundColor: t.color.scrim }, perde]}>
         <Pressable style={s.tam} onPress={onKapat} accessibilityRole="button" accessibilityLabel="Menüyü kapat" testID="cekmece-perde" />
       </Animated.View>
@@ -165,6 +188,7 @@ export function MenuCekmecesi({ acik, onKapat, genislik, pay }: {
           </View>
         </Pressable>
       </Animated.View>
+      </View>
     </Modal>
   );
 }

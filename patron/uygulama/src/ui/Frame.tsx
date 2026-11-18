@@ -29,6 +29,7 @@ import { useDestekEtkin } from "../destek/gorunurluk";
 import { SORUN_BILDIR_ETIKETI, useSorunBildir } from "./destek/SorunBildirDugmesi";
 import { AcikEylemler, DAR_BASLIK, TasmaMenusu, type BaslikEylemi } from "./BaslikMenusu";
 import { MenuCekmecesi, cekmeceGenisligi, useRayGruplari } from "./Cekmece";
+import { kenarHareketiEtkin, kenardanSagaMi, useCekmeceSuruklemesi } from "./KenarKaydirma";
 
 export function useWide(): boolean {
   return useWindowDimensions().width >= WIDE_MIN;
@@ -350,6 +351,25 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const { width } = useWindowDimensions();
   const dar = width < DAR_BASLIK;
   const [cekmece, setCekmece] = useState(false);
+  // Kenardan kaydırma (yalnız iOS, telefon kökü — "≡" görünen her ekran): parmak çekmeceyi sürer (`KenarKaydirma.ts`).
+  const cekmeceKonumu = useSharedValue(0);
+  const [surukleniyor, setSurukleniyor] = useState(false);
+  const kenar = useCekmeceSuruklemesi({
+    // Sürükleme bitene dek bağlı kalır (çekmece açılınca sökülseydi bırakma olayı kaybolurdu).
+    etkin: kenarHareketiEtkin({ genis: wide, geriVar: showBack }) && (!cekmece || surukleniyor),
+    genislik: cekmeceGenisligi(width) + insets.left,
+    konum: cekmeceKonumu,
+    baslangic: 0,
+    devral: kenardanSagaMi,
+    onBasla: () => {
+      setSurukleniyor(true);
+      setCekmece(true);
+    },
+    onBirak: (acik) => {
+      setSurukleniyor(false);
+      setCekmece(acik);
+    },
+  });
   const bildir = useSorunBildir();
   const ikinciller: readonly BaslikEylemi[] = [
     ...(headerSecondary ?? []),
@@ -374,7 +394,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const sub = subtitle ? <>{subtitle}</> : null;
   const seamless = !!sub && subFilled;
   return (
-    <View style={s.screen}>
+    <View style={s.screen} {...kenar} testID="ekran">
       <ScreenHeader
         title={title}
         topInset={insets.top + space.xs}
@@ -388,7 +408,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         action={<>{headerRight}<BildirimZili />{dar ? <TasmaMenusu eylemler={ikinciller} /> : <AcikEylemler eylemler={ikinciller} />}</>}
         meta={meta ? <View style={s.meta}>{meta}</View> : undefined}
       />
-      {!wide ? <MenuCekmecesi acik={cekmece} onKapat={() => setCekmece(false)} genislik={cekmeceGenisligi(width)} pay={insets} /> : null}
+      {!wide ? <MenuCekmecesi acik={cekmece} onKapat={() => setCekmece(false)} genislik={cekmeceGenisligi(width)} pay={insets} konum={cekmeceKonumu} surukleniyor={surukleniyor} /> : null}
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
