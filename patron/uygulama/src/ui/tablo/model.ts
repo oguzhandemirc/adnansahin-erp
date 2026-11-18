@@ -24,8 +24,10 @@ export interface SutunTanimi<R> {
   readonly ad?: string;
   /** Oranlı genişlik (flex); başlık ve satır AYNI ağırlığı kullanır → hizalı. */
   readonly agirlik: number;
-  /** Sayılar sağa yaslı ve tabular rakamlı. */
+  /** Sayı sütunu: rakamlar tabular (alt alta hizalı); hiza verilmezse sağa yaslı. */
   readonly sayi?: boolean;
+  /** Başlık + hücre hizası (tek kaynak `sutunHizasi`); verilmezse sayı sağa, metin sola. */
+  readonly hiza?: "sol" | "sag";
   /** Sunucu sıralama alanı (`LIST_SORT`); yoksa sütun sıralanamaz. */
   readonly sirala?: string;
   readonly hucre: (r: R) => string;
@@ -59,6 +61,9 @@ export const azamiSutun = (_genislik?: number): number => AZAMI_SUTUN;
 /** Yatay kipte sütun genişliği = ağırlık × birim (pt). */
 export const SUTUN_BIRIMI = 80;
 export const sutunGenisligi = (agirlik: number): number => Math.round(agirlik * SUTUN_BIRIMI);
+
+/** Sütunun hizası: başlık ve hücre bunu okur (birebir aynı). Varsayılan bugünkü davranış: sayı sağa, metin sola. */
+export const sutunHizasi = (c: { readonly sayi?: boolean; readonly hiza?: "sol" | "sag" }): "sol" | "sag" => c.hiza ?? (c.sayi ? "sag" : "sol");
 
 /** Başlığa dokununca: başka sütun → artan; artan → azalan; azalan → kapalı (sunucunun varsayılan sırası). */
 export function sonrakiSiralama(simdiki: Siralama | null, alan: string): Siralama | null {

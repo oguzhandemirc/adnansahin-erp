@@ -2,16 +2,21 @@
 // Kaynak enum'lar (Teks-Erp/prisma/schema.prisma): OrderStatus {PENDING, APPROVED, PARTIAL_SHIPPED, COMPLETED, CANCELLED} ·
 // ShipmentDestination {DOMESTIC, EXPORT} (`siparis.yon`) · ItemUnit {MT, KG, ADET} (`siparis-kalemi.birim`).
 // Etiketler panelin `orderStatusLabels`ıyla aynı (sevk dili, "Onaylandı" jargonu yok); bilinmeyen değer ham döner.
-import type { StatusEntry } from "./ortak";
+// Durum RENGİ burada değil: tek kaynak `src/ui/siparis/durum.ts` (`siparisDurumu`).
+
+/** Sipariş durumu sözlük girdisi (yalnız etiket; ton `ui/siparis/durum.ts`). */
+export interface OrderStatusEntry {
+  readonly label: string;
+}
 
 export type OrderStatus = "PENDING" | "APPROVED" | "PARTIAL_SHIPPED" | "COMPLETED" | "CANCELLED";
 
-export const ORDER_STATUS: Readonly<Record<OrderStatus, StatusEntry>> = {
-  PENDING: { label: "Henüz onaylanmadı", tone: "uyari" },
-  APPROVED: { label: "Henüz gönderilmedi", tone: "bilgi" },
-  PARTIAL_SHIPPED: { label: "Bir kısmı gönderildi", tone: "bilgi" },
-  COMPLETED: { label: "Hepsi gönderildi", tone: "iyi" },
-  CANCELLED: { label: "Sipariş iptal edildi", tone: "bilgi" },
+export const ORDER_STATUS: Readonly<Record<OrderStatus, OrderStatusEntry>> = {
+  PENDING: { label: "Henüz onaylanmadı" },
+  APPROVED: { label: "Henüz gönderilmedi" },
+  PARTIAL_SHIPPED: { label: "Bir kısmı gönderildi" },
+  COMPLETED: { label: "Hepsi gönderildi" },
+  CANCELLED: { label: "Sipariş iptal edildi" },
 };
 
 /** Tek satırlık listede rozet için kısa etiket (sevk dili; tam etiket erişilebilirlik metninde ve ayrıntıda kalır). */
@@ -32,10 +37,10 @@ const OPEN: ReadonlySet<string> = new Set<OrderStatus>(["PENDING", "APPROVED", "
 export const DESTINATION: Readonly<Record<string, string>> = { DOMESTIC: "Yurt içi", EXPORT: "İhracat" };
 export const UNIT: Readonly<Record<string, string>> = { MT: "m", KG: "kg", ADET: "adet" };
 
-/** Bilinmeyen durum ham etiketle "bilgi" tonunda döner (ekranda yine görünür; bekçi eksiği yakalar). */
-export function orderStatus(value: unknown): StatusEntry {
-  if (typeof value !== "string") return { label: "—", tone: "bilgi" };
-  return (ORDER_STATUS as Readonly<Record<string, StatusEntry | undefined>>)[value] ?? { label: value, tone: "bilgi" };
+/** Bilinmeyen durum ham etiketle döner (ekranda yine görünür; bekçi eksiği yakalar). */
+export function orderStatus(value: unknown): OrderStatusEntry {
+  if (typeof value !== "string") return { label: "—" };
+  return (ORDER_STATUS as Readonly<Record<string, OrderStatusEntry | undefined>>)[value] ?? { label: value };
 }
 
 export function orderStatusShort(value: unknown): string {

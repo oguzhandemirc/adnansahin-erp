@@ -1,10 +1,10 @@
 // Sipariş satırı (şartname §4.2): TEK satır 48 — sipariş no · müşteri · açık miktar · kısa durum rozeti. Termin ve
 // gecikme göstergesi YOK (kullanıcı kararı). Her değer fabrikadan; uygulama hesap ve tarih karşılaştırması yapmaz.
 import type { ProjectionRecord } from "../../api/wire";
-import type { StatusKind } from "../tokens";
 import { formatNumber } from "../../lib/format";
-import { isOpenOrder, orderStatus, orderStatusShort } from "../../lib/labels/siparis";
-import { ListeSatiri, Rozet, type RozetTonu } from "../ortak";
+import { isOpenOrder } from "../../lib/labels/siparis";
+import { ListeSatiri, Rozet } from "../ortak";
+import { siparisDurumu } from "./durum";
 
 export type Obj = Readonly<Record<string, unknown>>;
 
@@ -20,19 +20,16 @@ export function uretimMetni(k: Obj): string {
   return str(asObj(k.uretim).metin) ?? "—";
 }
 
-/** Fabrika durum tonu → rozet tonu (tek yer). */
-export const ROZET_TONU: Readonly<Record<StatusKind, RozetTonu>> = { iyi: "success", uyari: "warning", kritik: "danger", bilgi: "info" };
-
 /** Satır metinleri (test ve erişilebilirlik aynı kaynaktan). */
 export function orderRowText(r: ProjectionRecord, showCustomer = true) {
   const k = asObj(r.kayit);
   const no = str(k.siparisNo) ?? "—";
-  const durum = orderStatus(k.durum);
+  const durum = siparisDurumu(k.durum);
   // Açık miktar ölçülen (metre) kalemlerin toplamıdır (fabrika `acikMiktar`); kapanmış siparişte gösterilmez.
   const open = isOpenOrder(k.durum) && present(k.acikMiktar) ? `${formatNumber(k.acikMiktar)} m` : null;
   const title = showCustomer ? (str(k.musteriAdi) ?? "—") : no;
   const label = [title, showCustomer ? no : null, durum.label, open ? `açık ${open}` : null].filter(Boolean).join(", ");
-  return { title, no, status: durum, short: orderStatusShort(k.durum), open, label };
+  return { title, no, status: durum, short: durum.kisa, open, label };
 }
 
 export function OrderRow({ r, onPress, showCustomer = true, ayrac }: { r: ProjectionRecord; onPress?: () => void; showCustomer?: boolean; ayrac?: boolean }) {
@@ -43,7 +40,7 @@ export function OrderRow({ r, onPress, showCustomer = true, ayrac }: { r: Projec
       birincil={x.title}
       ikincil={showCustomer ? x.no : undefined}
       deger={x.open ?? undefined}
-      rozet={<Rozet label={x.short} tone={ROZET_TONU[x.status.tone]} />}
+      rozet={<Rozet label={x.short} tone={x.status.ton} />}
       ayrac={ayrac}
       onPress={onPress}
       ok={false}

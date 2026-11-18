@@ -1,6 +1,6 @@
 // Veri tablosu çizimi (şartname §4 liste): araç şeridi (arama · süzgeç rozeti · sütun seçimi) + yapışkan sütun başlığı +
 // tek satırlık hizalı satırlar. Başlık ve satır AYNI sütun ağırlıklarını ve AYNI iç boşluğu kullanır → sütunlar hizalı.
-// Sayılar sağa yaslı, tabular rakamlı. Başlığa dokunmak sıralamayı döndürür (artan → azalan → kapalı); sıralanamayan
+// Sayılar tabular rakamlı; hiza `sutunHizasi` (varsayılan sayı sağa, sütun `hiza` ile değiştirir). Başlığa dokunmak sıralamayı döndürür (artan → azalan → kapalı); sıralanamayan
 // sütunun başlığı düğme değildir. Süzme/sıralama SUNUCUDA (`useVeriTablosu`); burada yalnız çizim.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef, type RefObject } from "react";
@@ -11,7 +11,7 @@ import type { IconName } from "../icons";
 import { SearchField } from "../siparis/parts";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, space, tabularNums, typography } from "../tokens";
-import { sutunGenisligi, type Siralama, type SutunTanimi } from "./model";
+import { sutunGenisligi, sutunHizasi, type Siralama, type SutunTanimi } from "./model";
 
 /** Satır yüksekliği (tek satır, dokunma hedefi ≥ 44). */
 export const TABLO_SATIR = 44;
@@ -130,13 +130,14 @@ export function TabloBasligi<R>(p: {
       {p.sutunlar.map((c, i) => {
         const alan = c.sirala && p.siralanabilir.includes(c.sirala) ? c.sirala : null;
         const aktif = alan !== null && p.siralama?.alan === alan ? p.siralama.yon : null;
+        const sag = sutunHizasi(c) === "sag";
         const yazi = (
-          <Text style={[s.baslikYazi, c.sayi && s.sag, aktif && { color: t.tint }]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>
+          <Text style={[s.baslikYazi, sag && s.sag, aktif && { color: t.tint }]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>
             {c.baslik}
           </Text>
         );
         const ok = aktif ? <Ionicons name={aktif === "artan" ? "arrow-up" : "arrow-down"} size={12} color={t.tint} testID={`${p.testID}-ok-${c.key}`} /> : null;
-        const ic = <View style={[s.baslikIc, c.sayi && s.sagaYasli]}>{c.sayi ? ok : null}{yazi}{c.sayi ? null : ok}</View>;
+        const ic = <View style={[s.baslikIc, sag && s.sagaYasli]}>{sag ? ok : null}{yazi}{sag ? null : ok}</View>;
         const stil = [s.hucre, i > 0 && s.sutunAyrac, yatay ? { width: sutunGenisligi(c.agirlik) } : { flex: c.agirlik }];
         if (!alan) return <View key={c.key} style={stil} testID={`${p.testID}-sutun-${c.key}`}>{ic}</View>;
         return (
@@ -175,10 +176,11 @@ export function TabloSatiri<R>(p: { readonly sutunlar: readonly SutunTanimi<R>[]
     >
       {p.sutunlar.map((c, i) => {
         const oge = c.ogeler?.(p.kayit);
+        const sag = sutunHizasi(c) === "sag";
         return (
-          <View key={c.key} style={[s.hucre, i > 0 && s.sutunAyrac, p.yatay ? { width: sutunGenisligi(c.agirlik) } : { flex: c.agirlik }, c.sayi && s.hucreSag]}>
+          <View key={c.key} style={[s.hucre, i > 0 && s.sutunAyrac, p.yatay ? { width: sutunGenisligi(c.agirlik) } : { flex: c.agirlik }, sag && s.hucreSag]}>
             {oge ?? (
-              <Text style={[s.hucreYazi, i === 0 && s.ilkHucre, c.sayi && s.sayi]} numberOfLines={c.satir ?? 1} maxFontSizeMultiplier={FONT_SCALE.title}>
+              <Text style={[s.hucreYazi, i === 0 && s.ilkHucre, c.sayi && s.sayi, sag && s.sag]} numberOfLines={c.satir ?? 1} maxFontSizeMultiplier={FONT_SCALE.title}>
                 {c.hucre(p.kayit)}
               </Text>
             )}
@@ -254,5 +256,5 @@ const useStyles = makeStyles((t) => ({
   // Yoğun tablo gövdesi 13 pt (telefonda 4 sütun sığsın); başlık 12 pt.
   hucreYazi: { ...typography.footnote, color: t.text },
   ilkHucre: { fontWeight: "600" as const },
-  sayi: { ...tabularNums, textAlign: "right" as const },
+  sayi: tabularNums,
 }));

@@ -87,7 +87,7 @@ describe("§1 sipariş satırı", () => {
 describe("§2 durum rozeti sözlükten; termin/gecikme göstergesi yok", () => {
   it("her OrderStatus Türkçe; bilinmeyen değer ham döner", () => {
     for (const k of Object.keys(ORDER_STATUS)) expect(orderStatus(k).label).not.toBe(k);
-    expect(orderStatus("PARTIAL_SHIPPED")).toEqual({ label: "Bir kısmı gönderildi", tone: "bilgi" });
+    expect(orderStatus("PARTIAL_SHIPPED")).toEqual({ label: "Bir kısmı gönderildi" });
     // Sevk dili (panelle aynı): "Onaylandı"/"Kısmi sevk" jargonu hiçbir durumda yok.
     expect(Object.values(ORDER_STATUS).map((e) => e.label)).toEqual([
       "Henüz onaylanmadı",

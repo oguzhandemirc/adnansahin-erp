@@ -2,70 +2,29 @@
 // Arama, süzgeç ve sıralama SUNUCUDA (`useVeriTablosu`); görünüm tercihi profilde (`tablo.siparis`). Termin/gecikme
 // süzgeci/vurgusu ve para sütunu yok (kullanıcı kararı); termin yalnız düz tarih ek sütunu. "Yeni sipariş" yalnız yazma
 // izniyle ve çevrimiçiyken. 2026-11-17: ek sütunlar ve özet kartları seçicide KAPALI gelir (`src/ui/siparis/gorunum.ts`);
-// kart seçimi aynı `tablo.siparis` tercihinde, hiç kart serbest.
+// kart seçimi aynı `tablo.siparis` tercihinde, hiç kart serbest. Sütunlar `src/ui/siparis/sutunlar.tsx` (hepsi sola dayalı).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Text, useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 import type { ProjectionRecord } from "../../../../src/api/wire";
 import { can } from "../../../../src/lib/access";
-import { formatDate, formatNumber, kisaBelgeNo } from "../../../../src/lib/format";
-import { orderStatus, orderStatusShort } from "../../../../src/lib/labels/siparis";
+import { formatNumber } from "../../../../src/lib/format";
 import { useSession } from "../../../../src/state/session";
 import { useRemote } from "../../../../src/state/useRemote";
 import { Screen } from "../../../../src/ui/Frame";
 import { MODULE_ICON } from "../../../../src/ui/icons";
 import { openRecord } from "../../../../src/ui/nav";
 import { Basilabilir } from "../../../../src/ui/hareket";
-import { ListeBlogu, ListeSatiri, OzetSeridi, rozetRenk, type SeritOgesi } from "../../../../src/ui/ortak";
+import { ListeBlogu, ListeSatiri, OzetSeridi, type SeritOgesi } from "../../../../src/ui/ortak";
 import { SIPARIS_KARTLARI, siparisKartDegistir, siparisKartlari, siparisKartSifirla, type SiparisKartKey } from "../../../../src/ui/siparis/gorunum";
-import { ROZET_TONU, asObj, present, str, uretimMetni } from "../../../../src/ui/siparis/OrderRow";
+import { asObj, present, str } from "../../../../src/ui/siparis/OrderRow";
 import { CapsuleButton, StaleNote } from "../../../../src/ui/siparis/parts";
-import type { SutunTanimi } from "../../../../src/ui/tablo/model";
+import { SIPARIS_SUTUNLARI } from "../../../../src/ui/siparis/sutunlar";
 import { VisibilityPicker } from "../../../../src/ui/tablo/Seciciler";
 import { TabloListesi, TabloUstu, useVeriTablosu } from "../../../../src/ui/tablo/useVeriTablosu";
 import { useTokens } from "../../../../src/ui/theme-context";
-import { FONT_SCALE, TOUCH, space, typography } from "../../../../src/ui/tokens";
-
-const k = (r: ProjectionRecord) => asObj(r.kayit);
-const sayi = (v: unknown, birim = "") => (present(v) ? `${formatNumber(v, 0)}${birim}` : "—");
-const YON: Readonly<Record<string, string>> = { DOMESTIC: "Yurtiçi", EXPORT: "İhracat" };
-
-/** Dar sütunda hap rozet sığmaz: durum tonunun rengiyle kısa etiket (tam ad erişilebilirlik etiketinde). */
-function DurumHucresi({ durum }: { durum: unknown }) {
-  const t = useTokens();
-  const renk = rozetRenk(t, ROZET_TONU[orderStatus(durum).tone]).fg;
-  return <Text style={[typography.caption, { fontWeight: "600", color: renk }]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>{orderStatusShort(durum)}</Text>;
-}
-
-const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
-  { key: "no", baslik: "No", ad: "Sipariş no", agirlik: 1.15, sirala: "siparisNo", hucre: (r) => kisaBelgeNo(str(k(r).siparisNo)) ?? "—" },
-  // Müşteri adı kesilmez: geniş sütun + alt satıra kayar (en çok 3 satır).
-  { key: "musteri", baslik: "Müşteri", agirlik: 1.5, satir: 3, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
-  { key: "tarih", baslik: "Tarih", ad: "Sipariş tarihi", agirlik: 1, sirala: "siparisTarihi", hucre: (r) => (str(k(r).siparisTarihi) ? formatDate(k(r).siparisTarihi) : "—") },
-  // Sevk edilen / sipariş toplamı (m, brüt). Toplamı fabrika hesaplar (`toplamMiktar`); gelmiyorsa (eski fabrika) "—".
-  {
-    key: "sevkToplam", baslik: "Sevk / Toplam", ad: "Sevk / Toplam (m)", agirlik: 1.5, sayi: true, sirala: "sevkMiktari",
-    hucre: (r) => (present(k(r).toplamMiktar) ? `${sayi(k(r).sevkMiktari)} / ${sayi(k(r).toplamMiktar)}` : "—"),
-  },
-  // Üretimde nerede (fabrika cümlesi; "Fasonda – <firma> · +1 yerde daha" uzun olabilir → 2 satır). Eski fabrika "—".
-  { key: "uretim", baslik: "Üretim", ad: "Üretim durumu", agirlik: 1.6, satir: 2, hucre: (r) => uretimMetni(k(r)) },
-  { key: "kalem", baslik: "Kalem", ad: "Kalem sayısı", agirlik: 0.7, sayi: true, sirala: "kalemSayisi", hucre: (r) => sayi(k(r).kalemSayisi) },
-  { key: "yon", baslik: "Yön", agirlik: 0.9, hucre: (r) => YON[str(k(r).yon) ?? ""] ?? "—" },
-  {
-    key: "durum", baslik: "Durum", agirlik: 1.35, hucre: (r) => orderStatus(k(r).durum).label,
-    ogeler: (r) => <DurumHucresi durum={k(r).durum} />,
-  },
-  // 2026-11-17 ek sütunlar (seçicide KAPALI): telin kendi alanları, biçimlenir — hesap yok. Sevk BRÜT (fabrika).
-  { key: "acik", baslik: "Açık m", ad: "Açık miktar (m)", agirlik: 1.1, sayi: true, sirala: "acikMiktar", hucre: (r) => sayi(k(r).acikMiktar) },
-  { key: "sevk", baslik: "Sevk m", ad: "Sevk edilen (m, brüt)", agirlik: 1.1, sayi: true, sirala: "sevkMiktari", hucre: (r) => sayi(k(r).sevkMiktari) },
-  { key: "toplam", baslik: "Toplam m", ad: "Sipariş toplamı (m)", agirlik: 1.1, sayi: true, hucre: (r) => sayi(k(r).toplamMiktar) },
-  // Termin düz tarih: gecikme vurgusu/rozeti YOK (kullanıcı kararı sürer).
-  { key: "termin", baslik: "Termin", agirlik: 1, hucre: (r) => formatDate(k(r).termin) },
-  { key: "tamam", baslik: "Tamamlanma", ad: "Tamamlanma tarihi", agirlik: 1.1, hucre: (r) => formatDate(k(r).tamamlanma) },
-  { key: "iptal", baslik: "İptal", ad: "İptal tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).iptalTarihi) },
-  { key: "kayit", baslik: "Kayıt", ad: "Kayıt tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).olusturulma) },
-];
+import { TOUCH, space } from "../../../../src/ui/tokens";
 
 const AYAR = {
   projeksiyon: "siparis",

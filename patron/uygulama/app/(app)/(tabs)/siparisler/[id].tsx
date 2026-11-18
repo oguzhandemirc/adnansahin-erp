@@ -13,13 +13,14 @@ import { Text, View } from "react-native";
 import { moduleVisible } from "../../../../src/lib/access";
 import { fmtFactoryDateTime } from "../../../../src/lib/factory-time";
 import { formatDate, formatNumber } from "../../../../src/lib/format";
-import { destinationLabel, isOpenOrder, orderStatus } from "../../../../src/lib/labels/siparis";
+import { destinationLabel, isOpenOrder } from "../../../../src/lib/labels/siparis";
 import { useSession } from "../../../../src/state/session";
 import { useRemote } from "../../../../src/state/useRemote";
 import { Screen } from "../../../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../../../src/ui/hareket";
 import { HataDurumu, IconTile, Iskelet, ListeBlogu, ListeSatiri, Rozet, StatCard } from "../../../../src/ui/ortak";
-import { ROZET_TONU, asObj, present, str, uretimMetni } from "../../../../src/ui/siparis/OrderRow";
+import { asObj, present, str, uretimMetni } from "../../../../src/ui/siparis/OrderRow";
+import { siparisDurumu } from "../../../../src/ui/siparis/durum";
 import { useListCapability } from "../../../../src/ui/siparis/capabilities";
 import { OrderLines, useOrderLines } from "../../../../src/ui/siparis/OrderLines";
 import { OrderWorkOrders, useOrderWorkOrders } from "../../../../src/ui/siparis/OrderWorkOrders";
@@ -43,7 +44,7 @@ export default function OrderDetail() {
   const isEmirleri = useOrderWorkOrders(id ? String(id) : null);
   const k = asObj(r.data?.kayit);
   const no = str(k.siparisNo);
-  const status = orderStatus(k.durum);
+  const status = siparisDurumu(k.durum);
   const doviz = str(k.doviz);
   const cariId = str(k.cariKartId);
   const cariAc = cariId && moduleVisible(permissions, "cariler") ? () => router.push({ pathname: "/cariler/[id]", params: { id: cariId } } as never) : undefined;
@@ -86,7 +87,7 @@ export default function OrderDetail() {
       <View style={s.flex}>
         <Text style={s.musteriAd} numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE.title} testID="siparis-musteri">{str(k.musteriAdi) ?? "—"}</Text>
         <View style={s.rozetler}>
-          <Rozet label={status.label} tone={ROZET_TONU[status.tone]} testID="siparis-durum" />
+          <Rozet label={status.label} tone={status.ton} icon={status.icon} accessibilityLabel={`Durum: ${status.label}`} testID="siparis-durum" />
         </View>
       </View>
       {cariAc ? <Ionicons name="chevron-forward" size={18} color={t.color.textMuted} /> : null}
