@@ -3,7 +3,7 @@
 // MEVCUT `tablo.stok` tercihine yazılır (yeni anahtar/uç yok) ve ürün tablosunun sütun seçimini EZMEZ · §4 tercih ucu
 // başarısızken yerelde çalışır. 2026-11-18: varsayılan HİÇ kart (kullanıcı: "kartlar default olarak kapalı gelsin").
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
 import type React from "react";
 import { resetCards, shownCards, toggleCard } from "../src/ui/stok/kartlar";
 import type { TabloTercihi } from "../src/ui/tablo/model";
@@ -94,11 +94,31 @@ describe("§2 ekran", () => {
     fireEvent.press(screen.getByTestId("stok-kart-secici-ham"));
     await flush();
     expect(screen.queryByTestId("kpi-ham")).toBeNull();
-    expect(screen.getByText("Hepsi kapatılabilir")).toBeTruthy();
+    expect(screen.queryByText("Hepsi kapatılabilir")).toBeNull(); // bilgi yazısı yerine düğme (2026-11-19)
     fireEvent.press(screen.getByTestId("stok-kart-secici-varsayilan"));
     await flush();
     expect(screen.queryByTestId("kpi-yari")).toBeNull();
     expect(screen.queryByTestId("olu-stok")).toBeNull();
+  });
+
+  it("'Hepsini kapat' tek dokunuşla bütün kartları kapatır; hepsi kapalıyken 'Hepsini aç' geri açar", async () => {
+    render(<Stock />);
+    await flush();
+    fireEvent.press(screen.getByTestId("stok-kart-sec"));
+    await flush();
+    const toplu = () => screen.getByTestId("stok-kart-secici-toplu");
+    expect(within(toplu()).getByText("Hepsini aç")).toBeTruthy(); // varsayılan hiç kart
+    fireEvent.press(toplu());
+    await flush();
+    for (const id of ["kpi-ham", "kpi-yari", "kpi-bitmis", "olu-stok"]) expect(screen.getByTestId(id)).toBeTruthy();
+    expect(within(toplu()).getByText("Hepsini kapat")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("stok-kart-secici-yari"));
+    await flush();
+    expect(within(toplu()).getByText("Hepsini kapat")).toBeTruthy(); // bir kısmı açıkken de kapat
+    fireEvent.press(toplu());
+    await flush();
+    for (const id of ["kpi-ham", "kpi-yari", "kpi-bitmis", "olu-stok"]) expect(screen.queryByTestId(id)).toBeNull();
+    expect(within(toplu()).getByText("Hepsini aç")).toBeTruthy();
   });
 });
 

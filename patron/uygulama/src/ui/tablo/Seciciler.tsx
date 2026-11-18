@@ -115,12 +115,27 @@ export function VisibilityPicker(p: {
   const t = useTokens();
   const s = useStyles();
   const enAz = p.enAz ?? 1;
+  // Hepsi kapatılabiliyorsa (kartlar) bilgi yazısı yerine TEK dokunuşluk düğme (2026-11-19): açık kart varsa "Hepsini
+  // kapat", hepsi kapalıysa "Hepsini aç" (geri alma). Çağıranın tek tek değiştiricisiyle yürür (tercih kancaları son
+  // değerin üstüne yazar; ardışık çağrılar birikir) — ekran başına yeni bağlantı yok.
+  const acik = p.items.filter((c) => p.shown.includes(c.key));
+  const hepsiniKapat = acik.length > 0;
+  const toplu = () => {
+    haptic("selection");
+    for (const c of hepsiniKapat ? acik : p.items) p.onToggle(c.key);
+  };
   return (
     <AltSayfa
       visible={p.visible} title={p.title} onClose={p.onClose} testID={p.testID}
       alt={
         <View style={s.altSatir}>
-          <Text style={s.not}>{enAz > 0 ? `En az ${enAz} kart açık kalır` : "Hepsi kapatılabilir"}</Text>
+          {enAz > 0 ? (
+            <Text style={s.not}>{`En az ${enAz} kart açık kalır`}</Text>
+          ) : (
+            <Pressable onPress={toplu} hitSlop={8} accessibilityRole="button" testID={`${p.testID}-toplu`}>
+              <Text style={[s.bittiYazi, { color: t.tint }]}>{hepsiniKapat ? "Hepsini kapat" : "Hepsini aç"}</Text>
+            </Pressable>
+          )}
           <Pressable onPress={p.onDefault} hitSlop={8} accessibilityRole="button" testID={`${p.testID}-varsayilan`}>
             <Text style={[s.bittiYazi, { color: t.tint }]}>Varsayılana dön</Text>
           </Pressable>
