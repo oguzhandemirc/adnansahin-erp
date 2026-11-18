@@ -20,7 +20,7 @@ jest.mock("expo-router", () => ({ useRouter: () => mockRouter, usePathname: () =
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 const Orders = (require("../app/(app)/(tabs)/siparisler/index") as { default: () => ReactElement }).default;
-const OrderDetail = (require("../app/(app)/(tabs)/siparisler/[id]") as { default: () => ReactElement }).default;
+const OrderDetail = (require("../app/(app)/siparisler/[id]") as { default: () => ReactElement }).default;
 const { uretimMetni } = require("../src/ui/siparis/OrderRow") as typeof import("../src/ui/siparis/OrderRow");
 const { workOrderRowText } = require("../src/ui/siparis/OrderWorkOrders") as typeof import("../src/ui/siparis/OrderWorkOrders");
 const { keepPhrases } = require("../src/lib/format") as typeof import("../src/lib/format");

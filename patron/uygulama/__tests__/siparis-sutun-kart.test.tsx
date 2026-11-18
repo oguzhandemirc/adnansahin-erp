@@ -26,7 +26,7 @@ jest.mock("expo-router", () => ({ useRouter: () => mockRouter, usePathname: () =
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 const Orders = (require("../app/(app)/(tabs)/siparisler/index") as { default: () => ReactElement }).default;
-const OrderDetail = (require("../app/(app)/(tabs)/siparisler/[id]") as { default: () => ReactElement }).default;
+const OrderDetail = (require("../app/(app)/siparisler/[id]") as { default: () => ReactElement }).default;
 const { LIST_ID_FILTERS, LIST_SEARCH, LIST_SORT } = require("../src/api/wire") as typeof import("../src/api/wire");
 
 const ID1 = "11111111-1111-4111-8111-111111111111";

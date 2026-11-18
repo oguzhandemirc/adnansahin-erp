@@ -1,4 +1,4 @@
-// Cariler sekmesinin kendi yığını: liste → cari kartı · yeni müşteri (alttan), sekme çubuğu altta kalır.
+// Cariler sekmesinin kendi yığını: liste · yeni müşteri (alttan). Cari kartı kök yığında (`app/(app)/cariler/[id]`, 2026-11-19).
 import { Stack } from "expo-router";
 import { useGezinme } from "../../../../src/ui/hareket/gezinme";
 import { useTokens } from "../../../../src/ui/theme-context";

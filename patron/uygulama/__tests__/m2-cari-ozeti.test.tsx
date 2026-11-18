@@ -18,7 +18,7 @@ jest.mock("../src/state/session", () => ({ useSession: () => mockSession }));
 jest.mock("expo-router", () => ({ useRouter: () => mockRouter, usePathname: () => "/cariler", useLocalSearchParams: () => ({ id: "0b7c5a1e-4f2d-4c8e-9a51-3d6f2e8b1c40" }) }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
-const CustomerDetail = (require("../app/(app)/(tabs)/cariler/[id]") as { default: () => ReactElement }).default;
+const CustomerDetail = (require("../app/(app)/cariler/[id]") as { default: () => ReactElement }).default;
 const { ApiError } = require("../src/api/client") as typeof import("../src/api/client");
 const { LIST_ID_FILTERS, LIST_SEARCH } = require("../src/api/wire") as typeof import("../src/api/wire");
 const { toplamKartlari } = require("../src/ui/cari/OzetBolumleri") as typeof import("../src/ui/cari/OzetBolumleri");

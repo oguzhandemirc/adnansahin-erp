@@ -24,6 +24,9 @@ export default function TabsLayout() {
   const g = useGezinme();
   return (
     <Tabs
+      // Geri (donanım + başlık oku) GELİNEN sekmeye döner; geçmiş boşsa (Pano) uygulamadan çıkılır (Android standardı).
+      // Varsayılan "firstRoute" her kök ekranda Pano'ya atıyordu (2026-11-19).
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         animation: g.sekme.animation,

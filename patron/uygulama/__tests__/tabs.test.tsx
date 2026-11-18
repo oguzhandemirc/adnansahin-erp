@@ -45,8 +45,13 @@ describe("sekme yolları sabit", () => {
   });
   it("her sekmenin dosyası (tabs) grubunda; eski yerinde kopya yok (URL tek)", () => {
     const tabs = join(ROOT, "app/(app)/(tabs)");
-    for (const f of ["pano.tsx", "uretim.tsx", "stok.tsx", "siparisler/index.tsx", "siparisler/yeni.tsx", "cariler/index.tsx", "cariler/yeni.tsx", "cariler/[id].tsx"]) expect(existsSync(join(tabs, f))).toBe(true);
-    for (const f of ["pano.tsx", "uretim.tsx", "stok.tsx", "siparisler", "cariler"]) expect(existsSync(join(ROOT, "app/(app)", f))).toBe(false);
+    for (const f of ["pano.tsx", "uretim.tsx", "stok.tsx", "siparisler/index.tsx", "siparisler/yeni.tsx", "cariler/index.tsx", "cariler/yeni.tsx"]) expect(existsSync(join(tabs, f))).toBe(true);
+    for (const f of ["pano.tsx", "uretim.tsx", "stok.tsx", "siparisler/index.tsx", "siparisler/yeni.tsx", "cariler/index.tsx", "cariler/yeni.tsx"]) expect(existsSync(join(ROOT, "app/(app)", f))).toBe(false);
+    // Kayıt ayrıntıları kök yığında (2026-11-19, geri = gelinen ekran; `gezinme-geri.test`): sekme yığınında [id] yok.
+    for (const f of ["siparisler/[id].tsx", "cariler/[id].tsx"]) {
+      expect(existsSync(join(ROOT, "app/(app)", f))).toBe(true);
+      expect(existsSync(join(tabs, f))).toBe(false);
+    }
     for (const f of ["diger.tsx"]) {
       expect(existsSync(join(ROOT, "app/(app)", f))).toBe(true);
       expect(existsSync(join(tabs, f))).toBe(false);

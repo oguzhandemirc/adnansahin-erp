@@ -22,7 +22,7 @@ jest.mock("../src/state/session", () => ({ useSession: () => mockSession }));
 jest.mock("expo-router", () => ({ useRouter: () => mockRouter, usePathname: () => "/cariler", useLocalSearchParams: () => ({ id: ID }) }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
-const CustomerDetail = (require("../app/(app)/(tabs)/cariler/[id]") as { default: () => ReactElement }).default;
+const CustomerDetail = (require("../app/(app)/cariler/[id]") as { default: () => ReactElement }).default;
 const Customers = (require("../app/(app)/(tabs)/cariler/index") as { default: () => ReactElement }).default;
 const { LIST_ID_FILTERS, LIST_SEARCH, LIST_SORT } = require("../src/api/wire") as typeof import("../src/api/wire");
 const { CARI_SUTUNLARI, CARI_VARSAYILAN_SUTUN, cariTemizle } = require("../src/ui/cari/sutunlar") as typeof import("../src/ui/cari/sutunlar");
