@@ -152,6 +152,8 @@ export interface StockKalemRoll {
   /** Kalem satırının `key`i (ham: kumaş · bitmiş: kumaş+en+renk+kat). */
   kalemKey: string;
   qty: number;
+  /** Kesin metre (3 hane, `Roll.currentQty`); `qty` görünen 1 hanedir. Patron süzülmüş toplamı bunu toplar (2026-11-19). */
+  exactQty: number;
   weightKg: number | null;
   batchNumber: string | null;
   warehouseName: string | null;
@@ -159,6 +161,7 @@ export interface StockKalemRoll {
   /** Rafa giriş FABRİKA günü (`YYYY-MM-DD`, statü damgasından); damgasız top `null`. */
   shelfDay: string | null;
   /** Etikette yazan müşteri (`Roll.labelCustomerId`, sahiplik DEĞİL); stok etiketi / eski top `null`. */
+  labelCustomerId: string | null;
   labelCustomerName: string | null;
   /** Çuval no ve çuval carisi; raf topunda ikisi de `null`. */
   sackNo: string | null;
@@ -209,11 +212,12 @@ function rollRow(extras: Map<string, ShelfRollExtras>) {
   return ({ c, key }: { c: StockCell; key: string }): StockKalemRoll => {
     const e = extras.get(c.rollId);
     return {
-      rollId: c.rollId, barcode: c.barcode, kalemKey: key, qty: round1(c.qty),
+      rollId: c.rollId, barcode: c.barcode, kalemKey: key, qty: round1(c.qty), exactQty: Math.round(c.qty * 1000) / 1000,
       weightKg: c.weightKg === null ? null : round1(c.weightKg),
       batchNumber: e?.batchNumber ?? null, warehouseName: e?.warehouseName ?? null,
       days: c.days === null ? null : round1(c.days),
       shelfDay: e?.statusChangedAt ? factoryYmd(e.statusChangedAt) : null,
+      labelCustomerId: e?.labelCustomerId ?? null,
       labelCustomerName: e?.labelCustomerName ?? null,
       sackNo: e?.sackNo ?? null,
       sackCustomerName: e?.sackCustomerName ?? null,

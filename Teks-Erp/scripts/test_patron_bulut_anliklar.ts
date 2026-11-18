@@ -36,6 +36,8 @@
 // NEGATİF SONDA (2026-11-17, stok-kalem kime/nerede): `etiketMusteri` ← çuval carisi → §3 "raf topu: etiket müşterisi"
 //   + "çuvaldaki top: …" ✗ (2 kırmızı, geri alındı). Çuval sorgusuna SHIPPED eklemek yeşil kaldı: `getSackedFinishedRolls`
 //   ayrıca `isFinishedCell` ile süzer (çift sed, bilinçli).
+// NEGATİF SONDA (2026-11-19, stok-kalem süzülmüş toplam katkısı): `contributionOf` raf katkısı `r.exactQty` yerine görünen
+//   `r.qty` (1 hane) → §3 "katkı metresi kesin" + "bitmiş raf: Σ depoda katkısı = toplam" (193.4/193.5) ✗ (2 kırmızı, geri alındı).
 // NEGATİF SONDA (2026-11-13, kırmızı verdi, geri alındı):
 //   · `boyahanedeTop` ← tüm açık toplar (kategori süzgeci yok) → §3 fixture farkı + "boyahanedeki top" ✗
 //   · firma `kategoriler` boş dizi → §3 "firma başına top + kategori uyuşmazlığı" ✗
@@ -231,6 +233,36 @@ async function main(): Promise<void> {
   check("fixture farkı: çuvalda +2 top / +50 m", kNow.cuvaldaTop - kBase.cuvaldaTop === 2 && Math.round((kNow.cuvaldaMetre - kBase.cuvaldaMetre) * 10) / 10 === 50,
     `${kNow.cuvaldaTop - kBase.cuvaldaTop} · ${kNow.cuvaldaMetre - kBase.cuvaldaMetre}`);
   check("çuvalda sayısı = dizi uzunluğu", kNow.cuvaldaTop === kNow.cuvaldakiToplar.length);
+
+  // Süzülmüş toplam (2.13.1): her top hazır katkısını taşır; süzgeçsiz toplam bölüm toplamıyla BİREBİR (uygulama yalnız toplar).
+  // Ek fixture: 3 haneli iki raf topu (10,049 m) — görünen 1 hanelik `metre`yi toplamak 0,1 m kaçırır, kesin katkı kaçırmaz.
+  for (const i of [0, 1]) {
+    const r = await prisma.roll.create({
+      data: { itemId: item.id, initialQty: 10.049, currentQty: 10.049, status: "WAREHOUSE", entrySource: "SUPPLIER_RECEIPT", barcode: `${STAMP}K${i}` },
+      select: { id: true },
+    });
+    fx.rolls.push(r.id);
+  }
+  type Katki = { depodaTop: number; depodaMetre: number; cuvaldaTop: number; cuvaldaMetre: number };
+  const sk = (await buildSnapshots({ now, productionOn: true, only: new Set(["stok-kalem"]) })).snapshots[0]?.data as
+    { ham: { toplamTop: number; toplamMetre: number; toplar: Katki[] }; bitmis: Bitmis & { toplamTop: number; toplamMetre: number; toplar: Katki[]; cuvaldakiToplar: Katki[] } } | undefined;
+  const r0 = sk?.bitmis.toplar.find((t) => (t as unknown as { topNo: string }).topNo === `${STAMP}R0`);
+  check("raf topu katkısı: depoda 1 top / 123,4 m, çuvalda 0", r0?.depodaTop === 1 && r0.depodaMetre === 123.4 && r0.cuvaldaTop === 0 && r0.cuvaldaMetre === 0, JSON.stringify(r0));
+  const sTop = sk?.bitmis.cuvaldakiToplar.find((t) => (t as unknown as { topNo: string }).topNo === `${STAMP}S0`);
+  check("çuvaldaki top katkısı: çuvalda 1 top / 30 m, depoda 0", sTop?.cuvaldaTop === 1 && sTop.cuvaldaMetre === 30 && sTop.depodaTop === 0 && sTop.depodaMetre === 0, JSON.stringify(sTop));
+  const k3 = sk?.bitmis.toplar.find((t) => (t as unknown as { topNo: string }).topNo === `${STAMP}K0`);
+  check("katkı metresi kesin (3 hane): 10,049", k3?.depodaMetre === 10.049, JSON.stringify(k3));
+  const sum = (rows: Katki[] | undefined, k: keyof Katki) => (rows ?? []).reduce((a, t) => a + Math.round(t[k] * 1000), 0);
+  const m1 = (mm: number) => Math.round(mm / 100) / 10;
+  check("ham: Σ katkı = bölüm toplamı (top + metre), çuvalda 0",
+    !!sk && sum(sk.ham.toplar, "depodaTop") / 1000 === sk.ham.toplamTop && m1(sum(sk.ham.toplar, "depodaMetre")) === sk.ham.toplamMetre && sum(sk.ham.toplar, "cuvaldaTop") === 0,
+    `${sum(sk?.ham.toplar, "depodaTop") / 1000}/${sk?.ham.toplamTop} · ${m1(sum(sk?.ham.toplar, "depodaMetre"))}/${sk?.ham.toplamMetre}`);
+  check("bitmiş raf: Σ depoda katkısı = toplamTop/toplamMetre, çuvalda 0",
+    !!sk && sum(sk.bitmis.toplar, "depodaTop") / 1000 === sk.bitmis.toplamTop && m1(sum(sk.bitmis.toplar, "depodaMetre")) === sk.bitmis.toplamMetre && sum(sk.bitmis.toplar, "cuvaldaMetre") === 0,
+    `${sum(sk?.bitmis.toplar, "depodaTop") / 1000}/${sk?.bitmis.toplamTop} · ${m1(sum(sk?.bitmis.toplar, "depodaMetre"))}/${sk?.bitmis.toplamMetre}`);
+  check("bitmiş çuval: Σ çuvalda katkısı = cuvaldaTop/cuvaldaMetre, depoda 0",
+    !!sk && sum(sk.bitmis.cuvaldakiToplar, "cuvaldaTop") / 1000 === sk.bitmis.cuvaldaTop && m1(sum(sk.bitmis.cuvaldakiToplar, "cuvaldaMetre")) === sk.bitmis.cuvaldaMetre && sum(sk.bitmis.cuvaldakiToplar, "depodaTop") === 0,
+    `${sum(sk?.bitmis.cuvaldakiToplar, "cuvaldaTop") / 1000}/${sk?.bitmis.cuvaldaTop} · ${m1(sum(sk?.bitmis.cuvaldakiToplar, "cuvaldaMetre"))}/${sk?.bitmis.cuvaldaMetre}`);
 
   // Çuval deposu (2.12.4): panelin Paketleme/Çuvallar kapsamı (havuz + PLANNED) ve sayıları; DISPATCHED gelmez, hayalet
   // top (kartelaya gitmiş) sayılmaz. Ek fixture stok-kalem ölçüsünden SONRA kurulur (yukarıdaki farkları bozmaz).

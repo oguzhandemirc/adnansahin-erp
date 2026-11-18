@@ -34,9 +34,12 @@ const CariSummary = z.strictObject({
 // Stok kalem listesi: kalem (ham = kumaş; bitmiş = kumaş + en + renk + kat) ve raftaki toplar; metre ile kg ayrı (toplanmaz).
 // 2.12.4: top etiket müşterisi (`Roll.labelCustomerId`, sahiplik değil) · çuval no · çuval carisi (ad); bitmiş bölüm
 // çuvaldaki bitmiş topları AYRI dizide (`cuvaldakiToplar`, kalemin görünen alanlarıyla) ve sayısını/metresini taşır.
+const ContributionFields = { depodaTop: Num, depodaMetre: Num, cuvaldaTop: Num, cuvaldaMetre: Num };
 const TopFields = {
   id: z.string().uuid(), topNo: Str.nullable(), kalem: Str, metre: Num, kg: Num.nullable(), parti: Str.nullable(), depo: Str.nullable(), gun: Num.nullable(),
   etiketMusteri: Str.nullable(), cuvalNo: Str.nullable(), cuvalCari: Str.nullable(),
+  // 2.13.1: süzülmüş toplamın hazır katkısı (raf ya da çuval; metre kesin 3 hane) — uygulama yalnız süzülen topları toplar.
+  ...ContributionFields,
 };
 const StockKalemSectionFields = {
   toplamTop: Num, toplamMetre: Num,

@@ -220,13 +220,13 @@ async function loadCells(where: Prisma.Sql): Promise<StockCell[]> {
  */
 export interface ShelfRollExtras {
   batchNumber: string | null; warehouseName: string | null; statusChangedAt: Date | null;
-  labelCustomerName: string | null; sackNo: string | null; sackCustomerName: string | null;
+  labelCustomerId: string | null; labelCustomerName: string | null; sackNo: string | null; sackCustomerName: string | null;
 }
 export async function loadShelfRollExtras(ids: string[]): Promise<Map<string, ShelfRollExtras>> {
   if (ids.length === 0) return new Map();
   const rows = await prisma.$queryRaw<Array<ShelfRollExtras & { id: string }>>(Prisma.sql`
     SELECT r.id, b."batchNumber" AS "batchNumber", w.name AS "warehouseName", r."statusChangedAt" AS "statusChangedAt",
-           lc.name AS "labelCustomerName", s."sackNo" AS "sackNo", sc.name AS "sackCustomerName"
+           r."labelCustomerId" AS "labelCustomerId", lc.name AS "labelCustomerName", s."sackNo" AS "sackNo", sc.name AS "sackCustomerName"
     FROM rolls r
     LEFT JOIN batches b    ON b.id = r."batchId"
     LEFT JOIN warehouses w ON w.id = r."warehouseId"
@@ -237,7 +237,7 @@ export async function loadShelfRollExtras(ids: string[]): Promise<Map<string, Sh
   `);
   return new Map(rows.map((r) => [r.id, {
     batchNumber: r.batchNumber, warehouseName: r.warehouseName, statusChangedAt: r.statusChangedAt,
-    labelCustomerName: r.labelCustomerName, sackNo: r.sackNo, sackCustomerName: r.sackCustomerName,
+    labelCustomerId: r.labelCustomerId, labelCustomerName: r.labelCustomerName, sackNo: r.sackNo, sackCustomerName: r.sackCustomerName,
   }]));
 }
 

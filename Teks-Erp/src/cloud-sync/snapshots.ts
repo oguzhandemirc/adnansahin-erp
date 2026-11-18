@@ -15,7 +15,7 @@ import { SNAPSHOT_PROJECTIONS } from "./projections";
 import { SNAPSHOT_WIRE_SCHEMAS, type SnapshotWireName } from "./snapshot-schemas";
 import { buildSubcontractOpenData } from "./snapshot-fason";
 import { buildCustomerSummaryData } from "./snapshot-cari-ozeti";
-import { buildStockKalemData } from "./snapshot-stok-kalem";
+import { buildStockKalemData, loadStockKalemSource } from "./snapshot-stok-kalem";
 import { buildSackDepotData } from "./snapshot-cuval-deposu";
 import { remoteReportCatalog } from "./remote-reports";
 import { snapshotDigest } from "./digest";
@@ -58,6 +58,8 @@ class RoundSources {
   coverage = () => this.once("coverage", () => getOpenOrderCoverage());
   flow = () => this.once("flow", () => new InventoryService().getProductionFlow({ includeQueues: true, includeSevk: true }));
   stations = () => this.once("stations", () => DashboardService.getStationsLiveState());
+  /** `stok-kalem` ve `cari-ozeti` (etiket müşterisinin depodaki malı) aynı raf + çuval okumasını paylaşır. */
+  stockKalem = () => this.once("stockKalem", () => loadStockKalemSource());
 }
 
 type Section = readonly [SnapshotWireName, () => Promise<BuiltSnapshot | null>];
@@ -212,7 +214,7 @@ export async function buildSnapshots(ctx: SnapshotContext): Promise<SnapshotBuil
           }
           break;
         case "stok-karnesi": out.push(await buildStock(src)); break;
-        case "stok-kalem": out.push(seal("stok-kalem", await buildStockKalemData(ctx.now))); break;
+        case "stok-kalem": out.push(seal("stok-kalem", await buildStockKalemData(ctx.now, await src.stockKalem()))); break;
         case "cuval-deposu": out.push(seal("cuval-deposu", await buildSackDepotData())); break;
         case "acik-siparis-karsilama": out.push(await buildCoverage(src)); break;
         case "uretim-akisi": out.push(await buildProductionFlow(src)); break;
