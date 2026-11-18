@@ -230,6 +230,7 @@ describe("akış çekirdeği ve listeler (saf)", () => {
       cari: { id: "c1", title: "Akın Tekstil" },
       kalemler: [{ urun: { id: "u1", title: "Ribana" }, renk: { id: "r1", title: "Siyah" }, miktar: "500" }, { urun: { id: "u1", title: "Ribana" }, renk: null, miktar: "300" }],
       termin: "18.11.2026",
+      aciklama: null,
     });
   });
   it("zorunlu adım atlanamaz; adaylar seçimle çözülür, seçilmezse forma boş gider", () => {

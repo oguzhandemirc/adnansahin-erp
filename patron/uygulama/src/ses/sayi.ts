@@ -9,7 +9,7 @@ const BIRLER: Readonly<Record<string, number>> = {
 const CARPAN: Readonly<Record<string, number>> = { yuz: 100, bin: 1000, milyon: 1_000_000 };
 const TUM = [...Object.keys(BIRLER), ...Object.keys(CARPAN)].sort((a, b) => b.length - a.length);
 /** Sayı sözcüğüne yapışan ekler ("yirmisi", "beşi", "dokuzu", "bine", "yüzer"). */
-const SAYI_EKLERI = ["sinde", "sine", "si", "su", "er", "ar", "ye", "ya", "e", "a", "i", "u"] as const;
+const SAYI_EKLERI = ["sinde", "sine", "ser", "sar", "si", "su", "er", "ar", "ye", "ya", "e", "a", "i", "u"] as const;
 
 interface Atom { readonly carpan: boolean; readonly deger: number }
 
@@ -80,6 +80,15 @@ export interface SayiSonucu {
   readonly deger: number;
   /** Sayının bittiği sözcük dizini (hariç). */
   readonly son: number;
+  /** Dağıtma eki ("250'şer", "yüzer", "ikişer yüz"): miktar sonraki her renk/ürün için ayrı ayrı. */
+  readonly dagitim?: boolean;
+}
+
+/** Sözcük dağıtma ekiyle mi bitiyor ("250'şer", "yüzer", "beşer", "ellişer", "onar"). */
+function dagitimEki(w: Sozcuk): boolean {
+  if (w.ek) return /^s?[ae]r$/.test(w.ek);
+  if (/^\d/.test(w.k) || bak(w.k)) return false;
+  return ["ser", "sar", "er", "ar"].some((ek) => w.k.endsWith(ek) && !!bak(w.k.slice(0, -ek.length)));
 }
 
 /**
@@ -103,6 +112,15 @@ export function sayiOku(s: readonly Sozcuk[], i: number): SayiSonucu | null {
       d = d.olcek >= 1000 ? { ...d, toplam: d.toplam + d.olcek / 2 } : { ...d, simdiki: d.simdiki + (d.olcek >= 100 ? 50 : 0.5) };
       continue;
     }
+    // "2 bin 500" / "bin 500": çarpandan sonra gelen KÜÇÜK rakam aynı sayıya eklenir (tanıma böyle yazar).
+    const r = rakamOku(w.k);
+    if (r !== null) {
+      if (j > i && d.simdiki === 0 && d.toplam > 0 && d.olcek >= 1000 && Number.isInteger(r) && r < d.olcek) {
+        d = { ...d, simdiki: r, olcek: 1 };
+        j += 1;
+      }
+      break;
+    }
     const at = atomlar(w.k);
     if (!at) break;
     if (rakam !== null && at.some((a) => !a.carpan || a.deger === 100)) break;
@@ -114,14 +132,19 @@ export function sayiOku(s: readonly Sozcuk[], i: number): SayiSonucu | null {
   if (j === i) return null;
   // Tek başına "bir": arkasında birim yoksa sözcük ("bir de …") sayılır.
   if (rakam === null && j === i + 1 && ilk.k === "bir" && !birimOku(s, j)) return null;
-  return { deger: Math.round((d.toplam + d.simdiki) * 1e6) / 1e6, son: j };
+  const deger = Math.round((d.toplam + d.simdiki) * 1e6) / 1e6;
+  return { deger, son: j, ...(dagitimEki(s[j - 1]!) ? { dagitim: true } : {}) };
 }
 
-export type Birim = "metre" | "kg";
+/** Formun miktarı ürünün kendi birimindedir (metre ya da kg); top ve adet forma YAZILMAZ (çevrilemez). */
+export type Birim = "metre" | "kg" | "top" | "adet";
 const BIRIMLER: Readonly<Record<string, Birim>> = {
   metre: "metre", metr: "metre", mt: "metre", m: "metre", mtr: "metre", metrelik: "metre",
   kilo: "kg", kg: "kg", kilogram: "kg", kiloluk: "kg",
+  top: "top", topluk: "top", rulo: "top", adet: "adet", tane: "adet", parca: "adet",
 };
+/** Forma doğrudan yazılabilen birimler. */
+export const FORM_BIRIMI: ReadonlySet<Birim> = new Set<Birim>(["metre", "kg"]);
 
 /** `i`'deki sözcük birim mi ("metre", "metrelik", "metreden", "m", "kilo") → birim + bitiş. */
 export function birimOku(s: readonly Sozcuk[], i: number): { birim: Birim; son: number } | null {

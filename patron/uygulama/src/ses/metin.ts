@@ -19,23 +19,43 @@ export interface Sozcuk {
   readonly k: string;
   readonly o: string;
   readonly sinir?: boolean;
+  /** Kesme işaretinden sonra atılan ek, katlanmış ("250'şer" → "ser"). */
+  readonly ek?: string;
+  /** Özgün metindeki konum [bas, son) (not gibi serbest metni özgün hâliyle kesmek için). */
+  readonly bas?: number;
+  readonly son?: number;
 }
 
 /**
  * Metni sözcüklere böler. Kesme işaretli ek atılır ("Akın'a" → "akin"); sayı içindeki nokta/virgül/bölü korunur
- * ("1.250", "2,5", "20.11"); virgül ve cümle sonu SINIR sözcüğü olur.
+ * ("1.250", "2,5", "20.11"); virgül ve cümle sonu SINIR sözcüğü olur. Rakama bitişik ek de ayrılır ("250şer").
  */
 export function sozcuklere(metin: string): Sozcuk[] {
   const out: Sozcuk[] = [];
-  const re = /(\d+(?:[.,/]\d+)*)|([\p{L}\p{N}]+(?:['’`][\p{L}]+)?)|([,;]|[.!?](?=\s|$))/gu;
+  const re = /(\d+(?:[.,/]\d+)*)(?:['’`]?(\p{L}+))?|([\p{L}\p{N}]+(?:['’`][\p{L}]+)?)|([,;]|[.!?](?=\s|$))/gu;
   for (const m of metin.matchAll(re)) {
-    if (m[3]) {
-      out.push({ k: ",", o: m[3], sinir: true });
+    const bas = m.index ?? 0;
+    const son = bas + m[0].length;
+    if (m[4]) {
+      out.push({ k: ",", o: m[4], sinir: true, bas, son });
       continue;
     }
-    const ham = (m[1] ?? m[2] ?? "").replace(/['’`][\p{L}]*$/u, "");
+    if (m[1]) {
+      const ek = m[2] ? katla(m[2]) : undefined;
+      // Rakama bitişik birim ("500m", "80kg") ek değildir: ayrı sözcük olur.
+      if (m[2] && !/['’`]/.test(m[0]) && /^(m|mt|mtr|metre|kg|kilo|top|adet)$/.test(ek!)) {
+        out.push({ k: m[1], o: m[1], bas, son: bas + m[1].length });
+        out.push({ k: ek!, o: m[2], bas: bas + m[1].length, son });
+        continue;
+      }
+      out.push({ k: m[1], o: m[1], bas, son, ...(ek ? { ek } : {}) });
+      continue;
+    }
+    const tam = m[3] ?? "";
+    const ekM = /['’`]([\p{L}]*)$/u.exec(tam);
+    const ham = ekM ? tam.slice(0, ekM.index) : tam;
     if (ham === "") continue;
-    out.push({ k: katla(ham), o: ham });
+    out.push({ k: katla(ham), o: ham, bas, son, ...(ekM?.[1] ? { ek: katla(ekM[1]) } : {}) });
   }
   return out;
 }

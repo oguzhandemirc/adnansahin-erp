@@ -1,7 +1,7 @@
 // Sesli sipariş — yazıya dökülmüş konuşmadan SİPARİŞ TASLAĞI (SAF, kural tabanlı; yapay zekâ ve ağ YOK).
 // Çıktı yalnız formu doldurmaya yarar: alan başına {değer | adaylar | bulunamadı} + anlaşılamayan artık metin. Türev hesap
 // yapılmaz. "gönder"/"kaydet" gibi sözcükler KOMUT DEĞİLDİR: taslakta gönderim alanı yoktur, artık metne düşerler.
-import { addDaysToKey } from "../lib/factory-time";
+import { addDaysToKey, fmtDayKey } from "../lib/factory-time";
 import { enIyiAralik, karar, type Alan, type Aday, type HazirListe } from "./eslestir";
 import { govdeler, sozcuklere, type Sozcuk } from "./metin";
 import { birimOku, miktarMetni, sayiOku, type Birim } from "./sayi";
@@ -30,6 +30,8 @@ export interface SiparisTaslagi {
   readonly kalemler: readonly KalemTaslagi[];
   /** Teslim günü `yyyy-MM-dd`. */
   readonly termin: Alan<string>;
+  /** "not: …" ile söylenen serbest açıklama (özgün yazımla). */
+  readonly not?: string;
   /** Hiçbir alana oturmayan sözler (özgün yazımla). */
   readonly artik: string;
 }
@@ -49,6 +51,8 @@ interface Miktar {
   readonly son: number;
   readonly deger: number;
   readonly birim: Birim | null;
+  /** "250'şer metre siyah ve beyaz": her renk/ürün için aynı miktar. */
+  readonly dagitim?: boolean;
 }
 
 function miktarlar(s: readonly Sozcuk[], kullanildi: readonly boolean[]): Miktar[] {
@@ -58,7 +62,7 @@ function miktarlar(s: readonly Sozcuk[], kullanildi: readonly boolean[]): Miktar
     const n = sayiOku(s, i);
     if (!n || n.deger <= 0 || s.slice(i, n.son).some((_, j) => kullanildi[i + j])) continue;
     const b = kullanildi[n.son] ? null : birimOku(s, n.son);
-    hepsi.push({ bas: i, son: b ? b.son : n.son, deger: n.deger, birim: b ? b.birim : null });
+    hepsi.push({ bas: i, son: b ? b.son : n.son, deger: n.deger, birim: b ? b.birim : null, ...(n.dagitim ? { dagitim: true } : {}) });
     i = (b ? b.son : n.son) - 1;
   }
   // Birimli miktar varsa birimsiz sayılar kalem açmaz (ürün adındaki "280" gibi); yoksa hepsi miktardır.
@@ -66,7 +70,11 @@ function miktarlar(s: readonly Sozcuk[], kullanildi: readonly boolean[]): Miktar
   return birimli.length ? birimli : hepsi;
 }
 
-const bulunamadi = (duyulan?: string): { readonly durum: "bulunamadi"; readonly duyulan?: string } => ({ durum: "bulunamadi", ...(duyulan ? { duyulan } : {}) });
+const bulunamadi = (duyulan?: string, neden?: string): { readonly durum: "bulunamadi"; readonly duyulan?: string; readonly neden?: string } => ({
+  durum: "bulunamadi",
+  ...(duyulan ? { duyulan } : {}),
+  ...(neden ? { neden } : {}),
+});
 
 function eslestirIsaretle(s: readonly Sozcuk[], maske: boolean[], liste: HazirListe, kullanildi: boolean[]): Alan<Aday> {
   const r = enIyiAralik(s, maske, liste);
@@ -78,17 +86,73 @@ function eslestirIsaretle(s: readonly Sozcuk[], maske: boolean[], liste: HazirLi
   return karar(r.sirali, r.duyulan);
 }
 
+/** Cümlede listeden geçen her ad (ürün ya da renk), söylenme sırasıyla. */
+interface Anis {
+  readonly bas: number;
+  readonly son: number;
+  readonly alan: Alan<Aday>;
+}
+
+function anislar(s: readonly Sozcuk[], kullanildi: boolean[], liste: HazirListe): Anis[] {
+  const out: Anis[] = [];
+  for (;;) {
+    const r = enIyiAralik(s, kullanildi, liste);
+    if (!r || r.sirali.length === 0) break;
+    for (let i = r.bas; i < r.son; i++) kullanildi[i] = true;
+    out.push({ bas: r.bas, son: r.son, alan: karar(r.sirali, r.duyulan) });
+  }
+  return out.sort((a, b) => a.bas - b.bas);
+}
+
+/**
+ * Anışları kalemlere dağıtır. Sayı miktar sayısına eşitse SIRAYLA (konuşma tanıma noktalama koymaz; "siyah 500 lacivert
+ * 300" ile "500 siyah 300 lacivert" aynı sonuca varır); tek anış `paylas` ise bütün kalemlere; aksi hâlde bağlaç/virgül
+ * bölütüne göre. Yerleşemeyen anış `fazla`dır (anlaşılmayan metne düşer, sessizce atılmaz).
+ */
+function ata(anis: readonly Anis[], n: number, satir: readonly number[], paylas: boolean): { yer: (Anis | undefined)[]; fazla: Anis[] } {
+  const yer: (Anis | undefined)[] = Array.from({ length: n }, () => undefined);
+  const fazla: Anis[] = [];
+  if (anis.length === 0) return { yer, fazla };
+  if (n === 1) {
+    yer[0] = anis[0];
+    fazla.push(...anis.slice(1));
+  } else if (anis.length === n) {
+    anis.forEach((a, i) => (yer[i] = a));
+  } else if (anis.length === 1 && paylas) {
+    yer.fill(anis[0]);
+  } else {
+    for (const a of anis) {
+      const k = Math.min(Math.max(satir[a.bas] ?? 0, 0), n - 1);
+      if (!yer[k]) yer[k] = a;
+      else fazla.push(a);
+    }
+  }
+  return { yer, fazla };
+}
+
+/** "not: …" / "açıklama …": arkasındaki her şey serbest açıklamadır. */
+const NOT_SOZ = new Set(["not", "notu", "notum", "aciklama", "aciklamasi"]);
+
 /** Serbest cümle → sipariş taslağı. `bugun` fabrika günü `yyyy-MM-dd`. */
 export function cumleAyristir(metin: string, listeler: Listeler, bugun: string): SiparisTaslagi {
   const s = sozcuklere(metin);
   const kullanildi = s.map(() => false);
 
-  // 1) Teslim tarihi (sayılar miktar sanılmasın diye önce).
+  // 0) Not: anahtar sözden sonrası alan aranmadan açıklamaya gider ("not: kenar etiketli olsun").
+  let not = "";
+  const n0 = s.findIndex((w) => !w.sinir && NOT_SOZ.has(w.k));
+  if (n0 >= 0) {
+    not = metin.slice(s[n0]!.son ?? metin.length).replace(/^[\s:;,.\-–]+/u, "").trim();
+    for (let i = n0; i < s.length; i++) kullanildi[i] = true;
+  }
+
+  // 1) Teslim tarihi (sayılar miktar sanılmasın diye önce). Geçmiş gün termine YAZILMAZ, nedeniyle gösterilir.
   let termin: Alan<string> = bulunamadi();
-  const t = tarihBul(s, bugun);
+  const t = tarihBul(s, bugun, kullanildi);
   if (t) {
     for (let i = t.bas; i < t.son; i++) kullanildi[i] = true;
-    termin = { durum: "bulundu", deger: t.gun, duyulan: s.slice(t.bas, t.son).map((w) => w.o).join(" ") };
+    const duyulan = s.slice(t.bas, t.son).map((w) => w.o).join(" ");
+    termin = t.gecmis ? bulunamadi(duyulan, `Geçmiş bir gün (${fmtDayKey(t.gun)}); teslim tarihini formda seçin.`) : { durum: "bulundu", deger: t.gun, duyulan };
   }
 
   // 2) Miktarlar kalem çapalarıdır; birim sözcüğü ("metre") cari adına ("Metro") benzemesin diye cariden ÖNCE.
@@ -98,6 +162,7 @@ export function cumleAyristir(metin: string, listeler: Listeler, bugun: string):
   // 3) Cari.
   const cari = eslestirIsaretle(s, [...kullanildi], listeler.cari, kullanildi);
 
+  // 4) Bağlaç/virgül bölütleri: her sözcüğün ait olduğu kalem (sıra-tabanlı yerleşim yetmediğinde kullanılır).
   const icerik = (i: number) => !kullanildi[i] && !s[i]!.sinir && !dolgu(s[i]!);
   const satir = s.map(() => -1);
   if (q.length === 0) {
@@ -122,19 +187,28 @@ export function cumleAyristir(metin: string, listeler: Listeler, bugun: string):
     });
   }
 
-  const satirSayisi = Math.max(q.length, 1);
+  // 5) Ürün ve renk anışları bütün cümlede aranır, sonra kalemlere dağıtılır.
+  const urunler = anislar(s, kullanildi, listeler.urun);
+  const renkler = anislar(s, kullanildi, listeler.renk);
+  const dagitim = q.length === 1 && q[0]!.dagitim === true && Math.max(urunler.length, renkler.length) > 1;
+  const satirSayisi = dagitim ? Math.max(urunler.length, renkler.length) : Math.max(q.length, 1);
+  const u = ata(urunler, satirSayisi, satir, true);
+  const r = ata(renkler, satirSayisi, satir, dagitim);
+  for (const a of [...u.fazla, ...r.fazla]) for (let i = a.bas; i < a.son; i++) kullanildi[i] = false;
+
   const kalemler: KalemTaslagi[] = [];
   for (let k = 0; k < satirSayisi; k++) {
-    const maske = s.map((_, i) => kullanildi[i] || satir[i] !== k);
-    let urun = eslestirIsaretle(s, maske, listeler.urun, kullanildi);
-    const renk = eslestirIsaretle(s, maske, listeler.renk, kullanildi);
-    const m = q[k];
-    const onceki = kalemler[k - 1];
-    let urunDevralindi = false;
+    const m = dagitim ? q[0] : q[k];
+    const ua = u.yer[k];
+    const ra = r.yer[k];
+    let urun: Alan<Aday> = ua ? ua.alan : bulunamadi();
+    let urunDevralindi = !!ua && urunler.length === 1 && satirSayisi > 1 && !dagitim && satir[ua.bas] !== k;
+    const onceki = kalemler[kalemler.length - 1];
     if (urun.durum === "bulunamadi" && onceki && onceki.urun.durum !== "bulunamadi") {
       urun = onceki.urun;
       urunDevralindi = true;
     }
+    const renk: Alan<Aday> = ra ? ra.alan : bulunamadi();
     if (!m && urun.durum === "bulunamadi" && renk.durum === "bulunamadi") continue;
     kalemler.push({
       urun,
@@ -145,14 +219,16 @@ export function cumleAyristir(metin: string, listeler: Listeler, bugun: string):
     });
   }
 
-  // Ürün yalnız SONDA söylendiyse ("500 siyah, 300 lacivert ribana") önceki ürünsüz kalemlere de geçer.
+  // Ürün yalnız SONRAKİ kalemde söylendiyse ("500 siyah, 300 lacivert ribana") önceki ürünsüz kalemlere de geçer.
   const ilkUrunlu = kalemler.findIndex((x) => x.urun.durum !== "bulunamadi" && !x.urunDevralindi);
   if (ilkUrunlu > 0) {
-    for (let k = 0; k < ilkUrunlu; k++) kalemler[k] = { ...kalemler[k]!, urun: kalemler[ilkUrunlu]!.urun, urunDevralindi: true };
+    for (let k = 0; k < ilkUrunlu; k++) {
+      if (kalemler[k]!.urun.durum === "bulunamadi") kalemler[k] = { ...kalemler[k]!, urun: kalemler[ilkUrunlu]!.urun, urunDevralindi: true };
+    }
   }
 
   const artik = s.filter((w, i) => !kullanildi[i] && !w.sinir && !dolgu(w)).map((w) => w.o).join(" ");
-  return { cari, kalemler, termin, artik };
+  return { cari, kalemler, termin, ...(not ? { not } : {}), artik };
 }
 
 /** Adım adım kipte sorulan alan. */
@@ -178,11 +254,22 @@ export function alanAyristir(alan: AdimAlani, metin: string, listeler: Listeler,
   }
   if (alan === "termin") {
     const t = tarihBul(s, bugun);
+    if (t?.gecmis) return bulunamadi(duyulan, `Geçmiş bir gün (${fmtDayKey(t.gun)}).`);
     return t ? { durum: "bulundu", deger: t.gun, duyulan } : bulunamadi(duyulan);
   }
   const r = enIyiAralik(s, [], listeler[alan]);
   if (!r || r.sirali.length === 0) return bulunamadi(duyulan);
   return karar(r.sirali, r.duyulan);
+}
+
+/** Adım adım miktar cevabındaki birim ("yüz elli kilo" → kg); söylenmediyse null. */
+export function miktarBirimi(metin: string): Birim | null {
+  const s = sozcuklere(metin);
+  for (let i = 0; i < s.length; i++) {
+    const n = sayiOku(s, i);
+    if (n) return birimOku(s, n.son)?.birim ?? null;
+  }
+  return null;
 }
 
 /** "Başka kalem var mı?" cevabı. */

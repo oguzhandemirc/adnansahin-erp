@@ -95,7 +95,7 @@ function TaslakKarti(p: { taslak: SiparisTaslagi; onSec: (yol: AlanYolu, a: Alan
           <Text style={[s.kalemBaslik, { color: t.text }]}>{`${i + 1}. kalem`}</Text>
           <AlanSatiri etiket="Ürün" alan={k.urun} onSec={() => p.onSec({ alan: "urun", kalem: i }, k.urun)} testID={`ses-urun-${i}`} not={k.urunDevralindi ? "önceki kalemden" : undefined} />
           <AlanSatiri etiket="Renk" alan={k.renk} onSec={() => p.onSec({ alan: "renk", kalem: i }, k.renk)} testID={`ses-renk-${i}`} />
-          <AlanSatiri etiket="Miktar" alan={k.miktar} deger={(v) => `${v} ${k.birim === "kg" ? "kg" : "metre"}`} testID={`ses-miktar-${i}`} />
+          <AlanSatiri etiket="Miktar" alan={k.miktar} deger={(v) => `${v} ${k.birim ?? "metre"}`} testID={`ses-miktar-${i}`} />
         </View>
       ))}
       <View style={[s.kalem, { borderTopColor: t.separator }]}>

@@ -54,11 +54,17 @@ describe("tarihler (bugün 2026-11-17 salı)", () => {
     ["cuma", "2026-11-20"], ["cumaya kadar", "2026-11-20"], ["salı", "2026-11-24"], ["haftaya salı", "2026-11-24"],
     ["haftaya cuma", "2026-11-27"], ["gelecek hafta pazartesi", "2026-11-23"], ["bu cuma", "2026-11-20"], ["gelecek hafta", "2026-11-24"],
     ["ayın yirmisi", "2026-11-20"], ["ayın 20'si", "2026-11-20"], ["ayın on beşi", "2026-12-15"], ["ayın 10'u", "2026-12-10"],
-    ["20 Kasım", "2026-11-20"], ["yirmi kasım", "2026-11-20"], ["5 Kasım", "2027-11-05"], ["3 ocak", "2027-01-03"], ["20 kasım 2027", "2027-11-20"],
+    ["20 Kasım", "2026-11-20"], ["yirmi kasım", "2026-11-20"], ["3 ocak", "2027-01-03"], ["20 kasım 2027", "2027-11-20"],
     ["20.12", "2026-12-20"], ["15.01.2027", "2027-01-15"], ["10 gün sonra", "2026-11-27"], ["2 hafta sonra", "2026-12-01"],
     ["bir ay sonra", "2026-12-17"], ["ay sonu", "2026-11-30"], ["ay sonuna", "2026-11-30"], ["ay başı", "2026-12-01"], ["hafta sonu", "2026-11-21"],
     ["cumartesiye", "2026-11-21"], ["31 şubat", null], ["500 metre", null],
   ])("%s → %s", (m, v) => expect(gun(m)).toBe(v));
+  it("yakın geçmiş gün gelecek yıla ATILMAZ, geçmiş işaretlenir; uzak geçmiş gelecek yıldır", () => {
+    expect(tarihBul(sozcuklere("5 Kasım"), BUGUN)).toMatchObject({ gun: "2026-11-05", gecmis: true });
+    expect(tarihBul(sozcuklere("10.11"), BUGUN)).toMatchObject({ gun: "2026-11-10", gecmis: true });
+    expect(tarihBul(sozcuklere("3 eylül"), BUGUN)).toMatchObject({ gun: "2027-09-03" });
+    expect(tarihBul(sozcuklere("3 eylül"), BUGUN)?.gecmis).toBeUndefined();
+  });
 });
 
 interface Beklenen {

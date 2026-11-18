@@ -1,7 +1,7 @@
 // Sesli sipariş — listeyle YAKLAŞIK eşleştirme (SAF). Söylenen sözcük aralığı, seçicinin kullandığı kayıtlarla
 // (cari / ürün / renk: başlık + kod) karşılaştırılır. Kesin seçim yalnız eşik üstü VE açık ara öndeyse yapılır; aksi
 // hâlde adaylar döner (kullanıcı modal listeden seçer), hiçbiri yoksa "bulunamadı".
-import { benzerlik, katla, sozcuklere, sozcukBenzerligi, type Sozcuk } from "./metin";
+import { benzerlik, govdeler, katla, sozcuklere, sozcukBenzerligi, type Sozcuk } from "./metin";
 
 export interface Aday {
   readonly id: string;
@@ -13,7 +13,7 @@ export interface Aday {
 export type Alan<T> =
   | { readonly durum: "bulundu"; readonly deger: T; readonly duyulan: string }
   | { readonly durum: "adaylar"; readonly adaylar: readonly T[]; readonly duyulan: string }
-  | { readonly durum: "bulunamadi"; readonly duyulan?: string };
+  | { readonly durum: "bulunamadi"; readonly duyulan?: string; /** Neden yazılmadı (ör. geçmiş tarih). */ readonly neden?: string };
 
 /** Ayırt etmeyen sözcükler (şirket türü, ölçü) eşleşme kapsamında az sayılır. */
 const GENEL = new Set([
@@ -36,6 +36,8 @@ interface Hazir {
   readonly sozler: readonly { k: string; w: number }[];
   readonly toplamAgirlik: number;
   readonly birlesik: string;
+  /** Adın bitişik önekleri ("ahmet", "ahmettekstil", …): tanıma adı bitiştirip türünü düşürdüğünde. */
+  readonly onekler: readonly string[];
   readonly kod: string | null;
 }
 
@@ -50,6 +52,7 @@ export function hazirla(adaylar: readonly Aday[]): HazirListe {
       sozler,
       toplamAgirlik: sozler.reduce((t, x) => t + x.w, 0) || 1,
       birlesik: sozler.map((x) => x.k).join(""),
+      onekler: sozler.map((_, i) => sozler.slice(0, i + 1).map((x) => x.k).join("")).slice(1),
       kod: aday.kod ? katla(aday.kod).replace(/[^a-z0-9]/g, "") : null,
     };
   });
@@ -74,16 +77,34 @@ export function skor(aralik: readonly string[], h: Hazir): number {
     });
     if (en < SOZCUK_ESIGI) {
       // Tanıma sözcükleri bitiştirmiş/ayırmış olabilir ("akıntekstil"): tüm ad bitişik karşılaştırılır.
-      const fark = Math.abs(bitisik.length - h.birlesik.length) / Math.max(bitisik.length, h.birlesik.length, 1);
-      if (fark > 0.12) return 0;
-      const b = benzerlik(bitisik, h.birlesik);
-      return b >= 0.88 ? b : 0;
+      return bitisikSkor(bitisik, h);
     }
     toplam += en;
     eslesen.add(hangi);
   }
   const kapsam = [...eslesen].reduce((t, i) => t + (h.sozler[i]?.w ?? 0), 0) / h.toplamAgirlik;
   return (toplam / aralik.length) * (0.6 + 0.4 * Math.min(1, kapsam));
+}
+
+/** Bitişik söylenmiş ad (ekli olabilir) ↔ adın tamamı ya da en az iki sözcüklük öneki; eşik 0,88. */
+function bitisikSkor(bitisik: string, h: Hazir): number {
+  let en = 0;
+  for (const g of govdeler(bitisik)) {
+    for (const hedef of [h.birlesik, ...h.onekler]) {
+      const fark = Math.abs(g.length - hedef.length) / Math.max(g.length, hedef.length, 1);
+      if (fark > 0.12) continue;
+      const b = benzerlik(g, hedef);
+      // Önek eşleşmesi tam addan biraz düşük sayılır (kapsam eksik).
+      const sk = hedef === h.birlesik ? b : b * 0.95;
+      if (b >= 0.88 && sk > en) en = sk;
+    }
+  }
+  return en;
+}
+
+/** Yalnız ayırt etmeyen sözcüklerden ("tekstil", "ltd") oluşan söz hiçbir kayda bağlanmaz. */
+export function genelMi(k: string): boolean {
+  return govdeler(k).some((g) => GENEL.has(g));
 }
 
 export interface Sirali {
@@ -128,7 +149,7 @@ export function enIyiAralik(s: readonly Sozcuk[], kullanildi: readonly boolean[]
     for (let n = 1; n <= EN_UZUN_ARALIK && i + n <= son; n++) {
       const parca = s.slice(i, i + n);
       if (parca.some((w, j) => w.sinir || kullanildi[i + j])) break;
-      if (parca.every((w) => /^\d/.test(w.k))) continue;
+      if (parca.every((w) => /^\d/.test(w.k) || genelMi(w.k))) continue;
       const sirali = sirala(parca.map((w) => w.k), liste);
       const ust = sirali[0]?.skor ?? 0;
       if (ust > enSkor + 1e-9 || (en && Math.abs(ust - enSkor) <= 1e-9 && ust > 0 && n > en.son - en.bas)) {

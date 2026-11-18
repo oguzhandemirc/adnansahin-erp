@@ -1,7 +1,8 @@
 // Sesli sipariş — ekran akışının SAF çekirdeği: adım adım soru sırası, aday seçimiyle çözme ve forma aktarılacak
 // değerler. Burada GÖNDERİM YOKTUR: çıktı yalnız formun alanlarıdır; gönderim mevcut "Gönder" düğmesindedir.
 import { fmtDayKey } from "../lib/factory-time";
-import { alanAyristir, atlaMi, evetHayir, type Alan, type Aday, type KalemTaslagi, type Listeler, type SiparisTaslagi } from "./ayristir";
+import { FORM_BIRIMI } from "./sayi";
+import { alanAyristir, atlaMi, evetHayir, miktarBirimi, type Alan, type Aday, type KalemTaslagi, type Listeler, type SiparisTaslagi } from "./ayristir";
 
 export type Adim = "cari" | "urun" | "renk" | "miktar" | "baska" | "termin" | "bitti";
 
@@ -87,7 +88,7 @@ export function adimCevap(d: AdimDurumu, metin: string, listeler: Listeler, bugu
     case "miktar": {
       const r = alanAyristir("miktar", metin, listeler, bugun) as Alan<string>;
       if (r.durum !== "bulundu") return { ...d, uyari: `${tirnak(metin.trim())} bir miktar olarak anlaşılmadı. Örnek: “beş yüz metre”.` };
-      return { ...d, adim: "baska", taslak: kalemYaz(d.taslak, d.kalem, { miktar: r, birim: "metre" }), uyari: null };
+      return { ...d, adim: "baska", taslak: kalemYaz(d.taslak, d.kalem, { miktar: r, birim: miktarBirimi(metin) ?? "metre" }), uyari: null };
     }
     case "baska": {
       const c = evetHayir(metin);
@@ -98,7 +99,7 @@ export function adimCevap(d: AdimDurumu, metin: string, listeler: Listeler, bugu
     case "termin": {
       if (atlaMi(metin)) return adimAtla(d);
       const r = alanAyristir("termin", metin, listeler, bugun) as Alan<string>;
-      if (r.durum !== "bulundu") return { ...d, uyari: `${tirnak(metin.trim())} bir tarih olarak anlaşılmadı. Örnek: “cuma”, “20 Kasım”.` };
+      if (r.durum !== "bulundu") return { ...d, uyari: r.durum === "bulunamadi" && r.neden ? `${r.neden} Yeniden söyleyin ya da “yok” deyin.` : `${tirnak(metin.trim())} bir tarih olarak anlaşılmadı. Örnek: “cuma”, “20 Kasım”.` };
       return { ...d, adim: "bitti", taslak: { ...d.taslak, termin: r }, uyari: null };
     }
     default:
@@ -133,20 +134,29 @@ export interface FormDoldurma {
   readonly kalemler: readonly { urun: FormSecimi | null; renk: FormSecimi | null; miktar: string }[];
   /** "GG.AA.YYYY" ya da null. */
   readonly termin: string | null;
+  /** "not: …" ile söylenen açıklama ya da null. */
+  readonly aciklama: string | null;
 }
 
 const kesin = (a: Alan<Aday>): FormSecimi | null => (a.durum === "bulundu" ? { id: a.deger.id, title: a.deger.title } : null);
 
+/** Miktar forma yazılır mı: bulundu ve birim metre/kg ya da söylenmedi (formun birimi ürünün birimidir). */
+export function miktarYazilir(k: KalemTaslagi): boolean {
+  return k.miktar.durum === "bulundu" && (k.birim === null || FORM_BIRIMI.has(k.birim));
+}
+
 export function formaDonustur(t: SiparisTaslagi): FormDoldurma {
   return {
     cari: kesin(t.cari),
-    kalemler: t.kalemler.map((k) => ({ urun: kesin(k.urun), renk: kesin(k.renk), miktar: k.miktar.durum === "bulundu" ? k.miktar.deger : "" })),
+    // Top/adet ürün birimine çevrilemez: miktar forma YAZILMAZ (kullanıcı metre/kg girer; ekranda söylenir).
+    kalemler: t.kalemler.map((k) => ({ urun: kesin(k.urun), renk: kesin(k.renk), miktar: miktarYazilir(k) ? (k.miktar as { deger: string }).deger : "" })),
     termin: t.termin.durum === "bulundu" ? fmtDayKey(t.termin.deger, "") || null : null,
+    aciklama: t.not ? t.not : null,
   };
 }
 
 /** Taslakta forma aktarılacak en az bir şey var mı. */
 export function aktarilacakVar(t: SiparisTaslagi): boolean {
   const f = formaDonustur(t);
-  return !!f.cari || !!f.termin || f.kalemler.some((k) => k.urun || k.renk || k.miktar);
+  return !!f.cari || !!f.termin || !!f.aciklama || f.kalemler.some((k) => k.urun || k.renk || k.miktar);
 }

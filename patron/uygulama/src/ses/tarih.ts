@@ -33,6 +33,14 @@ function ayEkle(key: string, n: number): string {
   return anahtar(y, m, Math.min(p.d, ayGunu(y, m)));
 }
 
+/**
+ * Yılsız söylenen gün bu yıl için geçmişteyse: son 60 gün içindeyse büyük olasılıkla yanlış söylendi/duyuldu ("10 Kasım"
+ * 18 Kasımda) → GEÇMİŞ işaretlenir; daha eskiyse gelecek yıl kastedilmiştir ("3 Ocak" Kasımda).
+ */
+function yakinGecmis(gun: string, bugun: string): boolean {
+  return gun < bugun && addDaysToKey(gun, 60) >= bugun;
+}
+
 /** Sözcük gövdelerinden biri listede mi → dizin. */
 function listede(w: Sozcuk | undefined, liste: readonly string[]): number {
   if (!w || w.sinir) return -1;
@@ -47,12 +55,14 @@ const esit = (w: Sozcuk | undefined, ...kok: string[]) => !!w && !w.sinir && gov
 export interface TarihSonucu {
   /** Teslim günü `yyyy-MM-dd`. */
   readonly gun: string;
+  /** Söylenen gün GEÇMİŞTE (yakın geçmiş ya da açık yıl): termine yazılmaz, kullanıcıya gösterilir. */
+  readonly gecmis?: boolean;
   readonly bas: number;
   readonly son: number;
 }
 
 /** `i`'de başlayan çıplak tarih ifadesi (ön/arka sözler hariç). */
-function cekirdek(s: readonly Sozcuk[], i: number, bugun: string): { gun: string; son: number } | null {
+function cekirdek(s: readonly Sozcuk[], i: number, bugun: string): { gun: string; son: number; gecmis?: boolean } | null {
   const w = s[i];
   if (!w || w.sinir) return null;
   const p = parca(bugun);
@@ -73,7 +83,7 @@ function cekirdek(s: readonly Sozcuk[], i: number, bugun: string): { gun: string
     if (g >= 0) return { gun: addDaysToKey(pazartesi, g), son: j + 1 };
     return { gun: addDaysToKey(bugun, 7), son: j };
   }
-  if (esit(w, "bu") && listede(s[i + 1], GUNLER) >= 0) {
+  if (esit(w, "bu", "onumuzdeki", "gelecek", "ilk") && listede(s[i + 1], GUNLER) >= 0) {
     const g = listede(s[i + 1], GUNLER);
     const fark = g - haftaGunu(bugun);
     return { gun: addDaysToKey(bugun, fark >= 0 ? fark : fark + 7), son: i + 2 };
@@ -111,8 +121,11 @@ function cekirdek(s: readonly Sozcuk[], i: number, bugun: string): { gun: string
     const d = Number(t[1]);
     const m = Number(t[2]);
     let y = t[3] ? Number(t[3].length === 2 ? `20${t[3]}` : t[3]) : p.y;
-    if (!t[3] && anahtar(y, m, d) < bugun) y += 1;
-    if (gecerli(y, m, d)) return { gun: anahtar(y, m, d), son: i + 1 };
+    if (!t[3] && anahtar(y, m, d) < bugun) {
+      if (yakinGecmis(anahtar(y, m, d), bugun)) return gecerli(y, m, d) ? { gun: anahtar(y, m, d), son: i + 1, gecmis: true } : null;
+      y += 1;
+    }
+    if (gecerli(y, m, d)) return { gun: anahtar(y, m, d), son: i + 1, ...(anahtar(y, m, d) < bugun ? { gecmis: true } : {}) };
   }
   // N gün/hafta/ay sonra|içinde · 20 Kasım [2027]
   const n = sayiOku(s, i) ?? (w.k === "bir" ? { deger: 1, son: i + 1 } : null);
@@ -131,8 +144,11 @@ function cekirdek(s: readonly Sozcuk[], i: number, bugun: string): { gun: string
       if (yil !== null && yil >= 2000 && yil <= 2100 && Number.isInteger(yil)) {
         y = yil;
         son += 1;
-      } else if (anahtar(y, ay + 1, n.deger) < bugun) y += 1;
-      if (gecerli(y, ay + 1, n.deger)) return { gun: anahtar(y, ay + 1, n.deger), son };
+      } else if (anahtar(y, ay + 1, n.deger) < bugun) {
+        if (yakinGecmis(anahtar(y, ay + 1, n.deger), bugun)) return gecerli(y, ay + 1, n.deger) ? { gun: anahtar(y, ay + 1, n.deger), son, gecmis: true } : null;
+        y += 1;
+      }
+      if (gecerli(y, ay + 1, n.deger)) return { gun: anahtar(y, ay + 1, n.deger), son, ...(anahtar(y, ay + 1, n.deger) < bugun ? { gecmis: true } : {}) };
     }
   }
   return null;
@@ -151,7 +167,7 @@ export function tarihBul(s: readonly Sozcuk[], bugun: string, kullanildi: readon
     while (bas > 0 && !kullanildi[bas - 1] && ON_SOZ.has(s[bas - 1]!.k)) bas -= 1;
     let son = c.son;
     while (son < s.length && !s[son]!.sinir && govdeler(s[son]!.k).some((g) => ARKA_SOZ.has(g))) son += 1;
-    return { gun: c.gun, bas, son };
+    return { gun: c.gun, bas, son, ...(c.gecmis ? { gecmis: true } : {}) };
   }
   return null;
 }
