@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { moduleTitle } from "../../src/lib/access";
+import { gizlilikAc, gizlilikAdresi } from "../../src/lib/gizlilik";
 import { MODULE_ICON } from "../../src/ui/icons";
 import { ROLE_LABEL, roleOf } from "../../src/ui/RoleBadge";
 import { useSession } from "../../src/state/session";
@@ -33,6 +34,7 @@ export default function Profile() {
   const tfOpen = tf.status?.acik === true;
   const role = roleOf(permissions);
   const hesap = facility?.hesap;
+  const gizlilik = gizlilikAdresi();
   return (
     <Screen module="profil">
       <View style={[s.hero, { backgroundColor: t.color.primary, borderColor: t.scheme === "dark" ? t.color.primary2 : t.color.primary }]} testID="profil-kart">
@@ -76,6 +78,12 @@ export default function Profile() {
         <ListeSatiri birincil="İki adımlı doğrulama" ikincil={tf.status ? (tfOpen ? "Açık · girişte kod istenir" : "Kapalı") : "—"} icon={tfOpen ? "shield-checkmark-outline" : "shield-outline"} ton="green"
           {...(tf.status ? { onPress: () => { setOk(null); setTfSheet(true); } } : {})} testID="dogrulama-git" />
       </ListeBlogu>
+      {gizlilik ? (
+        <ListeBlogu baslik="Hakkında">
+          <ListeSatiri birincil="Gizlilik politikası" ikincil="Hangi veriler işlenir · hesap silme" accessibilityLabel="Gizlilik politikası, tarayıcıda açılır"
+            icon="document-text-outline" ton="sky" ayrac={false} onPress={() => gizlilikAc(gizlilik)} testID="gizlilik-politikasi" />
+        </ListeBlogu>
+      ) : null}
       <View style={s.logout}>
         <ConfirmButton label="Çıkış yap" question="Bütün cihazlardaki oturumunuz kapatılsın ve bu cihazdaki son veri silinsin mi?" onConfirm={() => void logout()} testID="cikis" />
       </View>

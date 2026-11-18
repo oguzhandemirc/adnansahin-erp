@@ -69,8 +69,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Siparişi sesle girebilmeniz için mikrofon kullanılır. Ses kaydedilmez, yalnız siz mikrofon düğmesine bastığınızda dinlenir.",
-          "speechRecognitionPermission": "Konuşmanız yeni sipariş formunu doldurmak için telefonun ses tanıma hizmetiyle yazıya çevrilir. Sipariş yalnız siz Gönder'e bastığınızda gider.",
+          "microphonePermission": "Yeni sipariş formunu sesle doldurabilmeniz için mikrofon yalnız siz mikrofon düğmesine bastığınızda dinler. Uygulama ses kaydı tutmaz.",
+          "speechRecognitionPermission": "Konuşmanız yeni sipariş formuna yazılmak için Apple'ın ses tanıma hizmetiyle yazıya çevrilir; bunun için ses Apple'a iletilebilir. Uygulama sesi saklamaz; sipariş yalnız siz Gönder'e bastığınızda gider.",
           "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
         }
       ]

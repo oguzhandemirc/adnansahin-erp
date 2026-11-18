@@ -1,6 +1,7 @@
 // Sesli sipariş — konuşma tanıma sarmalayıcısı. Telefonun KENDİ tanıma hizmeti (Android Google, iOS Apple), dil tr-TR,
-// `expo-speech-recognition` üstünden. Ses kaydı tutulmaz (`recordingOptions` verilmez), metin yalnız cihazda işlenir;
-// buluta hiçbir şey gitmez. Yerel modül yoksa (web, Expo Go, eski paket) motor "kullanılamaz" döner — düğme çizilmez.
+// `expo-speech-recognition` üstünden. Ses kaydı tutulmaz (`recordingOptions` verilmez); `requiresOnDeviceRecognition`
+// verilmez → tanıma AĞ tabanlı olabilir (iOS Apple, Android Google sunucuları; gizlilik politikası § izinler bunu söyler).
+// Çıkan metin yalnız telefonda formu doldurur; bulutumuza ses gitmez. Yerel modül yoksa (web, Expo Go, eski paket) motor "kullanılamaz" döner — düğme çizilmez.
 // Testte ve geliştirme önizlemesinde sahte motor enjekte edilir (`sesMotoruAyarla`).
 import { Platform } from "react-native";
 

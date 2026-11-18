@@ -5,13 +5,14 @@
 // cümle, alan söylenmez). Web duman betiği giriş sayfasında `input` sayar (≥ 2): ① adımda iki alan kalır.
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { ApiError } from "../src/api/client";
 import { loginErrorMessage } from "../src/lib/giris-hata";
+import { gizlilikAc, gizlilikAdresi } from "../src/lib/gizlilik";
 import { useSession } from "../src/state/session";
 import { AuthShell } from "../src/ui/diger/AuthShell";
 import { Banner, Button, Field } from "../src/ui/kit";
-import { space } from "../src/ui/tokens";
+import { ON_NAVY, space, typography } from "../src/ui/tokens";
 
 export default function Login() {
   const { login, phase, configured } = useSession();
@@ -40,12 +41,20 @@ export default function Login() {
     }
   }
 
+  const gizlilik = gizlilikAdresi();
+  // Alt bağlantı: mağaza kuralı gereği gizlilik politikası girişten önce de açılabilir (adres bulut kökeninden).
+  const footer = gizlilik ? (
+    <Pressable onPress={() => gizlilikAc(gizlilik)} accessibilityRole="link" accessibilityLabel="Gizlilik politikası, tarayıcıda açılır" hitSlop={8} testID="giris-gizlilik">
+      <Text style={{ ...typography.footnote, color: ON_NAVY.textSecondary, textAlign: "center", textDecorationLine: "underline" }}>Gizlilik politikası</Text>
+    </Pressable>
+  ) : undefined;
   const canSubmit = configured && kullaniciAdi.trim() !== "" && parola !== "";
   return (
     <AuthShell
       title={step === 1 ? "Giriş yap" : "Doğrulama kodu"}
       {...(step === 2 ? { subtitle: "Doğrulama uygulamanızdaki 6 haneli kodu girin" } : {})}
       {...(step === 2 ? { step: { at: 2, of: 2 } } : {})}
+      {...(footer ? { footer } : {})}
     >
       {!configured ? <Banner tone="error" text="Uygulama bulut adresi olmadan derlenmiş; giriş yapılamaz" /> : null}
       {error ? <Banner tone="error" text={error} testID="giris-hata" /> : null}
