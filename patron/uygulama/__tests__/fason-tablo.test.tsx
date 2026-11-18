@@ -206,6 +206,60 @@ describe("altToplam (SAF) — hesap yok: fabrikanın toplamı ya da satır sayı
   });
 });
 
+describe("firma payı (fabrika 2.13.1 `fasonFirmaPayi`) — firma/işlem süzgecinde satırın seçime düşen payı", () => {
+  const PAY = [
+    { fasonFirmaId: F1, kategoriKodlari: ["BOYA"], top: 1, metre: 300 },
+    { fasonFirmaId: F2, kategoriKodlari: ["APRE"], top: 2, metre: 256 },
+  ];
+  const W4P = ie("w4", { ...(W4.kayit as Record<string, unknown>), fasonFirmaPayi: PAY });
+  // Topları F2'de ama firma payı tamamen F1'de olmayan satır: F1 süzgecinde pay düzeyinde düşer.
+  const W7P = ie("w7", { isEmriNo: "IE-0007", musteriAdi: "Bora Mensucat", asamaTop: fason(4, 400), fasonFirmaIdleri: [F1, F2], fasonFirmaPayi: [{ fasonFirmaId: F2, kategoriKodlari: ["APRE"], top: 4, metre: 400 }] });
+  const HEPSI_P = [W1, W2, W3, W4P, W5, W6, W7P];
+  const satir = T.fasonSatirlari(HEPSI_P, ANLIK);
+  const gs = T.fasonGruplari(satir, ANLIK);
+  const hesap = (secim: Record<string, string>, ara = "") =>
+    T.altToplam({ anlik: ANLIK, gruplar: gs, secim, ara, suzulen: T.fasonSuz(satir, gs, secim, ara), tam: true });
+
+  it("bölünmüş iş emri firma süzgecinde: şerit seçili firmanın payını toplar (yalnız adet DEĞİL)", () => {
+    expect(hesap({ firma: F1, musteri: "Bora Mensucat" })).toEqual({ etiket: "Süzülen", top: 1, metre: 300, isEmri: 1 });
+    expect(hesap({ firma: F2, musteri: "Bora Mensucat" })).toEqual({ etiket: "Süzülen", top: 6, metre: 656, isEmri: 2 });
+  });
+
+  it("işlem süzgeci payın kategori kodlarıyla; çoklu firma seçimi payları birleştirir; satırın Top/Metre'si pay", () => {
+    expect(hesap({ islem: "APRE", musteri: "Bora Mensucat" })).toEqual({ etiket: "Süzülen", top: 6, metre: 656, isEmri: 2 });
+    const r = T.fasonSuz(satir, gs, { firma: `${F1}\n${F2}`, musteri: "Bora Mensucat" }, "").find((x) => x.id === "w4")!;
+    expect([r.top, r.metre]).toEqual([3, 556]);
+    const tek = T.fasonSuz(satir, gs, { firma: F1, islem: "APRE" }, "");
+    expect(tek.map((x) => x.id)).toEqual([]);
+  });
+
+  it("süzgeçsizken ve firma dışı süzgeçte satır fabrikanın tüm fason sayısını gösterir", () => {
+    const r = T.fasonSuz(satir, gs, { musteri: "Bora Mensucat" }, "").find((x) => x.id === "w4")!;
+    expect([r.top, r.metre]).toEqual([3, 556]);
+    expect(hesap({ musteri: "Bora Mensucat" })).toEqual({ etiket: "Süzülen", top: 7, metre: 956, isEmri: 2 });
+  });
+
+  it("bozuk pay girdisi → pay yok sayılır (eski davranış: bölünmüş satırda yalnız adet)", () => {
+    const bozuk = T.fasonSatirlari([ie("w4", { ...(W4.kayit as Record<string, unknown>), fasonFirmaPayi: [{ fasonFirmaId: F1, top: "x", metre: 1 }] })], ANLIK);
+    expect(bozuk[0]!.paylar).toBeNull();
+    const g = T.fasonGruplari(bozuk, ANLIK);
+    expect(T.altToplam({ anlik: ANLIK, gruplar: g, secim: { firma: F1, musteri: "Bora Mensucat" }, ara: "", suzulen: T.fasonSuz(bozuk, g, { firma: F1, musteri: "Bora Mensucat" }, ""), tam: true }))
+      .toEqual({ etiket: "Süzülen", top: null, metre: null, isEmri: 1 });
+  });
+
+  it("ekran: fasoncu ön seçiliyken bölünmüş satırın Top/Metre hücresi o firmanın payı", async () => {
+    serve([HEPSI_P]);
+    mockParams = { firma: F1 };
+    render(<Fason />);
+    await flush();
+    expect(satirlar()).toEqual(["w1", "w2", "w4"]);
+    const w4 = within(screen.getByTestId("fason-satir-w4"));
+    expect(w4.getByText("300")).toBeTruthy();
+    expect(w4.queryByText("556")).toBeNull();
+    expect(serit()).toBe("Süzülen: 22 top · 2.000 m · 3 iş emri");
+  });
+});
+
 describe("giriş noktaları", () => {
   it("Üretim › nerede: fason satırları fason tablosuna (firma ön seçili), kurşun/tambur konum listesine", () => {
     expect(locationRoute({ location: "fason", params: { asama: "FASON" } })).toEqual({ pathname: "/fason", params: {} });

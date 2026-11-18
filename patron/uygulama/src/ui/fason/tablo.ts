@@ -8,6 +8,9 @@
 // Alt şerit (`altToplam`): süzgeçsizken fabrikanın toplamı (`fason-acik`); yalnız TEK firma ya da TEK işlem seçiliyken
 // fabrikanın o firma/kategori toplamı; başka her süzgeçte satırların FABRİKA sayıları toplanır — ama iki firmaya bölünmüş
 // iş emri firma/işlem süzgecindeyse satırın sayısı o firmaya ait değildir ⇒ toplam yazılmaz, yalnız satır adedi.
+// Firma payı (2.13.1, `fasonFirmaPayi`): fabrika satırın fason top/metresini firma (+ kategori kodları) başına bölüp
+// gönderdiyse firma/işlem süzgecinde satır yalnız seçime uyan payların toplamını gösterir ve şerit bunu toplar (bölünmüş
+// satır da toplanır); alan gelmediyse (eski fabrika) yukarıdaki davranış aynen kalır. Telefon yine yalnız toplar.
 import type { ProjectionRecord } from "../../api/wire";
 import { formatDate, formatNumber } from "../../lib/format";
 import { katla } from "../../ses/metin";
@@ -31,12 +34,38 @@ export interface FasonSatiri {
   readonly islem: string;
   readonly siparisler: readonly string[];
   readonly siparis: string;
-  /** Fabrikanın fason top/metresi; gelmediyse null. */
+  /** Fabrikanın fason top/metresi; gelmediyse null. Firma/işlem süzgecinde (pay varsa) seçime düşen pay. */
   readonly top: number | null;
   readonly metre: number | null;
+  /** Fabrikanın firma payları (`fasonFirmaPayi`); alan yoksa ya da bozuksa null (eski fabrika). */
+  readonly paylar: readonly FasonPayi[] | null;
   /** Gönderimden bu yana tam gün (termin/gecikme DEĞİL). */
   readonly gun: number | null;
   readonly gonderim: string | null;
+}
+
+/** Satırın fason top/metresinin bir firmaya düşen payı (fabrikanın sayısı). `firmaId` null: açık kalemi olmayan top. */
+export interface FasonPayi {
+  readonly firmaId: string | null;
+  /** Firmanın hizmet kategori KODLARI (İşlem süzgecinin değerleri). */
+  readonly islemler: readonly string[];
+  readonly top: number;
+  readonly metre: number;
+}
+
+/** `fasonFirmaPayi` → paylar; alan yoksa ya da tek bir girdisi bozuksa null (yarım veriyle toplam yazılmaz). */
+function paylarOku(v: unknown): FasonPayi[] | null {
+  if (!Array.isArray(v)) return null;
+  const out: FasonPayi[] = [];
+  for (const x of v) {
+    const p = obj(x);
+    const top = num(p.top);
+    const metre = num(p.metre);
+    const firmaId = str(p.fasonFirmaId);
+    if (top === null || metre === null || (firmaId === null && p.fasonFirmaId !== null)) return null;
+    out.push({ firmaId, islemler: metinler(p.kategoriKodlari), top, metre });
+  }
+  return out;
 }
 
 /** Anlıktan firma ve kategori sözlükleri. */
@@ -105,6 +134,7 @@ export function fasonSatirlari(items: readonly ProjectionRecord[], anlikVeri: un
       siparis: orderCell(k),
       top: fs ? top : null,
       metre: fs ? num(fs.metre) : null,
+      paylar: paylarOku(k.fasonFirmaPayi),
       gun: gunOf(gonderim, simdi),
       gonderim,
     }];
@@ -192,15 +222,33 @@ function etkinSecim(gs: readonly SuzgecGrubu[], secim: Readonly<Record<string, s
   return out;
 }
 
-/** Süzgeç (alan içinde VEYA, alanlar arası VE) + arama (her kelime satırın metninde; Türkçe katlamalı). */
+/** Payın firma/işlem süzgecindeki değerleri. */
+const payDegerleri = (p: FasonPayi, alan: "firma" | "islem"): readonly string[] => (alan === "firma" ? (p.firmaId ? [p.firmaId] : []) : p.islemler);
+
+/**
+ * Süzgeç (alan içinde VEYA, alanlar arası VE) + arama (her kelime satırın metninde; Türkçe katlamalı). Satırın firma
+ * payları varsa firma/işlem süzgeci PAY düzeyinde uygulanır: satır seçime uyan en az bir payı varsa kalır ve Top/Metre'si
+ * o payların toplamıdır (fabrikanın sayıları; metre binde bir tamsayıyla toplanır).
+ */
 export function fasonSuz(satirlar: readonly FasonSatiri[], gs: readonly SuzgecGrubu[], secim: Readonly<Record<string, string>>, ara: string): FasonSatiri[] {
   const e = etkinSecim(gs, secim);
+  const payAlanlari = (["firma", "islem"] as const).filter((a) => e.has(a));
   const kelimeler = katla(ara).replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-  return satirlar.filter((r) => {
-    for (const [alan, xs] of e) if (!degerleri(r, alan).some((v) => xs.includes(v))) return false;
-    if (kelimeler.length === 0) return true;
-    const metin = katla([r.isEmriNo, r.musteri, r.kumas, r.renk, r.firma, r.islem, ...r.siparisler].filter(Boolean).join(" "));
-    return kelimeler.every((w) => metin.includes(w));
+  return satirlar.flatMap((r): FasonSatiri[] => {
+    const payli = r.paylar !== null && payAlanlari.length > 0;
+    for (const [alan, xs] of e) {
+      if (payli && (alan === "firma" || alan === "islem")) continue;
+      if (!degerleri(r, alan).some((v) => xs.includes(v))) return [];
+    }
+    if (kelimeler.length > 0) {
+      const metin = katla([r.isEmriNo, r.musteri, r.kumas, r.renk, r.firma, r.islem, ...r.siparisler].filter(Boolean).join(" "));
+      if (!kelimeler.every((w) => metin.includes(w))) return [];
+    }
+    if (!payli) return [r];
+    const uyan = r.paylar!.filter((p) => payAlanlari.every((a) => payDegerleri(p, a).some((v) => e.get(a)!.includes(v))));
+    if (uyan.length === 0) return [];
+    const mm = uyan.reduce((n, p) => n + Math.round(p.metre * 1000), 0);
+    return [{ ...r, top: uyan.reduce((n, p) => n + p.top, 0), metre: mm / 1000 }];
   });
 }
 
@@ -272,7 +320,8 @@ export function altToplam(p: {
   }
   if (!p.tam) return null;
   const firmaSuzgeci = e.has("firma") || e.has("islem");
-  const toplanir = p.suzulen.every((r) => r.top !== null && r.metre !== null) && !(firmaSuzgeci && p.suzulen.some((r) => r.firmaIdleri.length > 1));
+  // Bölünmüş satır yalnız payı YOKSA engeldir (paylı satırın sayısı `fasonSuz`da seçime düşen paydır).
+  const toplanir = p.suzulen.every((r) => r.top !== null && r.metre !== null) && !(firmaSuzgeci && p.suzulen.some((r) => r.firmaIdleri.length > 1 && r.paylar === null));
   if (!toplanir) return { etiket: "Süzülen", top: null, metre: null, isEmri: p.suzulen.length };
   return {
     etiket: "Süzülen",

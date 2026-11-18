@@ -1,6 +1,7 @@
 // Fason ekranının ALTTA SABİT toplam şeridi (Stok'un `StokToplamSatiri` düzeni): tek satır, kaydırma yok; sığmazsa yazı
 // küçülür (en çok %75). "Fasonda 330 top · 12.345 m · 42 iş emri" — süzgeçliyken "Süzülen …". Sayılar `altToplam`dan
-// (fabrikanın toplamı ya da satırların fabrika sayıları); top/metre yazılamayan kümede yalnız iş emri adedi.
+// (fabrikanın toplamı ya da satırların fabrika sayıları; firma/işlem süzgecinde fabrikanın firma payları varsa seçime
+// düşen paylar); top/metre yazılamayan kümede (pay göndermeyen eski fabrika + bölünmüş iş emri) yalnız iş emri adedi.
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { UNIT } from "../../lib/labels/uretim";
