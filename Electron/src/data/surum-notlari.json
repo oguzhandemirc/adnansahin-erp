@@ -17,6 +17,20 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-18b",
+      "baslik": "Bildirimleri açıp kapatan anahtar",
+      "surumler": {
+        "panel": "1.3.21"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Bildirim Atamaları sayfasına bildirimleri açıp kapatan anahtar eklendi (yalnız sistem yöneticisi kullanır)."
+        }
+      ]
+    },
+    {
       "id": "2026-11-18",
       "baslik": "Panelde kişisel bildirimler",
       "surumler": {
