@@ -1,30 +1,64 @@
 // Cari kartı "Özet" bölümleri (M2 sözleşmesi): Toplamlar · En çok alınan · Açık siparişler · İadeler. Her bölüm
 // kendi isteği, iskeleti, boş durumu ve hatasıyla yaşar; birinin hatası diğerini düşürmez. Uygulama SAYMAZ:
 // sayılar fabrikanın `cari-ozeti` anlığından, listeler sunucu süzgecinden. Para yok; birimler toplanmaz.
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { Text, useWindowDimensions, View } from "react-native";
-import type { CustomerSummary, CustomerSummaryPeriod, CustomerSummaryResponse, UnitQuantity } from "../../api/wire";
+import { Pressable, Text, useWindowDimensions, View } from "react-native";
+import type { CustomerSummary, CustomerSummaryPeriod, CustomerSummaryPeriodCounts, CustomerSummaryPeriodKey, CustomerSummaryResponse, UnitQuantity } from "../../api/wire";
 import { formatDate, formatNumber } from "../../lib/format";
 import { UNIT } from "../../lib/labels/siparis";
 import { useSession } from "../../state/session";
 import { useRemote, type Remote } from "../../state/useRemote";
 import { MODULE_ICON } from "../icons";
 import { BlokBasligi, BosDurum, HataDurumu, Iskelet, ListeBlogu, ListeSatiri, Rozet, StatCard, type StatDeger } from "../ortak";
-import { KompaktSecim } from "../KompaktSecim";
+import { KOMPAKT_YUKSEKLIK, KompaktSecim } from "../KompaktSecim";
 import { CARI_SIPARIS_SUTUNLARI, SIPARIS_SUTUNLARI } from "../siparis/sutunlar";
 import { KisaTablo, sutunSec } from "../tablo/KisaTablo";
 import type { SutunTanimi } from "../tablo/model";
 import { asObj, str } from "../siparis/OrderRow";
 import { ListStates } from "../siparis/parts";
 import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
-import { makeStyles } from "../theme-context";
-import { space } from "../tokens";
+import { BASMA } from "../hareket/sabitler";
+import { ChoiceSheet } from "../siparis/ChoiceSheet";
+import { makeStyles, useTokens } from "../theme-context";
+import { FONT_SCALE, space, typography } from "../tokens";
 
-export type Donem = "tumZamanlar" | "son12Ay";
+export type Donem = CustomerSummaryPeriodKey;
+/** Hazır dönemler (fabrika 2.13.1; sınırları fabrika hesaplar). Sıra seçicide görünen sıradır. */
 export const DONEMLER: readonly { key: Donem; label: string }[] = [
   { key: "tumZamanlar", label: "Tüm zamanlar" },
   { key: "son12Ay", label: "Son 12 ay" },
+  { key: "buAy", label: "Bu ay" },
+  { key: "gecenAy", label: "Geçen ay" },
+  { key: "son3Ay", label: "Son 3 ay" },
+  { key: "son6Ay", label: "Son 6 ay" },
+  { key: "buYil", label: "Bu yıl" },
+  { key: "gecenYil", label: "Geçen yıl" },
 ];
+
+/** Veride OLAN dönemler (eski fabrika yalnız tüm zamanlar + son 12 ay gönderir; olmayan seçenek çizilmez). */
+export function mevcutDonemler(ozet: CustomerSummary): readonly { key: Donem; label: string }[] {
+  return DONEMLER.filter((d) => {
+    const v = (ozet as unknown as Record<string, unknown>)[d.key];
+    return typeof v === "object" && v !== null;
+  });
+}
+
+/** Seçili dönemin sayıları; seçim veride yoksa (eski özet) tüm zamanlar. */
+export function donemVerisi(ozet: CustomerSummary, donem: Donem): CustomerSummaryPeriodCounts {
+  return mevcutDonemler(ozet).some((d) => d.key === donem) ? (ozet[donem] as CustomerSummaryPeriodCounts) : ozet.tumZamanlar;
+}
+
+/**
+ * Seçili dönemin tarih aralığı fabrikanın `donemler`inden ("01.11.2026 – 19.11.2026"): açık uç (`bitis` null) = özetin
+ * üretildiği fabrika günü (`uretimGunu`; yoksa "bugün"). Tüm zamanlar (başlangıç null) ve sınırı gelmeyen dönem → null.
+ */
+export function donemAraligi(r: Pick<CustomerSummaryResponse, "donemler" | "uretimGunu">, donem: Donem): string | null {
+  const s = r.donemler?.[donem];
+  if (!s || !s.baslangic) return null;
+  const son = s.bitis ? formatDate(s.bitis) : r.uretimGunu ? formatDate(r.uretimGunu) : "bugün";
+  return `${formatDate(s.baslangic)} – ${son}`;
+}
 export const OZET_ILK = 5;
 export const URUN_TUMU = 10;
 const IADE_SAYFA = 25;
@@ -44,11 +78,11 @@ export function useCariOzeti(cariKartId: string | null, enabled: boolean): Remot
  * Kartlar: sipariş · açık (şu an) · brüt sevk · iade (varsayılan) + sipariş kalemi · sevk kg · son sipariş · son sevk
  * (2026-11-17, seçicide KAPALI). Sevk brüt; iade ayrı, sevkten düşülmez. Tarihler fabrikanın; gün farkı hesaplanmaz.
  */
-export function toplamKartlari(ozet: CustomerSummary, d: CustomerSummaryPeriod) {
+export function toplamKartlari(ozet: CustomerSummary, d: CustomerSummaryPeriodCounts) {
   return [...temelKartlar(ozet, d), ...ekKartlar(ozet, d)];
 }
 
-function ekKartlar(ozet: CustomerSummary, d: CustomerSummaryPeriod) {
+function ekKartlar(ozet: CustomerSummary, d: CustomerSummaryPeriodCounts) {
   const tarih = (v: string | null): StatDeger[] => (v ? [{ deger: formatDate(v) }] : []);
   return [
     { key: "kalem", etiket: "Sipariş kalemi", icon: "list-outline" as const, ton: "violet" as const, degerler: [{ deger: sayi(d.kalemSayisi, 0), birim: "kalem" }], ipucu: `${sayi(d.siparisSayisi, 0)} sipariş` },
@@ -61,7 +95,7 @@ function ekKartlar(ozet: CustomerSummary, d: CustomerSummaryPeriod) {
   ];
 }
 
-function temelKartlar(ozet: CustomerSummary, d: CustomerSummaryPeriod) {
+function temelKartlar(ozet: CustomerSummary, d: CustomerSummaryPeriodCounts) {
   const sevk: StatDeger[] = [{ deger: sayi(d.sevk.metre), birim: "m" }, { deger: sayi(d.sevk.top, 0), birim: "top" }];
   const acikMiktar = birimDegerleri(ozet.acik.acikMiktar);
   return [
@@ -114,20 +148,74 @@ export function ToplamlarBolumu({ ozet, donem, onDonem, kartlar = ["siparis", "a
   if (ozet.data && !veri) return <View style={s.bolum}><BosDurum baslik="Bu müşterinin henüz hareketi yok" icon={MODULE_ICON.siparisler.icon} testID="cari-toplamlar-bos" /></View>;
   if (!veri) return null;
   const cikanlar = oneCikanlar(veri, kartlar);
+  const ekSatirlar = ozetEkSatirlari(veri);
   return (
     <View style={s.bolum} testID="cari-toplamlar">
-      {/* Dönem: kompakt bölmeli seçim, içerik genişliğinde, sola dayalı (N seçenek alır; "Aralık…" girişi ileride yanına). */}
-      {donemli ? <KompaktSecim items={DONEMLER} value={donem} onChange={onDonem} testIDPrefix="cari-donem-" accessibilityLabel="Dönem" /> : null}
+      {donemli && ozet.data ? <DonemSecici yanit={ozet.data} ozet={veri} donem={donem} onDonem={onDonem} /> : null}
       {kartlar.length > 0 ? (
         <View style={s.izgara}>
-          {toplamKartlari(veri, veri[donem]).filter((k) => kartlar.includes(k.key)).map((k) => (
+          {toplamKartlari(veri, donemVerisi(veri, donem)).filter((k) => kartlar.includes(k.key)).map((k) => (
             <StatCard key={k.key} taban={taban} etiket={k.etiket} icon={k.icon} ton={k.ton} degerler={k.degerler} ipucu={k.ipucu} bos={"bos" in k ? k.bos : undefined} testID={`cari-toplam-${k.key}`} />
           ))}
         </View>
       ) : null}
       {cikanlar ? <Text style={s.cikanlar} testID="cari-one-cikanlar">{cikanlar}</Text> : null}
+      {ekSatirlar.map((x) => <Text key={x.key} style={s.cikanlar} testID={`cari-ozet-${x.key}`}>{x.metin}</Text>)}
     </View>
   );
+}
+
+/**
+ * Dönem seçimi. Eski fabrika (yalnız iki dönem): bugünkü küçük bölmeli seçim. 2.13.1+ (8 dönem yan yana sığmaz): tek
+ * kompakt "Dönem: Bu ay ▾" düğmesi → alt sayfada veride OLAN dönemler; yanında seçili dönemin aralığı küçük yazıyla.
+ */
+function DonemSecici({ yanit, ozet, donem, onDonem }: { yanit: CustomerSummaryResponse; ozet: CustomerSummary; donem: Donem; onDonem: (d: Donem) => void }) {
+  const s = useStyles();
+  const t = useTokens();
+  const [acik, setAcik] = useState(false);
+  const secenekler = mevcutDonemler(ozet);
+  const secili = secenekler.some((d) => d.key === donem) ? donem : "tumZamanlar";
+  const aralik = donemAraligi(yanit, secili);
+  if (secenekler.length <= 2) return <KompaktSecim items={secenekler} value={secili} onChange={onDonem} testIDPrefix="cari-donem-" accessibilityLabel="Dönem" />;
+  const ad = secenekler.find((d) => d.key === secili)?.label ?? "Tüm zamanlar";
+  return (
+    <View style={s.donemSatiri}>
+      <Pressable
+        onPress={() => setAcik(true)} hitSlop={{ top: 6, bottom: 6 }} accessibilityRole="button" accessibilityLabel={`Dönem: ${ad}${aralik ? `, ${aralik}` : ""}`}
+        testID="cari-donem-dugme" style={({ pressed }) => [s.donemDugme, pressed && { opacity: BASMA.opaklik }]}
+      >
+        <Text style={s.donemYazi} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>
+          <Text style={s.donemOnek}>Dönem: </Text>{ad}
+        </Text>
+        <Ionicons name="chevron-down" size={14} color={t.textSecondary} />
+      </Pressable>
+      {aralik ? <Text style={s.cikanlar} testID="cari-donem-aralik">{aralik}</Text> : null}
+      <ChoiceSheet visible={acik} title="Dönem" choices={secenekler} value={secili} onSelect={onDonem} onClose={() => setAcik(false)} testIDPrefix="cari-donem-" />
+    </View>
+  );
+}
+
+/**
+ * Özetin ek satırları (fabrika 2.13.1; alan yoksa satır yok): en eski açık sipariş (tarih + fabrikanın gün sayısı) ve
+ * etiketi bu cari olan depodaki mal. Termin/gecikme sayısı YOK (anlık kuralı yasaklar).
+ */
+export function ozetEkSatirlari(ozet: CustomerSummary): { key: string; metin: string }[] {
+  const out: { key: string; metin: string }[] = [];
+  const t = ozet.acik.enEskiSiparisTarihi;
+  if (t) {
+    const gun = ozet.acik.enEskiSiparisYasGun;
+    out.push({ key: "en-eski", metin: `En eski açık sipariş: ${formatDate(t)}${typeof gun === "number" ? ` · ${sayi(gun, 0)} gün` : ""}` });
+  }
+  const m = ozet.depodakiMal;
+  if (m) {
+    out.push({
+      key: "depodaki-mal",
+      metin: m.depodaTop === 0 && m.cuvaldaTop === 0
+        ? "Depoda malı yok"
+        : `Depoda malı: ${sayi(m.depodaTop, 0)} top ${sayi(m.depodaMetre)} m · Çuvalda ${sayi(m.cuvaldaTop, 0)} top ${sayi(m.cuvaldaMetre)} m`,
+    });
+  }
+  return out;
 }
 
 /**
@@ -148,19 +236,38 @@ function useKartTabani(): number {
 }
 
 type Urun = CustomerSummaryPeriod["enCokUrun"][number] & { readonly id: string };
-/** En çok alınan: Ürün · Renk · Sipariş adedi · Miktar (birim fabrikanın; birimler toplanmaz). Son sipariş tarihi telde YOK. */
+/**
+ * En çok alınan: Ürün · Renk · Sipariş adedi · Miktar (birim fabrikanın; birimler toplanmaz) · Son sipariş (fabrika
+ * 2.13.1 `sonSiparisTarihi`; eski fabrika göndermez → sütun çizilmez, `urunSutunlari`).
+ */
 export const URUN_SUTUNLARI: readonly SutunTanimi<Urun>[] = [
   { key: "urun", baslik: "Ürün", agirlik: 2, satir: 2, hucre: (u) => u.urunAdi },
   { key: "renk", baslik: "Renk", agirlik: 1.3, hucre: (u) => u.renkAdi ?? "—" },
   { key: "siparis", baslik: "Sipariş", ad: "Sipariş adedi", agirlik: 0.8, sayi: true, hucre: (u) => sayi(u.siparisSayisi, 0) },
   { key: "miktar", baslik: "Miktar", agirlik: 1.1, sayi: true, hucre: (u) => `${sayi(u.miktar)} ${birimEtiketi(u.birim)}` },
+  { key: "sonSiparis", baslik: "Son sipariş", agirlik: 1.1, hucre: (u) => (u.sonSiparisTarihi ? formatDate(u.sonSiparisTarihi) : "—") },
 ];
+/** Satırlardan biri `sonSiparisTarihi` alanını taşıyorsa (fabrika 2.13.1+) son sipariş sütunu; yoksa bugünkü dört sütun. */
+export const urunSutunlari = (xs: readonly Urun[]): readonly SutunTanimi<Urun>[] =>
+  xs.some((u) => u.sonSiparisTarihi !== undefined) ? URUN_SUTUNLARI : URUN_SUTUNLARI.filter((c) => c.key !== "sonSiparis");
 const ACIK_SUTUNLARI = sutunSec(SIPARIS_SUTUNLARI, CARI_SIPARIS_SUTUNLARI);
 
-export function EnCokUrunBolumu({ ozet, donem }: { ozet: Remote<CustomerSummaryResponse>; donem: Donem }) {
+export function EnCokUrunBolumu({ ozet, donem, onDonem }: { ozet: Remote<CustomerSummaryResponse>; donem: Donem; onDonem?: (d: Donem) => void }) {
   const s = useStyles();
   const [tumu, setTumu] = useState(false);
-  const urunler = ozet.data?.ozet?.[donem].enCokUrun ?? [];
+  const veri = ozet.data?.ozet;
+  if (!veri) return null;
+  const d = donemVerisi(veri, donem) as Partial<CustomerSummaryPeriod>;
+  // Kısa dönemlerde fabrika "en çok alınan" listesi göndermez (yalnız tüm zamanlar + son 12 ay): boş bant yerine tek satır.
+  if (d.enCokUrun === undefined) {
+    return (
+      <Text style={[s.cikanlar, s.bolum]} testID="cari-urun-donem-yok">
+        {"Bu dönem için en çok alınan listesi yok — "}
+        <Text style={s.baglanti} onPress={onDonem ? () => onDonem("son12Ay") : undefined} accessibilityRole="link" testID="cari-urun-son12">Son 12 ay'a bak</Text>
+      </Text>
+    );
+  }
+  const urunler = d.enCokUrun;
   // Yükleme/hata/henüz gelmedi Toplamlar'da gösterilir (aynı istek); boş dizi = blok çizilmez (sözleşme §1).
   if (urunler.length === 0) return null;
   const gorunen = urunler.slice(0, tumu ? URUN_TUMU : OZET_ILK);
@@ -171,7 +278,7 @@ export function EnCokUrunBolumu({ ozet, donem }: { ozet: Remote<CustomerSummaryR
   return (
     <View style={s.bolum} testID="cari-urunler">
       <BlokBasligi baslik="En çok alınan · miktara göre" sag={sag} />
-      <KisaTablo sutunlar={URUN_SUTUNLARI} satirlar={satirlar} testID="cari-urun" />
+      <KisaTablo sutunlar={urunSutunlari(satirlar)} satirlar={satirlar} testID="cari-urun" />
     </View>
   );
 }
@@ -258,6 +365,15 @@ const useStyles = makeStyles((t) => ({
   bolum: { marginTop: space.l, gap: space.m },
   izgara: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: space.m },
   cikanlar: { fontSize: 13, lineHeight: 18, color: t.color.textMuted },
+  baglanti: { fontWeight: "600" as const, color: t.color.link },
+  // Dönem düğmesi KompaktSecim ile aynı boy ve zemin: içerik genişliğinde, sola dayalı.
+  donemSatiri: { flexDirection: "row" as const, alignItems: "center" as const, flexWrap: "wrap" as const, columnGap: space.m, rowGap: space.xs },
+  donemDugme: {
+    flexDirection: "row" as const, alignItems: "center" as const, gap: space.xs, height: KOMPAKT_YUKSEKLIK, paddingHorizontal: space.m,
+    borderRadius: t.radius.control, backgroundColor: t.scheme === "dark" ? t.surfaceAlt : t.separator,
+  },
+  donemYazi: { ...typography.footnote, color: t.text, fontWeight: "600" as const },
+  donemOnek: { fontWeight: "400" as const, color: t.textSecondary },
   sagSira: { flexDirection: "row" as const, alignItems: "center" as const },
   ozetMetni: { fontSize: 13, lineHeight: 18, color: t.color.textMuted },
   tumu: { fontSize: 15, lineHeight: 20, fontWeight: "600" as const, color: t.color.link, paddingVertical: space.xs, paddingLeft: space.m },

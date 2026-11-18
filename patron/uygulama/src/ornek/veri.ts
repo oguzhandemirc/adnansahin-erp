@@ -1,6 +1,6 @@
 // ÖRNEK VERİ — yalnız geliştirme önizlemesi (`kapi.ts`). Bütün adlar açıkça uydurmadır ("Örnek", "Deneme",
 // "Numune"…); gerçek müşteri/kişi adı YOKTUR. Tel şekli uygulamanın okuyucularıyla aynı (savunmalı okunur).
-import { LIST_SORT, type CustomerSummary, type CustomerSummaryPeriod, type CustomerSummaryResponse, type FacilityStatus, type LoginResponse, type ProjectionRecord } from "../api/wire";
+import { LIST_SORT, type CustomerSummary, type CustomerSummaryPeriod, type CustomerSummaryPeriodCounts, type CustomerSummaryResponse, type FacilityStatus, type LoginResponse, type ProjectionRecord } from "../api/wire";
 
 const GUN = 86_400_000;
 const once = (gun: number, saat = 0): string => new Date(Date.now() - gun * GUN - saat * 3_600_000).toISOString();
@@ -573,6 +573,43 @@ const donemOzeti = (o: { siparis: number; mt: number; kg?: number; sevkM: number
 });
 
 /**
+ * Fabrika 2.13.1 + yeni bulut alanları (örnek): hazır kısa dönemler (yalnız sayılar; tüm zamanlardan ölçeklenmiş uydurma),
+ * ürün satırında son sipariş tarihi, kökte `uretimGunu` + `donemler`. Gerçekte sınırları fabrika hesaplar.
+ */
+function yeniAlanlar(r: CustomerSummaryResponse): CustomerSummaryResponse {
+  const o = r.ozet;
+  if (!o) return r;
+  const sayilar = (c: number): CustomerSummaryPeriodCounts => {
+    const t = o.tumZamanlar;
+    return {
+      siparisSayisi: Math.round(t.siparisSayisi * c), kalemSayisi: Math.round(t.kalemSayisi * c),
+      siparisMiktari: t.siparisMiktari.map((x) => ({ ...x, miktar: Math.round(x.miktar * c) })),
+      sevk: { metre: Math.round(t.sevk.metre * c), top: Math.round(t.sevk.top * c), kg: Math.round(t.sevk.kg * c), tartiliCuval: Math.round(t.sevk.tartiliCuval * c), cuval: Math.round(t.sevk.cuval * c) },
+      iade: { adet: c >= 0.25 ? t.iade.adet : 0, metre: c >= 0.25 ? t.iade.metre : 0 },
+    };
+  };
+  const tarihli = (p: CustomerSummaryPeriod): CustomerSummaryPeriod => ({ ...p, enCokUrun: p.enCokUrun.map((u, i) => ({ ...u, sonSiparisTarihi: once(3 + i * 11) })) });
+  const simdi = new Date();
+  const y = simdi.getUTCFullYear();
+  const m = simdi.getUTCMonth();
+  const gun = (yy: number, mm: number, dd = 1) => new Date(Date.UTC(yy, mm, dd, -3)).toISOString();
+  return {
+    ...r,
+    uretimGunu: simdi.toISOString().slice(0, 10),
+    donemler: {
+      tumZamanlar: { baslangic: null, bitis: null }, son12Ay: { baslangic: once(365), bitis: null },
+      buAy: { baslangic: gun(y, m), bitis: null }, gecenAy: { baslangic: gun(y, m - 1), bitis: new Date(Date.parse(gun(y, m)) - 1).toISOString() },
+      son3Ay: { baslangic: gun(y, m - 3, simdi.getUTCDate()), bitis: null }, son6Ay: { baslangic: gun(y, m - 6, simdi.getUTCDate()), bitis: null },
+      buYil: { baslangic: gun(y, 0), bitis: null }, gecenYil: { baslangic: gun(y - 1, 0), bitis: new Date(Date.parse(gun(y, 0)) - 1).toISOString() },
+    },
+    ozet: {
+      ...o, tumZamanlar: tarihli(o.tumZamanlar), son12Ay: tarihli(o.son12Ay),
+      buAy: sayilar(0.04), gecenAy: sayilar(0.05), son3Ay: sayilar(0.12), son6Ay: sayilar(0.22), buYil: sayilar(0.36), gecenYil: sayilar(0.3),
+    },
+  };
+}
+
+/**
  * `GET /cari-ozeti/:id` örnekleri — c1 iadeli, c2 iadesiz, c3 anlık "henüz gelmedi" (404), c4 sade, c5 (tedarikçi)
  * `ozet: null` (hiç hareket yok). Sayılar uydurmadır; para YOK, birimler ayrı.
  */
@@ -580,18 +617,22 @@ export function ORNEK_CARI_OZETI(id: string): CustomerSummaryResponse | undefine
   const tam = (ozet: CustomerSummary | null): CustomerSummaryResponse => ({ cariKartId: id, son12AyBaslangic: once(365), surum: once(0, 0.05), ozet });
   const sonTarihler = { sonSiparisTarihi: once(3), sonSevkTarihi: once(1) };
   if (id === "c1") {
-    return tam({
+    // Fabrika 2.13.1 alanlarıyla (hazır dönemler, en eski açık sipariş, depodaki mal, ürün son sipariş tarihi).
+    return yeniAlanlar(tam({
       tumZamanlar: donemOzeti({ siparis: 48, mt: 84250.5, kg: 1350, sevkM: 61230.4, top: 1712, cuval: 224, tartili: 210, kgSevk: 18450.5, iadeTop: 3, iadeM: 161.7, urunCarpan: 1 }),
       son12Ay: donemOzeti({ siparis: 20, mt: 30100, sevkM: 22010, top: 610, cuval: 41, tartili: 41, kgSevk: 6120, iadeTop: 3, iadeM: 161.7, urunCarpan: 0.4 }),
       // Açık sayılar örnek sipariş listesiyle tutarlı (c1'de tek açık sipariş: SIP-2026-0451).
-      acik: { siparisSayisi: 1, kalemSayisi: 1, acikMiktar: [{ birim: "MT", miktar: 2400 }] },
+      acik: { siparisSayisi: 1, kalemSayisi: 1, acikMiktar: [{ birim: "MT", miktar: 2400 }], enEskiSiparisTarihi: once(68), enEskiSiparisYasGun: 68 },
+      depodakiMal: { depodaTop: 12, depodaMetre: 486.5, cuvaldaTop: 3, cuvaldaMetre: 141.25 },
       ...sonTarihler,
-    });
+    }));
   }
   if (id === "c2" || id === "c4") {
     const k = id === "c2" ? 1 : 0.35;
     const d = (c: number) => donemOzeti({ siparis: Math.round(31 * c), mt: Math.round(42800 * c), sevkM: Math.round(37950 * c), top: Math.round(988 * c), cuval: 0, tartili: 0, kgSevk: 0, iadeTop: 0, iadeM: 0, urunCarpan: 0.6 * c });
-    return tam({ tumZamanlar: d(k), son12Ay: d(k * 0.5), acik: id === "c2" ? { siparisSayisi: 2, kalemSayisi: 3, acikMiktar: [{ birim: "MT", miktar: 9900 }] } : { siparisSayisi: 1, kalemSayisi: 2, acikMiktar: [{ birim: "MT", miktar: 4950 }] }, ...sonTarihler });
+    // c4 eski fabrika gibi: yalnız tüm zamanlar + son 12 ay (yeni alan yok).
+    const r = tam({ tumZamanlar: d(k), son12Ay: d(k * 0.5), acik: id === "c2" ? { siparisSayisi: 2, kalemSayisi: 3, acikMiktar: [{ birim: "MT", miktar: 9900 }] } : { siparisSayisi: 1, kalemSayisi: 2, acikMiktar: [{ birim: "MT", miktar: 4950 }] }, ...sonTarihler });
+    return id === "c2" ? yeniAlanlar(r) : r;
   }
   if (id === "c5") return tam(null);
   return undefined;

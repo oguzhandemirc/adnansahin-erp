@@ -141,7 +141,7 @@ export default function CustomerDetail() {
                   <KisaTablo sutunlar={OZET_SEVK_TABLO} satirlar={sevk.items.slice(0, OZET_SATIR)} onPress={sevkAc} testID="cari-sevkiyatlar" />
                 </View>
               ) : null}
-              {orders && goster("enCokUrun") ? <EnCokUrunBolumu ozet={ozet} donem={donem} /> : null}
+              {orders && goster("enCokUrun") ? <EnCokUrunBolumu ozet={ozet} donem={donem} onDonem={setDonem} /> : null}
               {iadeIzni && cariId && goster("iadeler") ? <IadelerBolumu cariKartId={cariId} destek={cap.idFilter("iade", "cariKartId")} enabled={ozetGorunur} iade={ozet.data?.ozet?.tumZamanlar.iade} /> : null}
               {/* "Son siparişler" açık siparişler bölümü görünürken çizilmez (2026-11-19: iki bölüm çoğu satırı yineliyordu);
                   açık bölümü yoksa (eski bulut ya da kart kapalı) son siparişler tek sipariş listesidir. */}
