@@ -1,7 +1,8 @@
 // Ekran veri kancası (SWR, K1-a): saklı kopya ANINDA çizilir (`stale: true` — "fabrika verisi <zaman>"), arkadan ağ;
 // başarıda `stale: false`. Ağ hatasında son veri + çevrimdışı bandı (`offline`); bayat ≠ çevrimdışı, iki ayrı bayrak.
-// 403/404 gelince ekrandaki (saklı) veri de düşer. Odak, öne gelme (≥5 sn aralık) ve etiket geçersizleştirmesi
-// (`changes.ts`) yeniden çeker; odakta olmayan ekran geçersizleşirse bir sonraki odakta çeker.
+// 403/404 gelince ekrandaki (saklı) veri de düşer. Odak, öne gelme (bayatlık eşiği) ve etiket geçersizleştirmesi
+// (`changes.ts`) yeniden çeker; odakta olmayan ekran geçersizleşirse bir sonraki odakta çeker. Odak/öne gelme eşiği
+// `OTOMATIK_TAZELEME_ESIGI_MS` (5 dk); elle yenileme `state/yenile.ts`.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, errorMessage } from "../api/client";
 import { dueForRefetch } from "../lib/refresh";
@@ -56,7 +57,7 @@ interface State<T> {
 const blank = <T,>(loading: boolean): State<T> => ({ data: null, error: null, notFound: false, forbidden: false, loading, refreshing: false, stale: false, offline: false, savedAt: null });
 
 export function useRemote<T>(key: string | null, fetcher: () => Promise<T>, options: RemoteOptions = {}): Remote<T> {
-  const { cache, markOnline } = useSession();
+  const { cache, markOnline, offline } = useSession();
   const [state, setState] = useState<State<T>>(() => blank<T>(key !== null));
   const [tick, setTick] = useState(0);
   const fetcherRef = useRef(fetcher);
@@ -127,11 +128,15 @@ export function useRemote<T>(key: string | null, fetcher: () => Promise<T>, opti
     });
   }, [key, tagKey, reload]);
 
+  // Otomatik tazeleme yalnız eşikten (`OTOMATIK_TAZELEME_ESIGI_MS`) eski veride ve çevrimiçiyken; çevrimdışıyken
+  // deneme yok (bağlantı dönünce aşağıdaki efekt çeker). Etiket geçersizleştirmesi (gerçek değişiklik) eşiğe bakmaz.
+  const offlineRef = useRef(offline);
+  offlineRef.current = offline;
   useScreenFocus(
     useCallback(() => {
       focused.current = true;
       if (firstFocus.current) firstFocus.current = false;
-      else if (dirty.current || dueForRefetch(lastFetchAt.current, Date.now())) reload();
+      else if (dirty.current || (!offlineRef.current && dueForRefetch(lastFetchAt.current, Date.now()))) reload();
       return () => {
         focused.current = false;
       };
@@ -140,8 +145,18 @@ export function useRemote<T>(key: string | null, fetcher: () => Promise<T>, opti
 
   useForeground(() => {
     if (!focused.current) dirty.current = true;
-    else if (dueForRefetch(lastFetchAt.current, Date.now())) reload();
+    else if (!offlineRef.current && dueForRefetch(lastFetchAt.current, Date.now())) reload();
   });
+
+  // Çevrimdışından dönüş: odaktaki ekranın verisi o sırada eskidiyse bir kez çeker.
+  const wasOffline = useRef(offline);
+  useEffect(() => {
+    const was = wasOffline.current;
+    wasOffline.current = offline;
+    if (!was || offline || key === null) return;
+    if (!focused.current) dirty.current = true;
+    else if (dueForRefetch(lastFetchAt.current, Date.now())) reload();
+  }, [offline, key, reload]);
 
   return { ...state, reload };
 }

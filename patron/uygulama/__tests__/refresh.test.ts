@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { ENDPOINTS } from "../src/api/endpoints";
-import { REFRESH_FAIL_BACKOFF_MS, REFRESH_MIN_GAP_MS, createRefreshGate, dueForRefetch } from "../src/lib/refresh";
+import { OTOMATIK_TAZELEME_ESIGI_MS, REFRESH_FAIL_BACKOFF_MS, REFRESH_MIN_GAP_MS, createRefreshGate, dueForRefetch } from "../src/lib/refresh";
 
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));
 jest.mock("../src/state/session", () => ({ useSession: jest.fn() }));
@@ -91,9 +91,11 @@ describe("zil sonrası çekme (P2) — fabrika paketi aynı ekranda görünür",
     expect(check2).not.toHaveBeenCalled();
   });
 
-  it("odak/öne gelme aralığı: son çekimden en az REFRESH_MIN_GAP_MS", () => {
-    expect(dueForRefetch(1_000, 1_000 + REFRESH_MIN_GAP_MS - 1)).toBe(false);
-    expect(dueForRefetch(1_000, 1_000 + REFRESH_MIN_GAP_MS)).toBe(true);
+  it("odak/öne gelme bayatlık eşiği = fabrikanın varsayılan eşitleme aralığı (5 dk); eşik altı çekmez", () => {
+    expect(OTOMATIK_TAZELEME_ESIGI_MS).toBe(5 * 60_000);
+    expect(dueForRefetch(1_000, 1_000 + REFRESH_MIN_GAP_MS)).toBe(false); // eski 5 sn aralığı artık yetmez
+    expect(dueForRefetch(1_000, 1_000 + OTOMATIK_TAZELEME_ESIGI_MS - 1)).toBe(false);
+    expect(dueForRefetch(1_000, 1_000 + OTOMATIK_TAZELEME_ESIGI_MS)).toBe(true);
   });
 });
 

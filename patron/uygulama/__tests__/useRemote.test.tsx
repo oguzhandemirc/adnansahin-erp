@@ -17,7 +17,7 @@ function mockMem() {
   };
 }
 
-const mockSession = { cache: null as ReturnType<typeof createCache> | null, markOnline: jest.fn() };
+const mockSession = { cache: null as ReturnType<typeof createCache> | null, markOnline: jest.fn(), offline: false };
 jest.mock("../src/state/session", () => ({ useSession: () => mockSession }));
 
 /** expo-router odak taklidi: bağlanınca odak, `blur()`/`focus()` ile kayıp/dönüş. */
@@ -57,6 +57,7 @@ let store: ReturnType<typeof mockMem>;
 
 beforeEach(() => {
   now = 1_000_000;
+  mockSession.offline = false;
   jest.spyOn(Date, "now").mockImplementation(() => now);
   store = mockMem();
   mockSession.cache = createCache(store, "t1:h1", () => new Date("2026-10-22T09:00:00Z"));
@@ -166,32 +167,50 @@ describe("SWR sırası", () => {
 });
 
 describe("odak ve öne gelme tazelemesi", () => {
-  it("odağa dönüş: son çekimden ≥5 sn geçtiyse yeniden çeker, daha erken çekmez", async () => {
+  it("odağa dönüş: son çekim bayatlık eşiğinden (5 dk) eskiyse TEK istek; eşik altında istek yok", async () => {
     const f = jest.fn(async () => 1);
     render(<Probe name="a" k="anlik:pano" fetcher={f} />);
     await waitFor(() => expect(seen.a!.loading).toBe(false));
     expect(f).toHaveBeenCalledTimes(1);
     act(() => blur());
-    now += 4_000;
+    now += 4 * 60_000 + 59_000;
     await act(async () => focus());
     expect(f).toHaveBeenCalledTimes(1);
     act(() => blur());
     now += 1_000;
     await act(async () => focus());
     await waitFor(() => expect(f).toHaveBeenCalledTimes(2));
+    expect(f).toHaveBeenCalledTimes(2);
   });
 
-  it("öne gelme (AppState active): ≥5 sn aralıkla yeniden çeker", async () => {
+  it("öne gelme (AppState active): yalnız eşikten eski veride yeniden çeker", async () => {
     const f = jest.fn(async () => 1);
     render(<Probe name="a" k="anlik:pano" fetcher={f} />);
     await waitFor(() => expect(seen.a!.loading).toBe(false));
     act(() => appState("background"));
-    now += 2_000;
+    now += 60_000;
     await act(async () => appState("active"));
     expect(f).toHaveBeenCalledTimes(1);
     act(() => appState("background"));
-    now += 10_000;
+    now += 5 * 60_000;
     await act(async () => appState("active"));
+    await waitFor(() => expect(f).toHaveBeenCalledTimes(2));
+  });
+
+  it("çevrimdışıyken eşik dolsa da otomatik deneme yok; bağlantı dönünce bir kez çeker", async () => {
+    const f = jest.fn(async () => 1);
+    const { rerender } = render(<Probe name="a" k="anlik:pano" fetcher={f} />);
+    await waitFor(() => expect(seen.a!.loading).toBe(false));
+    mockSession.offline = true;
+    rerender(<Probe name="a" k="anlik:pano" fetcher={f} />);
+    act(() => appState("background"));
+    now += 10 * 60_000;
+    await act(async () => appState("active"));
+    act(() => blur());
+    await act(async () => focus());
+    expect(f).toHaveBeenCalledTimes(1);
+    mockSession.offline = false;
+    await act(async () => rerender(<Probe name="a" k="anlik:pano" fetcher={f} />));
     await waitFor(() => expect(f).toHaveBeenCalledTimes(2));
   });
 

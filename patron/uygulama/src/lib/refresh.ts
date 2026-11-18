@@ -37,9 +37,17 @@ export function createRefreshGate(): RefreshGate {
 export const openRefreshGate = createRefreshGate();
 
 /**
- * Ekran odağı / öne gelme tazelemesi (P2): son çekimden bu yana alt sınır (`REFRESH_MIN_GAP_MS`) dolduysa
- * yeniden çek. Ardışık sekme geçişleri ve kısa arka plan turları aynı veriyi tekrar tekrar istemez.
+ * Otomatik tazeleme bayatlık eşiği (2026-11-19): fabrikanın varsayılan eşitleme aralığı (5 dk;
+ * `DEFAULT_PATRON_CLOUD_SYNC_INTERVAL_MINUTES`). Bundan sık bulut okuması yeni veri getirmez — buluttaki gerçek
+ * değişiklik zaten değişim akışıyla (`changes.ts`, ön planda) etiketli kancaları anında geçersizleştirir; eşik yalnız
+ * kaçan olaya karşı emniyettir. Eskiden 5 sn'ydi: her sekme geçişi aynı veriyi yeniden istiyordu (sunucu yükü).
  */
-export function dueForRefetch(lastFetchMs: number, nowMs: number, gapMs: number = REFRESH_MIN_GAP_MS): boolean {
+export const OTOMATIK_TAZELEME_ESIGI_MS = 5 * 60_000;
+
+/**
+ * Ekran odağı / öne gelme tazelemesi: son çekimden bu yana bayatlık eşiği dolduysa yeniden çek. Elle yenileme
+ * (aşağı çek, menü simgesi) eşiğe bakmaz. Fabrikadan taze veri isteği otomatikte HİÇ atılmaz (`state/yenile.ts`).
+ */
+export function dueForRefetch(lastFetchMs: number, nowMs: number, gapMs: number = OTOMATIK_TAZELEME_ESIGI_MS): boolean {
   return nowMs - lastFetchMs >= gapMs;
 }

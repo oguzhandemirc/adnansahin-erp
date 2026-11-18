@@ -26,6 +26,12 @@ export function syncNowFeedback(r: SyncNowResponse, nowMs: number): SyncNowFeedb
   return { tone: "warning", text: `Az önce güncellendi, ${kalan} sn sonra tekrar deneyebilirsiniz`, follow: false };
 }
 
+/** Elle yenilemede fabrika isteği düşerse kısa bildirim cümlesi (başarı sessizdir). */
+export function yenileHataMetni(err: unknown): string {
+  if (err instanceof ApiError && err.status === 403) return "Fabrika bağlantısı kapalı — güncelleme istenemedi";
+  return "Bağlantı yok — tekrar deneyin";
+}
+
 export function syncNowErrorFeedback(err: unknown): SyncNowFeedback {
   if (err instanceof ApiError && err.status === 403) return { tone: "error", text: "Fabrika bağlantısı kapalı; güncelleme istenemedi", follow: false };
   return { tone: "error", text: "İstek gönderilemedi, bağlantınızı kontrol edin", follow: false };
