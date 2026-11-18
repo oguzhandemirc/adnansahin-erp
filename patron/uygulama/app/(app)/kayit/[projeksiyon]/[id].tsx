@@ -1,6 +1,6 @@
 // Jenerik kayıt ayrıntısı: kök alanlar + izinliyse kişisel alt satırı (sunucu süzer). Adnan'da finans buluta gitmez:
 // tutar bölümü yoktur. Tarih fabrika diliminden. Sevkiyatta (2026-11-19) üstte kompakt künye özeti (`ui/sevkiyat/KunyeOzeti`);
-// tam künye varsayılan kapalı, ok ile açılır.
+// tam künye varsayılan kapalı, ok ile açılır; altında "Çuvallar" bölümü (`ui/sevkiyat/CuvalBolumu`, çuval → top).
 import { useLocalSearchParams } from "expo-router";
 import { Text, View } from "react-native";
 import { RECORD_ENUMS } from "../../../../src/lib/labels/rapor";
@@ -15,6 +15,7 @@ import type { IconName } from "../../../../src/ui/icons";
 import { BlokBasligi, IconTile, Iskelet } from "../../../../src/ui/ortak";
 import { useAcikKapali } from "../../../../src/ui/ortak/useAcikKapali";
 import { obj } from "../../../../src/ui/pano/read";
+import { CuvalBolumu, useSevkIcerigi } from "../../../../src/ui/sevkiyat/CuvalBolumu";
 import { KunyeOzeti } from "../../../../src/ui/sevkiyat/KunyeOzeti";
 import { makeStyles } from "../../../../src/ui/theme-context";
 import { DOMAIN_TONE, FONT_SCALE, space, typography, type Domain } from "../../../../src/ui/tokens";
@@ -40,8 +41,14 @@ export default function RecordDetail() {
   // açık/kapalı cihazda hatırlanır.
   const sevk = p === "sevkiyat";
   const kunye = useAcikKapali("sevkiyat.kunye", false);
+  // Sevkiyat: künyenin altında "Çuvallar" bölümü (ayrı kayıt `sevkiyat-icerigi`); aşağı çekmek ikisini de yeniler.
+  const icerik = useSevkIcerigi(sevk && id ? String(id) : null);
+  const yenile = () => {
+    r.reload();
+    if (sevk) icerik.reload();
+  };
   return (
-    <Screen title={title === "Kayıt" ? kind.label : title} back onRefresh={r.reload} refreshing={r.refreshing}>
+    <Screen title={title === "Kayıt" ? kind.label : title} back onRefresh={yenile} refreshing={r.refreshing || (sevk && icerik.refreshing)}>
       {r.loading && !d ? <Iskelet bicim="metin" satir={5} /> : null}
       {r.error && !d ? <ErrorBox text={r.error} onRetry={r.reload} /> : null}
       {d && sevk ? (
@@ -65,6 +72,7 @@ export default function RecordDetail() {
               </View>
             </View>
           </KademeliGiris>}
+          {sevk ? <CuvalBolumu remote={icerik} /> : null}
           {d.kisisel !== undefined && d.kisisel !== null ? (
             <>
               <BlokBasligi baslik="İletişim" />

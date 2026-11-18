@@ -95,6 +95,7 @@ export const EXPORT_DATASET_LABEL: Readonly<Record<string, string>> = {
   siparis: "Siparişler",
   "siparis-kalemi": "Sipariş kalemleri",
   sevkiyat: "Sevkiyatlar",
+  "sevkiyat-icerigi": "Sevkiyat içeriği (çuval ve toplar)",
   "dogrudan-sevk": "Doğrudan sevkler",
   cuval: "Çuvallar",
   iade: "İadeler",

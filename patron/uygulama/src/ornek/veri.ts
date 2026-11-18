@@ -509,7 +509,47 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
   const urun = [["u1", "Örnek Saten 280 cm", "SAT-280"], ["u2", "Deneme Keten 150 cm", "KTN-150"], ["u3", "Numune Tül 320 cm", "TUL-320"], ["u4", "Taslak Kadife 140 cm", "KDF-140"]]
     .map(([id, ad, kod]) => kayit(id!, { ad, kod, tur: "FABRIC", aktif: true }));
   const renk = ["Krem", "Beyaz", "Ekru", "Bordo", "Antrasit", "Lacivert", "Siyah"].map((ad, i) => kayit(`r${i + 1}`, { ad, aktif: true }));
-  return { siparis, "siparis-kalemi": kalem, "cari-kart": cari, sevkiyat, "is-emri": isEmri, iade, sube, urun, renk };
+  return { siparis, "siparis-kalemi": kalem, "cari-kart": cari, sevkiyat, "is-emri": isEmri, iade, sube, urun, renk, "sevkiyat-icerigi": ornekSevkIcerikleri() };
+}
+
+// Sevkiyat içeriği (örnek, KAYIT `sevkiyat-icerigi`): v2 = bir çuval (iade alınmış + çuvalda olmayan top) + çuvalsız top;
+// v3 = beş çuval (biri tartısız). Sayılar `sevkiyat` kaydının top/çuval/metre/kg değerleriyle tutarlı (gerçekte fabrika
+// verir). v1 (onay bekleyen) ve diğerlerinde kayıt YOK → ekran "henüz gelmedi" boş durumunu gösterir.
+function ornekSevkIcerikleri(): ProjectionRecord[] {
+  const top = (k: string, n: number, o: Record<string, unknown> = {}) => ({
+    id: `00000000-0000-4000-8000-0000000d${k}${String(n).padStart(2, "0")}`, topNo: `T${k}${String(n).padStart(3, "0")}`, urun: "ÖRNEK SATEN", renk: "KREM", en: 280,
+    metre: 120, kg: null, etiketMusteri: null, iade: false, iadeTarihi: null, iadeSebebi: null, yok: false, ...o,
+  });
+  const v2Toplar = [
+    top("20", 1, { metre: 150, etiketMusteri: "Deneme Kumaş Ltd. Şti." }),
+    top("20", 2, { metre: 144, iade: true, iadeTarihi: once(0, 4), iadeSebebi: "Renk farkı" }),
+    top("20", 3, { metre: 90, yok: true }),
+  ];
+  const v2 = kayit("v2", {
+    id: "v2", sevkNo: "SVK-0450", durum: "DISPATCHED", cikisTarihi: once(0, 2), olusturulma: once(1, 3),
+    ozet: { cuval: 1, top: 4, metre: 434, kg: 121, tartiliCuval: 1, iadeTop: 1, iadeMetre: 144, kartela: 0 },
+    cuvallar: [{ id: "00000000-0000-4000-8000-0000000e0201", cuvalNo: "CV1811260021", sira: "1", kg: 121, top: 3, metre: 384, iadeTop: 1, iadeMetre: 144, kartela: 0, toplar: v2Toplar }],
+    cuvalsizToplar: [top("21", 1, { urun: "DENEME KETEN", renk: "GRİ", en: 150, metre: 50 })],
+  });
+  const bolum = [5, 5, 4, 4, 4];
+  const kglar = [200, 210.5, null, 230, 240];
+  let n = 0;
+  const v3Cuvallar = bolum.map((adet, ci) => {
+    const toplar = Array.from({ length: adet }, () => {
+      n += 1;
+      return top("30", n, n === 22 ? { metre: 130 } : {});
+    });
+    return {
+      id: `00000000-0000-4000-8000-0000000e030${ci + 1}`, cuvalNo: `CV1711260${String(30 + ci)}`, sira: String(ci + 1), kg: kglar[ci],
+      top: adet, metre: toplar.reduce((a, x) => a + x.metre, 0), iadeTop: 0, iadeMetre: 0, kartela: 0, toplar,
+    };
+  });
+  const v3 = kayit("v3", {
+    id: "v3", sevkNo: "SVK-0449", durum: "DISPATCHED", cikisTarihi: once(1, 2), olusturulma: once(2, 3),
+    ozet: { cuval: 5, top: 22, metre: 2650, kg: 880.5, tartiliCuval: 4, iadeTop: 0, iadeMetre: 0, kartela: 0 },
+    cuvallar: v3Cuvallar, cuvalsizToplar: [],
+  });
+  return [v2, v3];
 }
 
 const donemOzeti = (o: { siparis: number; mt: number; kg?: number; sevkM: number; top: number; cuval: number; tartili: number; kgSevk: number; iadeTop: number; iadeM: number; urunCarpan: number }): CustomerSummaryPeriod => ({

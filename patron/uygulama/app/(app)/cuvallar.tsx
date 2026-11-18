@@ -8,12 +8,13 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState, type ReactElement } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import { can } from "../../src/lib/access";
-import { cariAnahtari, cuvalDeposu, CUVAL_SIRALANABILIR, cuvalSuzgecGruplari, gorunenCuvallar, topKalemi, type Cuval, type CuvalDeposu } from "../../src/lib/cuval-deposu";
+import { cariAnahtari, cuvalDeposu, CUVAL_SIRALANABILIR, cuvalSuzgecGruplari, gorunenCuvallar, type Cuval, type CuvalDeposu, type CuvalTopu } from "../../src/lib/cuval-deposu";
 import { UNIT } from "../../src/lib/labels/uretim";
 import { useSession } from "../../src/state/session";
 import { Screen } from "../../src/ui/Frame";
 import { Basilabilir, KademeliGiris } from "../../src/ui/hareket";
 import { MODULE_ICON } from "../../src/ui/icons";
+import { CuvalToplari, type TopIsareti } from "../../src/ui/cuval/CuvalToplari";
 import { BlokBasligi, ListeBlogu, ListeSatiri, Rozet, StatCard } from "../../src/ui/ortak";
 import { qty } from "../../src/ui/pano/read";
 import { SnapshotGate } from "../../src/ui/pano/SnapshotGate";
@@ -27,7 +28,7 @@ import { useCihazTercihi } from "../../src/ui/tablo/useCihazTercihi";
 import type { TabloTercihiDurumu } from "../../src/ui/tablo/useTabloTercihi";
 import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useYatayEksen } from "../../src/ui/tablo/VeriTablosu";
 import { makeStyles, useTokens } from "../../src/ui/theme-context";
-import { TOUCH, space, tabularNums, typography } from "../../src/ui/tokens";
+import { TOUCH, space, typography } from "../../src/ui/tokens";
 
 /** İlk çizimde bu kadar çuval; "Daha fazla" her basışta bir o kadar açar. */
 export const CUVAL_SAYFA = 50;
@@ -191,36 +192,14 @@ function CuvalListesi({ satirlar, sutunlar, yatay }: { readonly satirlar: readon
   );
 }
 
-/** Açılan çuvalın içeriği: başlıkta çuvalın kendi bilgisi, altında toplar (top no · metre · kalem · kalite · kg · etiket). */
+/** Açılan çuvalın içeriği: başlıkta çuvalın kendi bilgisi, altında toplar — ortak görünüm `ui/cuval/CuvalToplari`
+ *  (sevkiyat ayrıntısının çuvallarıyla aynı); etiketi başka müşteriye basılmış top sarı zeminli ve işaretli. */
+const FARK_ISARETI: readonly TopIsareti[] = [{ anahtar: "fark", label: ETIKET_FARKLI, tone: "warning" }];
+const farkIsareti = (x: CuvalTopu): readonly TopIsareti[] => (x.etiketFarkli ? FARK_ISARETI : []);
+
 function CuvalIcerigi({ c }: { readonly c: Cuval }) {
-  const s = useStyles();
-  const t = useTokens();
   const bas = [c.cari ?? "Müşterisiz", c.sube, c.sevkiyatNo ? `Sevkiyat ${c.sevkiyatNo}` : "Depoda", c.kg !== null ? `${qty(c.kg)} kg brüt` : "Tartılmadı"].filter(Boolean).join(" · ");
-  return (
-    <View style={s.icerik} testID={`cuval-icerik-${c.id}`}>
-      <Text style={s.icerikBas}>{bas}</Text>
-      {c.toplar.length === 0 ? <Text style={s.topAlt}>Çuval boş</Text> : null}
-      {c.toplar.map((x, i) => {
-        const etiket = x.etiketMusteri ? `Etiket: ${x.etiketMusteri}` : "Stok etiketi";
-        const alt = [x.kalite, x.kg !== null ? `${qty(x.kg)} kg` : null, etiket].filter(Boolean).join(" · ");
-        return (
-          <View
-            key={x.id} style={[s.top, i > 0 && { borderTopWidth: 1, borderTopColor: t.separator }, x.etiketFarkli && { backgroundColor: t.color.warning.bg }]}
-            accessible accessibilityLabel={[`Top ${x.topNo ?? "numarasız"}`, `${qty(x.metre)} metre`, topKalemi(x), alt, x.etiketFarkli ? ETIKET_FARKLI : null].filter(Boolean).join(", ")}
-            testID={`cuval-top-${x.id}`}
-          >
-            <View style={s.topUst}>
-              <Text style={s.topNo} numberOfLines={1}>{x.topNo ?? "—"}</Text>
-              {x.etiketFarkli ? <Rozet label={ETIKET_FARKLI} tone="warning" testID={`cuval-top-fark-${x.id}`} /> : null}
-              <Text style={s.topMetre}>{`${qty(x.metre)} ${UNIT.metre}`}</Text>
-            </View>
-            <Text style={s.topAlt} numberOfLines={2}>{topKalemi(x)}</Text>
-            <Text style={s.topAlt} numberOfLines={2}>{alt}</Text>
-          </View>
-        );
-      })}
-    </View>
-  );
+  return <CuvalToplari toplar={c.toplar} onEk="cuval" id={c.id} baslik={bas} isaretler={farkIsareti} vurgu={(x) => x.etiketFarkli} />;
 }
 
 const useStyles = makeStyles((t) => ({
@@ -232,11 +211,4 @@ const useStyles = makeStyles((t) => ({
   dahaFazla: { minHeight: 44, alignItems: "center" as const, justifyContent: "center" as const, marginBottom: space.m },
   dahaYazi: { ...typography.callout, fontWeight: "600" as const },
   kartDugmesi: { minWidth: TOUCH, minHeight: TOUCH, alignItems: "center" as const, justifyContent: "center" as const },
-  icerik: { backgroundColor: t.surfaceAlt, paddingVertical: space.xs, paddingLeft: space.l, paddingRight: space.s },
-  icerikBas: { ...typography.footnote, color: t.textSecondary, paddingVertical: space.xs },
-  top: { paddingVertical: space.xs, paddingHorizontal: space.xs, gap: 2 },
-  topUst: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s },
-  topNo: { ...typography.callout, color: t.text, flex: 1 },
-  topMetre: { ...typography.callout, color: t.text, ...tabularNums },
-  topAlt: { ...typography.footnote, color: t.textSecondary },
 }));

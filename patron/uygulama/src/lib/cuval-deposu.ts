@@ -62,7 +62,8 @@ export const DURUM_ETIKETI: Readonly<Record<CuvalDurum, string>> = { DEPODA: "De
 
 const sayi = (v: unknown): number => num(v) ?? 0;
 
-function topOku(v: unknown): CuvalTopu {
+/** Tek topu savunmalı okur (çuval deposu ve sevkiyat içeriği aynı top biçimini taşır; tek okuyucu). */
+export function topOku(v: unknown): CuvalTopu {
   const t = obj(v);
   return {
     id: str(t.id) ?? "", topNo: str(t.topNo), urun: str(t.urun) ?? "—", renk: str(t.renk), en: num(t.en), kat: str(t.kat), kalite: str(t.kalite),
