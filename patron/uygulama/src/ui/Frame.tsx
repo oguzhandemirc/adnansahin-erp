@@ -16,7 +16,7 @@ import { Banner } from "./kit";
 import { ScreenHeader, useHeaderScroll } from "./LargeHeader";
 import { BildirimZili } from "./BildirimZili";
 import { SonVeriSatiri } from "./SonVeri";
-import { KisaBildirim } from "./KisaBildirim";
+import { KisaBildirim, kisaBildirimAltPayi, useKlavyeYuksekligi } from "./KisaBildirim";
 import { useYenile } from "../state/yenile";
 import { useScreenFocus } from "../state/useScreenFocus";
 import { ROLE_LABEL, roleOf } from "./RoleBadge";
@@ -348,7 +348,12 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const sorunBildir = useDestekEtkin() && !path.startsWith("/destek");
   const showBack = !wide && (back ?? !TABS.some((tab) => tab.route === path));
   // Telefon düzeni (2026-11-19): kökte sol üstte "≡" (soldan çekmece), ayrıntıda aynı yerde geri oku; ikinciller "⋯".
-  const { width } = useWindowDimensions();
+  const { width, height: pencereYuksekligi } = useWindowDimensions();
+  // Kısa bildirimin yeri gerçek yerleşimden: kabın altı pencerenin altında değilse altta sekme çubuğu var.
+  const [kapYuksekligi, setKapYuksekligi] = useState(0);
+  const [altSerit, setAltSerit] = useState(0);
+  const klavye = useKlavyeYuksekligi();
+  const bildirimAlti = kisaBildirimAltPayi({ altBosluk: kapYuksekligi > 0 ? Math.max(0, pencereYuksekligi - kapYuksekligi) : 0, guvenliAlt: insets.bottom, altSerit: footer ? altSerit : 0, klavye });
   const dar = width < DAR_BASLIK;
   const [cekmece, setCekmece] = useState(false);
   // Kenardan kaydırma (yalnız iOS, telefon kökü — "≡" görünen her ekran): parmak çekmeceyi sürer (`KenarKaydirma.ts`).
@@ -394,7 +399,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const sub = subtitle ? <>{subtitle}</> : null;
   const seamless = !!sub && subFilled;
   return (
-    <View style={s.screen} {...kenar} testID="ekran">
+    <View style={s.screen} {...kenar} onLayout={(e) => setKapYuksekligi(e.nativeEvent.layout.height)} testID="ekran">
       <ScreenHeader
         title={title}
         topInset={insets.top + space.xs}
@@ -436,8 +441,8 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         {sticky && allowed ? <View style={[s.sticky, { marginHorizontal: -pad, paddingHorizontal: pad }]}>{sticky}</View> : null}
         <View>{allowed ? children : <Banner tone="error" icon="lock-closed-outline" text="Bu bölümü görme yetkiniz yok" />}</View>
       </Animated.ScrollView>
-      {footer}
-      <KisaBildirim metin={odakta ? yenileme.bildirim : null} ton="hata" />
+      {footer ? <View onLayout={(e) => setAltSerit(e.nativeEvent.layout.height)} testID="ekran-alt-serit">{footer}</View> : null}
+      <KisaBildirim metin={odakta ? yenileme.bildirim : null} ton="hata" altPay={bildirimAlti} />
     </View>
   );
 }
