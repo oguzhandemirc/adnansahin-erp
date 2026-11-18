@@ -6,8 +6,10 @@
 // NEGATİF SONDA (2026-11-17, ikisi de kırmızı verdi, geri alındı): `gorunenCuvallar`da cari satırı kaldırıldı → §2 "cari
 // süzgeci" ve §4 "döküme dokununca süzer" ✗; içerikte rozet koşulu `x.etiketFarkli` yerine `!!x.etiketMusteri` → §4
 // "yalnız farklı etiketli top işaretli" ✗.
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
 import type React from "react";
+import { StyleSheet } from "react-native";
 import { ApiError } from "../src/api/client";
 import * as lib from "../src/lib/cuval-deposu";
 import { moduleVisible } from "../src/lib/access";
@@ -208,5 +210,42 @@ describe("§6 örnek veri", () => {
     expect(d.cariler.reduce((a, c) => a + c.cuval, 0)).toBe(d.ozet.cuval);
     expect(d.cuvallar.some((c) => c.farkVar)).toBe(true);
     expect(d.cuvallar.some((c) => c.durum === "SEVKE_ATANDI")).toBe(true);
+  });
+});
+
+// §7 (2026-11-19, kullanıcı: kartlar kapalıyken başlığın altında boş bant): ilk görünür blok üst pay almaz; ekran adını
+// yineleyen "Çuvallar" başlığı yalnız cari dökümü üstündeyken (iki listeyi ayırmak için) çizilir.
+describe("§7 kartlar kapalıyken üst boşluk", () => {
+  // Kart seçimi cihazda saklanır: her test varsayılan (hepsi açık) seçimden başlar.
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+  const ustPay = (id: string) => (StyleSheet.flatten(screen.getByTestId(id).props.style) as { marginTop?: number } | undefined)?.marginTop ?? 0;
+  const kapat = async (anahtarlar: readonly string[]) => {
+    fireEvent.press(screen.getByTestId("cuval-kart-sec"));
+    for (const k of anahtarlar) await act(async () => { fireEvent.press(screen.getByTestId(`cuval-kart-secici-${k}`)); });
+    await flush();
+  };
+
+  it("sayı kartları kapalı, döküm açık: döküm ilk blok (üst pay 0); Çuvallar başlığı ayırıcı olarak durur", async () => {
+    mockApi.snapshot.mockImplementation(veriIle(VERI));
+    render(<Cuvallar />);
+    await flush();
+    expect(ustPay("cuval-cariler-blok")).toBeGreaterThan(0); // kartların altında: bloklar arası boşluk
+    await kapat(["cuval", "top", "metre", "kg"]);
+    expect(screen.queryByTestId("kpi-cuval")).toBeNull();
+    expect(ustPay("cuval-cariler-blok")).toBe(0);
+    expect(screen.getByTestId("cuval-liste-baslik")).toBeTruthy();
+  });
+
+  it("hiç kart yok: kart kabı, döküm ve yineleyen başlık yok; araç satırı ve liste yerinde", async () => {
+    mockApi.snapshot.mockImplementation(veriIle(VERI));
+    render(<Cuvallar />);
+    await flush();
+    await kapat(["cuval", "top", "metre", "kg", "cariler"]);
+    for (const id of ["kpi-cuval", "kpi-cuval-top", "kpi-cuval-metre", "kpi-cuval-kg", "cuval-cariler", "cuval-liste-baslik"]) expect(screen.queryByTestId(id)).toBeNull();
+    expect(screen.queryByText("ÇUVALLAR")).toBeNull();
+    expect(screen.getByTestId("cuval-ara")).toBeTruthy();
+    expect(screen.getAllByTestId(/^cuval-satir-/)).toHaveLength(3);
   });
 });

@@ -109,7 +109,7 @@ function Icerik({ d, pref, azami }: { readonly d: CuvalDeposu; readonly pref: Ta
       ))}
 
       {kartlar.includes("cariler") ? (
-        <ListeBlogu baslik="Kimin kaç çuvalı" sayi={d.cariler.length} testID="cuval-cariler">
+        <ListeBlogu baslik="Kimin kaç çuvalı" sayi={d.cariler.length} ilk={kpis.length === 0} testID="cuval-cariler">
           <ListeSatiri
             birincil="Hepsi" ikincil={`${qty(o.cuval)} çuval · ${qty(o.top)} ${UNIT.top}`} deger={`${qty(o.metre)} ${UNIT.metre}`} ikiSatir ayrac={false} ok={false}
             rozet={seciliCari === null ? <Rozet label="Seçili" tone="primary" /> : undefined}
@@ -129,7 +129,11 @@ function Icerik({ d, pref, azami }: { readonly d: CuvalDeposu; readonly pref: Ta
         </ListeBlogu>
       ) : null}
 
-      <BlokBasligi baslik="Çuvallar" sayi={satirlar.length} testID="cuval-liste-baslik" />
+      {/* Ekran adını yineleyen "Çuvallar" başlığı yalnız üstünde cari dökümü varken (iki listeyi ayırır); yoksa araç
+          satırı doğrudan kartların ya da ekran başlığının altında (2026-11-19, boş bant kusuru). */}
+      {kartlar.includes("cariler") ? (
+        <View style={s.listeBasi}><BlokBasligi baslik="Çuvallar" sayi={satirlar.length} testID="cuval-liste-baslik" /></View>
+      ) : null}
       <TabloAraclari
         testID="cuval"
         ara={{ value: ara, onChangeText: setAra, placeholder: "Çuval no, cari, top no, ürün ara" }}
@@ -222,6 +226,7 @@ function CuvalIcerigi({ c }: { readonly c: Cuval }) {
 const useStyles = makeStyles((t) => ({
   ikili: { flexDirection: "row" as const, gap: space.m, marginBottom: space.s },
   yarim: { flex: 1, minWidth: 0, flexDirection: "row" as const },
+  listeBasi: { marginTop: space.l },
   not: { ...typography.footnote, color: t.color.textMuted, marginTop: space.s, marginBottom: space.m },
   bos: { ...typography.footnote, color: t.color.textMuted, paddingVertical: space.l, textAlign: "center" as const },
   dahaFazla: { minHeight: 44, alignItems: "center" as const, justifyContent: "center" as const, marginBottom: space.m },

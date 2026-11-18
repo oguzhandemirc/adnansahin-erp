@@ -32,12 +32,15 @@ export function BlokBasligi({ baslik, sayi, sag, testID }: { readonly baslik: st
 }
 
 /** Tam genişlik liste bloğu: satırlar (`ListeSatiri`, ilkinde `ayrac={false}`) kart zemininde. `ayracli`: kendi
- *  ayracı olmayan özel satırların (onay kutusu, form alanı) arasına 1 px ayraç koyar. */
-export function ListeBlogu({ baslik, sayi, sag, ayracli = false, children, testID }: {
+ *  ayracı olmayan özel satırların (onay kutusu, form alanı) arasına 1 px ayraç koyar. `ilk`: ekranın İLK görünür bloğu —
+ *  üst pay (bloklar arası boşluk) verilmez; yoksa ekranın üst dolgusuna eklenip başlığın altında boş bant bırakır
+ *  (2026-11-19, kartlar kapalıyken görüldü). Hangi bloğun ilk olduğunu ekran bilir (kartlar seçime bağlı). */
+export function ListeBlogu({ baslik, sayi, sag, ayracli = false, ilk = false, children, testID }: {
   readonly baslik?: string;
   readonly sayi?: number;
   readonly sag?: ReactNode;
   readonly ayracli?: boolean;
+  readonly ilk?: boolean;
   readonly children: ReactNode;
   readonly testID?: string;
 }) {
@@ -46,7 +49,7 @@ export function ListeBlogu({ baslik, sayi, sag, ayracli = false, children, testI
     ? Children.toArray(children).filter(Boolean).map((c, i) => <Fragment key={i}>{i > 0 ? <View style={s.ayrac} /> : null}{c}</Fragment>)
     : children;
   return (
-    <View style={s.blok}>
+    <View style={ilk ? undefined : s.blok} testID={testID ? `${testID}-blok` : undefined}>
       {baslik ? <BlokBasligi baslik={baslik} sayi={sayi} sag={sag} /> : null}
       <TamGenislik style={s.liste} testID={testID}>{icerik}</TamGenislik>
     </View>

@@ -78,16 +78,29 @@ export default function Production() {
   const kk1 = flow.data ? arr(obj(flow.data.veri).istasyonlar).filter((x) => str(x.tur) === HAM_GIRIS_TURU) : [];
   const hamGiris = kk1.length > 0 ? kk1.reduce((n, x) => n + (num(x.bugunTamamlanan) ?? 0), 0) : null;
 
+  // Görünür bloklar ekran sırasıyla; İLKİ üst pay almaz (ekranın üst dolgusuna eklenince kartlar kapalıyken başlığın
+  // altında boş bant kalıyordu, 2026-11-19). Bloklar arası boşluk her blokta aynı (`space.l`).
+  const gorunur: Record<"nerede" | "bugun" | "isEmirleri" | "akis" | "istasyonlar" | "fasonOzet" | "fasonKategori", boolean> = {
+    nerede: goster("nerede"),
+    bugun: (goster("bugunBiten") && bugunBiten !== null) || (goster("hamGiris") && hamGiris !== null),
+    isEmirleri: ieAcik && !isEmirleri.forbidden,
+    akis: goster("akis") && !!flow.data,
+    istasyonlar: goster("istasyonlar") && !!flow.data,
+    fasonOzet: goster("fasonOzet") && !!fason.data && num(fasonVeri.acikSevk) !== null,
+    fasonKategori: goster("fasonKategori") && kategoriler.length > 0,
+  };
+  const ilk = (Object.keys(gorunur) as (keyof typeof gorunur)[]).find((k) => gorunur[k]) ?? null;
+
   return (
     <Screen module="uretim" onRefresh={() => { all.reload(); if (ieAcik) isEmirleri.reload(); }} refreshing={all.refreshing || isEmirleri.refreshing} headerRight={kartDugmesi}>
-      {goster("nerede") ? (
+      {gorunur.nerede ? (
       <KademeliGiris sira={0}>
         <SnapshotGate remote={flow} variant="list" rows={4} empty="Fabrikadan üretim verisi henüz gelmedi" testID="uretim-akisi">
           {(veri) => {
             const rows = productionLocations({ flow: veri, fason: fason.data?.veri }).filter((r) => !(fasonLoading && r.location === "fason"));
             return (
               <>
-                <ListeBlogu baslik="Üretimdeki toplar nerede?" testID="bolum-nerede">
+                <ListeBlogu baslik="Üretimdeki toplar nerede?" ilk={ilk === "nerede"} testID="bolum-nerede">
                   {rows.map((r, i) => (
                     <ListeSatiri
                       key={r.key}
@@ -112,8 +125,8 @@ export default function Production() {
       </KademeliGiris>
       ) : null}
 
-      {(goster("bugunBiten") && bugunBiten !== null) || (goster("hamGiris") && hamGiris !== null) ? (
-        <KademeliGiris sira={1} style={s.blok}>
+      {gorunur.bugun ? (
+        <KademeliGiris sira={1} style={ilk === "bugun" ? undefined : s.blok} testID="bolum-bugun-blok">
           <BlokBasligi baslik="Bugün ne bitti?" testID="bolum-bugun" />
           <View style={s.ikili} testID="uretim-kpi">
             {goster("bugunBiten") && bugunBiten !== null ? (
@@ -130,10 +143,11 @@ export default function Production() {
         </KademeliGiris>
       ) : null}
 
-      {ieAcik && !isEmirleri.forbidden ? (
+      {gorunur.isEmirleri ? (
         <KademeliGiris sira={2}>
           <ListeBlogu
             baslik="Açık iş emirleri"
+            ilk={ilk === "isEmirleri"}
             testID="bolum-is-emirleri"
             sag={
               <Basilabilir onPress={() => router.push("/is-emirleri" as never)} accessibilityRole="link" testID="is-emirleri-tumu">
@@ -160,9 +174,9 @@ export default function Production() {
         </KademeliGiris>
       ) : null}
 
-      {goster("akis") && flow.data ? (
+      {gorunur.akis && flow.data ? (
         <KademeliGiris sira={3}>
-          <ListeBlogu baslik="Üretim akışı" testID="bolum-akis">
+          <ListeBlogu baslik="Üretim akışı" ilk={ilk === "akis"} testID="bolum-akis">
             {akisSatirlari(flow.data.veri).map((x, i) => (
               <ListeSatiri key={x.key} birincil={x.etiket} ikincil={x.not ?? undefined} deger={x.deger} ayrac={i > 0} testID={`akis-${x.key}`} />
             ))}
@@ -170,15 +184,15 @@ export default function Production() {
         </KademeliGiris>
       ) : null}
 
-      {goster("istasyonlar") && flow.data ? (
-        <KademeliGiris sira={4}>
+      {gorunur.istasyonlar && flow.data ? (
+        <KademeliGiris sira={4} style={ilk === "istasyonlar" ? undefined : s.blok} testID="bolum-istasyonlar-blok">
           <IstasyonTablosu satirlar={arr(obj(flow.data.veri).istasyonlar)} pref={pref} />
         </KademeliGiris>
       ) : null}
 
-      {goster("fasonOzet") && fason.data && num(fasonVeri.acikSevk) !== null ? (
+      {gorunur.fasonOzet ? (
         <KademeliGiris sira={5}>
-          <ListeBlogu baslik="Fason özeti" testID="bolum-fason-ozet">
+          <ListeBlogu baslik="Fason özeti" ilk={ilk === "fasonOzet"} testID="bolum-fason-ozet">
             {[
               { key: "sevk", etiket: "Açık fason sevki", deger: fasonVeri.acikSevk, birim: "sevk" },
               { key: "top", etiket: "Fasondaki top", deger: fasonVeri.acikTop, birim: "top" },
@@ -193,9 +207,9 @@ export default function Production() {
         </KademeliGiris>
       ) : null}
 
-      {goster("fasonKategori") && kategoriler.length > 0 ? (
+      {gorunur.fasonKategori ? (
         <KademeliGiris sira={6}>
-          <ListeBlogu baslik="Fason hizmet kategorileri" testID="bolum-fason-kategori">
+          <ListeBlogu baslik="Fason hizmet kategorileri" ilk={ilk === "fasonKategori"} testID="bolum-fason-kategori">
             {kategoriler.map((x, i) => (
               <ListeSatiri
                 key={str(x.kod) ?? String(i)} birincil={str(x.ad) ?? str(x.kod) ?? "—"}

@@ -6,7 +6,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import type { ReactElement } from "react";
-import { Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 
 const mockApi = { list: jest.fn(), record: jest.fn(), snapshot: jest.fn(), viewPref: jest.fn(), viewPrefSet: jest.fn() };
 const mockCache = { load: jest.fn(async (_k: string, f: () => Promise<unknown>) => ({ data: await f(), offline: false, savedAt: "" })), peek: jest.fn(async () => null) };
@@ -97,6 +97,38 @@ describe("§2 hiç blok", () => {
     render(<Production />);
     await settle();
     expect(isEmriIstegi()).toBe(true);
+  });
+});
+
+// §2b (2026-11-19, kullanıcı: kartlar kapalıyken başlığın altında boş bant): ekranın İLK görünür bloğu üst pay almaz
+// (ekran zaten üst dolgu verir); sonrakiler bloklar arası boşlukla ayrılır. Hangi blok ilkse o.
+describe("§2b ilk blok üst pay almaz", () => {
+  const ustPay = (id: string) => (StyleSheet.flatten(screen.getByTestId(id).props.style) as { marginTop?: number } | undefined)?.marginTop ?? 0;
+  const ile = async (kartlar: string) => {
+    mockApi.viewPref.mockResolvedValue({ anahtar: "tablo.is-emri", deger: tercih({ uretimKartlar: kartlar }), guncelleme: null });
+    render(<Production />);
+    await settle();
+  };
+
+  it("varsayılan: 'nerede' ilk (0), sonrakiler ayrık", async () => {
+    await ile("nerede,bugunBiten,hamGiris,isEmirleri");
+    expect(ustPay("bolum-nerede-blok")).toBe(0);
+    expect(ustPay("bolum-bugun-blok")).toBeGreaterThan(0);
+    expect(ustPay("bolum-is-emirleri-blok")).toBeGreaterThan(0);
+  });
+
+  it("'nerede' kapalı: 'bugün' ilk (0)", async () => {
+    await ile("bugunBiten,isEmirleri");
+    expect(screen.queryByTestId("bolum-nerede")).toBeNull();
+    expect(ustPay("bolum-bugun-blok")).toBe(0);
+    expect(ustPay("bolum-is-emirleri-blok")).toBeGreaterThan(0);
+  });
+
+  it("yalnız sonradan eklenen bloklar: ilk görünen (akış) 0, istasyonlar ayrık", async () => {
+    await ile("akis,istasyonlar");
+    expect(ustPay("bolum-akis-blok")).toBe(0);
+    expect(ustPay("bolum-istasyonlar-blok")).toBeGreaterThan(0);
+    expect(screen.queryByTestId("bolum-bugun-blok")).toBeNull();
   });
 });
 
