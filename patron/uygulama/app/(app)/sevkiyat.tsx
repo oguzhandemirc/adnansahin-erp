@@ -87,8 +87,8 @@ export default function Shipments() {
     </View>
   ) : undefined;
   return (
-    <Screen
-      module="sevkiyat" onRefresh={refresh} refreshing={tablo.list.refreshing || summary.refreshing}
+    <Screen module="sevkiyat"
+      onRefresh={refresh} refreshing={tablo.list.refreshing || summary.refreshing}
       onEndReached={tablo.list.loadMore} headerRight={kartDugmesi} subtitle={ozet}
       sticky={<TabloUstu tablo={tablo} />}
     >
