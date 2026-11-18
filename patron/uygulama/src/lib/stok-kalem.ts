@@ -53,6 +53,30 @@ export interface Top {
   readonly cuvalCari: string | null;
   /** Fabrika bu alanları gönderdi mi (eski fabrika → sütun "—", süzgeç/kart yok). */
   readonly kimNerede: boolean;
+  /**
+   * Fabrikanın top başına HAZIR katkısı (2.13.1 `contributionOf`): raf (`depoda*`) ve çuval (`cuvalda*`); metre binde bir
+   * TAMSAYI (kayan nokta toplamı kaymasın). Eski fabrika göndermez → null (süzülen toplam yazılmaz, satır sayısı kalır).
+   */
+  readonly katki: Katki | null;
+}
+
+export interface Katki {
+  readonly depodaTop: number;
+  readonly depodaMetreBinde: number;
+  readonly cuvaldaTop: number;
+  readonly cuvaldaMetreBinde: number;
+}
+
+const binde = (n: number) => Math.round(n * 1000);
+
+/** Top satırının hazır katkısı; dört alandan biri eksikse null (yarım katkıyla toplam uydurulmaz). */
+function katkiOku(r: Readonly<Record<string, unknown>>): Katki | null {
+  const dt = num(r.depodaTop);
+  const dm = num(r.depodaMetre);
+  const ct = num(r.cuvaldaTop);
+  const cm = num(r.cuvaldaMetre);
+  if (dt === null || dm === null || ct === null || cm === null) return null;
+  return { depodaTop: dt, depodaMetreBinde: binde(dm), cuvaldaTop: ct, cuvaldaMetreBinde: binde(cm) };
 }
 
 export interface StokBolumu {
@@ -93,6 +117,7 @@ export function stokBolumu(veri: unknown, bolum: Bolum): StokBolumu {
     urun: k?.urun ?? null, en: k?.en ?? null, renk: k?.renk ?? null, kat: k?.kat ?? null,
     metre: num(r.metre) ?? 0, kg: num(r.kg), parti: str(r.parti), depo: str(r.depo), gun: num(r.gun),
     etiketMusteri: str(r.etiketMusteri), cuvalNo: str(r.cuvalNo), cuvalCari: str(r.cuvalCari), kimNerede: Object.hasOwn(r, "etiketMusteri"),
+    katki: katkiOku(r),
   });
   const toplar = arr(b.toplar).map((r) => topOku(r, ad.get(String(r.kalem ?? ""))));
   // Çuvaldaki topun kalemi raf listesinde olmayabilir → görünen alanlar topun kendi telinden.
@@ -289,6 +314,58 @@ export function stokSuzgecDurumu(b: StokBolumu, kip: Gorunum, kalemTercih: Reado
   return { gruplar, knGruplar, kalemSecim, knSecim, etkin: Object.keys(kalemSecim).length + Object.keys(knSecim).length > 0 };
 }
 
-/** Süzgece (aramasız) uyan satır sayısı: belge tam ⇒ kesin; satır sayımıdır, metre/top toplamı DEĞİL (o fabrikanın). */
-export const suzulenSatir = (b: StokBolumu, kip: Gorunum, d: StokSuzgecDurumu): number =>
-  kip === "kalem" ? gorunenKalemler(b, "", d.kalemSecim, null).length : gorunenToplar(b, "", d.kalemSecim, null, d.knSecim).length;
+/** Süzgece + aramaya uyan satır sayısı: belge tam ⇒ kesin; satır sayımıdır, metre/top toplamı DEĞİL (o fabrikanın). */
+export const suzulenSatir = (b: StokBolumu, kip: Gorunum, d: StokSuzgecDurumu, ara = ""): number =>
+  kip === "kalem" ? gorunenKalemler(b, ara, d.kalemSecim, null).length : gorunenToplar(b, ara, d.kalemSecim, null, d.knSecim).length;
+
+/** Kalemlerin raftaki topları (kalem satırı raf toplarıyla birebir; çuvaldaki top kalem satırına girmez). */
+export function kalemlerinToplari(b: StokBolumu, kalemler: readonly Pick<Kalem, "anahtar">[]): readonly Top[] {
+  const anahtarlar = new Set(kalemler.map((k) => k.anahtar));
+  return b.toplar.filter((t) => anahtarlar.has(t.kalem));
+}
+
+/** Süzülen top kümesinin toplamı: yalnız fabrikanın hazır katkılarının toplamı (metre 1 haneye yuvarlı). */
+export interface SuzulenToplam {
+  readonly depoTop: number;
+  readonly depoMetre: number;
+  readonly cuvalTop: number;
+  readonly cuvalMetre: number;
+}
+
+/** Fabrika bu bölümün HER top satırına katkı gönderdi mi (2.13.1+); yarım küme toplanmaz. */
+export const katkiVar = (b: StokBolumu): boolean => {
+  const xs = tumToplar(b);
+  return xs.length > 0 && xs.every((t) => t.katki !== null);
+};
+
+/** Topların hazır katkılarını toplar (metre binde bir tamsayıyla, sonra 1 haneye); katkısı olmayan top varsa null. */
+export function katkiToplami(toplar: readonly Top[]): SuzulenToplam | null {
+  let dt = 0, dm = 0, ct = 0, cm = 0;
+  for (const t of toplar) {
+    if (!t.katki) return null;
+    dt += t.katki.depodaTop;
+    dm += t.katki.depodaMetreBinde;
+    ct += t.katki.cuvaldaTop;
+    cm += t.katki.cuvaldaMetreBinde;
+  }
+  const m = (x: number) => Math.round(x / 100) / 10;
+  return { depoTop: dt, depoMetre: m(dm), cuvalTop: ct, cuvalMetre: m(cm) };
+}
+
+/**
+ * Alt şeridin süzgeç/arama etkinken yazacağı: fabrika katkı gönderiyorsa `toplam` (top görünümü: süzülen bütün toplar,
+ * raf + çuval; kalem görünümü: süzülen kalemlerin RAF topları → yalnız Depoda, çünkü kalem listesi çuvaldakileri içermez);
+ * göndermiyorsa (eski fabrika) `adet` = satır sayısı. Liste ile AYNI helper'lar (`gorunenToplar`/`gorunenKalemler`).
+ */
+export type SuzulenOzet =
+  | { readonly tur: "toplam"; readonly toplam: SuzulenToplam; readonly cuvalDahil: boolean }
+  | { readonly tur: "adet"; readonly adet: number };
+
+export function suzulenOzet(b: StokBolumu, kip: Gorunum, d: StokSuzgecDurumu, ara: string): SuzulenOzet {
+  if (katkiVar(b)) {
+    const toplar = kip === "top" ? gorunenToplar(b, ara, d.kalemSecim, null, d.knSecim) : kalemlerinToplari(b, gorunenKalemler(b, ara, d.kalemSecim, null));
+    const toplam = katkiToplami(toplar);
+    if (toplam) return { tur: "toplam", toplam, cuvalDahil: kip === "top" };
+  }
+  return { tur: "adet", adet: suzulenSatir(b, kip, d, ara) };
+}

@@ -28,16 +28,17 @@ import { KompaktSecim } from "../KompaktSecim";
 /** İlk çizimde bu kadar satır; "Daha fazla" her basışta bir o kadar açar (telefon ~700 satırı tek seferde çizmez). */
 export const SAYFA = 60;
 
-export function StokKalemBolumu() {
+/** `ara`: arama terimi ekranda (alt toplam şeridi de okur: süzülen toplam aramayı da izler). */
+export function StokKalemBolumu({ ara, onAra }: { readonly ara: string; readonly onAra: (v: string) => void }) {
   const snap = useSnapshot("stok-kalem");
   return (
     <SnapshotGate remote={snap} variant="list" rows={4} empty="Kalem listesi fabrikadan henüz gelmedi" testID="stok-kalem">
-      {(veri) => <Icerik veri={veri} />}
+      {(veri) => <Icerik veri={veri} ara={ara} setAra={onAra} />}
     </SnapshotGate>
   );
 }
 
-function Icerik({ veri }: { readonly veri: unknown }) {
+function Icerik({ veri, ara, setAra }: { readonly veri: unknown; readonly ara: string; readonly setAra: (v: string) => void }) {
   const s = useStyles();
   const genislik = useWindowDimensions().width;
   // En çok 10 sütun seçilir; ekrana sığandan fazlası yatay kaydırılır (liste ekranlarıyla aynı kural, `useVeriTablosu`).
@@ -54,7 +55,6 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   const tumGruplar = knGruplar.length > 0 ? [...gruplar, ...knGruplar] : gruplar;
   const tumSecim = { ...suzgec, ...knSuzgec };
   const knAnahtar = (g: string) => (KIM_NEREDE_ANAHTARLARI as readonly string[]).includes(g);
-  const [ara, setAra] = useState("");
   const [sutunAcik, setSutunAcik] = useState(false);
   const [suzgecAcik, setSuzgecAcik] = useState(false);
   const pref = kip === "kalem" ? kalemPref : topPref;

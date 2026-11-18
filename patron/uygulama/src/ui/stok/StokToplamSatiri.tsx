@@ -6,14 +6,14 @@
 //   • Çuvalda — fabrikanın `cuvaldaTop` + `cuvaldaMetre`si (yalnız fabrika gönderdiyse).
 // Küme: seçili bölümün (Ham | Bitmiş) TAMAMI. TEK SATIR, yatay kaydırma YOK: sığmazsa yazı küçülür (en çok %75); çok dar
 // ekranda (< 340 pt) son çare iki öbek alt alta.
-// SÜZGEÇ ETKİNKEN (kullanıcı kararı 2026-11-19 "Süzülen toplam"): fabrika süzgece göre top/metre toplamı GÖNDERMİYOR
-// (anlık yalnız bölüm toplamı + kalem satırı taşır) ve uygulama toplama yapmaz ⇒ bölüm toplamı yerine dürüst durum:
-// "Süzülen: N kalem|top" — N süzgece uyan SATIR sayısıdır (anlık tam, sayfasız ⇒ kesin), metre/top toplamı değil.
-// Süzülen metre/top için fabrikanın anlığa süzgeç-boyutlu toplam eklemesi gerekir (rapor: patron-app İş 2).
+// SÜZGEÇ/ARAMA ETKİNKEN (2.13.1, kullanıcı kararı 2026-11-19): fabrikanın top başına HAZIR katkıları (`depodaTop` ·
+// `depodaMetre` · `cuvaldaTop` · `cuvaldaMetre`) yalnız süzülen TOP satırlarında toplanır (`suzulenOzet`, liste ile aynı
+// helper): "Süzülen: Depoda X top Y m · Çuvalda X top Y m". Kalem görünümünde süzülen kalemlerin RAF topları (kalem
+// listesi çuvaldakileri içermez) → yalnız Depoda. Eski fabrika katkı göndermez → satır sayısı ("Süzülen: N kalem|top").
 import { useMemo } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
 import { UNIT } from "../../lib/labels/uretim";
-import { stokBolumu, stokSuzgecDurumu, suzulenSatir, type StokBolumu } from "../../lib/stok-kalem";
+import { stokBolumu, stokSuzgecDurumu, suzulenOzet, type StokBolumu, type SuzulenOzet } from "../../lib/stok-kalem";
 import { useWide } from "../Frame";
 import { qty } from "../pano/read";
 import { useSnapshot } from "../pano/useSnapshot";
@@ -42,7 +42,16 @@ export function toplamParcalari(b: StokBolumu): ToplamParcasi[] {
   return out;
 }
 
-export function StokToplamSatiri() {
+/** SAF: süzülen öbeklerin metni ("Depoda 3 top 120 m", "Çuvalda 1 top 40 m") ya da eski fabrikada satır sayısı. */
+export function suzulenParcalari(o: SuzulenOzet, kip: "kalem" | "top"): ToplamParcasi[] | string {
+  if (o.tur === "adet") return `${qty(o.adet)} ${kip === "kalem" ? "kalem" : UNIT.top}`;
+  const tm = (top: number, metre: number) => `${qty(top)} ${UNIT.top} ${qty(metre)} ${UNIT.metre}`;
+  const out: ToplamParcasi[] = [{ key: "depo", etiket: "Depoda", deger: tm(o.toplam.depoTop, o.toplam.depoMetre) }];
+  if (o.cuvalDahil) out.push({ key: "cuval", etiket: "Çuvalda", deger: tm(o.toplam.cuvalTop, o.toplam.cuvalMetre) });
+  return out;
+}
+
+export function StokToplamSatiri({ ara = "" }: { readonly ara?: string }) {
   const s = useStyles();
   const wide = useWide();
   const { width } = useWindowDimensions();
@@ -58,21 +67,35 @@ export function StokToplamSatiri() {
   const suzulen = useMemo(() => {
     if (!b) return null;
     const d = stokSuzgecDurumu(b, kip, kalemPref.tercih.suzgec, topPref.tercih.suzgec);
-    return d.etkin ? suzulenSatir(b, kip, d) : null;
-  }, [b, kip, kalemPref.tercih.suzgec, topPref.tercih.suzgec]);
+    return d.etkin || ara.trim() !== "" ? suzulenParcalari(suzulenOzet(b, kip, d, ara), kip) : null;
+  }, [b, kip, kalemPref.tercih.suzgec, topPref.tercih.suzgec, ara]);
   const parcalar = useMemo(() => (b ? toplamParcalari(b) : null), [b]);
   if (!parcalar) return null;
   const pad = ekranOlugu(wide);
   if (suzulen !== null) {
-    const birim = kip === "kalem" ? "kalem" : UNIT.top;
+    const adet = typeof suzulen === "string";
+    const etiketSuz = adet
+      ? `Süzgeç etkin: ${suzulen}. Süzülen metre toplamını fabrika henüz göndermiyor.`
+      : `Süzülen: ${suzulen.map((x) => `${x.etiket} ${x.deger}`).join(", ")}`;
     return (
       <View
         style={[s.cubuk, { paddingBottom: space.s + (wide ? insets.bottom : 0), paddingHorizontal: pad }]} testID="stok-toplam-satiri" accessible
-        accessibilityLabel={`Süzgeç etkin: ${qty(suzulen)} ${birim}. Süzülen metre toplamını fabrika henüz göndermiyor.`}
+        accessibilityLabel={etiketSuz}
       >
-        <Text style={s.satir} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={FONT_SCALE.title} testID="stok-toplam-suzulen">
-          <Text style={s.etiket}>Süzülen </Text>
-          <Text style={s.deger} testID="stok-toplam-suzulen-deger">{`${qty(suzulen)} ${birim}`}</Text>
+        {/* Tek satır; sığmazsa yazı küçülür (süzülen satır uzun: en çok %65). */}
+        <Text style={s.satir} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={adet ? 0.75 : 0.65} maxFontSizeMultiplier={FONT_SCALE.title} testID="stok-toplam-suzulen">
+          <Text style={s.etiket}>{adet ? "Süzülen " : "Süzülen: "}</Text>
+          {adet ? (
+            <Text style={s.deger} testID="stok-toplam-suzulen-deger">{suzulen}</Text>
+          ) : (
+            suzulen.flatMap((x, i) => [
+              ...(i > 0 ? [<Text key={`ara-${x.key}`} style={s.etiket}>{" · "}</Text>] : []),
+              <Text key={x.key} testID={`stok-toplam-suzulen-${x.key}`}>
+                <Text style={s.etiket}>{`${x.etiket} `}</Text>
+                <Text style={s.deger} testID={`stok-toplam-suzulen-${x.key}-deger`}>{x.deger}</Text>
+              </Text>,
+            ])
+          )}
         </Text>
       </View>
     );

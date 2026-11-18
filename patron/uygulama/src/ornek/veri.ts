@@ -156,6 +156,10 @@ export function ORNEK_ANLIK(): Record<string, unknown> {
   };
 }
 
+// Top başına hazır katkı (fabrika 2.13.1 `contributionOf`): raftaki top yalnız Depoda, çuvaldaki yalnız Çuvalda sayılır.
+const rafKatkisi = (metre: number) => ({ depodaTop: 1, depodaMetre: metre, cuvaldaTop: 0, cuvaldaMetre: 0 });
+const cuvalKatkisi = (metre: number) => ({ depodaTop: 0, depodaMetre: 0, cuvaldaTop: 1, cuvaldaMetre: metre });
+
 type OrnekKalem = { anahtar: string; urun: string; en: number | null; renk: string | null; kat: string | null; gunler: number[]; boy: number };
 
 /** Stok kalem anlığı (örnek): kalem satırları kendi toplarından toplanır ki iki görünüm aynı sayıyı versin. */
@@ -165,7 +169,7 @@ function stokKalemBolumu(kalemler: OrnekKalem[], onEk: string) {
     k.gunler.map((gun, i) => {
       sira += 1;
       const metre = Math.round((k.boy - i * 7.5 + (sira % 3) * 4.25) * 10) / 10;
-      return { id: `${onEk}-${sira}`, topNo: `${onEk.toUpperCase()}-${String(1000 + sira)}`, kalem: k.anahtar, metre, kg: null, parti: sira % 2 ? `P0${(sira % 9) + 1}` : null, depo: "Ana depo", gun };
+      return { id: `${onEk}-${sira}`, topNo: `${onEk.toUpperCase()}-${String(1000 + sira)}`, kalem: k.anahtar, metre, kg: null, parti: sira % 2 ? `P0${(sira % 9) + 1}` : null, depo: "Ana depo", gun, ...rafKatkisi(metre) };
     }),
   );
   const satirlar = kalemler.map(({ gunler: _g, boy: _b, ...k }) => {
@@ -242,7 +246,7 @@ export function ORNEK_CUVAL_DEPOSU() {
 function ornekCuvaldakiToplar() {
   return ORNEK_CUVALLAR.flatMap((c, ci) => c.toplar.map((x, ti) => ({
     id: ornekCuvalTopKimligi(ci, ti), topNo: `${c.no}-${ti + 1}`, kalem: `cv-${x.urun}-${x.en}-${x.renk}`, metre: x.metre, kg: null, parti: null, depo: "Ana depo", gun: x.gun,
-    etiketMusteri: x.etiket ? ORNEK_CARI[x.etiket].ad : null, cuvalNo: c.no, cuvalCari: c.cari ? ORNEK_CARI[c.cari].ad : null,
+    etiketMusteri: x.etiket ? ORNEK_CARI[x.etiket].ad : null, cuvalNo: c.no, cuvalCari: c.cari ? ORNEK_CARI[c.cari].ad : null, ...cuvalKatkisi(x.metre),
     urun: x.urun, en: x.en, renk: x.renk, kat: x.kat,
   })));
 }

@@ -76,12 +76,14 @@ export default function Stock() {
   const temizle = useMemo(() => (ham: unknown) => tercihiTemizle(ham, { varsayilan: STOK_VARSAYILAN, sutunlar: STOK_ANAHTARLAR, azami }), [azami]);
   const pref = useTabloTercihi("tablo.stok", temizle);
   const [secici, setSecici] = useState(false);
+  // Kalem listesinin araması burada: liste ve alt toplam şeridi aynı terimi okur (süzülen toplam aramayı da izler).
+  const [ara, setAra] = useState("");
   const shown = shownCards(pref.tercih);
   const kartlarEylemi = kartSecEylemi(() => setSecici(true), "stok-kart-sec");
   return (
-    <Screen module="stok" onRefresh={card.reload} refreshing={card.refreshing} headerSecondary={[kartlarEylemi]} footer={<StokToplamSatiri />}>
+    <Screen module="stok" onRefresh={card.reload} refreshing={card.refreshing} headerSecondary={[kartlarEylemi]} footer={<StokToplamSatiri ara={ara} />}>
       <SnapshotGate remote={card} domain="stok" rows={3} empty="Fabrikadan stok karnesi henüz gelmedi" testID="stok-karnesi">
-        {(veri) => <StockBody data={veri} shown={shown} pref={pref} azami={azami} />}
+        {(veri) => <StockBody data={veri} shown={shown} pref={pref} azami={azami} ara={ara} onAra={setAra} />}
       </SnapshotGate>
       <VisibilityPicker
         visible={secici} title="Kartları seç" testID="stok-kart-secici"
@@ -94,7 +96,7 @@ export default function Stock() {
   );
 }
 
-function StockBody({ data, shown, pref, azami }: { readonly data: unknown; readonly shown: readonly StockCardKey[]; readonly pref: TabloTercihiDurumu; readonly azami: number }) {
+function StockBody({ data, shown, pref, azami, ara, onAra }: { readonly data: unknown; readonly shown: readonly StockCardKey[]; readonly pref: TabloTercihiDurumu; readonly azami: number; readonly ara: string; readonly onAra: (v: string) => void }) {
   const s = useStyles();
   const o = obj(obj(data).ozet);
   const dead = (num(o.oluMiktar) ?? 0) > 0;
@@ -160,7 +162,7 @@ function StockBody({ data, shown, pref, azami }: { readonly data: unknown; reado
       ) : null}
 
       <KademeliGiris sira={3} style={s.blok}>
-        <StokKalemBolumu />
+        <StokKalemBolumu ara={ara} onAra={onAra} />
       </KademeliGiris>
 
       {items.length > 0 ? (

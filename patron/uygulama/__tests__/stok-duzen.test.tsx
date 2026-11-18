@@ -156,10 +156,16 @@ describe("§3 alt sabit toplam satırı (dört birleşim)", () => {
     expect(screen.getByTestId("stok-toplam-satiri").props.accessibilityLabel).toBe("Ham stok: Depoda 2 top · 300 m");
   });
 
-  it("arama süzmesi alt satırı değiştirmez (küme: seçili bölümün tamamı, bugünkü başlıkla aynı)", async () => {
+  // 2026-11-19 (2.13.1, kullanıcı kararı "süzgeç/arama etkinken süzülen toplam"): arama da şeridi süzer. Bu belge eski
+  // fabrikanındır (katkı yok) → bölüm toplamı yerine satır sayısı; temizlenince bölüm toplamı geri gelir.
+  it("arama etkinken şerit süzülene döner; temizlenince bölüm toplamı", async () => {
     render(<Stock />);
     await flush();
     fireEvent.changeText(screen.getByTestId("stok-kalem-ara"), "panos");
+    await flush();
+    expect(screen.queryByTestId("stok-toplam-depo")).toBeNull();
+    expect(screen.getByTestId("stok-toplam-suzulen")).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId("stok-kalem-ara"), "");
     await flush();
     expect(deger("depo")).toBe("833 top · 14.572 m");
   });
