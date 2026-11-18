@@ -66,6 +66,7 @@
       "expo-font",
       "./plugins/withPatronImza.js",
       "./plugins/withBildirimBaglantisi.js",
+      "./plugins/withSahneYasamDongusu.js",
       [
         "expo-speech-recognition",
         {

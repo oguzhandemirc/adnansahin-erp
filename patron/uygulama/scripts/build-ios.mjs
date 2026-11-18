@@ -11,6 +11,9 @@
 //                                        kimliği kimlik.json `appleEkipKimligi`) + Apple Distribution sertifikası;
 //                                        profil -allowProvisioningUpdates ile otomatik. YÜKLEME bu betikte YOKTUR
 //                                        (kullanıcı adımı; sonda yazdırılan Transporter/altool yönergesi).
+// iOS 27 KÖPRÜSÜ (2026-11-19): plugins/withSahneYasamDongusu.js UIScene'i benimsetir (Xcode 27 / iOS 27 SDK ile derlenen,
+// UIScene'siz uygulama açılışta sonlandırılır — Apple TN3187; App Store Nisan 2027'den itibaren iOS 27 SDK ister) ve pod
+// dağıtım hedeflerini ≥ 15.1 yapar. Expo SDK 58'e geçince eklenti, testi ve aşağıdaki iki sahne denetimi SİLİNİR.
 // `ios/` prebuild çıktısıdır, git dışıdır (.gitignore `/ios`, Android `/android` ile aynı düzen); her derleme temiz üretilir.
 // Bulut adresi derlemeye açıkça gömülür (EXPO_PUBLIC_PATRON_API), `.env*` okunmaz. Çıkış: 0 tamam · 1 hata.
 // =============================================================================
@@ -86,6 +89,12 @@ const yapi = plistOku(infoPlist, "CFBundleVersion");
 if (surum !== app.version && surum !== "$(MARKETING_VERSION)") sorunlar.push(`CFBundleShortVersionString ${surum} ≠ ${app.version}`);
 if (yapi !== String(app.ios.buildNumber) && yapi !== "$(CURRENT_PROJECT_VERSION)") sorunlar.push(`CFBundleVersion ${yapi} ≠ ${app.ios.buildNumber}`);
 if (plistOku(infoPlist, "ITSAppUsesNonExemptEncryption") !== "false") sorunlar.push("ITSAppUsesNonExemptEncryption=false yok (her yüklemede şifreleme sorusu çıkar)");
+// iOS 27 SDK: UIScene benimsenmezse uygulama açılışta sonlandırılır (TN3187) → plugins/withSahneYasamDongusu.js
+if (plistOku(infoPlist, "UIApplicationSceneManifest:UISceneConfigurations:UIWindowSceneSessionRoleApplication:0:UISceneDelegateClassName") !== "$(PRODUCT_MODULE_NAME).SceneDelegate") sorunlar.push("Info.plist UIApplicationSceneManifest (SceneDelegate) yok — iOS 27'de açılışta sonlandırılır");
+const appDelegateYolu = path.join(IOS, ad, "AppDelegate.swift");
+const appDelegate = fs.existsSync(appDelegateYolu) ? fs.readFileSync(appDelegateYolu, "utf8") : "";
+if (!/class SceneDelegate\b/.test(appDelegate)) sorunlar.push("AppDelegate.swift'te SceneDelegate yok");
+if (appDelegate.includes("UIWindow(frame:")) sorunlar.push("AppDelegate.swift hâlâ UIWindow(frame:) ile pencere kuruyor");
 const pbx = fs.readFileSync(path.join(IOS, `${ad}.xcodeproj`, "project.pbxproj"), "utf8");
 if (!pbx.includes(`PRODUCT_BUNDLE_IDENTIFIER = ${KIMLIK.uygulamaKimligi};`)) sorunlar.push("pbxproj bundle kimliği uyuşmuyor");
 if (!pbx.includes(`DEVELOPMENT_TEAM = ${KIMLIK.appleEkipKimligi};`)) sorunlar.push("pbxproj DEVELOPMENT_TEAM (Apple ekip kimliği) yok");
