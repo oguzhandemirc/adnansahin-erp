@@ -31,7 +31,7 @@ function RolHucresi({ r }: { r: ProjectionRecord }) {
 
 export const CARI_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "ad", baslik: "Ad", ad: "Cari adı", agirlik: 2, sirala: "ad", hucre: (r) => str(k(r).ad) ?? "—" },
-  { key: "kod", baslik: "Kod", ad: "Cari kodu", agirlik: 1, sirala: "kod", hucre: (r) => str(k(r).kod) ?? "—" },
+  { key: "kod", baslik: "Kod", ad: "Cari kodu", agirlik: 1, kirpilmaz: 13, sirala: "kod", hucre: (r) => str(k(r).kod) ?? "—" },
   { key: "il", baslik: "İl", agirlik: 1, sirala: "il", hucre: (r) => str(k(r).il) ?? "—" },
   { key: "ilce", baslik: "İlçe", agirlik: 1, sirala: "ilce", hucre: (r) => str(k(r).ilce) ?? "—" },
   { key: "ulke", baslik: "Ülke", agirlik: 1, sirala: "ulke", hucre: (r) => str(k(r).ulke) ?? "—" },

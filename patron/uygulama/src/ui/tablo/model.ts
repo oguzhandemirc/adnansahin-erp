@@ -35,6 +35,16 @@ export interface SutunTanimi<R> {
   readonly satir?: number;
   /** Metin yerine rozet gibi öğe (erişilebilirlik ve test yine `hucre` metnini kullanır). */
   readonly ogeler?: (r: R) => ReactNode;
+  /**
+   * KIRPILMAZ belge/kayıt numarası sütunu (sevk no, sipariş no, iş emri no, çuval no, top no, cari kodu, fatura no):
+   * değer, numaranın fabrika biçimindeki en uzun gerçek uzunluğudur (karakter; ör. "SVK1811260034" → 13). Sütun hiçbir
+   * genişlikte kırpılmaz ve üç noktayla kesilmez: hücrede satır sınırı yok, sütun daralmaz (`flexShrink: 0`), genişliği
+   * `max(bu değer, görünen satırlardaki en uzun parça, başlık)` karakterden hesaplanır (`kirpilmazGenislik`). Sığmayınca
+   * önce esnek sütunlar daralır/sarar, o da yetmezse tablo yatay kayar (`yatayGerekir`).
+   */
+  readonly kirpilmaz?: number;
+  /** ÇİZİM ANINDA hesaplanır (`sutunlariOlc`), tanımda verilmez: kırpılmaz sütunun pt genişliği. */
+  readonly genislik?: number;
 }
 
 export interface SuzgecSecenegi {
@@ -58,9 +68,55 @@ export const siganSutun = (genislik: number): number => (genislik >= 600 ? GENIS
 /** Seçilebilecek en çok sütun (sığmayanlar yatay kaydırmayla görünür). */
 export const AZAMI_SUTUN = 10;
 export const azamiSutun = (_genislik?: number): number => AZAMI_SUTUN;
-/** Yatay kipte sütun genişliği = ağırlık × birim (pt). */
+/** Yatay kipte sütun genişliği = ağırlık × birim (pt); kırpılmaz sütun hesaplanan genişliğinden dar olamaz. */
 export const SUTUN_BIRIMI = 80;
-export const sutunGenisligi = (agirlik: number): number => Math.round(agirlik * SUTUN_BIRIMI);
+export const sutunGenisligi = (c: { readonly agirlik: number; readonly genislik?: number; readonly kirpilmaz?: number }): number =>
+  Math.max(Math.round(c.agirlik * SUTUN_BIRIMI), asgariGenislik(c) ?? 0);
+
+/**
+ * Kırpılmaz sütunun ölçüsü. Hücre yazısı 13 pt (`typography.footnote`), ilk sütunda kalın; numaralar tabular rakamlı.
+ * Karakter başına 0,66 em: Roboto/SF kalın tabular rakam ≈ 0,56–0,62 em, büyük harf (S, V, K, C) ≈ 0,60–0,67 em → en
+ * geniş karışık biçime pay. Üstüne hücre iç boşluğu (2 × 4) ve 4 pt yuvarlama payı. Sistem yazı büyütmesi hücrenin
+ * `maxFontSizeMultiplier` (1,4) sınırına kadar çarpılır.
+ */
+export const HUCRE_PUNTO = 13;
+export const KARAKTER_EM = 0.66;
+export const HUCRE_IC_BOSLUK = 8;
+export const OLCU_PAYI = 4;
+export const AZAMI_YAZI_OLCEGI = 1.4;
+export const kirpilmazGenislik = (karakter: number, yaziOlcegi = 1): number =>
+  Math.ceil(karakter * HUCRE_PUNTO * KARAKTER_EM * Math.min(Math.max(yaziOlcegi, 1), AZAMI_YAZI_OLCEGI)) + HUCRE_IC_BOSLUK + OLCU_PAYI;
+/** Kırpılmaz sütunun asgari genişliği (ölçülmemişse yalnız beyandan); kırpılmaz değilse yok. */
+export const asgariGenislik = (c: { readonly genislik?: number; readonly kirpilmaz?: number }): number | undefined =>
+  c.genislik ?? (c.kirpilmaz ? kirpilmazGenislik(c.kirpilmaz) : undefined);
+
+/** Metnin bölünemez en uzun parçası (boşluk, virgül, satır sonunda sarılabilir): "SIP1, SIP2" → 4. */
+export const enUzunParca = (metin: string): number => metin.split(/[\s,]+/u).reduce((a, p) => Math.max(a, [...p].length), 0);
+
+/** Kırpılmaz sütunlara görünen satırlardan + başlıktan genişlik yazar; diğer sütunlar aynen döner. */
+export function sutunlariOlc<R>(sutunlar: readonly SutunTanimi<R>[], satirlar: readonly R[], yaziOlcegi = 1): readonly SutunTanimi<R>[] {
+  return sutunlar.map((c) => {
+    if (!c.kirpilmaz) return c;
+    let karakter = Math.max(c.kirpilmaz, enUzunParca(c.baslik));
+    for (const r of satirlar) karakter = Math.max(karakter, enUzunParca(c.hucre(r)));
+    return { ...c, genislik: kirpilmazGenislik(karakter, yaziOlcegi) };
+  });
+}
+
+/** Esnek (kırpılabilir) sütunun oranlı kipte inebileceği en dar genişlik; bunun altında tablo yatay kayar. */
+export const ESNEK_ASGARI = 56;
+/** Satırın iki yan kenarı (`VeriTablosu` `KENAR` × 2) + tablo kartının çerçevesi. */
+export const SATIR_KENARI = 10;
+
+/**
+ * Tablo yatay kayar mı: görünür sütun sayısı ekrana sığandan fazlaysa YA DA kırpılmaz sütunların genişliği + esnek
+ * sütunların asgarisi kullanılabilir genişliğe sığmıyorsa. Sütun seçimi KORUNUR — sütun gizlenmez, tablo kayar.
+ */
+export function yatayGerekir(sutunlar: readonly { readonly genislik?: number; readonly kirpilmaz?: number }[], kullanilabilir: number, ekran: number): boolean {
+  if (sutunlar.length > siganSutun(ekran)) return true;
+  const gerekli = sutunlar.reduce((a, c) => a + (asgariGenislik(c) ?? ESNEK_ASGARI), 0) + SATIR_KENARI;
+  return gerekli > kullanilabilir;
+}
 
 /**
  * Sütunun hizası: başlık ve hücre bunu okur (birebir aynı). Kullanıcı kararı 2026-11-18 ("hepsini sola al"): her

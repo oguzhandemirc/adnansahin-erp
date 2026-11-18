@@ -3,15 +3,15 @@
 // Sayılar tabular rakamlı; hiza `sutunHizasi` (varsayılan her sütun sola, sütun `hiza` ile değiştirir). Başlığa dokunmak sıralamayı döndürür (artan → azalan → kapalı); sıralanamayan
 // sütunun başlığı düğme değildir. Süzme/sıralama SUNUCUDA (`useVeriTablosu`); burada yalnız çizim.
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useEffect, useMemo, useRef, type RefObject } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Basilabilir } from "../hareket";
 import { BASMA } from "../hareket/sabitler";
 import type { IconName } from "../icons";
 import { SearchField } from "../siparis/parts";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, space, tabularNums, typography } from "../tokens";
-import { sutunGenisligi, sutunHizasi, type Siralama, type SutunTanimi } from "./model";
+import { asgariGenislik, sutunGenisligi, sutunHizasi, sutunlariOlc, yatayGerekir, type Siralama, type SutunTanimi } from "./model";
 
 /** Satır yüksekliği (tek satır, dokunma hedefi ≥ 44). */
 export const TABLO_SATIR = 44;
@@ -49,7 +49,39 @@ function esle(e: YatayEksen, ev: NativeSyntheticEvent<NativeScrollEvent>) {
 
 /** Yatay kipte satırın toplam genişliği (iki yan kenar dahil). */
 export function toplamGenislik<R>(sutunlar: readonly SutunTanimi<R>[]): number {
-  return sutunlar.reduce((a, c) => a + sutunGenisligi(c.agirlik), 0) + KENAR * 2;
+  return sutunlar.reduce((a, c) => a + sutunGenisligi(c), 0) + KENAR * 2;
+}
+
+/**
+ * Hücrenin boyu (başlık + satır AYNI): yatay kipte sabit genişlik; oranlı kipte kırpılmaz sütun hesaplanan genişlikte
+ * SABİT durur (büyümez, daralmaz), esnek sütunlar kalan alanı ağırlıkla paylaşır.
+ */
+export function sutunBoyu(c: SutunTanimi<never>, yatay: boolean): { width: number; flexGrow?: number; flexShrink?: number } | { flex: number } {
+  if (yatay) return { width: sutunGenisligi(c) };
+  const sabit = asgariGenislik(c);
+  return sabit === undefined ? { flex: c.agirlik } : { width: sabit, flexGrow: 0, flexShrink: 0 };
+}
+
+/**
+ * Tablonun ölçüsü (tek kaynak; liste ekranları, kısa tablo, stok): kırpılmaz sütunlara görünen satırlardan genişlik
+ * yazar ve tablonun kullanılabilir genişliğini (`onLayout`) ölçüp yatay kaydırma gerekip gerekmediğine karar verir.
+ * Ölçülene dek pencere genişliği kullanılır.
+ */
+export function useTabloOlcusu<R>(sutunlar: readonly SutunTanimi<R>[], satirlar: readonly R[]): {
+  readonly sutunlar: readonly SutunTanimi<R>[];
+  readonly yatay: YatayEksen | null;
+  readonly onLayout: (e: LayoutChangeEvent) => void;
+} {
+  const { width, fontScale } = useWindowDimensions();
+  const [alan, setAlan] = useState<number | null>(null);
+  const eksen = useYatayEksen();
+  const olculen = useMemo(() => sutunlariOlc(sutunlar, satirlar, fontScale), [sutunlar, satirlar, fontScale]);
+  const yatay = yatayGerekir(olculen, alan ?? width, width) ? eksen : null;
+  const onLayout = useMemo(() => (e: LayoutChangeEvent) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    if (w > 0) setAlan((a) => (a === w ? a : w));
+  }, []);
+  return { sutunlar: olculen, yatay, onLayout };
 }
 
 function YatayKaydirici(p: { readonly eksen: YatayEksen; readonly kaynak: "baslik" | "govde"; readonly children: React.ReactNode; readonly testID: string }) {
@@ -138,7 +170,7 @@ export function TabloBasligi<R>(p: {
         );
         const ok = aktif ? <Ionicons name={aktif === "artan" ? "arrow-up" : "arrow-down"} size={12} color={t.tint} testID={`${p.testID}-ok-${c.key}`} /> : null;
         const ic = <View style={[s.baslikIc, sag && s.sagaYasli]}>{sag ? ok : null}{yazi}{sag ? null : ok}</View>;
-        const stil = [s.hucre, i > 0 && s.sutunAyrac, yatay ? { width: sutunGenisligi(c.agirlik) } : { flex: c.agirlik }];
+        const stil = [s.hucre, i > 0 && s.sutunAyrac, sutunBoyu(c, !!yatay)];
         if (!alan) return <View key={c.key} style={stil} testID={`${p.testID}-sutun-${c.key}`}>{ic}</View>;
         return (
           <Pressable
@@ -178,9 +210,9 @@ export function TabloSatiri<R>(p: { readonly sutunlar: readonly SutunTanimi<R>[]
         const oge = c.ogeler?.(p.kayit);
         const sag = sutunHizasi(c) === "sag";
         return (
-          <View key={c.key} style={[s.hucre, i > 0 && s.sutunAyrac, p.yatay ? { width: sutunGenisligi(c.agirlik) } : { flex: c.agirlik }, sag && s.hucreSag]}>
+          <View key={c.key} style={[s.hucre, i > 0 && s.sutunAyrac, sutunBoyu(c, !!p.yatay), sag && s.hucreSag]}>
             {oge ?? (
-              <Text style={[s.hucreYazi, i === 0 && s.ilkHucre, c.sayi && s.sayi, sag && s.sag]} numberOfLines={c.satir ?? 1} maxFontSizeMultiplier={FONT_SCALE.title}>
+              <Text style={[s.hucreYazi, i === 0 && s.ilkHucre, (c.sayi || !!c.kirpilmaz) && s.sayi, sag && s.sag]} numberOfLines={c.kirpilmaz ? undefined : (c.satir ?? 1)} maxFontSizeMultiplier={FONT_SCALE.title} testID={c.kirpilmaz ? `kirpilmaz-${c.key}-${p.testID}` : undefined}>
                 {c.hucre(p.kayit)}
               </Text>
             )}

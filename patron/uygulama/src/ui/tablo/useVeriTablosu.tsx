@@ -2,7 +2,7 @@
 // Arama gecikmeli istek; süzgeç ve sıralama tercihten SUNUCU parametresine çevrilir — istemci listeyi süzmez/sıralamaz.
 // Ekran `TabloUstu`nü `Screen.sticky`ye, `TabloListesi`ni gövdeye koyar; ikisi aynı sütun tanımından çizilir.
 import { useMemo, useState } from "react";
-import { useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View, type LayoutChangeEvent } from "react-native";
 import type { ProjectionRecord, ViewPrefKey } from "../../api/wire";
 import type { IconName } from "../icons";
 import { useDebounced } from "../Picker";
@@ -11,10 +11,10 @@ import { ListStates } from "../siparis/parts";
 import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
 import { useSession } from "../../state/session";
 import type { ListQuery } from "../siparis/useRemoteList";
-import { azamiSutun, etkinSuzgecSayisi, siganSutun, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecSec, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
+import { azamiSutun, etkinSuzgecSayisi, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecSec, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
 import { SutunSecici, SuzgecSecici } from "./Seciciler";
 import { useTabloTercihi } from "./useTabloTercihi";
-import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useYatayEksen, type YatayEksen } from "./VeriTablosu";
+import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useTabloOlcusu, type YatayEksen } from "./VeriTablosu";
 
 export interface VeriTablosuAyari {
   readonly projeksiyon: string;
@@ -39,6 +39,8 @@ export interface VeriTablosu {
   readonly azami: number;
   /** Görünür sütun ekrana sığmıyorsa başlık ve satırların ortak yatay ekseni; sığıyorsa yok. */
   readonly yatay: YatayEksen | null;
+  /** Tablonun kullanılabilir genişliğini ölçer (yatay kip kararı). */
+  readonly onLayout: (e: LayoutChangeEvent) => void;
   readonly list: RemoteList;
   readonly suzuldu: boolean;
   degistir(f: (t: TabloTercihi) => TabloTercihi): void;
@@ -58,7 +60,6 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
   const { facility } = useSession();
   const { width } = useWindowDimensions();
   const azami = azamiSutun(width);
-  const eksen = useYatayEksen();
   const spec = useListCapability().search(ayar.projeksiyon);
   const siralanabilir = facility?.liste?.siralama?.[ayar.projeksiyon] ?? [];
   const cokluSuzgec = !!facility?.liste?.siralama;
@@ -81,10 +82,13 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
   const suzgec = [ek.suzgec, temel.suzgec].filter(Boolean).join(",") || undefined;
   const sorgu: ListQuery = { ...temel, suzgec, ...ek.kimlik };
   const list = useRemoteList(ayar.projeksiyon, sorgu, { enabled: pref.hazir });
-  const gorunur = pref.tercih.sutunlar.flatMap((k) => ayar.sutunlar.filter((c) => c.key === k));
+  const secili = useMemo(() => pref.tercih.sutunlar.flatMap((k) => ayar.sutunlar.filter((c) => c.key === k)), [pref.tercih.sutunlar, ayar.sutunlar]);
+  // Kırpılmaz numara sütunları yüklü satırlardan ölçülür; sığmazsa tablo yatay kayar (sütun seçimi korunur).
+  const olcu = useTabloOlcusu(secili, list.items);
+  const gorunur = olcu.sutunlar;
   return {
     ayar, tercih: pref.tercih, gorunur, gruplar: gs, siralanabilir, aramaVar: !!spec, terim, setTerim, azami, list,
-    yatay: gorunur.length > siganSutun(width) ? eksen : null,
+    yatay: olcu.yatay, onLayout: olcu.onLayout,
     suzuldu: !!sorgu.ara || !!temel.suzgec || Object.values(ek.kimlik ?? {}).some(Boolean),
     degistir: pref.degistir,
   };
@@ -96,7 +100,7 @@ export function TabloUstu({ tablo }: { readonly tablo: VeriTablosu }) {
   const [suzgecAcik, setSuzgecAcik] = useState(false);
   const { ayar, tercih, degistir } = tablo;
   return (
-    <View>
+    <View onLayout={tablo.onLayout}>
       <TabloAraclari
         testID={ayar.testID}
         ara={tablo.aramaVar ? { value: tablo.terim, onChangeText: tablo.setTerim, placeholder: ayar.aramaIpucu } : undefined}

@@ -20,13 +20,13 @@ export function cuvalHucresi(c: Cuval): string {
 }
 
 export const CUVAL_SUTUNLARI: readonly SutunTanimi<Cuval>[] = [
-  { key: "cuval", baslik: "Çuval", ad: "Çuval no", agirlik: 1.8, sirala: "cuval", satir: 2, hucre: cuvalHucresi },
+  { key: "cuval", baslik: "Çuval", ad: "Çuval no", agirlik: 1.8, kirpilmaz: 12, sirala: "cuval", satir: 2, hucre: cuvalHucresi },
   { key: "cari", baslik: "Cari", agirlik: 1.9, sirala: "cari", satir: 2, hucre: (c) => c.cari ?? "Müşterisiz" },
   { key: "top", baslik: "Top", ad: "Top sayısı", agirlik: 0.6, sayi: true, sirala: "top", hucre: (c) => sayi(c.top) },
   { key: "metre", baslik: "Metre", agirlik: 0.9, sayi: true, sirala: "metre", hucre: (c) => sayi(c.metre) },
   { key: "kg", baslik: "Kg", ad: "Brüt kg (tartı)", agirlik: 0.8, sayi: true, sirala: "kg", hucre: (c) => sayi(c.kg) },
   { key: "durum", baslik: "Durum", agirlik: 1.2, sirala: "durum", hucre: (c) => DURUM_ETIKETI[c.durum] },
-  { key: "sevkiyat", baslik: "Sevkiyat", ad: "Sevkiyat no", agirlik: 1.5, hucre: (c) => c.sevkiyatNo ?? "—" },
+  { key: "sevkiyat", baslik: "Sevkiyat", ad: "Sevkiyat no", agirlik: 1.5, kirpilmaz: 13, hucre: (c) => c.sevkiyatNo ?? "—" },
   { key: "sube", baslik: "Şube", agirlik: 1.3, sirala: "sube", satir: 2, hucre: (c) => c.sube ?? "—" },
   { key: "tarih", baslik: "Açılış", ad: "Açılış tarihi", agirlik: 1.1, sirala: "tarih", hucre: (c) => (c.olusturulma ? formatDate(c.olusturulma) : "—") },
 ];

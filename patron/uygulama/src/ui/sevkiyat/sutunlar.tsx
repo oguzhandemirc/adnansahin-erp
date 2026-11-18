@@ -21,7 +21,7 @@ function DurumHucresi({ durum }: { durum: unknown }) {
 }
 
 export const SEVKIYAT_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
-  { key: "no", baslik: "Sevk no", agirlik: 1.5, sirala: "sevkNo", hucre: (r) => str(k(r).sevkNo) ?? "—" },
+  { key: "no", baslik: "Sevk no", agirlik: 1.5, kirpilmaz: 13, sirala: "sevkNo", hucre: (r) => str(k(r).sevkNo) ?? "—" },
   { key: "tarih", baslik: "Tarih", ad: "Sevk tarihi", agirlik: 1.1, sirala: "cikisTarihi", hucre: (r) => formatDate(str(k(r).cikisTarihi) ?? str(k(r).olusturulma)) },
   // Müşteri adı kesilmez: geniş sütun + alt satıra kayar (sipariş listesiyle aynı).
   { key: "musteri", baslik: "Müşteri", agirlik: 1.6, satir: 2, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
@@ -32,7 +32,7 @@ export const SEVKIYAT_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "cuval", baslik: "Çuval", ad: "Çuval sayısı", agirlik: 0.8, sayi: true, sirala: "cuvalSayisi", hucre: (r) => sayi(k(r).cuvalSayisi) },
   { key: "durum", baslik: "Durum", agirlik: 1.3, hucre: (r) => sevkDurumu(k(r).durum).label, ogeler: (r) => <DurumHucresi durum={k(r).durum} /> },
   // Sütun seçicide KAPALI gelen ekler (eski "Satırda göster" alanları): telin kendi alanları.
-  { key: "fatura", baslik: "Fatura", ad: "Fatura no", agirlik: 1.1, hucre: (r) => str(k(r).disFaturaNo) ?? "—" },
+  { key: "fatura", baslik: "Fatura", ad: "Fatura no", agirlik: 1.1, kirpilmaz: 16, hucre: (r) => str(k(r).disFaturaNo) ?? "—" },
   { key: "faturaTarihi", baslik: "Fatura tar.", ad: "Fatura tarihi", agirlik: 1.1, hucre: (r) => formatDate(k(r).faturalanma) },
   { key: "kayit", baslik: "Kayıt", ad: "Kayıt tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).olusturulma) },
   { key: "iptal", baslik: "İptal", ad: "İptal tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).iptalTarihi) },

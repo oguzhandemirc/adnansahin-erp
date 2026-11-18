@@ -20,7 +20,7 @@ function DurumHucresi({ durum }: { durum: unknown }) {
 
 /** Hepsi sola dayalı: ortak tablonun varsayılanı (`sutunHizasi`); burada ayrıca hiza verilmez. */
 export const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
-  { key: "no", baslik: "No", ad: "Sipariş no", agirlik: 1.5, sirala: "siparisNo", hucre: (r) => kisaBelgeNo(str(k(r).siparisNo)) ?? "—" },
+  { key: "no", baslik: "No", ad: "Sipariş no", agirlik: 1.5, kirpilmaz: 13, sirala: "siparisNo", hucre: (r) => kisaBelgeNo(str(k(r).siparisNo)) ?? "—" },
   // Müşteri adı kesilmez: geniş sütun + alt satıra kayar (en çok 3 satır).
   { key: "musteri", baslik: "Müşteri", agirlik: 1.5, satir: 3, sirala: "musteriAdi", hucre: (r) => str(k(r).musteriAdi) ?? "—" },
   { key: "tarih", baslik: "Tarih", ad: "Sipariş tarihi", agirlik: 1, sirala: "siparisTarihi", hucre: (r) => (str(k(r).siparisTarihi) ? formatDate(k(r).siparisTarihi) : "—") },

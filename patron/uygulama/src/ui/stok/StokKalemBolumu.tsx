@@ -13,10 +13,10 @@ import { UNIT } from "../../lib/labels/uretim";
 import { qty } from "../pano/read";
 import { SnapshotGate } from "../pano/SnapshotGate";
 import { useSnapshot } from "../pano/useSnapshot";
-import { azamiSutun, etkinSuzgecSayisi, siganSutun, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SuzgecGrubu, type SutunTanimi } from "../tablo/model";
+import { azamiSutun, etkinSuzgecSayisi, sonrakiSiralama, suzgecSec, sutunDegistir, sutunTasi, type SuzgecGrubu, type SutunTanimi } from "../tablo/model";
 import { SuzgecSecici, SutunSecici } from "../tablo/Seciciler";
 import { useTabloTercihi } from "../tablo/useTabloTercihi";
-import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useYatayEksen, type YatayEksen } from "../tablo/VeriTablosu";
+import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useTabloOlcusu, type YatayEksen } from "../tablo/VeriTablosu";
 import { makeStyles, useTokens } from "../theme-context";
 import { space, tabularNums, typography } from "../tokens";
 import {
@@ -49,7 +49,6 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   const genislik = useWindowDimensions().width;
   // En çok 10 sütun seçilir; ekrana sığandan fazlası yatay kaydırılır (liste ekranlarıyla aynı kural, `useVeriTablosu`).
   const azami = azamiSutun(genislik);
-  const eksen = useYatayEksen();
   const gorunum = useTabloTercihi("stok.gorunum", gorunumTemizle);
   const kalemPref = useTabloTercihi("tablo.stok-kalem", useMemo(() => kalemTemizle(azami), [azami]));
   const topPref = useTabloTercihi("tablo.stok-top", useMemo(() => topTemizle(azami), [azami]));
@@ -70,12 +69,17 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   const [suzgecAcik, setSuzgecAcik] = useState(false);
   const pref = kip === "kalem" ? kalemPref : topPref;
   const sutunlar = (kip === "kalem" ? KALEM_SUTUNLARI : TOP_SUTUNLARI) as readonly SutunTanimi<unknown>[];
-  const gorunur = pref.tercih.sutunlar.flatMap((k) => sutunlar.filter((c) => c.key === k));
-  const yatay = gorunur.length > siganSutun(genislik) ? eksen : null;
+  const secili = useMemo(() => pref.tercih.sutunlar.flatMap((k) => sutunlar.filter((c) => c.key === k)), [pref.tercih.sutunlar, sutunlar]);
+  const kalemler = kip === "kalem" ? gorunenKalemler(b, ara, suzgec, kalemPref.tercih.siralama) : null;
+  const toplar = kip === "top" ? gorunenToplar(b, ara, suzgec, topPref.tercih.siralama, knSuzgec) : null;
+  // Kırpılmaz numara sütunları (Top no, Çuval no) görünen satırlardan ölçülür; sığmazsa tablo yatay kayar.
+  const olcu = useTabloOlcusu(secili, (kalemler ?? toplar ?? []) as readonly unknown[]);
+  const gorunur = olcu.sutunlar;
+  const yatay = olcu.yatay;
   const sec = (k: "bolum" | "gorunum", v: Bolum | Gorunum) => gorunum.degistir((t) => ({ ...t, suzgec: { ...t.suzgec, [k]: v } }));
 
   return (
-    <View testID="stok-kalem-bolumu">
+    <View testID="stok-kalem-bolumu" onLayout={olcu.onLayout}>
       {/* Tek araç satırı: iki küçük bölmeli seçim + arama/süzgeç/sütun. Dar ekranda sıkı iki satıra sarar. Sayılar ALTTA
           sabit toplam satırında (`StokToplamSatiri`); burada sayı gösterilmez (çift gösterim yok). */}
       <View style={s.aracSatiri} testID="stok-arac-satiri">
@@ -105,8 +109,8 @@ function Icerik({ veri }: { readonly veri: unknown }) {
         onSirala={(alan) => pref.degistir((t) => ({ ...t, siralama: sonrakiSiralama(t.siralama, alan) }))}
       />
       {kip === "kalem"
-        ? <KalemListesi b={b} kalemler={gorunenKalemler(b, ara, suzgec, kalemPref.tercih.siralama)} sutunlar={gorunur} yatay={yatay} />
-        : <SayfaliListe satirlar={gorunenToplar(b, ara, suzgec, topPref.tercih.siralama, knSuzgec)} sutunlar={gorunur} yatay={yatay} testID="stok-top" anahtar={(t) => t.id} />}
+        ? <KalemListesi b={b} kalemler={kalemler ?? []} sutunlar={gorunur} yatay={yatay} />
+        : <SayfaliListe satirlar={toplar ?? []} sutunlar={gorunur} yatay={yatay} testID="stok-top" anahtar={(t) => t.id} />}
       {!kgVar(b) ? null : <Text style={s.not}>Kg yalnız tartılı topların toplamıdır; metreyle toplanmaz.</Text>}
       <SutunSecici
         visible={sutunAcik} testID="stok-kalem-sutun-secici" sutunlar={sutunlar} gorunur={pref.tercih.sutunlar} azami={azami}

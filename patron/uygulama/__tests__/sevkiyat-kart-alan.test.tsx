@@ -9,7 +9,7 @@ import type React from "react";
 import { StyleSheet } from "react-native";
 import { sevkDurumu } from "../src/ui/sevkiyat/durum";
 import { SEVKIYAT_SUTUNLARI, SEVK_LISTE_VARSAYILAN } from "../src/ui/sevkiyat/sutunlar";
-import { sutunGenisligi, type TabloTercihi } from "../src/ui/tablo/model";
+import { kirpilmazGenislik, sutunGenisligi, type TabloTercihi } from "../src/ui/tablo/model";
 
 const { LIST_ID_FILTERS, LIST_SEARCH, LIST_SORT } = require("../src/api/wire") as typeof import("../src/api/wire");
 const mockApi = { snapshot: jest.fn(), list: jest.fn(), record: jest.fn(), viewPref: jest.fn(), viewPrefSet: jest.fn() };
@@ -98,7 +98,9 @@ describe("§1 varsayılan görünüm", () => {
     const s1 = satir(V1);
     for (const v of ["SVK1811260034", "16.11.2026", "Örnek Tekstil A.Ş.", "İhracat", "15", "1.800 m", "Sevk edildi"]) expect(s1.getByText(v)).toBeTruthy();
     // Numara kırpılmaz: No sütunu 13 haneli belge numarasını taşıyacak genişlikte (eski 84 pt satır "SVK1811…" kesiyordu).
-    expect(sutunGenisligi(SEVKIYAT_SUTUNLARI.find((c) => c.key === "no")!.agirlik)).toBeGreaterThanOrEqual(120);
+    expect(sutunGenisligi(SEVKIYAT_SUTUNLARI.find((c) => c.key === "no")!)).toBeGreaterThanOrEqual(kirpilmazGenislik(13));
+    // Ekranın kendi satırında da: hücre metninde satır sınırı yok (üç nokta çıkamaz).
+    expect(screen.getByTestId(`kirpilmaz-no-sevk-satir-${V1}`).props.numberOfLines).toBeUndefined();
     // Çıkışı olmayan satırda tarih kayıt anından; top gelmezse "—".
     expect(satir(V3).getByText("14.11.2026")).toBeTruthy();
     expect(satir(V2).getAllByText("—").length).toBeGreaterThan(0);

@@ -1,12 +1,12 @@
 // Kısa tablo (2026-11-19): bir ayrıntı ekranının içindeki SABİT sütunlu liste (cari ayrıntısı sipariş/sevkiyat satırları).
 // Liste ekranlarının ortak tablosuyla AYNI parçalar (`TabloBasligi` · `TabloGovdesi` · `TabloSatiri`) ve aynı kurallar:
-// her sütun sola dayalı, sığmayan sütunlar (telefonda > 4) yatay kayar. Sütun seçimi/sıralama/arama YOK — sütunlar
+// her sütun sola dayalı, sığmayan sütunlar (telefonda > 4 ya da kırpılmaz numara sığmıyorsa) yatay kayar. Sütun seçimi/sıralama/arama YOK — sütunlar
 // çağıranın verdiği sabit küme; sıra sunucunun sırası. Satıra dokunmak `onPress`; `acilir` satırın
 // altında yerinde açılan içeriği çizer (Çuvallar ekranının çuval → top deseni).
 import type { ReactNode } from "react";
-import { useWindowDimensions, View } from "react-native";
-import { siganSutun, type SutunTanimi } from "./model";
-import { TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useYatayEksen } from "./VeriTablosu";
+import { View } from "react-native";
+import type { SutunTanimi } from "./model";
+import { TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useTabloOlcusu } from "./VeriTablosu";
 
 const SIRASIZ: readonly string[] = [];
 const bos = () => undefined;
@@ -26,17 +26,16 @@ export function KisaTablo<R extends { readonly id: string }>(p: {
   /** Tablonun altında (ör. "Daha fazla", boş/hata durumu). */
   readonly alt?: ReactNode;
 }) {
-  const genislik = useWindowDimensions().width;
-  const eksen = useYatayEksen();
-  const yatay = p.sutunlar.length > siganSutun(genislik) ? eksen : null;
+  // Kırpılmaz numara sütunları satırlardan ölçülür; sığmazsa tablo yatay kayar.
+  const { sutunlar, yatay, onLayout } = useTabloOlcusu(p.sutunlar, p.satirlar);
   if (p.satirlar.length === 0) return <View testID={p.testID}>{p.alt}</View>;
   return (
-    <View testID={p.testID}>
-      <TabloBasligi testID={p.testID} sutunlar={p.sutunlar} siralama={null} siralanabilir={SIRASIZ} onSirala={bos} yatay={yatay ?? undefined} />
-      <TabloGovdesi testID={`${p.testID}-govde`} yatay={yatay ? { eksen: yatay, genislik: toplamGenislik(p.sutunlar) } : undefined}>
+    <View testID={p.testID} onLayout={onLayout}>
+      <TabloBasligi testID={p.testID} sutunlar={sutunlar} siralama={null} siralanabilir={SIRASIZ} onSirala={bos} yatay={yatay ?? undefined} />
+      <TabloGovdesi testID={`${p.testID}-govde`} yatay={yatay ? { eksen: yatay, genislik: toplamGenislik(sutunlar) } : undefined}>
         {p.satirlar.map((r, i) => (
           <View key={r.id}>
-            <TabloSatiri yatay={!!yatay} sutunlar={p.sutunlar} kayit={r} ayrac={i > 0} onPress={p.onPress ? () => p.onPress!(r) : undefined} testID={`${p.testID}-satir-${r.id}`} />
+            <TabloSatiri yatay={!!yatay} sutunlar={sutunlar} kayit={r} ayrac={i > 0} onPress={p.onPress ? () => p.onPress!(r) : undefined} testID={`${p.testID}-satir-${r.id}`} />
             {p.acilir?.(r) ?? null}
           </View>
         ))}

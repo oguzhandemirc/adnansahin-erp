@@ -47,7 +47,7 @@ export function sevkCuvalHucresi(c: SevkCuvali): string {
 }
 
 export const SEVK_CUVAL_SUTUNLARI: readonly SutunTanimi<SevkCuvali>[] = [
-  { key: "cuval", baslik: "Çuval", ad: "Çuval no", agirlik: 2, satir: 3, hucre: sevkCuvalHucresi },
+  { key: "cuval", baslik: "Çuval", ad: "Çuval no", agirlik: 2, kirpilmaz: 12, satir: 3, hucre: sevkCuvalHucresi },
   { key: "top", baslik: "Top", ad: "Top sayısı", agirlik: 0.6, sayi: true, hucre: (c) => formatNumber(c.top, 0) },
   { key: "metre", baslik: "Metre", agirlik: 0.9, sayi: true, hucre: (c) => qty(c.metre) },
   { key: "kg", baslik: "Kg", ad: "Brüt kg (tartı)", agirlik: 0.8, sayi: true, hucre: (c) => (c.kg === null ? "—" : qty(c.kg)) },

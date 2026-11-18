@@ -15,9 +15,9 @@ export const IS_EMRI_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "kumas", baslik: "Kumaş", ad: "Kumaş / renk", agirlik: 1.45, sirala: "urunAdi", hucre: (r) => kumasMetni(k(r)) },
   { key: "top", baslik: "Top", agirlik: 0.55, sayi: true, sirala: "topSayisi", hucre: (r) => topMetni(k(r)) },
   { key: "asama", baslik: "Aşama", agirlik: 0.95, hucre: (r) => asamaMetni(k(r)) },
-  { key: "no", baslik: "No", ad: "İş emri no", agirlik: 1.3, sirala: "isEmriNo", hucre: (r) => isEmriNo(k(r)) },
+  { key: "no", baslik: "No", ad: "İş emri no", agirlik: 1.3, kirpilmaz: 12, sirala: "isEmriNo", hucre: (r) => isEmriNo(k(r)) },
   { key: "metre", baslik: "Metre", agirlik: 0.9, sayi: true, sirala: "metre", hucre: (r) => { const m = metre(k(r)); return m === null ? "—" : formatNumber(m, 0); } },
-  { key: "siparis", baslik: "Sipariş", ad: "Sipariş no", agirlik: 1.3, hucre: (r) => siparisNolari(k(r)).join(", ") || "—" },
+  { key: "siparis", baslik: "Sipariş", ad: "Sipariş no", agirlik: 1.3, kirpilmaz: 13, hucre: (r) => siparisNolari(k(r)).join(", ") || "—" },
   { key: "tarih", baslik: "Açılış", ad: "Açılış tarihi", agirlik: 0.9, sirala: "olusturulma", hucre: (r) => tarih(k(r).olusturulma) },
   // Panel eşliği (2026-11-16): panel sütunlarından buluta zaten gelenler; sıralama beyanı yok → sıralanmaz.
   { key: "fason", baslik: "Fason", ad: "Fason firması", agirlik: 1.3, hucre: (r) => fasonFirmCell(k(r)) },

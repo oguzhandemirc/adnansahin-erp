@@ -24,7 +24,7 @@ export const KALEM_SUTUNLARI: readonly SutunTanimi<Kalem>[] = [
 ];
 
 export const TOP_SUTUNLARI: readonly SutunTanimi<Top>[] = [
-  { key: "topNo", baslik: "Top no", agirlik: 2.1, sirala: "topNo", hucre: (t) => t.topNo ?? "—" },
+  { key: "topNo", baslik: "Top no", agirlik: 2.1, kirpilmaz: 11, sirala: "topNo", hucre: (t) => t.topNo ?? "—" },
   { key: "kalem", baslik: "Kalem", agirlik: 2, sirala: "kalem", satir: 3, hucre: (t) => t.kalemEtiket },
   { key: "metre", baslik: "Metre", agirlik: 0.9, sayi: true, sirala: "metre", hucre: (t) => sayi(t.metre) },
   { key: "gun", baslik: "Yaş", ad: "Yaş (gün)", agirlik: 0.6, sayi: true, sirala: "gun", hucre: (t) => sayi(t.gun) },
@@ -37,7 +37,7 @@ export const TOP_SUTUNLARI: readonly SutunTanimi<Top>[] = [
   { key: "kat", baslik: "Kat", agirlik: 0.9, sirala: "kat", hucre: (t) => metin(t.kat) },
   // Kime/nerede (fabrika 2.12.4+; eski fabrikada "—"). Sahiplik ETİKETTEN — sütun adı "Sahip" değil.
   { key: "etiket", baslik: "Etiket müşterisi", agirlik: 1.6, sirala: "etiket", satir: 2, hucre: (t) => (t.kimNerede ? (t.etiketMusteri ?? MUSTERISIZ) : "—") },
-  { key: "cuval", baslik: "Çuval", ad: "Çuval no", agirlik: 1.4, sirala: "cuval", hucre: (t) => (t.kimNerede ? (t.cuvalNo ?? ACIKTA) : "—") },
+  { key: "cuval", baslik: "Çuval", ad: "Çuval no", agirlik: 1.4, kirpilmaz: 12, sirala: "cuval", hucre: (t) => (t.kimNerede ? (t.cuvalNo ?? ACIKTA) : "—") },
   { key: "cuvalCari", baslik: "Çuval carisi", agirlik: 1.6, sirala: "cuvalCari", satir: 2, hucre: (t) => (t.kimNerede ? (t.cuvalCari ?? "—") : "—") },
 ];
 

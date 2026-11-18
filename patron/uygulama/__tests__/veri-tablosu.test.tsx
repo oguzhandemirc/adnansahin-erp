@@ -81,7 +81,7 @@ describe("§1 saf model", () => {
     // Seçilebilen sütun sığandan fazladır; fazlası yatay kaydırılır.
     expect(M.azamiSutun(390)).toBe(M.AZAMI_SUTUN);
     expect(M.AZAMI_SUTUN).toBeGreaterThan(M.GENIS_SUTUN);
-    expect(M.sutunGenisligi(1.5)).toBe(120);
+    expect(M.sutunGenisligi({ agirlik: 1.5 })).toBe(120);
   });
 
   it("rozet etkin grup sayısıdır; aynı değere yeniden dokunmak seçimi kaldırır", () => {
