@@ -165,7 +165,7 @@ async function main(): Promise<void> {
     await flushNotificationHook();
     const e1 = await events("siparis-iptal", o1);
     check("⭐ tek olay", e1.length === 1, String(e1.length));
-    check("metin: başlık + yapan + cari", e1[0]?.title === "Sipariş iptal edildi" && !!e1[0]?.body.includes(actor.fullName) && !!e1[0]?.body.includes(custName), e1[0]?.body);
+    check("metin: başlık + yapan + cari + iptal edilen miktar (2.13.1: iptal kalemleri de sayılır)", e1[0]?.title === "Sipariş iptal edildi" && !!e1[0]?.body.includes(actor.fullName) && !!e1[0]?.body.includes(custName) && !!e1[0]?.body.endsWith("· 10 m"), e1[0]?.body);
     const to1 = new Set(e1[0]?.deliveries.map((d) => d.userId));
     check("⭐ alıcı: atanmış + izinli alır; yazar ALMAZ; veri izni olmayan ALMAZ", to1.has(recv.id) && !to1.has(actor.id) && !to1.has(noPerm.id) && to1.size === 1, String(to1.size));
     check("rota telefon biçimi", e1[0]?.route === `/siparisler/${o1}`);

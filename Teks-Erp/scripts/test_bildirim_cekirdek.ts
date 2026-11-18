@@ -56,6 +56,7 @@ import {
   notificationKindForAudit,
   notificationMatchesForAudit,
   type NotificationKind,
+  orderAmountText,
 } from "../src/constants/notification-catalog";
 import { PERMISSION_CATALOG } from "../src/constants/permission-catalog";
 import { ensureTestAdmin } from "./fixture-test-user";
@@ -225,6 +226,13 @@ async function main(): Promise<void> {
     check("⭐ panel: tek olay (yeni-siparis)", pEv.length === 1 && pEv[0]?.kind === "yeni-siparis");
     check("panel: yazar = panel kullanıcısı, ad dondurulmuş, metinde ad + cari", pEv[0]?.authorUserId === panel.id && pEv[0]?.authorName === panel.fullName && !!pEv[0]?.body.includes(panel.fullName) && !!pEv[0]?.body.includes(custName), pEv[0]?.body);
     check("panel: rota telefon biçimi", pEv[0]?.route === `/siparisler/${pOrd.id}`);
+    // 2.13.1 (saha 2026-11-18): kilit ekranında müşteri + miktar — tek birimli siparişte toplam + birim.
+    check("⭐ panel: metinde sipariş toplamı (10 m)", !!pEv[0]?.body.endsWith("· 10 m"), pEv[0]?.body);
+    check("miktar metni: tek birim toplam (bulut biçimi), karışık birim 'N kalem', boş null",
+      orderAmountText({ quantity: { total: 1203, unit: "MT" }, lineCount: 3 }) === "1.203 m" &&
+      orderAmountText({ quantity: { total: 12.5, unit: "KG" }, lineCount: 1 }) === "12,5 kg" &&
+      orderAmountText({ quantity: null, lineCount: 2 }) === "2 kalem" &&
+      orderAmountText({ quantity: null, lineCount: null }) === null);
     const pTo = await deliveredTo("yeni-siparis", pOrd.id ?? "");
     const pExp = new Set([...expectOrder].filter((x) => x !== panel.id));
     check("⭐ panel: alıcılar = {alıcı, tercihsiz-sessiz, telefon}; yazar ALMAZ", pTo.size === pExp.size && [...pExp].every((x) => pTo.has(x)) && !pTo.has(panel.id), [...pTo].length.toString());
@@ -268,12 +276,13 @@ async function main(): Promise<void> {
 
     // ── §d iş emri + sevk ────────────────────────────────────────────────────
     console.log("\n§d yeni iş emri + yeni sevk: yazar künyeden, alıcılar veri iznine göre");
-    const wo = await prisma.workOrder.create({ data: { workOrderNumber: `${STAMP}-${letters(8)}`, createdById: rAll.id }, select: { id: true, workOrderNumber: true } });
+    const wo = await prisma.workOrder.create({ data: { workOrderNumber: `${STAMP}-${letters(8)}`, createdById: rAll.id, targetQuantity: 250 }, select: { id: true, workOrderNumber: true } });
     workOrderIds.push(wo.id);
     await AuditService.log({ userId: admin.id, action: "CREATE", tableName: "WORK_ORDER", recordId: wo.id, newData: { workOrderNumber: wo.workOrderNumber } });
     await flushNotificationHook();
     const woEv = await prisma.notificationEvent.findUnique({ where: { kind_entityId: { kind: "yeni-is-emri", entityId: wo.id } } });
     check("⭐ iş emri: olay doğdu, yazar KÜNYEDEN (createdById), çağrı aktörü değil", woEv?.authorUserId === rAll.id && woEv.authorName === rAll.fullName && !!woEv.body.includes(wo.workOrderNumber));
+    check("iş emri: hedef metraj metinde (2.13.1)", !!woEv?.body.endsWith("· 250 m"), woEv?.body);
     const woTo = await deliveredTo("yeni-is-emri", wo.id);
     check("iş emri: alıcı yalnız panel (yazar alıcı ALMAZ; sipariş atamalılar ALMAZ)", woTo.size === 1 && woTo.has(panel.id), String(woTo.size));
     const sh = await prisma.shipment.create({ data: { shipmentNo: `${STAMP}-${letters(8)}`, customerId: cust, createdById: panel.id }, select: { id: true, shipmentNo: true } });

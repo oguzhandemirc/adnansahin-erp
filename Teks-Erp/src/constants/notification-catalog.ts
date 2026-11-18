@@ -43,6 +43,10 @@ export interface NotificationFacts {
   readonly variant?: string | null;
   /** Hazır metin satırı (gün sonu özeti — sayılar fabrika raporlarından). */
   readonly summary?: string | null;
+  /** Sipariş miktarı (2.13.1): kalemlerin TEK birimi varsa toplam + birim; karışık birimde null (bkz. `lineCount`). */
+  readonly quantity?: { readonly total: number; readonly unit: string } | null;
+  /** Sipariş kalem sayısı — karışık birimde toplam UYDURULMAZ, "N kalem" yazılır. */
+  readonly lineCount?: number | null;
 }
 
 export interface NotificationText {
@@ -90,6 +94,20 @@ export function metersText(m: number | null | undefined): string | null {
   return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(m)} m`;
 }
 const rollsText = (n: number | null | undefined): string | null => (n === null || n === undefined ? null : `${n} top`);
+
+/** Birim kodu → metin (`ItemUnit`); bilinmeyen kod olduğu gibi. */
+const UNIT_TEXT: Readonly<Record<string, string>> = { MT: "m", KG: "kg", ADET: "adet" };
+
+/**
+ * Sipariş miktar metni (2.13.1, saha 2026-11-18 — kilit ekranında "müşteri + metre"): tek birimde toplam bulutun eski
+ * biçimiyle ("1.203 m", en çok 2 ondalık), karışık birimde "N kalem"; kalem yoksa null.
+ */
+export function orderAmountText(f: Pick<NotificationFacts, "quantity" | "lineCount">): string | null {
+  if (f.quantity && Number.isFinite(f.quantity.total)) {
+    return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(f.quantity.total)} ${UNIT_TEXT[f.quantity.unit] ?? f.quantity.unit}`;
+  }
+  return f.lineCount ? `${f.lineCount} kalem` : null;
+}
 const woRoute = (f: NotificationFacts, fallback: string): string => (f.refId ? `/is-emirleri/${f.refId}` : fallback);
 
 export const NOTIFICATION_KINDS = {
@@ -100,7 +118,7 @@ export const NOTIFICATION_KINDS = {
     missingPermissionText: "Siparişleri görme izni yok",
     sources: [{ action: "CREATE", tableName: "ORDER" }],
     author: "call",
-    text: (f, a) => ({ title: "Yeni sipariş açıldı", body: join([a, f.customerName, `Sipariş ${f.number}`]) }),
+    text: (f, a) => ({ title: "Yeni sipariş açıldı", body: join([a, f.customerName, `Sipariş ${f.number}`, orderAmountText(f)]) }),
     appRoute: (id) => `/siparisler/${id}`,
   },
   "siparis-iptal": {
@@ -114,7 +132,7 @@ export const NOTIFICATION_KINDS = {
       { action: "UPDATE", tableName: "ORDER_LINE", when: { field: "cancelled", oneOf: ["true"] }, via: "order-line-order" },
     ],
     author: "call",
-    text: (f, a) => ({ title: "Sipariş iptal edildi", body: join([a, f.customerName, `Sipariş ${f.number}`]) }),
+    text: (f, a) => ({ title: "Sipariş iptal edildi", body: join([a, f.customerName, `Sipariş ${f.number}`, orderAmountText(f)]) }),
     appRoute: (id) => `/siparisler/${id}`,
   },
   "siparis-tamamlandi": {
@@ -130,7 +148,7 @@ export const NOTIFICATION_KINDS = {
       { action: "UPDATE", tableName: "ORDER_LINE", when: { field: "cancelled", oneOf: ["true"] }, via: "order-line-order" },
     ],
     author: "call",
-    text: (f, a) => ({ title: "Sipariş tamamlandı", body: join([a, f.customerName, `Sipariş ${f.number}`]) }),
+    text: (f, a) => ({ title: "Sipariş tamamlandı", body: join([a, f.customerName, `Sipariş ${f.number}`, orderAmountText(f)]) }),
     appRoute: (id) => `/siparisler/${id}`,
   },
   "yeni-is-emri": {
@@ -140,7 +158,7 @@ export const NOTIFICATION_KINDS = {
     missingPermissionText: "İş emirlerini görme izni yok",
     sources: [{ action: "CREATE", tableName: "WORK_ORDER" }],
     author: "record",
-    text: (f, a) => ({ title: "Yeni iş emri açıldı", body: join([a, `İş emri ${f.number}`]) }),
+    text: (f, a) => ({ title: "Yeni iş emri açıldı", body: join([a, f.productName, `İş emri ${f.number}`, metersText(f.meters)]) }),
     appRoute: (id) => `/is-emirleri/${id}`,
   },
   "fire-top-iptal": {
@@ -163,7 +181,7 @@ export const NOTIFICATION_KINDS = {
     missingPermissionText: "Sevkiyatları görme izni yok",
     sources: [{ action: "CREATE", tableName: "SHIPMENT" }],
     author: "record",
-    text: (f, a) => ({ title: "Yeni sevkiyat oluşturuldu", body: join([a, f.customerName, `Sevk ${f.number}`]) }),
+    text: (f, a) => ({ title: "Yeni sevkiyat oluşturuldu", body: join([a, f.customerName, f.rollCount ? rollsText(f.rollCount) : null, f.rollCount ? metersText(f.meters) : null, `Sevk ${f.number}`]) }),
     appRoute: (id) => `/sevkiyat/${id}`,
   },
   "sevkiyat-cikti": {

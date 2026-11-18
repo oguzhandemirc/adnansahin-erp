@@ -10,7 +10,8 @@
 // =============================================================================
 
 import prisma from "../../lib/prisma";
-import { RollStatus } from "@prisma/client";
+import { Prisma, RollStatus } from "@prisma/client";
+import { isActiveLine } from "../helpers/order-line-scope.helper";
 import type { NotificationEntityVia, NotificationFacts, NotificationKind } from "../../constants/notification-catalog";
 import { grossRollCount, loadShipmentGrossTotals, LIVE_RETURN_WHERE } from "../helpers/shipment-gross-totals.helper";
 
@@ -28,12 +29,26 @@ type FactsLoader = (entityId: string, ctx: LoaderContext) => Promise<Notificatio
 const fresh = (at: Date | null | undefined, ctx: LoaderContext): boolean => !!at && ctx.nowMs - at.getTime() <= NOTIFICATION_FRESH_MS;
 const num = (d: { toNumber(): number } | null | undefined): number | null => (d ? d.toNumber() : null);
 
+/**
+ * Sipariş miktarı (2.13.1): kalemler durum tablosundan. `active` = yalnız aktif kalemler (`isActiveLine` — açılış,
+ * tamamlanma); iptal bildirimi BÜTÜN kalemleri sayar (iptal edilen miktar). Tek birimde toplam, karışıkta yalnız sayı.
+ */
+async function orderAmount(orderId: string, active: boolean): Promise<Pick<NotificationFacts, "quantity" | "lineCount">> {
+  const lines = await prisma.orderLine.findMany({ where: { orderId }, select: { quantity: true, unit: true, cancelledAt: true } });
+  const scope = active ? lines.filter(isActiveLine) : lines;
+  if (scope.length === 0) return { quantity: null, lineCount: null };
+  const units = new Set(scope.map((l) => l.unit));
+  if (units.size !== 1) return { quantity: null, lineCount: scope.length };
+  const total = scope.reduce((acc, l) => acc.plus(l.quantity), new Prisma.Decimal(0));
+  return { quantity: { total: total.toNumber(), unit: scope[0]!.unit }, lineCount: scope.length };
+}
+
 const loadOrder: FactsLoader = async (id) => {
   const r = await prisma.order.findUnique({
     where: { id },
     select: { orderNumber: true, createdById: true, customer: { select: { name: true } } },
   });
-  return r ? { number: r.orderNumber, customerName: r.customer?.name ?? null, createdById: r.createdById } : null;
+  return r ? { number: r.orderNumber, customerName: r.customer?.name ?? null, createdById: r.createdById, ...(await orderAmount(id, true)) } : null;
 };
 
 const loadOrderInState = (state: "CANCELLED" | "COMPLETED"): FactsLoader => async (id, ctx) => {
@@ -43,20 +58,24 @@ const loadOrderInState = (state: "CANCELLED" | "COMPLETED"): FactsLoader => asyn
   });
   if (!r || r.status !== state) return null;
   if (!fresh(state === "CANCELLED" ? r.cancelledAt : r.completedAt, ctx)) return null;
-  return { number: r.orderNumber, customerName: r.customer?.name ?? null, createdById: null };
+  return { number: r.orderNumber, customerName: r.customer?.name ?? null, createdById: null, ...(await orderAmount(id, state !== "CANCELLED")) };
 };
 
 const loadWorkOrder: FactsLoader = async (id) => {
-  const r = await prisma.workOrder.findUnique({ where: { id }, select: { workOrderNumber: true, createdById: true } });
-  return r ? { number: r.workOrderNumber, customerName: null, createdById: r.createdById } : null;
+  const r = await prisma.workOrder.findUnique({ where: { id }, select: { workOrderNumber: true, createdById: true, targetQuantity: true, targetItem: { select: { name: true } } } });
+  return r ? { number: r.workOrderNumber, customerName: null, createdById: r.createdById, meters: num(r.targetQuantity), productName: r.targetItem?.name ?? null } : null;
 };
 
+/** Yeni sevk: planlanırken topu varsa BRÜT top/metre (sevk çıkışıyla aynı kaynak); boş sevkte miktar yazılmaz. */
 const loadShipment: FactsLoader = async (id) => {
   const r = await prisma.shipment.findUnique({
     where: { id },
-    select: { shipmentNo: true, createdById: true, customer: { select: { name: true } } },
+    select: { shipmentNo: true, createdById: true, customer: { select: { name: true } }, _count: { select: { rolls: true, returns: { where: LIVE_RETURN_WHERE } } } },
   });
-  return r ? { number: r.shipmentNo, customerName: r.customer?.name ?? null, createdById: r.createdById } : null;
+  if (!r) return null;
+  const rolls = grossRollCount(r._count.rolls, r._count.returns);
+  const gross = rolls > 0 ? (await loadShipmentGrossTotals([id])).get(id) : undefined;
+  return { number: r.shipmentNo, customerName: r.customer?.name ?? null, createdById: r.createdById, rollCount: rolls, meters: gross ? gross.grossMeters.toNumber() : null };
 };
 
 /** Sevk çıkışı: DISPATCHED + taze `dispatchedAt`; metre ve top BRÜT (tek kaynak `shipment-gross-totals.helper`). */
