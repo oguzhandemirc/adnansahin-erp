@@ -6,7 +6,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import {
-  gorunenKalemler, gorunenToplar, kaleminToplari, kgVar, KIM_NEREDE_ANAHTARLARI, kimNeredeGruplari, stokBolumu, stokSuzgecGruplari,
+  gorunenKalemler, gorunenToplar, kaleminToplari, kgVar, KIM_NEREDE_ANAHTARLARI, stokBolumu, stokSuzgecDurumu,
   type Bolum, type Gorunum, type Kalem, type StokBolumu,
 } from "../../lib/stok-kalem";
 import { UNIT } from "../../lib/labels/uretim";
@@ -48,12 +48,9 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   const bolum = bolumOf(gorunum.tercih);
   const kip = gorunumOf(gorunum.tercih);
   const b = useMemo(() => stokBolumu(veri, bolum), [veri, bolum]);
-  const gruplar = useMemo(() => stokSuzgecGruplari(b, kip === "top"), [b, kip]);
-  // Kime/nerede süzgeci yalnız top görünümünde ve fabrika çuval bilgisini gönderdiyse; seçim `tablo.stok-top`ta.
-  const knGruplar = useMemo(() => (kip === "top" ? kimNeredeGruplari(b) : []), [b, kip]);
-  // Yalnız bu bölümde geçerli seçimler süzer (bitmişte seçilen renk ham bölümü boşaltmaz).
-  const suzgec = useMemo(() => gecerliSecim(gruplar, kalemPref.tercih.suzgec), [gruplar, kalemPref.tercih.suzgec]);
-  const knSuzgec = useMemo(() => gecerliSecim(knGruplar, topPref.tercih.suzgec), [knGruplar, topPref.tercih.suzgec]);
+  // Süzgeç durumu alt toplam satırıyla AYNI kaynaktan (`stokSuzgecDurumu`).
+  const durum = useMemo(() => stokSuzgecDurumu(b, kip, kalemPref.tercih.suzgec, topPref.tercih.suzgec), [b, kip, kalemPref.tercih.suzgec, topPref.tercih.suzgec]);
+  const { gruplar, knGruplar, kalemSecim: suzgec, knSecim: knSuzgec } = durum;
   const tumGruplar = knGruplar.length > 0 ? [...gruplar, ...knGruplar] : gruplar;
   const tumSecim = { ...suzgec, ...knSuzgec };
   const knAnahtar = (g: string) => (KIM_NEREDE_ANAHTARLARI as readonly string[]).includes(g);
@@ -70,7 +67,7 @@ function Icerik({ veri }: { readonly veri: unknown }) {
   const gorunur = olcu.sutunlar;
   const yatay = olcu.yatay;
   const sec = (k: "bolum" | "gorunum", v: Bolum | Gorunum) => gorunum.degistir((t) => ({ ...t, suzgec: { ...t.suzgec, [k]: v } }));
-  const suzgecEtkin = Object.keys(tumSecim).length > 0;
+  const suzgecEtkin = durum.etkin;
   // Kalem süzgeci `tablo.stok-kalem`te, kime/nerede `tablo.stok-top`ta (mevcut tercih anahtarları; yeni anahtar yok).
   const kalemAnahtarlari = (sec: Readonly<Record<string, string>>) => Object.fromEntries(Object.entries(sec).filter(([k]) => !knAnahtar(k)));
   const knAnahtarlari = (sec: Readonly<Record<string, string>>) => Object.fromEntries(Object.entries(sec).filter(([k]) => knAnahtar(k)));

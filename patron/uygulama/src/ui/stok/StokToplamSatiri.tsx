@@ -4,12 +4,16 @@
 //   • Depoda — fabrikanın `toplamTop` + `toplamMetre`si (çuval bilgisi varsa bunlar çuvalda olmayan, raftaki toplardır;
 //     yoksa — Ham ya da fabrika göndermiyorsa — bölümün toplamıdır);
 //   • Çuvalda — fabrikanın `cuvaldaTop` + `cuvaldaMetre`si (yalnız fabrika gönderdiyse).
-// Küme: seçili bölümün (Ham | Bitmiş) TAMAMI — arama/süzgeç bu sayıları değiştirmez. TEK SATIR, yatay kaydırma YOK:
-// sığmazsa yazı küçülür (en çok %75); çok dar ekranda (< 340 pt) son çare iki öbek alt alta.
+// Küme: seçili bölümün (Ham | Bitmiş) TAMAMI. TEK SATIR, yatay kaydırma YOK: sığmazsa yazı küçülür (en çok %75); çok dar
+// ekranda (< 340 pt) son çare iki öbek alt alta.
+// SÜZGEÇ ETKİNKEN (kullanıcı kararı 2026-11-19 "Süzülen toplam"): fabrika süzgece göre top/metre toplamı GÖNDERMİYOR
+// (anlık yalnız bölüm toplamı + kalem satırı taşır) ve uygulama toplama yapmaz ⇒ bölüm toplamı yerine dürüst durum:
+// "Süzülen: N kalem|top" — N süzgece uyan SATIR sayısıdır (anlık tam, sayfasız ⇒ kesin), metre/top toplamı değil.
+// Süzülen metre/top için fabrikanın anlığa süzgeç-boyutlu toplam eklemesi gerekir (rapor: patron-app İş 2).
 import { useMemo } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
 import { UNIT } from "../../lib/labels/uretim";
-import { stokBolumu, type StokBolumu } from "../../lib/stok-kalem";
+import { stokBolumu, stokSuzgecDurumu, suzulenSatir, type StokBolumu } from "../../lib/stok-kalem";
 import { useWide } from "../Frame";
 import { qty } from "../pano/read";
 import { useSnapshot } from "../pano/useSnapshot";
@@ -17,7 +21,8 @@ import { useTabloTercihi } from "../tablo/useTabloTercihi";
 import { makeStyles } from "../theme-context";
 import { FONT_SCALE, ekranOlugu, space, tabularNums, typography } from "../tokens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { bolumOf, gorunumTemizle } from "./sutunlar";
+import { bolumOf, gorunumOf, gorunumTemizle, kalemTemizle, topTemizle } from "./sutunlar";
+import { azamiSutun } from "../tablo/model";
 
 export interface ToplamParcasi {
   readonly key: "depo" | "cuval";
@@ -44,12 +49,35 @@ export function StokToplamSatiri() {
   const insets = useSafeAreaInsets();
   const snap = useSnapshot("stok-kalem");
   const gorunum = useTabloTercihi("stok.gorunum", gorunumTemizle);
+  const kalemPref = useTabloTercihi("tablo.stok-kalem", useMemo(() => kalemTemizle(azamiSutun()), []));
+  const topPref = useTabloTercihi("tablo.stok-top", useMemo(() => topTemizle(azamiSutun()), []));
   const bolum = bolumOf(gorunum.tercih);
+  const kip = gorunumOf(gorunum.tercih);
   const veri = snap.data?.veri;
-  const parcalar = useMemo(() => (veri === undefined || veri === null ? null : toplamParcalari(stokBolumu(veri, bolum))), [veri, bolum]);
+  const b = useMemo(() => (veri === undefined || veri === null ? null : stokBolumu(veri, bolum)), [veri, bolum]);
+  const suzulen = useMemo(() => {
+    if (!b) return null;
+    const d = stokSuzgecDurumu(b, kip, kalemPref.tercih.suzgec, topPref.tercih.suzgec);
+    return d.etkin ? suzulenSatir(b, kip, d) : null;
+  }, [b, kip, kalemPref.tercih.suzgec, topPref.tercih.suzgec]);
+  const parcalar = useMemo(() => (b ? toplamParcalari(b) : null), [b]);
   if (!parcalar) return null;
-  const etiket = `${bolum === "ham" ? "Ham" : "Bitmiş"} stok: ${parcalar.map((x) => `${x.etiket} ${x.deger}`).join(", ")}`;
   const pad = ekranOlugu(wide);
+  if (suzulen !== null) {
+    const birim = kip === "kalem" ? "kalem" : UNIT.top;
+    return (
+      <View
+        style={[s.cubuk, { paddingBottom: space.s + (wide ? insets.bottom : 0), paddingHorizontal: pad }]} testID="stok-toplam-satiri" accessible
+        accessibilityLabel={`Süzgeç etkin: ${qty(suzulen)} ${birim}. Süzülen metre toplamını fabrika henüz göndermiyor.`}
+      >
+        <Text style={s.satir} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={FONT_SCALE.title} testID="stok-toplam-suzulen">
+          <Text style={s.etiket}>Süzülen </Text>
+          <Text style={s.deger} testID="stok-toplam-suzulen-deger">{`${qty(suzulen)} ${birim}`}</Text>
+        </Text>
+      </View>
+    );
+  }
+  const etiket = `${bolum === "ham" ? "Ham" : "Bitmiş"} stok: ${parcalar.map((x) => `${x.etiket} ${x.deger}`).join(", ")}`;
   const obek = (x: ToplamParcasi) => (
     <Text key={x.key} testID={`stok-toplam-${x.key}`}>
       <Text style={s.etiket}>{`${x.etiket} `}</Text>

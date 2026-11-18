@@ -4,7 +4,7 @@
 // Kime/nerede (fabrika 2.12.4+): top etiket müşterisi · çuval no · çuval carisi; çuvaldaki bitmiş toplar ayrı dizi ve
 // sayıları fabrikadan (`cuvaldaTop`). Süzgeçleri de burada (mevcut desen: belge istemcide); alan yoksa grup çizilmez.
 import { arr, num, obj, str } from "../ui/pano/read";
-import { secimDegerleri, type SuzgecGrubu, type Siralama } from "../ui/tablo/model";
+import { gecerliSecim, secimDegerleri, type SuzgecGrubu, type Siralama } from "../ui/tablo/model";
 
 /**
  * Alan süzgeci: seçim yoksa geçer; varsa değer seçilenlerden BİRİ olmalı (çoklu seçim VEYA; alanlar arası VE).
@@ -269,3 +269,26 @@ export function gorunenToplar(
 }
 
 export const kaleminToplari = (b: StokBolumu, anahtar: string): readonly Top[] => b.toplar.filter((t) => t.kalem === anahtar);
+
+/** Ekranın süzgeç durumu (liste + alt toplam satırı AYNI kaynaktan): alanlar, geçerli seçim ve süzgece uyan SATIR sayısı. */
+export interface StokSuzgecDurumu {
+  readonly gruplar: readonly SuzgecGrubu[];
+  readonly knGruplar: readonly SuzgecGrubu[];
+  readonly kalemSecim: Readonly<Record<string, string>>;
+  readonly knSecim: Readonly<Record<string, string>>;
+  readonly etkin: boolean;
+}
+
+export function stokSuzgecDurumu(b: StokBolumu, kip: Gorunum, kalemTercih: Readonly<Record<string, string>>, topTercih: Readonly<Record<string, string>>): StokSuzgecDurumu {
+  const gruplar = stokSuzgecGruplari(b, kip === "top");
+  // Kime/nerede süzgeci yalnız top görünümünde ve fabrika çuval bilgisini gönderdiyse; seçim `tablo.stok-top`ta.
+  const knGruplar = kip === "top" ? kimNeredeGruplari(b) : [];
+  // Yalnız bu bölümde geçerli seçimler süzer (bitmişte seçilen renk ham bölümü boşaltmaz).
+  const kalemSecim = gecerliSecim(gruplar, kalemTercih);
+  const knSecim = gecerliSecim(knGruplar, topTercih);
+  return { gruplar, knGruplar, kalemSecim, knSecim, etkin: Object.keys(kalemSecim).length + Object.keys(knSecim).length > 0 };
+}
+
+/** Süzgece (aramasız) uyan satır sayısı: belge tam ⇒ kesin; satır sayımıdır, metre/top toplamı DEĞİL (o fabrikanın). */
+export const suzulenSatir = (b: StokBolumu, kip: Gorunum, d: StokSuzgecDurumu): number =>
+  kip === "kalem" ? gorunenKalemler(b, "", d.kalemSecim, null).length : gorunenToplar(b, "", d.kalemSecim, null, d.knSecim).length;

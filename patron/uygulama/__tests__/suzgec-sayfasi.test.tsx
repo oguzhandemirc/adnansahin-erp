@@ -230,3 +230,38 @@ describe("§3 Stok ekranı", () => {
     expect(screen.getByTestId(`stok-kalem-satir-${K2}`)).toBeTruthy();
   });
 });
+
+// Görünüm tercihi (Kalem|Top) modül deposunda kalır: Top'a geçen test EN SONDA.
+describe("§4 alt toplam satırı süzgece uyar (fabrika süzülen toplam göndermez → uygulama toplamaz)", () => {
+  it("süzgeçsiz bölüm toplamı; süzgeç etkinken 'Süzülen: N kalem' (metre toplamı YOK); çip kaldırınca geri döner", async () => {
+    render(<Stock />);
+    await flush();
+    expect(screen.getByTestId("stok-toplam-depo-deger").props.children).toBe("4 top · 151,2 m");
+    expect(screen.queryByTestId("stok-toplam-suzulen")).toBeNull();
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec"));
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec-secici-alan-urun"));
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec-secici-urun-ÖRNEK SATEN"));
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec-secici-uygula"));
+    await flush();
+    expect(screen.getByTestId("stok-toplam-suzulen-deger").props.children).toBe("1 kalem");
+    expect(screen.queryByTestId("stok-toplam-depo")).toBeNull();
+    // Kalemin kendi metresi (50) toplam yerine yazılmaz; bölüm toplamı (151,2) de görünmez.
+    expect(within(screen.getByTestId("stok-toplam-satiri")).queryByText(/151,2|50 m/)).toBeNull();
+    expect(screen.getByTestId("stok-toplam-satiri").props.accessibilityLabel).toContain("Süzgeç etkin");
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec-etkin-urun"));
+    await flush();
+    expect(screen.getByTestId("stok-toplam-depo-deger").props.children).toBe("4 top · 151,2 m");
+  });
+  it("top görünümünde süzülen top sayısı", async () => {
+    render(<Stock />);
+    await flush();
+    fireEvent.press(screen.getByTestId("stok-gorunum-top"));
+    await flush();
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec"));
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec-secici-alan-urun"));
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec-secici-urun-ÖRNEK PANOS"));
+    fireEvent.press(screen.getByTestId("stok-kalem-suzgec-secici-uygula"));
+    await flush();
+    expect(screen.getByTestId("stok-toplam-suzulen-deger").props.children).toBe("1 top");
+  });
+});
