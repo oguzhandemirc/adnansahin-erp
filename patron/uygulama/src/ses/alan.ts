@@ -3,7 +3,7 @@
 // miktar → sayı (ürün birimiyle uyuşmazsa yazılmaz, neden döner); termin → gün (geçmiş gün yazılmaz); not → aynen;
 // yeni cari alanları (ad, il, vergi no, telefon, e-posta) → temizlenmiş metin. Hiçbir sonuç kendiliğinden seçilmez/gönderilmez.
 import { fmtDayKey } from "../lib/factory-time";
-import { enIyiAralik, karar, KESIN_ESIK, type Aday, type HazirListe, type Sirali } from "./eslestir";
+import { adSozcukleri, enIyiAralik, karar, KESIN_ESIK, type Aday, type HazirListe, type Sirali } from "./eslestir";
 import { katla, sozcuklere } from "./metin";
 import { birimOku, miktarMetni, sayiOku, type Birim } from "./sayi";
 import { tarihBul } from "./tarih";
@@ -32,7 +32,7 @@ const EN_COK = 8;
 export function adaySirala(metin: string, liste: HazirListe): AdaySonucu {
   const duyulan = metin.trim();
   if (!duyulan || liste.length === 0) return { duyulan, sirali: [], guclu: false };
-  const r = enIyiAralik(sozcuklere(duyulan), [], liste);
+  const r = enIyiAralik(adSozcukleri(duyulan), [], liste);
   if (!r || r.sirali.length === 0) return { duyulan, sirali: [], guclu: false };
   return { duyulan, sirali: r.sirali.slice(0, EN_COK), guclu: karar(r.sirali, r.duyulan).durum === "bulundu" };
 }
