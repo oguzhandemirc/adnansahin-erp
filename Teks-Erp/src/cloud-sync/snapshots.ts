@@ -221,7 +221,7 @@ export async function buildSnapshots(ctx: SnapshotContext): Promise<SnapshotBuil
         case "fason-acik": out.push(seal("fason-acik", await buildSubcontractOpenData())); break;
         case "rapor-katalogu": out.push(seal("rapor-katalogu", { raporlar: await remoteReportCatalog() })); break;
         case "tesis": out.push(buildFacility()); break;
-        case "cari-ozeti": out.push(seal("cari-ozeti", await buildCustomerSummaryData(ctx.now))); break;
+        case "cari-ozeti": out.push(seal("cari-ozeti", await buildCustomerSummaryData(ctx.now, await src.stockKalem()))); break;
         default: throw new Error(`Anlık kurucu yok: ${p.name}`);
       }
     } catch (err) {

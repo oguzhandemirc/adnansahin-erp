@@ -21,6 +21,11 @@
 //  S4 son-12-ay başı fabrika gününe hizalanmadı (`now − 365 gün`) → 1 ✗: §7 (anlık her tur yeniden giderdi).
 //  (2026-11-13, `toplamMiktar`) S5 `derived.ts` toplam isMeasuredLine dalının dışına alındı (KG dahil) → 1 ✗: §5 toplam.
 //  S6 toplam isActiveLine dışına alındı (iptal kalem dahil) → 1 ✗: §5 toplam.
+//  §4 (2.13.1) her hazır dönemde sipariş adedi + brüt sevk + iade = panel karneleri (aynı aralık).
+//  §8 (2.13.1) dönem sınırları (sabit tarihli örnekler, ay kırpma, İstanbul gün sınırı) · üretim günü + `donemler` ·
+//     kısa dönemde `enCokUrun` yok · kalem son sipariş tarihi · en eski açık sipariş + yaş · etiket-müşteri depodaki mal.
+//  (2026-11-19) S7 `labelOwnedStock` çuvaldaki topu "raf" saydı → 1 ✗ §8 depodaki mal (2/52.8 · 0/0).
+//  S8 geçen ayın sonu bu ayın başı (−1 ms yok) → 1 ✗ §8 dönem sınırları. İkisi de geri alındı.
 // =============================================================================
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -34,7 +39,8 @@ import { buildRecords } from "../src/cloud-sync/record-builder";
 import { getCustomerScorecard } from "../src/services/reports/customer-scorecard.report.service";
 import { getReturnScorecard } from "../src/services/reports/return-scorecard.report.service";
 import { getOpenOrderCoverage } from "../src/services/reports/open-order-coverage.report.service";
-import { factoryDayStart } from "../src/constants/time";
+import { factoryDayStart, factoryYmd } from "../src/constants/time";
+import { CARI_PERIODS, cariPeriodRange, type CariPeriod } from "../src/cloud-sync/periods";
 import { ensureTestAdmin } from "./fixture-test-user";
 
 let pass = 0;
@@ -47,7 +53,7 @@ function check(l: string, ok: boolean, x = ""): void {
 const FINANCE = /fiyat|tutar|bakiye|maliyet|odeme|doviz|kdv|price|amount|balance|cost|paid|payment|currency|vat|tax|kur$/i;
 const STAMP = `TEST-M2A-${Date.now()}-`;
 const DAY_MS = 86_400_000;
-const fx = { customers: [] as string[], items: [] as string[], colors: [] as string[], orders: [] as string[], rolls: [] as string[], shipments: [] as string[], returns: [] as string[] };
+const fx = { sacks: [] as string[], customers: [] as string[], items: [] as string[], colors: [] as string[], orders: [] as string[], rolls: [] as string[], shipments: [] as string[], returns: [] as string[] };
 
 /** Tel değerini düz JSON'a çevirir (Decimal → sayı); karşılaştırma için. */
 function plain(v: unknown): unknown {
@@ -103,6 +109,19 @@ async function setup(now: Date): Promise<{ customerId: string; itemId: string; i
   // İptal edilen iade (storno ≠ iade): sayılara girmez.
   const gone = await prisma.rollReturn.create({ data: { ...base, rollId: r3.id, qty: 10, cancelledAt: now, cancelledById: user.id }, select: { id: true } });
   fx.returns.push(live.id, gone.id);
+  // Depodaki hazır mal (2.13.1, sahiplik YALNIZ etiket): raf 40,5 m + çuvalda 12,25 m (çuval carisi BAŞKA müşteri olsa da
+  // etiket sayılır); etiketli ama SHIPPED top ve etiketsiz raf topları (r2/r3) sayılmaz.
+  const other = await prisma.customer.create({ data: { code: `${STAMP}C2`, name: `${STAMP}Çuval Carisi` }, select: { id: true } });
+  fx.customers.push(other.id);
+  const sack = await prisma.sack.create({ data: { sackNo: `${STAMP}CV`, customerId: other.id }, select: { id: true } });
+  fx.sacks.push(sack.id);
+  for (const [i, [qty, status, sackId]] of ([[40.5, "WAREHOUSE", null], [12.25, "WAREHOUSE", sack.id], [7, "SHIPPED", null]] as const).entries()) {
+    const r = await prisma.roll.create({
+      data: { itemId: item.id, colorId: color.id, initialQty: qty, currentQty: qty, status, entrySource: "SUPPLIER_RECEIPT", barcode: `${STAMP}L${i}`, sackId, labelCustomerId: customer.id },
+      select: { id: true },
+    });
+    fx.rolls.push(r.id);
+  }
   return { customerId: customer.id, itemId: item.id, item2Id: item2.id, colorId: color.id, orderOpen: open.id, orderOld: old.id, orderCancelled: cancelled.id, liveReturn: live.id };
 }
 
@@ -146,7 +165,7 @@ async function main(): Promise<void> {
     check("son 12 ay: eski sipariş dışarıda — 1 sipariş, MT 380", field(y12, "siparisSayisi") === 1 && JSON.stringify(field(y12, "siparisMiktari")) === JSON.stringify([{ birim: "KG", miktar: 20 }, { birim: "MT", miktar: 380 }]));
     check("sevk BRÜT: 145 m / 2 top (iade düşülmez)", field(all, "sevk", "metre") === 145 && field(all, "sevk", "top") === 2, JSON.stringify(field(all, "sevk")));
     check("iade: 1 adet / 25 m (iptal edilen iade dışarıda)", field(all, "iade", "adet") === 1 && field(all, "iade", "metre") === 25, JSON.stringify(field(all, "iade")));
-    check("açık: 1 sipariş, 3 kalem, MT 280 (KG ölçülmez, iptal kalem yok)", JSON.stringify(field(entry, "acik")) === JSON.stringify({ siparisSayisi: 1, kalemSayisi: 3, acikMiktar: [{ birim: "MT", miktar: 280 }] }), JSON.stringify(field(entry, "acik")));
+    check("açık: 1 sipariş, 3 kalem, MT 280 (KG ölçülmez, iptal kalem yok)", JSON.stringify([field(entry, "acik", "siparisSayisi"), field(entry, "acik", "kalemSayisi"), field(entry, "acik", "acikMiktar")]) === JSON.stringify([1, 3, [{ birim: "MT", miktar: 280 }]]), JSON.stringify(field(entry, "acik")));
     const top = field(all, "enCokUrun");
     const topRows = Array.isArray(top) ? top : [];
     check("en çok: Kumaş A/Renk MT 300 · Kumaş B MT 120 (2 sipariş) · Kumaş A/Renk KG 20", topRows.length === 3
@@ -164,6 +183,44 @@ async function main(): Promise<void> {
     check("iade karnesi: adet + metre eşit", ret?.count === field(all, "iade", "adet") && ret?.qty === field(all, "iade", "metre"), `panel ${ret?.count}/${ret?.qty}`);
     const cov = (await getOpenOrderCoverage()).byCustomer.find((r) => r.key === ids.customerId);
     check("açık sipariş karşılama: açık metre eşit", cov?.openQty === 280 && cov.openQty === field(entry, "acik", "acikMiktar", "0", "miktar"), `panel ${cov?.openQty}`);
+    // 2.13.1 hazır dönemler: her dönemde müşteri karnesi (aynı aralık) aynı sipariş adedini ve BRÜT sevk metresini verir.
+    const ranges = cariSummaryPeriods(runNow);
+    for (const k of CARI_PERIODS) {
+      const pc = (await getCustomerScorecard(ranges[k], null, { customerId: [ids.customerId] })).ranking.find((r) => r.customerId === ids.customerId);
+      const pr = (await getReturnScorecard(ranges[k])).byCustomer.find((r) => r.key === ids.customerId);
+      const p = field(entry, k);
+      check(`dönem ${k}: sipariş adedi + brüt sevk + iade = panel karneleri`,
+        (pc?.orderCount ?? 0) === field(p, "siparisSayisi") && (pc?.shippedQty ?? 0) === field(p, "sevk", "metre") && (pr?.count ?? 0) === field(p, "iade", "adet"),
+        `panel ${pc?.orderCount ?? 0}/${pc?.shippedQty ?? 0}/${pr?.count ?? 0} · anlık ${field(p, "siparisSayisi")}/${field(p, "sevk", "metre")}/${field(p, "iade", "adet")}`);
+    }
+
+    console.log("\n§8 Hazır dönem sınırları · en eski açık sipariş · depodaki mal (2.13.1)");
+    const at = (iso: string) => (p: CariPeriod) => cariPeriodRange(p, new Date(iso));
+    const r31 = at("2026-03-31T10:00:00.000Z");
+    check("31 Mart: bu ay 1 Mart · geçen ay Şubat · bu yıl 1 Ocak · geçen yıl 2025 (fabrika günü başı, İstanbul)",
+      r31("buAy").from.toISOString() === "2026-02-28T21:00:00.000Z" && r31("gecenAy").from.toISOString() === "2026-01-31T21:00:00.000Z" && r31("gecenAy").to.toISOString() === "2026-02-28T20:59:59.999Z"
+      && r31("buYil").from.toISOString() === "2025-12-31T21:00:00.000Z" && r31("gecenYil").from.toISOString() === "2024-12-31T21:00:00.000Z" && r31("gecenYil").to.toISOString() === "2025-12-31T20:59:59.999Z",
+      [r31("buAy").from, r31("gecenAy").from, r31("gecenAy").to, r31("buYil").from, r31("gecenYil").from, r31("gecenYil").to].map((d) => d.toISOString()).join(" · "));
+    check("31 Mart: son 3 ay 31 Aralık · son 6 ay 30 Eylül", r31("son3Ay").from.toISOString() === "2025-12-30T21:00:00.000Z" && r31("son6Ay").from.toISOString() === "2025-09-29T21:00:00.000Z",
+      `${r31("son3Ay").from.toISOString()} · ${r31("son6Ay").from.toISOString()}`);
+    check("31 Mayıs − 3 ay = 28 Şubat (kısa ay kırpılır)", at("2026-05-31T10:00:00.000Z")("son3Ay").from.toISOString() === "2026-02-27T21:00:00.000Z", at("2026-05-31T10:00:00.000Z")("son3Ay").from.toISOString());
+    check("UTC 31 Mart 22:30 = İstanbul 1 Nisan: bu ay 1 Nisan", at("2026-03-31T22:30:00.000Z")("buAy").from.toISOString() === "2026-03-31T21:00:00.000Z", at("2026-03-31T22:30:00.000Z")("buAy").from.toISOString());
+    const sealed = plain(built.snapshots[0]?.data);
+    check("üretim günü = fabrika günü; dönem sınırı: şimdi ucu null, geçen ay kapalı, tüm zamanlar başı null",
+      field(sealed, "uretimGunu") === factoryYmd(runNow) && field(sealed, "donemler", "buAy", "bitis") === null && typeof field(sealed, "donemler", "gecenAy", "bitis") === "string"
+      && field(sealed, "donemler", "tumZamanlar", "baslangic") === null && field(sealed, "donemler", "son12Ay", "baslangic") === field(sealed, "son12AyBaslangic"),
+      JSON.stringify(field(sealed, "donemler", "buAy")));
+    check("kısa dönemlerde `enCokUrun` YOK, tüm zamanlar + son 12 ayda var",
+      ["buAy", "gecenAy", "son3Ay", "son6Ay", "buYil", "gecenYil"].every((k) => isRecord(field(entry, k)) && field(entry, k, "enCokUrun") === undefined) && Array.isArray(field(y12, "enCokUrun")));
+    check("en çok alınan kalemde son sipariş tarihi (Kumaş B: eski + açık sipariş → açığın tarihi)",
+      field(topRows[1], "sonSiparisTarihi") === new Date(now.getTime() - 10 * DAY_MS).toISOString(), String(field(topRows[1], "sonSiparisTarihi")));
+    check("en eski açık sipariş: tarih + 10 fabrika günü yaş (tamamlanan/iptal sayılmaz)",
+      field(entry, "acik", "enEskiSiparisTarihi") === new Date(now.getTime() - 10 * DAY_MS).toISOString() && field(entry, "acik", "enEskiSiparisYasGun") === 10,
+      `${String(field(entry, "acik", "enEskiSiparisTarihi"))} · ${String(field(entry, "acik", "enEskiSiparisYasGun"))}`);
+    check("depodaki mal (etiket): raf 1 top / 40,5 m · çuvalda 1 top / 12,3 m (SHIPPED + etiketsiz yok)",
+      JSON.stringify(field(entry, "depodakiMal")) === JSON.stringify({ depodaTop: 1, depodaMetre: 40.5, cuvaldaTop: 1, cuvaldaMetre: 12.3 }), JSON.stringify(field(entry, "depodakiMal")));
+    const sackOwner = plain(field(built.snapshots[0]?.data, "cariler", fx.customers[1] ?? ""));
+    check("çuval carisi etiket sahibi değildir: çuvaldaki top ona sayılmaz", sackOwner === undefined || field(sackOwner, "depodakiMal", "cuvaldaTop") === 0, JSON.stringify(field(sackOwner, "depodakiMal")));
 
     console.log("\n§5 Kayıtlar: iade satırı ve siparişin `acik`ı");
     if (iade && siparis) {
@@ -205,6 +262,7 @@ async function main(): Promise<void> {
   } finally {
     await prisma.rollReturn.deleteMany({ where: { id: { in: fx.returns } } });
     await prisma.roll.deleteMany({ where: { id: { in: fx.rolls } } });
+    await prisma.sack.deleteMany({ where: { id: { in: fx.sacks } } });
     await prisma.shipment.deleteMany({ where: { id: { in: fx.shipments } } });
     await prisma.orderLine.deleteMany({ where: { orderId: { in: fx.orders } } });
     await prisma.order.deleteMany({ where: { id: { in: fx.orders } } });

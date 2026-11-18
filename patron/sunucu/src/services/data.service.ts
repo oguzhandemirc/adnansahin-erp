@@ -266,14 +266,18 @@ export async function getCustomerSummary(ctx: CloudContext, s: SessionContext, c
   if (!UUID.test(cariKartId)) throw badRequest("cariKartId biçimsiz");
   const id = cariKartId.toLowerCase();
   const rows = await withTesis(ctx.app, { tesisId: s.tesisId, projections: s.projections }, (tx) =>
-    tx.$queryRaw<{ ozet: unknown; baslangic: string | null; version_at: Date }[]>(Prisma.sql`
-      SELECT r.data->'cariler'->${id} AS ozet, r.data->>'son12AyBaslangic' AS baslangic, r.version_at
+    tx.$queryRaw<{ ozet: unknown; baslangic: string | null; uretim_gunu: string | null; donemler: unknown; version_at: Date }[]>(Prisma.sql`
+      SELECT r.data->'cariler'->${id} AS ozet, r.data->>'son12AyBaslangic' AS baslangic, r.data->>'uretimGunu' AS uretim_gunu, r.data->'donemler' AS donemler, r.version_at
         FROM projection_rows r
        WHERE r.tesis_id = ${s.tesisId}::uuid AND r.projection = ${def.name} AND r.record_id = ${NO_TENANT}::uuid AND r.deleted_at IS NULL`),
   );
   const row = rows[0];
   if (!row) throw notFound("Anlık görüntü");
-  return { cariKartId: id, son12AyBaslangic: row.baslangic, ozet: (row.ozet ?? null) as CustomerSummary | null, surum: row.version_at.toISOString() };
+  // 2.13.1: üretim günü + hazır dönem sınırları fabrikadan aynen (eski fabrika göndermez → null).
+  return {
+    cariKartId: id, son12AyBaslangic: row.baslangic, ozet: (row.ozet ?? null) as CustomerSummary | null, surum: row.version_at.toISOString(),
+    uretimGunu: row.uretim_gunu ?? null, donemler: (row.donemler ?? null) as CustomerSummaryResponse["donemler"],
+  };
 }
 
 /** Ekranın üst şeridi: tesis adı · son eşitleme · sözleşme uyarısı · takılan ufuk · görülebilir projeksiyonlar · hizmet (hep ACIK). */

@@ -411,13 +411,17 @@ export interface UnitQuantity {
   readonly miktar: number;
 }
 
-/** Dönem özeti — sevk BRÜT (iade düşülmez), iade ayrı toplam; para alanı YOK. */
-export interface CustomerSummaryPeriod {
+/** Dönem sayıları — sevk BRÜT (iade düşülmez), iade ayrı toplam; para alanı YOK. */
+export interface CustomerSummaryPeriodCounts {
   readonly siparisSayisi: number;
   readonly kalemSayisi: number;
   readonly siparisMiktari: readonly UnitQuantity[];
   readonly sevk: { readonly metre: number; readonly top: number; readonly kg: number; readonly tartiliCuval: number; readonly cuval: number };
   readonly iade: { readonly adet: number; readonly metre: number };
+}
+
+/** Dönem özeti + "en çok alınan" (yalnız `tumZamanlar` ve `son12Ay`). `sonSiparisTarihi` fabrika 2.13.1+ (eskisi göndermez). */
+export interface CustomerSummaryPeriod extends CustomerSummaryPeriodCounts {
   readonly enCokUrun: readonly {
     readonly urunId: string;
     readonly urunAdi: string;
@@ -426,15 +430,49 @@ export interface CustomerSummaryPeriod {
     readonly birim: string;
     readonly miktar: number;
     readonly siparisSayisi: number;
+    readonly sonSiparisTarihi?: string | null;
   }[];
 }
 
+/** Hazır dönem anahtarları (fabrika 2.13.1, sınırların tek tanımı fabrika `cloud-sync/periods.ts`); bulut/uygulama aralık hesaplamaz. */
+export const CUSTOMER_SUMMARY_PERIODS = ["tumZamanlar", "son12Ay", "buAy", "gecenAy", "son3Ay", "son6Ay", "buYil", "gecenYil"] as const;
+export type CustomerSummaryPeriodKey = (typeof CUSTOMER_SUMMARY_PERIODS)[number];
+
+/** Etiketi bu cari olan bitmiş toplar: raf (`depoda*`) ve çuvaldaki (`cuvalda*`) ayrı; fabrika toplar. */
+export interface CustomerLabelStock {
+  readonly depodaTop: number;
+  readonly depodaMetre: number;
+  readonly cuvaldaTop: number;
+  readonly cuvaldaMetre: number;
+}
+
+/** 2.13.1 alanları isteğe bağlıdır: eski fabrika göndermez (`undefined`) → uygulama yalnız tüm zamanlar/son 12 ayı çizer. */
 export interface CustomerSummary {
   readonly tumZamanlar: CustomerSummaryPeriod;
   readonly son12Ay: CustomerSummaryPeriod;
-  readonly acik: { readonly siparisSayisi: number; readonly kalemSayisi: number; readonly acikMiktar: readonly UnitQuantity[] };
+  readonly buAy?: CustomerSummaryPeriodCounts;
+  readonly gecenAy?: CustomerSummaryPeriodCounts;
+  readonly son3Ay?: CustomerSummaryPeriodCounts;
+  readonly son6Ay?: CustomerSummaryPeriodCounts;
+  readonly buYil?: CustomerSummaryPeriodCounts;
+  readonly gecenYil?: CustomerSummaryPeriodCounts;
+  readonly acik: {
+    readonly siparisSayisi: number;
+    readonly kalemSayisi: number;
+    readonly acikMiktar: readonly UnitQuantity[];
+    /** En eski açık siparişin tarihi (ISO) ve yaşı (fabrika takvim günü); açık sipariş yoksa null. */
+    readonly enEskiSiparisTarihi?: string | null;
+    readonly enEskiSiparisYasGun?: number | null;
+  };
   readonly sonSiparisTarihi: string | null;
   readonly sonSevkTarihi: string | null;
+  readonly depodakiMal?: CustomerLabelStock;
+}
+
+/** Hazır dönemin sınırı: `baslangic` null = tüm zamanlar, `bitis` null = şimdiye kadar (açık uç). */
+export interface CustomerSummaryPeriodBounds {
+  readonly baslangic: string | null;
+  readonly bitis: string | null;
 }
 
 /**
@@ -446,6 +484,12 @@ export interface CustomerSummaryResponse {
   readonly son12AyBaslangic: string | null;
   readonly ozet: CustomerSummary | null;
   readonly surum: string;
+  /**
+   * Özetin üretildiği fabrika günü (`YYYY-MM-DD`) ve hazır dönem sınırları (fabrika 2.13.1). Eski fabrika → null; eski bulut
+   * alanları hiç döndürmez (`undefined`). Uygulama `uretimGunu` bugünden eskiyse dönemleri bayat sayar.
+   */
+  readonly uretimGunu?: string | null;
+  readonly donemler?: Readonly<Partial<Record<CustomerSummaryPeriodKey, CustomerSummaryPeriodBounds>>> | null;
 }
 
 /** `POST /api/tazele` (§14 S47): `ozet` zili çaldı mı; bir sonraki zile kaç ms var (tesis başına aralık). */

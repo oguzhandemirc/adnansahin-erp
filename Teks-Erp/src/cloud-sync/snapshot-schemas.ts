@@ -19,17 +19,30 @@ const CoverageBucket = z.strictObject({
 // M2a cari özeti: birim başına ayrı satır (farklı birim toplanmaz); para alanı yok; iade sevkten düşülmemiş ayrı toplam.
 const UnitQty = z.strictObject({ birim: Str, miktar: Num });
 const IsoOrNull = z.string().datetime().nullable();
-const CariPeriod = z.strictObject({
+const CariPeriodCountFields = {
   siparisSayisi: Num, kalemSayisi: Num, siparisMiktari: z.array(UnitQty),
   sevk: z.strictObject({ metre: Num, top: Num, kg: Num, tartiliCuval: Num, cuval: Num }),
   iade: z.strictObject({ adet: Num, metre: Num }),
-  enCokUrun: z.array(z.strictObject({ urunId: z.string().uuid(), urunAdi: Str, renkId: z.string().uuid().nullable(), renkAdi: Str.nullable(), birim: Str, miktar: Num, siparisSayisi: Num })),
+};
+// 2.13.1: "en çok alınan" yalnız tüm zamanlar + son 12 ayda (kalem başına son sipariş tarihiyle); diğer hazır dönemler yalnız sayı.
+const CariPeriod = z.strictObject({
+  ...CariPeriodCountFields,
+  enCokUrun: z.array(z.strictObject({
+    urunId: z.string().uuid(), urunAdi: Str, renkId: z.string().uuid().nullable(), renkAdi: Str.nullable(), birim: Str, miktar: Num, siparisSayisi: Num,
+    sonSiparisTarihi: IsoOrNull,
+  })),
 });
+const CariPeriodCounts = z.strictObject(CariPeriodCountFields);
 const CariSummary = z.strictObject({
   tumZamanlar: CariPeriod, son12Ay: CariPeriod,
-  acik: z.strictObject({ siparisSayisi: Num, kalemSayisi: Num, acikMiktar: z.array(UnitQty) }),
+  buAy: CariPeriodCounts, gecenAy: CariPeriodCounts, son3Ay: CariPeriodCounts, son6Ay: CariPeriodCounts, buYil: CariPeriodCounts, gecenYil: CariPeriodCounts,
+  // 2.13.1: en eski açık siparişin tarihi ve yaşı (fabrika takvim günü).
+  acik: z.strictObject({ siparisSayisi: Num, kalemSayisi: Num, acikMiktar: z.array(UnitQty), enEskiSiparisTarihi: IsoOrNull, enEskiSiparisYasGun: Num.nullable() }),
   sonSiparisTarihi: IsoOrNull, sonSevkTarihi: IsoOrNull,
+  // 2.13.1: etiketi bu cari olan bitmiş toplar (raf = depoda, çuvaldaki = çuvalda) — `stok-kalem` katkılarının toplamı.
+  depodakiMal: z.strictObject({ depodaTop: Num, depodaMetre: Num, cuvaldaTop: Num, cuvaldaMetre: Num }),
 });
+const CariPeriodBounds = z.strictObject({ baslangic: IsoOrNull, bitis: IsoOrNull });
 
 // Stok kalem listesi: kalem (ham = kumaş; bitmiş = kumaş + en + renk + kat) ve raftaki toplar; metre ile kg ayrı (toplanmaz).
 // 2.12.4: top etiket müşterisi (`Roll.labelCustomerId`, sahiplik değil) · çuval no · çuval carisi (ad); bitmiş bölüm
@@ -132,7 +145,16 @@ export const SNAPSHOT_WIRE_SCHEMAS = {
     raporlar: z.array(z.strictObject({ anahtar: Str, baslik: Str, soru: Str, aile: Str, izin: Str, parametreler: z.array(Str), standartDonemler: z.array(Str) })),
   }),
   tesis: TesisVerisiSchema.required(),
-  "cari-ozeti": z.strictObject({ son12AyBaslangic: z.string().datetime(), cariler: z.record(z.string().uuid(), CariSummary) }),
+  "cari-ozeti": z.strictObject({
+    son12AyBaslangic: z.string().datetime(),
+    // 2.13.1: özetin üretildiği fabrika günü (bayat dönem tespiti) + hazır dönemlerin sınırları ("şimdi" ucu null).
+    uretimGunu: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    donemler: z.strictObject({
+      tumZamanlar: CariPeriodBounds, son12Ay: CariPeriodBounds, buAy: CariPeriodBounds, gecenAy: CariPeriodBounds,
+      son3Ay: CariPeriodBounds, son6Ay: CariPeriodBounds, buYil: CariPeriodBounds, gecenYil: CariPeriodBounds,
+    }),
+    cariler: z.record(z.string().uuid(), CariSummary),
+  }),
 } as const satisfies Readonly<Record<string, z.ZodType>>;
 
 export type SnapshotWireName = keyof typeof SNAPSHOT_WIRE_SCHEMAS;

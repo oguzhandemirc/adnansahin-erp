@@ -7,6 +7,7 @@
 //      bilinmeyen müşteri 200 + `ozet:null` (anlık var, müşterinin girdisi yok) · ⭐ yanıt saklanan anlığın o müşteriye
 //      ait girdisiyle kanonik EŞİT (bulut hesap yapmaz) · başka müşteri/tesis girdisi sızmaz
 //   §4 statik: servis yalnız `data->'cariler'->id` ve `data->>'son12AyBaslangic'` seçer (toplama/aritmetik yok)
+//   §3i/§4c (2.13.1) `uretimGunu` + `donemler` aynen geçer · dönem anahtarları fabrika `CARI_PERIODS` ile birebir
 // ⭐ NEGATİF SONDA (ölçüldü 2026-11-12): servis `ozet` yerine bütün `data->'cariler'`i döndü → §3d/§3e/§3f/§3g/§4a ❌;
 //    LIST_ID_FILTERS.cariKartId'den `iade` çıkarıldı → §1a/§1c ❌ (400); geri alındı → yeşil (15/0).
 // Koşum: npx tsx scripts/test_cari_ozeti.ts
@@ -15,6 +16,8 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROLE_TEMPLATES } from "../src/catalog/permissions";
+import { CUSTOMER_SUMMARY_PERIODS } from "../src/wire/api";
+import { fabrikaDosyasi } from "./lib/fabrika-karsiligi";
 import { api, girdi, hesapKur, imzali, kanonik, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
 
 type Liste = { kayitlar: { id: string }[]; sonraki: string | null };
@@ -55,7 +58,8 @@ async function fikstur(o: Ortam, k: TestKurulumu, anlik: boolean): Promise<{ ids
   const iade = (id: string, no: string, cari: string, siparis: string | null, i: number) => ({
     id, iadeNo: no, cariKartId: cari, siparisId: siparis, sevkiyatId: null, urunId: randomUUID(), renkId: null, en: null, metre: "12.50", grupId: null, iptalTarihi: null, olusturulma: gun(i),
   });
-  const veri = { son12AyBaslangic: "2025-11-11T21:00:00.000Z", cariler: { [ids.musteri]: ozetGirdisi(2, 100), [ids.baska]: ozetGirdisi(5, 900) } };
+  // 2.13.1: üretim günü + hazır dönem sınırları aynen geçer (bulut tarih aritmetiği yapmaz).
+  const veri = { son12AyBaslangic: "2025-11-11T21:00:00.000Z", uretimGunu: "2026-11-12", donemler: { son12Ay: { baslangic: "2025-11-11T21:00:00.000Z", bitis: null }, gecenAy: { baslangic: "2026-09-30T21:00:00.000Z", bitis: "2026-10-31T20:59:59.999Z" } }, cariler: { [ids.musteri]: ozetGirdisi(2, 100), [ids.baska]: ozetGirdisi(5, 900) } };
   const r = await imzali(o, k, "/v1/esitle", {
     govde: paket(k, {
       ufuk: new Date(o.saat.simdi() - 60_000),
@@ -108,6 +112,8 @@ async function ozet(o: Ortam, h: TestHesabi, izinsiz: TestHesabi, ids: Ids, veri
   const cariler = veri.cariler as Record<string, unknown>;
   kontrol("§3e ⭐ yanıt saklanan anlığın o müşteriye ait girdisiyle kanonik EŞİT (bulut hesap yapmaz; büyük harfli id küçültülür)",
     r.status === 200 && d?.cariKartId === ids.musteri && kanonik(d.ozet) === kanonik(cariler[ids.musteri]) && d.son12AyBaslangic === veri.son12AyBaslangic && typeof d.surum === "string", `${r.status}`);
+  const dd = r.json.data as { uretimGunu?: unknown; donemler?: unknown } | undefined;
+  kontrol("§3i (2.13.1) üretim günü + dönem sınırları anlıktaki hâliyle aynen döner", dd?.uretimGunu === veri.uretimGunu && kanonik(dd?.donemler) === kanonik(veri.donemler), JSON.stringify(dd?.donemler));
   const govde = JSON.stringify(r.json);
   kontrol("§3f ⭐ başka müşterinin girdisi yanıtta yok", !govde.includes(ids.baska) && !govde.includes("\"miktar\":900"));
   const yab = await api(o, "GET", yol(yabanci.musteri), { belirtec: h.belirtec });
@@ -125,9 +131,15 @@ function statik(): void {
   const govde = /export async function getCustomerSummary[\s\S]*?\n\}/.exec(servis)?.[0] ?? "";
   const select = /SELECT([\s\S]*?)FROM/.exec(govde)?.[1] ?? "";
   const kolonlar = select.split(",").map((x) => x.trim()).filter(Boolean);
-  const beklenen = ["r.data->'cariler'->${id} AS ozet", "r.data->>'son12AyBaslangic' AS baslangic", "r.version_at"];
+  const beklenen = ["r.data->'cariler'->${id} AS ozet", "r.data->>'son12AyBaslangic' AS baslangic", "r.data->>'uretimGunu' AS uretim_gunu", "r.data->'donemler' AS donemler", "r.version_at"];
   kontrol("§4a ⭐ SELECT yalnız müşterinin girdisi + pencere başı + sürüm (toplama/aritmetik YOK)", kanonik(kolonlar) === kanonik(beklenen), kolonlar.join(" | "));
   kontrol("§4b servis sayısal işlem yapmaz (sum/count/avg/+)", govde !== "" && !/\b(sum|count|avg)\s*\(|reduce\(/i.test(govde));
+  // 2.13.1: telin dönem anahtarları fabrikanın tek tanımıyla (`cloud-sync/periods.ts` `CARI_PERIODS`) birebir.
+  const fab = fabrikaDosyasi("Teks-Erp/src/cloud-sync/periods.ts", "2.13.1");
+  if (fab) {
+    const fabrika = /CARI_PERIODS = \[([^\]]*)\]/.exec(fab)?.[1]?.split(",").map((x) => x.trim().replace(/"/g, "")).filter(Boolean) ?? [];
+    kontrol("§4c dönem anahtarları fabrikanın `CARI_PERIODS` listesiyle aynı (sıra dahil)", fabrika.length > 0 && JSON.stringify(fabrika) === JSON.stringify(CUSTOMER_SUMMARY_PERIODS), fabrika.join(","));
+  }
 }
 
 async function main(): Promise<void> {
