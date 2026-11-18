@@ -150,9 +150,9 @@ describe("§4 ekran (yeni fabrika)", () => {
     expect(screen.getByTestId("stok-kalem-sutun-etiket")).toBeTruthy();
     expect(screen.getByTestId("stok-kalem-sutun-cuvalCari")).toBeTruthy();
     // Alt sabit toplam satırı aynı fabrika sayılarını etiketiyle yazar (top bazında: listedeki top sayısı).
-    expect(screen.getByTestId("stok-toplam-satir-deger").props.children).toBe("5 top");
+    expect(screen.getByTestId("stok-toplam-depo")).toHaveTextContent("Depoda", { exact: false });
     expect(screen.getByTestId("stok-toplam-cuval")).toBeTruthy();
-    expect(screen.getByTestId("stok-toplam-toplam")).toHaveTextContent("Açıkta:", { exact: false });
+    expect(within(screen.getByTestId("stok-toplam-satiri")).queryByText(/Listede|Açıkta/)).toBeNull();
   });
   it("süzgeçte Yer › Çuvalda seçilince açıktaki top kaybolur; seçim tablo.stok-top'a yazılır", async () => {
     mockApi.snapshot.mockImplementation(veriIle(YENI));

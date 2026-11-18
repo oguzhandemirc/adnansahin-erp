@@ -119,7 +119,7 @@ describe("§2 ekran", () => {
     expect(screen.getByText("ÖRNEK PANOS 330 · BEYAZ · 4 Kat")).toBeTruthy();
     expect(screen.getByText("ÖRNEK SATEN 280 · KREM")).toBeTruthy();
     // Bölüm toplamı ALTTA sabit satırda (2026-11-18); üstte sayı yok.
-    expect(screen.getByTestId("stok-toplam-toplam-deger").props.children).toBe("4 top · 151,2 m");
+    expect(screen.getByTestId("stok-toplam-depo-deger").props.children).toBe("4 top · 151,2 m");
     expect(screen.queryByTestId("stok-kalem-ozet")).toBeNull();
     expect(screen.getByText("101,2")).toBeTruthy();
     // Kartlar varsayılan kapalı (2026-11-18).

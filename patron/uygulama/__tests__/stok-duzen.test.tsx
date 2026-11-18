@@ -67,7 +67,10 @@ beforeEach(async () => {
 });
 
 const deger = (k: string) => screen.getByTestId(`stok-toplam-${k}-deger`).props.children as string;
-const etiketler = () => within(screen.getByTestId("stok-toplam-satiri")).queryAllByText(/:$/).map((x) => x.props.children as string);
+// Satırda yalnız öbek etiketleri ("Depoda ", "Çuvalda ") — başka etiket yok.
+const ETIKET: Readonly<Record<string, string>> = { "stok-toplam-depo": "Depoda", "stok-toplam-cuval": "Çuvalda" };
+const etiketler = () => within(screen.getByTestId("stok-toplam-satiri")).queryAllByTestId(/^stok-toplam-(depo|cuval)$/).map((x) => ETIKET[x.props.testID as string]);
+const satir = () => screen.getByTestId("stok-toplam-satiri");
 
 describe("§1 kartlar varsayılan kapalı", () => {
   it("ilk açılışta hiçbir özet kartı çizilmez; kart seçme düğmesi ve listeler yerinde", async () => {
@@ -114,7 +117,7 @@ describe("§2 kompakt seçim", () => {
     await flush();
     expect(screen.getByTestId("stok-bolum-ham").props.accessibilityState).toMatchObject({ selected: true });
     expect(screen.getByTestId(`stok-top-satir-${top(1, "", 0).id}`)).toBeTruthy();
-    expect(deger("satir")).toBe("2 top");
+    expect(deger("depo")).toBe("2 top · 300 m");
   });
 });
 
@@ -122,29 +125,35 @@ describe("§3 alt sabit toplam satırı (dört birleşim)", () => {
   it("Screen footer yuvasında tek satır; dört birleşimde doğru etiket ve fabrika sayıları", async () => {
     render(<Stock />);
     await flush();
+    // Dört birleşimde YALNIZ iki öbek (kullanıcı kararı 2026-11-19); Kalem/Top görünümü satırı değiştirmez.
+    const yasak = /Listede|Açıkta|Kalem|Toplam|Bitmiş|Ham/;
     // Bitmiş × Kalem (varsayılan)
-    expect(etiketler()).toEqual(["Kalem:", "Açıkta:", "Çuvalda:"]);
-    expect(deger("satir")).toBe("2");
-    expect(deger("toplam")).toBe("833 top · 14.572 m");
+    expect(etiketler()).toEqual(["Depoda", "Çuvalda"]);
+    expect(deger("depo")).toBe("833 top · 14.572 m");
     expect(deger("cuval")).toBe("2.296 top · 40.100 m");
+    expect(satir()).not.toHaveTextContent(yasak);
+    expect(satir()).toHaveTextContent(/^Depoda 833 top · 14.572 m\s+Çuvalda 2.296 top · 40.100 m$/); // tam metin (sonda pozitif)
+    // Kaydırma kabı yok: tek satır, sığmazsa küçülür.
+    expect(within(screen.getByTestId("stok-toplam-satiri")).queryByTestId(/kaydirma/)).toBeNull();
+    expect(screen.getByTestId("stok-toplam-yazi").props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true });
     // Bitmiş × Top
     fireEvent.press(screen.getByTestId("stok-gorunum-top"));
     await flush();
-    expect(etiketler()).toEqual(["Listede:", "Açıkta:", "Çuvalda:"]);
-    expect(deger("satir")).toBe("4 top");
-    expect(deger("toplam")).toBe("833 top · 14.572 m");
-    // Ham × Top
+    expect(etiketler()).toEqual(["Depoda", "Çuvalda"]);
+    expect(deger("depo")).toBe("833 top · 14.572 m");
+    expect(satir()).not.toHaveTextContent(yasak);
+    // Ham × Top (çuval bilgisi yok → yalnız Depoda = bölüm toplamı)
     fireEvent.press(screen.getByTestId("stok-bolum-ham"));
     await flush();
-    expect(etiketler()).toEqual(["Listede:", "Toplam:"]);
-    expect(deger("toplam")).toBe("2 top · 300 m");
+    expect(etiketler()).toEqual(["Depoda"]);
+    expect(deger("depo")).toBe("2 top · 300 m");
     expect(screen.queryByTestId("stok-toplam-cuval")).toBeNull();
     // Ham × Kalem
     fireEvent.press(screen.getByTestId("stok-gorunum-kalem"));
     await flush();
-    expect(etiketler()).toEqual(["Kalem:", "Toplam:"]);
-    expect(deger("satir")).toBe("1");
-    expect(screen.getByTestId("stok-toplam-satiri").props.accessibilityLabel).toBe("Ham stok toplamı: Kalem 1, Toplam 2 top · 300 m");
+    expect(etiketler()).toEqual(["Depoda"]);
+    expect(satir()).not.toHaveTextContent(/Listede|Açıkta|Kalem:|Toplam/);
+    expect(screen.getByTestId("stok-toplam-satiri").props.accessibilityLabel).toBe("Ham stok: Depoda 2 top · 300 m");
   });
 
   it("arama süzmesi alt satırı değiştirmez (küme: seçili bölümün tamamı, bugünkü başlıkla aynı)", async () => {
@@ -152,20 +161,15 @@ describe("§3 alt sabit toplam satırı (dört birleşim)", () => {
     await flush();
     fireEvent.changeText(screen.getByTestId("stok-kalem-ara"), "panos");
     await flush();
-    expect(deger("satir")).toBe("2");
-    expect(deger("toplam")).toBe("833 top · 14.572 m");
+    expect(deger("depo")).toBe("833 top · 14.572 m");
   });
 });
 
 describe("§4 saf parçalar", () => {
-  it("parçalar yalnız fabrikanın alanlarını biçimler; negatif sonda: çuval yoksa 'Açıkta' değil 'Toplam'", () => {
+  it("öbekler yalnız fabrikanın alanlarını biçimler; negatif sonda: çuval yoksa yalnız 'Depoda'", () => {
     const b = lib.stokBolumu(KALEM, "bitmis");
-    expect(toplamParcalari(b, "kalem").map((x) => x.etiket)).toEqual(["Kalem", "Açıkta", "Çuvalda"]);
-    const cuvalsiz = { ...b, cuval: null };
-    expect(toplamParcalari(cuvalsiz, "kalem").map((x) => x.etiket)).toEqual(["Kalem", "Toplam"]);
-    expect(toplamParcalari(lib.stokBolumu(undefined, "ham"), "top")).toEqual([
-      { key: "satir", etiket: "Listede", deger: "0 top" },
-      { key: "toplam", etiket: "Toplam", deger: "0 top · 0 m" },
-    ]);
+    expect(toplamParcalari(b).map((x) => x.etiket)).toEqual(["Depoda", "Çuvalda"]);
+    expect(toplamParcalari({ ...b, cuval: null }).map((x) => x.etiket)).toEqual(["Depoda"]);
+    expect(toplamParcalari(lib.stokBolumu(undefined, "ham"))).toEqual([{ key: "depo", etiket: "Depoda", deger: "0 top · 0 m" }]);
   });
 });
