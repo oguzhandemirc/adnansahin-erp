@@ -59,14 +59,15 @@ afterEach(() => {
 });
 
 describe("telefon (393 pt)", () => {
-  it("başlık tek satır, sığmazsa küçülür; tazelik başlığın ALTINDA (sütun)", async () => {
+  it("başlık tek satır, sığmazsa küçülür; başlıkta tazelik öğesi yok (menüde 'Son veri')", async () => {
     await siparisler();
     const yazi = screen.getByTestId("baslik-yazisi");
     expect(yazi.props.numberOfLines).toBe(1);
     expect(yazi.props.adjustsFontSizeToFit).toBe(true);
     expect(yazi.props.minimumFontScale).toBeGreaterThanOrEqual(0.7);
     expect(flat("baslik-kutusu")).toMatchObject({ flexDirection: "column", minWidth: 120 });
-    expect(within(screen.getByTestId("baslik-kutusu")).getByTestId("esitleme-gostergesi")).toBeTruthy();
+    expect(screen.queryByTestId("esitleme-gostergesi")).toBeNull();
+    expect(screen.queryByTestId("simdi-guncelle")).toBeNull();
   });
 
   it("birincil düğme kısa ad, erişilebilirlik tam ad", async () => {
@@ -113,6 +114,27 @@ describe("telefon (393 pt)", () => {
     fireEvent.press(screen.getByTestId("cekmece-perde", { includeHiddenElements: true }));
     await act(async () => undefined);
     expect(screen.queryByTestId("cekmece")).toBeNull();
+  });
+
+  it("çekmecenin ALTINDA, hesap kartının hemen üstünde 'Son veri: HH:MM' + yenile simgesi; dokununca tam yenileme", async () => {
+    mockSession.refresh.mockClear();
+    mockSession.factoryStamp = "2026-11-19T22:34:00.000Z"; // İstanbul 20.11 01:34
+    jest.useFakeTimers({ now: Date.parse("2026-11-19T23:00:00.000Z"), doNotFake: ["nextTick", "setImmediate"] });
+    await siparisler();
+    fireEvent.press(screen.getByTestId("baslik-menu"));
+    const cekmece = screen.getByTestId("cekmece");
+    const satir = within(cekmece).getByTestId("cekmece-son-veri");
+    expect(within(satir).getByText("Son veri: 01:34")).toBeTruthy();
+    expect(within(satir).getByTestId("cekmece-son-veri-simge")).toBeTruthy();
+    expect(satir.props.accessibilityLabel).toBe("Son veri: 01:34. Yenile");
+    // Sıra: liste → Son veri → hesap kartı (panelin son iki çocuğu).
+    const ids = (cekmece.props.children as { props?: { testID?: string } }[]).flat().map((c) => c?.props?.testID);
+    expect(ids.slice(-2)).toEqual(["cekmece-son-veri", "cekmece-hesap"]);
+    await act(async () => {
+      fireEvent.press(satir);
+    });
+    expect(mockSession.refresh).toHaveBeenCalled();
+    mockSession.factoryStamp = new Date(Date.now() - 60_000).toISOString();
   });
 
   it("ayrıntı ekranında aynı yerde geri oku, ≡ yok", async () => {

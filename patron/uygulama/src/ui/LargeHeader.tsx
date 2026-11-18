@@ -1,4 +1,4 @@
-// Ekran başlığı: tavana yakın, kaydırmayla kaybolmayan tek satır — [geri] Başlık ⟳ süre ········ [eylem].
+// Ekran başlığı: tavana yakın, kaydırmayla kaybolmayan tek satır — [geri/≡] Başlık ········ [eylem]. Tazelik başlıkta yok.
 // Geri düğmesi başlığın SOLUNDA aynı satırdadır; sekme köklerinde yoktur ve başlık sola yaslı kalır.
 import { BASMA } from "./hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -42,7 +42,7 @@ export function useHeaderScroll(onEndReached?: () => void): { scrollY: SharedVal
 
 /**
  * Başlık çubuğu. Eylem (ör. "Yeni sipariş") başlıkla AYNI satırda, dikey ortalı ve sağa yaslıdır; uzun başlık
- * kısalır/sarılır, eylem sarılmaz (`flexShrink: 0`). `meta` başlığın hemen yanında (eşitleme göstergesi).
+ * kısalır/sarılır, eylem sarılmaz (`flexShrink: 0`). `meta` başlığın hemen yanında (ekranın kısa bilgisi).
  * Alt çizgi: `seamless` (altında krom zeminli alt satır kaydırılan içerikte devam ediyor) iken kaydırınca belirir.
  */
 export function ScreenHeader({ title, topInset, gutter, scrollY, seamless = false, onBack, onMenu, menuRozeti, dar = false, action, meta }: {

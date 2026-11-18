@@ -119,19 +119,13 @@ describe("Sevkiyatlar sekmesi", () => {
   });
 });
 
-describe("Fabrika verisi damgası", () => {
-  it("kaydın eski surum'u değil son paket ufku (her sekmede aynı, başlıktaki göstergeyle aynı an)", async () => {
+describe("Fabrika verisi damgası (2026-11-19: menüdeki 'Son veri' satırına taşındı, tekrar yok)", () => {
+  it("ayrıntının altında 'Fabrika verisi <tarih saat>' damgası çizilmez; hiçbir sekmede", async () => {
     render(<CustomerDetail />);
     await settle();
-    expect(screen.getByTestId("fabrika-veri-ani").props.children).toBe("Fabrika verisi 19.11.2026 00:10");
+    expect(screen.queryByTestId("fabrika-veri-ani")).toBeNull();
+    expect(screen.queryByText(/^Fabrika verisi \d{2}\.\d{2}\.\d{4}/)).toBeNull();
     fireEvent.press(screen.getByTestId("cari-sekme-siparisler"));
-    await settle();
-    expect(screen.getByTestId("fabrika-veri-ani").props.children).toBe("Fabrika verisi 19.11.2026 00:10");
-  });
-
-  it("eşitleme hiç gelmediyse damga çizilmez (uydurma an yok)", async () => {
-    mockSession.factoryStamp = null;
-    render(<CustomerDetail />);
     await settle();
     expect(screen.queryByTestId("fabrika-veri-ani")).toBeNull();
   });

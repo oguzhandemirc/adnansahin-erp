@@ -1,8 +1,8 @@
 // Ekran başlığı: tek satır — geri (varsa) başlığın SOLUNDA, eylem (ör. "Yeni sipariş") aynı satırda dikey ortalı ve
-// sağa yaslı; başlığın yanında eşitleme simgesi + kısa göreli süre, eşitleme gecikmesi için UYARI bandı yok.
+// sağa yaslı; başlıkta tazelik öğesi YOK (2026-11-19: "Son veri" menüde), bayat veri şeritte, aşağı çek = tam yenileme.
 import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
 import type { ReactElement } from "react";
-import { StyleSheet, Text } from "react-native";
+import { RefreshControl, StyleSheet, Text } from "react-native";
 import { ThemeProvider } from "../src/ui/theme-context";
 
 const mockSession = {
@@ -23,6 +23,7 @@ jest.mock("expo-router", () => ({ useRouter: () => mockRouter, usePathname: () =
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 47, bottom: 0, left: 0, right: 0 }) }));
 
 const { Screen } = require("../src/ui/Frame") as typeof import("../src/ui/Frame");
+const { yenileci } = require("../src/state/yenile") as typeof import("../src/state/yenile");
 
 async function draw(ui: ReactElement) {
   const store = { get: jest.fn(async () => null), set: jest.fn(async () => undefined) };
@@ -91,92 +92,110 @@ describe("Geri düğmesi", () => {
   });
 });
 
-describe("Eşitleme göstergesi", () => {
-  it("başlığın yanında simge + kısa süre; gecikmiş eşitlemede de uyarı bandı yok", async () => {
-    mockSession.factoryStamp = minutesAgo(36 * 60);
-    mockSession.facility = { tesis: { id: "t", ad: "Örnek", saklamaAy: 13 }, hesap: { ad: "A" }, esitleme: { sonEsitleme: minutesAgo(36 * 60), ufuk: minutesAgo(36 * 60) }, hizmet: { asama: "ACIK" } };
-    await draw(<Screen title="Pano" back={false}><Text>içerik</Text></Screen>);
-    const gosterge = within(screen.getByTestId("baslik-kutusu")).getByTestId("esitleme-gostergesi");
-    expect(within(gosterge).getByText("36 saat önce")).toBeTruthy();
-    expect(screen.queryByTestId("bant-gecikme")).toBeNull();
-    expect(screen.queryByText(/gecikti/)).toBeNull();
-  });
+describe("Başlıkta tazelik YOK (2026-11-19)", () => {
+  const BEYANLI = { tesis: { id: "t", ad: "Örnek", saklamaAy: 13 }, hesap: { ad: "A" }, simdiGuncelle: true, esitleme: { sonEsitleme: minutesAgo(5), ufuk: minutesAgo(5) }, hizmet: { asama: "ACIK" } };
 
-  it("damga yoksa gösterge çizilmez", async () => {
-    await draw(<Screen title="Pano" back={false}><Text>içerik</Text></Screen>);
-    expect(screen.queryByTestId("esitleme-gostergesi")).toBeNull();
-  });
-
-  it("süre her dakika kendini günceller", async () => {
-    jest.useFakeTimers({ now: Date.parse("2026-11-13T10:00:00Z") });
-    mockSession.factoryStamp = "2026-11-13T09:59:30Z";
-    await draw(<Screen title="Pano" back={false}><Text>içerik</Text></Screen>);
-    expect(screen.getByText("şimdi")).toBeTruthy();
-    await act(async () => {
-      jest.advanceTimersByTime(2 * 60_000);
-    });
-    expect(screen.getByText("2 dk önce")).toBeTruthy();
-  });
-
-  it("ekranın kısa bilgisi (meta) tazelikten ÖNCE aynı başlık kutusunda; alt satır yok", async () => {
+  it("beyanlı da beyansız da: başlıkta '↻ … önce' düğmesi/yazısı çizilmez", async () => {
     mockSession.factoryStamp = minutesAgo(5);
-    await draw(<Screen title="Cari" back={false} meta={<Text testID="ozel-meta">ORN-001 · Bursa</Text>}><Text>içerik</Text></Screen>);
-    const kutu = screen.getByTestId("baslik-kutusu");
-    expect(within(kutu).getByTestId("ozel-meta")).toBeTruthy();
-    expect(within(kutu).getByTestId("esitleme-gostergesi")).toBeTruthy();
+    await draw(<Screen title="Stok" back={false} onRefresh={jest.fn()}><Text>içerik</Text></Screen>);
+    expect(screen.queryByTestId("esitleme-gostergesi")).toBeNull();
+    expect(screen.queryByTestId("simdi-guncelle")).toBeNull();
+    expect(screen.queryByText(/önce$/)).toBeNull();
+    screen.unmount();
+    mockSession.facility = BEYANLI;
+    await draw(<Screen title="Stok" back={false} onRefresh={jest.fn()}><Text>içerik</Text></Screen>);
+    expect(screen.queryByTestId("simdi-guncelle")).toBeNull();
+    expect(screen.queryByText(/önce$/)).toBeNull();
+  });
+
+  it("ekranın kısa bilgisi (meta) başlık kutusunda kalır; alt satır yok", async () => {
+    mockSession.factoryStamp = minutesAgo(5);
+    await draw(<Screen title="Cari" back={false} meta={<Text testID="ozel-meta">Müşteri</Text>}><Text>içerik</Text></Screen>);
+    expect(within(screen.getByTestId("baslik-kutusu")).getByTestId("ozel-meta")).toBeTruthy();
     expect(screen.queryByTestId("baslik-alt-satiri")).toBeNull();
   });
 });
 
-describe("Tek tazelik + Şimdi güncelle (2026-11-16)", () => {
-  const BEYANLI = { tesis: { id: "t", ad: "Örnek", saklamaAy: 13 }, hesap: { ad: "A" }, simdiGuncelle: true, esitleme: { sonEsitleme: minutesAgo(5), ufuk: minutesAgo(5) }, hizmet: { asama: "ACIK" } };
-  afterEach(() => {
-    mockSession.api.syncNow.mockReset();
+describe("Bayat fabrika verisi şeridi", () => {
+  it("eşik (60 dk) altında şerit yok", async () => {
+    mockSession.factoryStamp = minutesAgo(59);
+    await draw(<Screen title="Pano" back={false}><Text>içerik</Text></Screen>);
+    expect(screen.queryByTestId("bant-bayat")).toBeNull();
   });
 
-  it("bulut beyan ettiyse her ekranın başlığındaki tazelik öğesi eylemdir; ayrı satır yok", async () => {
-    mockSession.factoryStamp = minutesAgo(5);
+  it("eşikten eskiyse her ekranda şerit: 'Fabrika verisi 2 saattir güncellenmedi'", async () => {
+    mockSession.factoryStamp = minutesAgo(125);
+    await draw(<Screen title="Pano" back={false}><Text>içerik</Text></Screen>);
+    expect(within(screen.getByTestId("bant-bayat")).getByText("Fabrika verisi 2 saattir güncellenmedi")).toBeTruthy();
+  });
+
+  it("çevrimdışıyken yalnız çevrimdışı bandı (iki şerit yok)", async () => {
+    mockSession.factoryStamp = minutesAgo(36 * 60);
+    mockSession.offline = true;
+    await draw(<Screen title="Pano" back={false}><Text>içerik</Text></Screen>);
+    expect(screen.getByTestId("bant-cevrimdisi")).toBeTruthy();
+    expect(screen.queryByTestId("bant-bayat")).toBeNull();
+  });
+});
+
+describe("Aşağı çek = tam yenileme", () => {
+  const BEYANLI = { tesis: { id: "t", ad: "Örnek", saklamaAy: 13 }, hesap: { ad: "A" }, simdiGuncelle: true, esitleme: { sonEsitleme: minutesAgo(5), ufuk: minutesAgo(5) }, hizmet: { asama: "ACIK" } };
+  const cek = async () => {
+    await act(async () => {
+      screen.UNSAFE_getByType(RefreshControl).props.onRefresh();
+    });
+  };
+  beforeEach(() => yenileci.sifirla());
+  afterEach(() => {
+    mockSession.api.syncNow.mockReset();
+    mockSession.refresh.mockClear();
+    yenileci.sifirla();
+  });
+
+  it("çekince ekranın okuması + oturum + fabrika isteği; başarı SESSİZ (toast yok)", async () => {
+    const yenile = jest.fn();
     mockSession.facility = BEYANLI;
-    await draw(<Screen title="Stok" back={false}><Text>içerik</Text></Screen>);
-    const btn = within(screen.getByTestId("baslik-kutusu")).getByTestId("simdi-guncelle");
-    expect(btn.props.accessibilityLabel).toBe("Şimdi güncelle. Son eşitleme 5 dk önce");
-    expect(screen.queryByTestId("esitleme-gostergesi")).toBeNull();
+    mockSession.api.syncNow.mockResolvedValue({ durum: "BEKLIYOR", sonrakiMumkun: new Date(Date.now() + 60_000).toISOString() });
+    await draw(<Screen title="Stok" back={false} onRefresh={yenile}><Text>içerik</Text></Screen>);
+    await cek();
+    expect(yenile).toHaveBeenCalledTimes(1);
+    expect(mockSession.refresh).toHaveBeenCalled();
+    expect(mockSession.api.syncNow).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("kisa-bildirim")).toBeNull();
+  });
+
+  it("hata: kısa bildirim (toast) düzeni itmez", async () => {
+    mockSession.facility = BEYANLI;
+    mockSession.api.syncNow.mockRejectedValue(new Error("ağ"));
+    await draw(<Screen title="Stok" back={false} onRefresh={jest.fn()}><Text>içerik</Text></Screen>);
+    await cek();
+    expect(screen.getByText("Bağlantı yok — tekrar deneyin")).toBeTruthy();
+    expect(flat("kisa-bildirim")).toMatchObject({ position: "absolute" });
     expect(screen.queryByTestId("baslik-alt-satiri")).toBeNull();
   });
 
-  it("dokununca ekran tazelenir + fabrikadan istenir; yanıt cümlesi KISA BİLDİRİM (toast): başlık altına satır eklenmez", async () => {
+  it("60 sn penceresinde ikinci çekiş fabrikaya gitmez, ekran yine okunur", async () => {
     const yenile = jest.fn();
-    mockSession.factoryStamp = minutesAgo(5);
     mockSession.facility = BEYANLI;
-    mockSession.api.syncNow.mockResolvedValue({ durum: "YAKIN_ZAMANDA", sonrakiMumkun: new Date(Date.now() + 30_000).toISOString() });
+    mockSession.api.syncNow.mockResolvedValue({ durum: "YAKIN_ZAMANDA", sonrakiMumkun: new Date(Date.now() + 60_000).toISOString() });
     await draw(<Screen title="Stok" back={false} onRefresh={yenile}><Text>içerik</Text></Screen>);
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("simdi-guncelle"));
-    });
-    expect(yenile).toHaveBeenCalledTimes(1);
+    await cek();
+    await cek();
+    expect(yenile).toHaveBeenCalledTimes(2);
     expect(mockSession.api.syncNow).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("kisa-bildirim")).toBeTruthy();
-    expect(screen.getByTestId("simdi-guncelle-bildirim")).toBeTruthy();
-    expect(screen.queryByTestId("baslik-alt-satiri")).toBeNull(); // düzen itilmez
-    expect(flat("kisa-bildirim")).toMatchObject({ position: "absolute" });
+    expect(screen.queryByTestId("kisa-bildirim")).toBeNull();
   });
 
-  it("eski bulut (beyan yok): bugünkü gösterge, istek yok", async () => {
+  it("eski bulut (beyan yok): yalnız ekran okunur, fabrikaya istek yok", async () => {
     const yenile = jest.fn();
-    mockSession.factoryStamp = minutesAgo(5);
     await draw(<Screen title="Stok" back={false} onRefresh={yenile}><Text>içerik</Text></Screen>);
-    expect(screen.queryByTestId("simdi-guncelle")).toBeNull();
-    fireEvent.press(screen.getByTestId("esitleme-gostergesi"));
-    expect(yenile).toHaveBeenCalled();
+    await cek();
+    expect(yenile).toHaveBeenCalledTimes(1);
     expect(mockSession.api.syncNow).not.toHaveBeenCalled();
   });
 
-  it("dokununca ekranın yenilemesi çağrılır", async () => {
-    const yenile = jest.fn();
-    mockSession.factoryStamp = minutesAgo(5);
-    await draw(<Screen title="Pano" back={false} onRefresh={yenile}><Text>içerik</Text></Screen>);
-    expect(screen.getByText("5 dk önce")).toBeTruthy();
-    fireEvent.press(screen.getByTestId("esitleme-gostergesi"));
-    expect(yenile).toHaveBeenCalled();
+  it("onRefresh vermeyen ekranda (form, ayar) yenileme denetimi yok", async () => {
+    await draw(<Screen title="Görünüm"><Text>içerik</Text></Screen>);
+    expect(screen.UNSAFE_queryByType(RefreshControl)).toBeNull();
   });
 });

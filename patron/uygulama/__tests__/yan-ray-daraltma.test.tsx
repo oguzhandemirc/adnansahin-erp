@@ -91,6 +91,32 @@ describe("§2 daraltma", () => {
     expect(genislik()).toBe(RAIL_WIDTH);
     expect(await plainStore.get(ANAHTAR)).toBe("1");
   });
+
+  it("'Son veri' rayın altında, hesap kartının üstünde; daraltılmışken yalnız simge (tam metin erişilebilirlik adında)", async () => {
+    mockSession.factoryStamp = new Date(Date.now() - 3 * 60_000).toISOString();
+    try {
+      await draw(() => <SideNav />);
+      const satir = screen.getByTestId("ray-son-veri");
+      expect(screen.getByTestId("ray-son-veri-metin").props.children).toMatch(/^Son veri: \d{2}:\d{2}$/);
+      const panel = screen.getByTestId("yan-ray-panel");
+      const sira = (panel.props.children as { props?: { testID?: string; children?: { props?: { testID?: string } } } }[])
+        .flat()
+        .map((c) => c?.props?.testID ?? c?.props?.children?.props?.testID);
+      expect(sira.slice(-2)).toEqual(["ray-son-veri", "ray-hesap"]);
+      expect(satir.props.accessibilityLabel).toMatch(/^Son veri: \d{2}:\d{2}\. Yenile$/);
+      await bas();
+      expect(screen.queryByTestId("ray-son-veri-metin")).toBeNull();
+      expect(screen.getByTestId("ray-son-veri-simge")).toBeTruthy();
+      expect(screen.getByTestId("ray-son-veri").props.accessibilityLabel).toMatch(/^Son veri: \d{2}:\d{2}\. Yenile$/);
+    } finally {
+      mockSession.factoryStamp = null;
+    }
+  });
+
+  it("damga yoksa (fabrika henüz bağlanmadı) 'Son veri' satırı çizilmez", async () => {
+    await draw(() => <SideNav />);
+    expect(screen.queryByTestId("ray-son-veri")).toBeNull();
+  });
 });
 
 describe("§4 kaydırma (2026-11-18)", () => {

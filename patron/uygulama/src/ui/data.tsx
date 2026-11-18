@@ -10,7 +10,9 @@ import { formatValue, humanize, isHiddenKey, nestedEntries, recordSubtitle, reco
 import { useSession } from "../state/session";
 import { useRemote } from "../state/useRemote";
 import { Banner, Button, Card, Muted } from "./kit";
-import { OfflineBand, PendingConnectionBand, ReadOnlyBand } from "./Bantlar";
+import { OfflineBand, PendingConnectionBand, ReadOnlyBand, StaleFactoryBand } from "./Bantlar";
+import { bayatlikMetni } from "../lib/tazelik";
+import { useMinuteClock } from "./SonVeri";
 import { DOMAIN_ICON } from "./icons";
 import { BosDurum, Iskelet, ListeBlogu, ListeSatiri, type ListeSatiriProps } from "./ortak";
 import { makeStyles, useTokens } from "./theme-context";
@@ -152,9 +154,15 @@ export function serviceBand(facility: Pick<FacilityStatus, "esitleme" | "hizmet"
   return facility.hizmet?.asama === "SALT_OKUNUR" ? "salt-okunur" : "acik";
 }
 
-/** Ekran üstü şerit: çevrimdışı (son veri), bağlantı kuruluyor, salt okunur. Eşitleme tazeliği bant değil, başlıkta süredir. */
+/**
+ * Ekran üstü şerit: çevrimdışı (son veri), bağlantı kuruluyor, salt okunur, BAYAT fabrika verisi. Olağan tazelik bant
+ * değil, menüdeki "Son veri" satırıdır (2026-11-19); ama fabrika verisi eşikten (`FABRIKA_BAYAT_MS`, 60 dk) eskiyse
+ * gizlenmez — her ekranda şerit. Çevrimdışıyken çevrimdışı bandı yeter (iki şerit yok).
+ */
 export function StatusBands() {
-  const { offline, offlineSince, facility } = useSession();
+  const { offline, offlineSince, facility, factoryStamp } = useSession();
+  const now = useMinuteClock();
+  const bayat = offline ? null : bayatlikMetni(factoryStamp, now);
   // Eski sunucu/önbellek `hizmet` taşımayabilir → açık say (bugünkü davranış).
   const service = facility?.hizmet;
   const band = serviceBand(facility);
@@ -168,6 +176,7 @@ export function StatusBands() {
         />
       ) : null}
       {band === "baglaniyor" ? <PendingConnectionBand text="Fabrika bağlantısı kuruluyor — veriler geldiğinde burada görünecek." /> : null}
+      {bayat && band !== "baglaniyor" ? <StaleFactoryBand text={bayat} /> : null}
     </View>
   );
 }

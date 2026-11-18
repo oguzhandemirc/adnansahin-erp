@@ -2,7 +2,7 @@
 // Menü yalnız izinli bölümleri gösterir (karar yine sunucuda; izinsiz uç 403 döner).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Image, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from "react-native-reanimated";
 import { useHareketAzalt } from "./hareket/azalt";
@@ -15,8 +15,10 @@ import { IconTile, Rozet } from "./ortak";
 import { Banner } from "./kit";
 import { ScreenHeader, useHeaderScroll } from "./LargeHeader";
 import { BildirimZili } from "./BildirimZili";
-import { SyncIndicator } from "./SyncIndicator";
-import { SyncNowFeedbackText, SyncNowIndicator, useSyncNow } from "./pano/SimdiGuncelle";
+import { SonVeriSatiri } from "./SonVeri";
+import { KisaBildirim } from "./KisaBildirim";
+import { useYenile } from "../state/yenile";
+import { useScreenFocus } from "../state/useScreenFocus";
 import { ROLE_LABEL, roleOf } from "./RoleBadge";
 import { TABS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
@@ -252,6 +254,10 @@ export function SideNav() {
         </View>
       ))}
       </ScrollView>
+      {/* Veri tazeliği başlıkta değil burada (2026-11-19): hesap kartının hemen üstünde; daraltılmışken yalnız simge. */}
+      <View style={!etiket && s.dar}>
+        <SonVeriSatiri dar={!etiket} testID="ray-son-veri" />
+      </View>
       <Pressable
         onPress={() => router.navigate("/profil" as never)}
         accessibilityRole="button"
@@ -300,7 +306,7 @@ export interface ScreenProps {
   readonly subtitle?: ReactNode;
   /** Kaydırmanın altında sabit kalan çubuk (ör. düzenleme kipinin eylemleri). */
   readonly footer?: ReactNode;
-  /** Başlığın yanında, tazelik öğesinden ÖNCE çizilen kısa bilgi (ör. cari kartı: kod · il · rozet). */
+  /** Başlığın yanında çizilen kısa bilgi (ör. rol rozeti). Tazelik başlıkta YOK (menüde "Son veri"). */
   readonly meta?: ReactNode;
 }
 
@@ -333,7 +339,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   const wide = useWide();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { permissions, factoryStamp, offline } = useSession();
+  const { permissions } = useSession();
   const { scrollY, onScroll } = useHeaderScroll(onEndReached);
   const allowed = module === undefined || moduleVisible(permissions, module);
   const path = usePathname();
@@ -351,25 +357,20 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
   ];
   const pad = ekranOlugu(wide);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/pano"));
-  const pull = useUserPull(refreshing, onRefresh);
-  const [subFilled, setSubFilled] = useState(true);
-  // TEK tazelik öğesi (2026-11-16): fabrikanın son eşitleme anı; bulut "Şimdi güncelle"yi beyan ettiyse aynı öğe
-  // eylemdir (fabrika bütün anlıkları yeniden hesaplar + bu ekranın bulut verisi tazelenir). Yanıt cümlesi alt satırda.
-  const syncNow = useSyncNow();
-  const freshness = syncNow.available ? (
-    <SyncNowIndicator
-      last={factoryStamp}
-      offline={offline}
-      busy={syncNow.busy}
-      onPress={() => {
-        onRefresh?.();
-        syncNow.trigger();
-      }}
-    />
-  ) : (
-    <SyncIndicator last={factoryStamp} offline={offline} onPress={onRefresh} />
+  // AŞAĞI ÇEK = TAM YENİLEME (2026-11-19): ekranın buluttan okuması + oturum + (beyanlıysa, 60 sn penceresi dışında)
+  // fabrikadan taze veri isteği — tek boğaz `useYenile`. Başarı sessiz; hata kısa bildirim. Başlıkta tazelik öğesi
+  // YOK: "Son veri" menüdedir (`SonVeri.tsx`), bayat veri her ekranın şeridinde (`StatusBands`).
+  const yenileme = useYenile(onRefresh);
+  const pull = useUserPull(refreshing || yenileme.yenileniyor, onRefresh ? yenileme.yenile : undefined);
+  // Bildirim yalnız odaktaki ekranda (yığında alttaki ekranlar da bağlı; ekran okuyucu tek kez duyursun).
+  const [odakta, setOdakta] = useState(true);
+  useScreenFocus(
+    useCallback(() => {
+      setOdakta(true);
+      return () => setOdakta(false);
+    }, []),
   );
-  // Yanıt cümlesi kısa bildirim (toast): düzeni itmez (eskiden başlık altına yeni satır olarak giriyordu).
+  const [subFilled, setSubFilled] = useState(true);
   const sub = subtitle ? <>{subtitle}</> : null;
   const seamless = !!sub && subFilled;
   return (
@@ -385,7 +386,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         menuRozeti={menuRozeti}
         dar={dar}
         action={<>{headerRight}<BildirimZili />{dar ? <TasmaMenusu eylemler={ikinciller} /> : <AcikEylemler eylemler={ikinciller} />}</>}
-        meta={meta ? <View style={s.meta}>{meta}{freshness}</View> : freshness}
+        meta={meta ? <View style={s.meta}>{meta}</View> : undefined}
       />
       {!wide ? <MenuCekmecesi acik={cekmece} onKapat={() => setCekmece(false)} genislik={cekmeceGenisligi(width)} pay={insets} /> : null}
       <Animated.ScrollView
@@ -416,7 +417,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         <View>{allowed ? children : <Banner tone="error" icon="lock-closed-outline" text="Bu bölümü görme yetkiniz yok" />}</View>
       </Animated.ScrollView>
       {footer}
-      <SyncNowFeedbackText feedback={syncNow.feedback} />
+      <KisaBildirim metin={odakta ? yenileme.bildirim : null} ton="hata" />
     </View>
   );
 }

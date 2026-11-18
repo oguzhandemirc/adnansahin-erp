@@ -27,7 +27,7 @@ import { AltSekmeler, BlokBasligi, HataDurumu, Iskelet, ListeBlogu, ListeSatiri,
 import { useListCapability } from "../../../src/ui/siparis/capabilities";
 import { cariRowText } from "../../../src/ui/siparis/CustomerRow";
 import { asObj, str } from "../../../src/ui/siparis/OrderRow";
-import { FabrikaVeriAni, ListStates, StaleNote } from "../../../src/ui/siparis/parts";
+import { ListStates, StaleNote } from "../../../src/ui/siparis/parts";
 import { CARI_SIPARIS_SUTUNLARI, SIPARIS_SUTUNLARI } from "../../../src/ui/siparis/sutunlar";
 import { CARI_SEVK_SUTUNLARI, OZET_SEVK_SUTUNLARI, SEVKIYAT_SUTUNLARI } from "../../../src/ui/sevkiyat/sutunlar";
 import { KisaTablo, sutunSec } from "../../../src/ui/tablo/KisaTablo";
@@ -198,7 +198,6 @@ export default function CustomerDetail() {
             </KademeliGiris>
           ) : null}
 
-          <FabrikaVeriAni />
         </>
       ) : null}
       <VisibilityPicker

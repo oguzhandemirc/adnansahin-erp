@@ -16,6 +16,7 @@ import { useHareketAzalt } from "./hareket/azalt";
 import { BASMA, EGRI, SURE } from "./hareket/sabitler";
 import { MODULE_ICON, type IconName } from "./icons";
 import { IconTile, Rozet } from "./ortak";
+import { SonVeriSatiri } from "./SonVeri";
 import { ROLE_LABEL, roleOf } from "./RoleBadge";
 import { RAIL_GROUPS } from "./tabs";
 import { makeStyles, useTokens } from "./theme-context";
@@ -145,6 +146,7 @@ export function MenuCekmecesi({ acik, onKapat, genislik, pay }: {
             </View>
           ))}
         </ScrollView>
+        <SonVeriSatiri testID="cekmece-son-veri" />
         <Pressable
           onPress={() => git("/profil")}
           accessibilityRole="button"

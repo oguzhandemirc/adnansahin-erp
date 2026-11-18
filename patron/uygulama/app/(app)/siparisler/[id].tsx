@@ -23,7 +23,7 @@ import { siparisDurumu } from "../../../src/ui/siparis/durum";
 import { useListCapability } from "../../../src/ui/siparis/capabilities";
 import { OrderLines, useOrderLines } from "../../../src/ui/siparis/OrderLines";
 import { OrderWorkOrders, useOrderWorkOrders } from "../../../src/ui/siparis/OrderWorkOrders";
-import { FabrikaVeriAni, StaleNote } from "../../../src/ui/siparis/parts";
+import { StaleNote } from "../../../src/ui/siparis/parts";
 import { DETAY_ANAHTARI, DETAY_OGELERI, detayDegistir, detayOgeleri, detaySifirla, detayTemizle, type DetayKey } from "../../../src/ui/siparis/gorunum";
 import { VisibilityPicker } from "../../../src/ui/tablo/Seciciler";
 import { useCihazTercihi } from "../../../src/ui/tablo/useCihazTercihi";
@@ -149,7 +149,6 @@ export default function OrderDetail() {
           <KademeliGiris sira={4}>
             <OrderWorkOrders list={isEmirleri} tick={tick} />
           </KademeliGiris>
-          <FabrikaVeriAni />
         </>
       ) : null}
     </Screen>
