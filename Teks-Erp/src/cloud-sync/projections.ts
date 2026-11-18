@@ -175,7 +175,7 @@ export const DELIBERATELY_EXCLUDED: Readonly<Record<string, string>> = {
   system_settings: "yapılandırma (şifre özetleri, kurulum kimliği taşır)",
   endpoint_latency_daily: "telemetri",
   sync_marks: "eşitlemenin kendi telemetrisi", sync_watermarks: "eşitlemenin kendi durum tablosu",
-  rolls: "top düzeyi buluta gitmez (v1) — stok karnesi + sevkiyat/çuval toplamları yeter; top araması fabrikada",
+  rolls: "top düzeyi kök projeksiyon değil (v1); top satırları yalnız gömülü gider (stok-kalem/cuval-deposu anlıkları, sevkiyat-icerigi.cuvallar); top araması fabrikada",
   roll_status_events: "stok hareket defteri v1 dışı (hacim) — rapor isteğiyle", warehouse_movements: "aynı",
   roll_movements: "aynı", roll_operations: "üretim ayrıntısı", work_order_events: "iş emri hareket defteri v1 dışı",
   printed_documents: "belge içeriği", label_templates: "şablon", traveler_card_templates: "şablon",

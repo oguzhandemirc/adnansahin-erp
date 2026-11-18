@@ -131,6 +131,28 @@ export const FACTS: readonly RecordProjection[] = [
     retention: { wireFields: ["cikisTarihi", "olusturulma"], sql: 'COALESCE(t."dispatchedAt", t."createdAt")' }, catalogVersion: 1,
   },
   {
+    // 2026-11-19 (Adnan'a özgü sözleşme genişletmesi): sevkiyatın çuval → top kırılımı, panelin sevkiyat ayrıntısıyla
+    // aynı (`getShipmentById`: BRÜT, iade `prevSackId` ile çuvalında). `sevkiyat` satırına GÖMÜLMEDİ: liste sayfası her
+    // satırda yüzlerce top taşırdı. Ayrı kök ⇒ uygulama tek kaydı `GET /veri/sevkiyat-icerigi/:sevkiyatId` ile okur.
+    // Satır ağır (top dizisi) ⇒ birim başına 100 kök (paket 32 MB/4 MB sınırının altında kalsın). Ürün/renk adı
+    // değişince eski içerik bir sonraki çuval/top değişikliğine dek eski adla kalır (bilinçli: ad başına bütün
+    // sevkiyatları yeniden kurmak yük). Migration yok: aynı tabloların filigranı + mevcut `*_sync_parent_moved` işaretleri.
+    name: "sevkiyat-icerigi", kind: "KAYIT", role: "OLGU", root: { table: "shipments", model: "Shipment" },
+    columns: [col("id", "id"), col("sevkNo", "shipmentNo"), col("durum", "status"), col("cikisTarihi", "dispatchedAt"),
+      col("olusturulma", "createdAt")],
+    derived: [
+      derived("ozet", "cloud-sync/shipment-content: ShippingService.getShipmentById summary (BRÜT) + tartiliCuval (kg'si dolu çuval)", ["sacks", "rolls", "roll_returns", "swatches"]),
+      derived("cuvallar", "cloud-sync/shipment-content: getShipmentById sacks[] (canlı + prevSackId iadeleri, hayalet `yok`) + Roll.weightKg/labelCustomer", ["sacks", "rolls", "roll_returns", "return_reasons", "items", "colors", "customers"]),
+      derived("cuvalsizToplar", "cloud-sync/shipment-content: getShipmentById rolls[] sackId boş", ["rolls", "roll_returns", "items", "colors", "customers"]),
+    ],
+    sources: [self("shipments"),
+      via("sacks", "shipmentId", "ESKİ sevkiyat ayrılmada görünmez → sacks_sync_parent_moved tetikleyicisi"),
+      via("rolls", "shipmentId", "ESKİ sevkiyat ayrılmada görünmez → rolls_sync_parent_moved tetikleyicisi"),
+      via("roll_returns", "fromShipmentId")],
+    deletion: "YOK", permission: "bulut:sevkiyat:oku", unitRoots: 100,
+    retention: { wireFields: ["cikisTarihi", "olusturulma"], sql: 'COALESCE(t."dispatchedAt", t."createdAt")' }, catalogVersion: 1,
+  },
+  {
     name: "dogrudan-sevk", kind: "KAYIT", role: "OLGU", root: { table: "direct_shipments", model: "DirectShipment" },
     columns: [col("id", "id"), col("sevkNo", "shipmentNo"), col("cariKartId", "customerId"), col("subeId", "branchId"),
       col("toplamMetre", "totalQty"), col("topSayisi", "rollCount"), col("cikisTarihi", "shippedAt"),

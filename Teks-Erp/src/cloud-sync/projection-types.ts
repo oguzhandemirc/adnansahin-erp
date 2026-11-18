@@ -107,6 +107,8 @@ export interface RecordProjection {
   readonly retention?: RetentionSpec;
   /** Kolon kümesi sürümü (§6.6): alan çıkarmak/anlam değiştirmek artırır ve TAM gönderim doğurur. */
   readonly catalogVersion: number;
+  /** Ağır satırlı (iç içe dizi taşıyan) projeksiyonda paket birimi başına kök tavanı; yoksa satır sayısından. */
+  readonly unitRoots?: number;
 }
 
 /** Bölümlü anlığın (`ozet`) bir bölümü: tel adı `<projeksiyon>.<bolum>`, ayrı izin. */

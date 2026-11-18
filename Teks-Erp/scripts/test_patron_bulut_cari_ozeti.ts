@@ -119,7 +119,7 @@ async function main(): Promise<void> {
   check("iade: serbest metin (reasonText/note) ve kişi (receivedById) GİTMEZ", iade !== undefined && !iade.columns.some((c) => ["reasonText", "note", "receivedById", "cancelReason"].includes(c.source)));
   const schemaKeys = schemaPropertyNames();
   check("cari-ozeti şeması: finans sözcüğü yok", schemaKeys.size > 20 && ![...schemaKeys].some((k) => FINANCE.test(k)), `${schemaKeys.size} anahtar`);
-  check("kayıt projeksiyonu sayısı 14", RECORD_PROJECTIONS.length === 14, `${RECORD_PROJECTIONS.length}`);
+  check("kayıt projeksiyonu sayısı 15 (+ sevkiyat-icerigi 2026-11-19)", RECORD_PROJECTIONS.length === 15, `${RECORD_PROJECTIONS.length}`);
 
   const ids = await setup(now);
   try {

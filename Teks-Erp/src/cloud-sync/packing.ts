@@ -63,7 +63,8 @@ export function toUnits(g: {
     byId.set(r.id, m);
   }
   const ids = [...byId.keys()];
-  const rootsPerUnit = Math.max(1, Math.floor(UNIT_MAX_ROWS / Math.max(1, names.length)));
+  // Birim içinde bölme yok (aşan paket yalnız birim sınırından ikiye ayrılır) ⇒ ağır satırlı projeksiyon kendi tavanını verir.
+  const rootsPerUnit = Math.max(1, Math.min(Math.floor(UNIT_MAX_ROWS / Math.max(1, names.length)), g.projection.unitRoots ?? Infinity));
   const makeEntries = (slice: string[], withRemoved: boolean): UnitEntry[] =>
     names.map((name) => ({
       name,

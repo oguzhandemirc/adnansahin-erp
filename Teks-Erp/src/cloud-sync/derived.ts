@@ -17,6 +17,7 @@ import {
   isOpenWorkOrderStatus, loadCloseDates, loadOpenFasonOfWorkOrders, loadRollStagesOfWorkOrders, metreNumber, NO_FASON,
   STAGE_STATION_SELECT, uretimStepName, workOrderStage, WO_ORDER_LINKS_SELECT,
 } from "./work-order-facts";
+import { shipmentContentDerived } from "./shipment-content";
 
 type RawRow = Record<string, unknown> & { id: string };
 export type DerivedValues = Map<string, Record<string, unknown>>;
@@ -254,6 +255,7 @@ export const DERIVERS: Readonly<Record<string, Deriver>> = {
   siparis: orderDerived,
   "siparis-kalemi": orderLineDerived,
   sevkiyat: shipmentDerived,
+  "sevkiyat-icerigi": shipmentContentDerived,
   cuval: sackDerived,
   "is-emri": workOrderDerived,
   iade: returnDerived,

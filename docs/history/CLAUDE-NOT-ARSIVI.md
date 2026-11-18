@@ -13491,3 +13491,11 @@ Negatif sondalar (tetik md5(prosrc) ve dosya md5 ile geri alındı):
 **Bekçi.** Bulut `test_bildirim_koprusu` 36/0, tam bulut paketi 37/37; fabrika `test_bildirim_bulut_koprusu` 33/0 (yeni §8 fabrika kataloğu ↔ bulut listesi/küme/etiket), `test_bildirim_atama` 55/0 (§g); uygulama jest 802/802; panel vitest 3822/3822. Sondalar: buluttan `fason-dondu` çıkar → §8a kırmızı; tipli okuma kaldır → §7b; bulut `turler` kaldır → §2c'; `/fason` kaldır → taps 2; konu satırı kaldır → labels §5; saat doğrulaması kaldır → §g 6; uç izin kapısından önce → 2. Commit'ler `38e5a6e1` `19ebb002` `b41bfe4b`.
 
 **Açık.** `test_permission_catalog` `cloud-mirror.service.ts` için "BEYANSIZ dinamik izin" kırmızısı D5'ten (`4b4b8220`) kalma, bu dilimde dokunulmadı. Panel saat alanı ekranda gözle denetlenmedi (dev sunucusu açılmadı).
+
+## 2026-11-19 — Patron sevkiyat içeriği: çuval → top kırılımı buluta (yeni KAYIT `sevkiyat-icerigi`, migration yok) [PATRON-BULUTU + SEVKIYAT]
+
+**Neden.** Kullanıcı: telefonda sevkiyata dokununca çuvallar, çuvala dokununca toplar görünmeli (salt izleme). Ölçüm: bulutta `cuval` OLGU yalnız çuval sayılarını taşır (top yok, `sevkiyatId` süzgeci yok); `cuval-deposu` anlığı yalnız sevk EDİLMEMİŞ çuvalları (havuz + PLANNED) taşır; sevk edilmiş sevkiyatın topları hiçbir yerde yok.
+
+**Karar.** Yeni KAYIT projeksiyonu `sevkiyat-icerigi` (kök `shipments`, izin `bulut:sevkiyat:oku`), türetici panelin `ShippingService.getShipmentById`ini sırayla çağırır (ikinci tanım yok; BRÜT, iade `prevSackId` ile eski çuvalında). Reddedilenler: (a) `sevkiyat` satırına gömmek — liste sayfası her satırda yüzlerce top taşırdı ve katalog sürümü artıp bütün sevkiyatlar TAM giderdi; (b) pencereli ANLIK + yeni bulut ucu — her aralıkta bütün pencere yeniden hesaplanır, eski sevkiyat görünmez, bulutta yeni rota gerekir. Seçilen yolda bulutta göç ve yeni uç yok (katalogda bir satır + `katalog-ozeti.json`); uygulama `GET /veri/sevkiyat-icerigi/:id` okur. Paketleme birimi içinde bölünmediği için ağır satır 32 MB sınırını aşabilirdi → `RecordProjection.unitRoots` (bu projeksiyonda 100). Ürün/renk adı değişikliği içeriği yeniden kurmaz (bilinçli).
+
+**Kurulum sırası.** Önce bulut kataloğu, sonra fabrika (yeni projeksiyon ilk turda TAM gider: saklama penceresindeki her sevkiyat için bir `getShipmentById`). Canlıda sayılar ölçülmedi — ana oturum ölçecek.
