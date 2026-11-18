@@ -10,7 +10,6 @@ import { visibleCards, visibleModules, type ModuleKey } from "../../../src/lib/a
 import { PERIODS, type PeriodKey } from "../../../src/lib/labels/uretim";
 import { TERIM } from "../../../src/lib/terim";
 import { destekRozetMetni, useDestekOkunmamis } from "../../../src/destek/gorunurluk";
-import { bildirimRozetMetni, useBildirimOkunmamis } from "../../../src/state/bildirim-okunmamis";
 import { rozetMetni, useOkunmamisRet } from "../../../src/state/okunmamis-ret";
 import { useSession } from "../../../src/state/session";
 import { useOpenRefresh } from "../../../src/state/useOpenRefresh";
@@ -91,10 +90,8 @@ export default function Dashboard() {
   // Destek yanıtı rozeti (destek kapalıyken depo hep sıfır → çizilmez); ret rozeti öncelikli (kırmızı).
   const destekOkunmamis = useDestekOkunmamis();
   const destekRozeti = destekRozetMetni(destekOkunmamis);
-  // Okunmamış bildirim (Menü → Bildirim ayarları); ret ve destek rozeti öncelikli.
-  const bildirimOkunmamis = useBildirimOkunmamis();
-  const bildirimRozeti = bildirimRozetMetni(bildirimOkunmamis);
-  const menuEtiketi = ["Menü", retRozeti ? `${okunmamis} okunmamış hata` : null, destekRozeti ? `${destekOkunmamis.tickets} talepte yeni destek yanıtı` : null, bildirimRozeti ? `${bildirimOkunmamis} okunmamış bildirim` : null].filter(Boolean).join(", ");
+  // Okunmamış bildirim rozeti başlık zilindedir (`BildirimZili`), Menü'de değil.
+  const menuEtiketi = ["Menü", retRozeti ? `${okunmamis} okunmamış hata` : null, destekRozeti ? `${destekOkunmamis.tickets} talepte yeni destek yanıtı` : null].filter(Boolean).join(", ");
   const duzenleDugmesi = ozetVar && !duzenle ? (
     <Basilabilir onPress={() => setDuzenle(true)} style={s.duzenle} accessibilityRole="button" accessibilityLabel="Panoyu düzenle" testID="pano-duzenle">
       <Ionicons name="create-outline" size={18} color={t.color.link} />
@@ -117,10 +114,6 @@ export default function Dashboard() {
       ) : destekRozeti ? (
         <View style={[s.menuRozet, { backgroundColor: t.color.primary }]} testID="pano-menu-destek-rozet">
           <Text style={[s.menuRozetYazi, { color: t.color.onPrimary }]}>{destekRozeti}</Text>
-        </View>
-      ) : bildirimRozeti ? (
-        <View style={[s.menuRozet, { backgroundColor: t.color.primary }]} testID="pano-menu-bildirim-rozet">
-          <Text style={[s.menuRozetYazi, { color: t.color.onPrimary }]}>{bildirimRozeti}</Text>
         </View>
       ) : null}
     </Basilabilir>

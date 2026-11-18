@@ -1,4 +1,4 @@
-// Bildirim Ayarları — bölümler: Cihazlar (bu cihazın izni, EN ÜSTTE) · Bildirimler (okunmamış vurgulu liste) · Ayarlar
+// Bildirim Ayarları — bölümler: Cihazlar (bu cihazın izni, EN ÜSTTE) · bildirim listesine bağlantı (liste başlık zilinde) · Ayarlar
 // (ana anahtar · tür · sessiz saat) · Eşikler; tesis varsayılanı (yönetici). Karar sunucudadır: ayar katı şemadan geçer, izni yetmeyen türe ayar açık olsa da gönderilmez.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
@@ -11,7 +11,10 @@ import { useSnapshot } from "../../src/ui/pano/useSnapshot";
 import { GroupNote } from "../../src/ui/diger/parts";
 import { Screen } from "../../src/ui/Frame";
 import { Banner, Button, ConfirmButton } from "../../src/ui/kit";
-import { NotificationDevices, NotificationHistory } from "../../src/ui/NotificationDevices";
+import { NotificationDevices } from "../../src/ui/NotificationDevices";
+import { BILDIRIM_LISTESI_ROTASI } from "../../src/ui/BildirimZili";
+import { ListeBlogu, ListeSatiri } from "../../src/ui/ortak";
+import { useRouter } from "expo-router";
 import { NotificationSettingsForm } from "../../src/ui/NotificationSettingsForm";
 import { BlokBasligi, BosDurum, HataDurumu, Iskelet } from "../../src/ui/ortak";
 import { space } from "../../src/ui/tokens";
@@ -27,6 +30,7 @@ const SOURCE: Readonly<Record<NotificationSettingsView["kaynak"], string>> = {
 
 export default function Notifications() {
   const { api, permissions } = useSession();
+  const router = useRouter();
   const remote = useRemote("bildirim-ayarlar", () => api.notificationSettings());
   // Termin türevi fabrikanın sipariş özetinden okunur; gelmiyorsa geciken kalem seçeneği çizilmez.
   const orders = useSnapshot("ozet.siparis", can(permissions, "bulut:ozet:oku") && can(permissions, "bulut:siparis:oku"));
@@ -77,7 +81,9 @@ export default function Notifications() {
     <>
       {view.gonderim === "kapali" ? <Banner tone="warn" text="Bildirim gönderimi sunucuda henüz açık değil; ayarlarınız saklanır ve açıldığında geçerli olur." testID="gonderim-kapali" /> : null}
       <NotificationDevices vapidKey={view.webPushAnahtari} />
-      <NotificationHistory />
+      <ListeBlogu>
+        <ListeSatiri birincil="Bildirimleri gör" ikincil="Son bildirimleriniz; başlıktaki zilden de açılır" icon="notifications-outline" ton="amber" ayrac={false} onPress={() => router.push(BILDIRIM_LISTESI_ROTASI as never)} testID="bildirim-listesine-git" />
+      </ListeBlogu>
       <BlokBasligi baslik="Ayarlar" />
       <GroupNote>{SOURCE[view.kaynak]}</GroupNote>
       <NotificationSettingsForm form={form} kinds={view.turler} dueDates={dueDates} onChange={(f) => { dirty.current = true; setForm(f); setSaved(null); }}

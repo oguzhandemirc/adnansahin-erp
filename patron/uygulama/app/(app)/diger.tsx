@@ -6,7 +6,6 @@ import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import { MODULES, moduleNavTitle, moduleVisible } from "../../src/lib/access";
 import { destekRozetMetni, useDestekEtkin, useDestekOkunmamis } from "../../src/destek/gorunurluk";
-import { bildirimRozetMetni, useBildirimOkunmamis } from "../../src/state/bildirim-okunmamis";
 import { rozetMetni, useOkunmamisRet } from "../../src/state/okunmamis-ret";
 import { useSession } from "../../src/state/session";
 import { Avatar } from "../../src/ui/diger/parts";
@@ -28,8 +27,6 @@ export default function More() {
   const hesap = facility?.hesap;
   const okunmamis = useOkunmamisRet();
   const retRozeti = rozetMetni(okunmamis);
-  const bildirimOkunmamis = useBildirimOkunmamis();
-  const bildirimRozeti = bildirimRozetMetni(bildirimOkunmamis);
   // Destek bloğu yalnız destek AÇIKKEN (kapalı / eski bulut → menü bugünküyle aynı).
   const destekEtkin = useDestekEtkin();
   const destekOkunmamis = useDestekOkunmamis();
@@ -66,9 +63,9 @@ export default function More() {
                 ton={DOMAIN_TONE[MODULE_ICON[m.key].domain]}
                 ayrac={i > 0}
                 rozet={m.key === "gelen-kutusu" && retRozeti ? <Rozet label={retRozeti} tone="danger" testID="gelen-okunmamis" />
-                  : m.key === "bildirimler" && bildirimRozeti ? <Rozet label={bildirimRozeti} tone="primary" testID="bildirim-okunmamis" /> : undefined}
+                  : undefined}
                 accessibilityLabel={m.key === "gelen-kutusu" && retRozeti ? `${moduleNavTitle(m.key)}, ${okunmamis} okunmamış hata`
-                  : m.key === "bildirimler" && bildirimRozeti ? `${moduleNavTitle(m.key)}, ${bildirimOkunmamis} okunmamış bildirim` : moduleNavTitle(m.key)}
+                  : moduleNavTitle(m.key)}
                 onPress={() => router.push(m.route as never)}
                 testID={`menu-${m.key}`}
               />

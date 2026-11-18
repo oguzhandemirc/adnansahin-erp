@@ -51,9 +51,10 @@ describe("Ekran başlığı + eylem", () => {
     expect(screen.getAllByTestId("eylem")).toHaveLength(1);
   });
 
-  it("uzun başlık esner (flex 1, minWidth 0), eylemsiz ekranda eylem yuvası yok", async () => {
+  it("uzun başlık esner (flex 1, minWidth 0); headerRight vermeyen ekranda da eylem yuvasında yalnız bildirim zili var (2026-11-18)", async () => {
     await draw(<Screen title={"Çok uzun bir ekran başlığı ".repeat(3)} back={false}><Text>içerik</Text></Screen>);
-    expect(screen.queryByTestId("baslik-eylemi")).toBeNull();
+    expect(screen.getByTestId("baslik-eylemi")).toBeTruthy();
+    expect(screen.getByTestId("bildirim-zili")).toBeTruthy();
     expect(flat("baslik-kutusu")).toMatchObject({ flex: 1, minWidth: 0 });
   });
 

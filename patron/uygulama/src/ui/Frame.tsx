@@ -14,6 +14,7 @@ import { DOMAIN_TONE } from "./tokens";
 import { MODULE_ICON } from "./icons";
 import { Banner } from "./kit";
 import { ScreenHeader, useHeaderScroll } from "./LargeHeader";
+import { BildirimZili } from "./BildirimZili";
 import { SyncIndicator } from "./SyncIndicator";
 import { SyncNowFeedbackText, SyncNowIndicator, useSyncNow } from "./pano/SimdiGuncelle";
 import { ROLE_LABEL, roleOf } from "./RoleBadge";
@@ -23,7 +24,6 @@ import { useAcikKapali } from "./ortak/useAcikKapali";
 import { CONTENT_MAX, RAIL_COLLAPSED_WIDTH, RAIL_WIDTH, TOUCH, WIDE_MIN, ekranOlugu, space, typography } from "./tokens";
 import { UYGULAMA_ADI } from "../lib/kimlik";
 import { destekRozetMetni, useDestekEtkin, useDestekOkunmamis } from "../destek/gorunurluk";
-import { bildirimRozetMetni, useBildirimOkunmamis } from "../state/bildirim-okunmamis";
 import { SorunBildirDugmesi } from "./destek/SorunBildirDugmesi";
 
 export function useWide(): boolean {
@@ -93,7 +93,6 @@ export function SideNav() {
   const profilAktif = path === "/profil";
   const destekEtkin = useDestekEtkin();
   const destekRozeti = destekRozetMetni(useDestekOkunmamis());
-  const bildirimRozeti = bildirimRozetMetni(useBildirimOkunmamis());
   const destekAktif = path === "/destek" || path.startsWith("/destek/");
   const ray = useAcikKapali(RAY_TERCIHI, true);
   const acik = ray.acik;
@@ -144,7 +143,6 @@ export function SideNav() {
                   key={m.key} acik={acik} active={path === m.route || path.startsWith(`${m.route}/`)}
                   icon={icon.icon} tone={DOMAIN_TONE[icon.domain]} title={moduleNavTitle(m.key)}
                   onPress={() => router.navigate(m.route as never)} testID={`menu-${m.key}`}
-                  {...(m.key === "bildirimler" && bildirimRozeti ? { rozet: bildirimRozeti, rozetTestID: "ray-bildirim-okunmamis", label: `${moduleNavTitle(m.key)}, ${bildirimRozeti} okunmamış bildirim` } : {})}
                 />
               );
             })}
@@ -277,7 +275,7 @@ export function Screen({ title: titleProp, module, children, back, onRefresh, re
         scrollY={scrollY}
         seamless={seamless}
         onBack={showBack ? goBack : undefined}
-        action={sorunBildir ? <>{headerRight}<SorunBildirDugmesi /></> : headerRight}
+        action={<>{headerRight}<BildirimZili />{sorunBildir ? <SorunBildirDugmesi /> : null}</>}
         meta={meta ? <View style={s.meta}>{meta}{freshness}</View> : freshness}
       />
       <Animated.ScrollView

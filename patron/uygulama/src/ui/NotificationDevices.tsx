@@ -1,7 +1,7 @@
 // Bildirim Ayarları ekranının alt bölümleri: Cihazlar (bu cihazın izin durumu + kaydet — izin isteme akışı — + kayıtlı
 // cihazlar + deneme; ekranın EN ÜSTÜNDE ki izin akışı bulunsun) ve
 // Bildirimler (son 20; okunmamış vurgulu + nokta; dokununca okundu sayılır ve yalnız uygulamanın kendi ekranı açılır —
-// `safeRoute`; "Tümünü okundu say"). Okundu kişi başına tek kayıttır, panel ile köprüyle eşitlenir.
+// `safeRoute`; "Tümünü okundu işaretle"). Okundu kişi başına tek kayıttır, panel ile köprüyle eşitlenir.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -205,14 +205,14 @@ export function NotificationHistory() {
   };
   const allButton = anyUnread && list.data?.okunmamis !== undefined ? (
     <Pressable onPress={() => void markAll()} disabled={readAll.busy} accessibilityRole="button" style={s.allRead} testID="bildirim-tumu-okundu">
-      <Text style={[s.allReadText, { color: t.color.link }]}>Tümünü okundu say</Text>
+      <Text style={[s.allReadText, { color: t.color.link }]}>Tümünü okundu işaretle</Text>
     </Pressable>
   ) : undefined;
   return (
     <View>
-      {list.data && items.length === 0 ? <><BlokBasligi baslik="Bildirimler" /><BosDurum icon={EMPTY_ICON.bildirim} baslik="Henüz bildirim yok" /></> : null}
+      {list.data && items.length === 0 ? <BosDurum icon={EMPTY_ICON.bildirim} baslik="Henüz bildirim yok" /> : null}
       {items.length > 0 ? (
-        <ListeBlogu baslik="Bildirimler" sag={allButton} ayracli testID="bildirim-gecmisi">
+        <ListeBlogu baslik="Son bildirimler" sag={allButton} ayracli testID="bildirim-gecmisi">
           {items.map((n) => {
             const route = safeRoute(n.rota);
             const look = notificationKind(n.tur);
