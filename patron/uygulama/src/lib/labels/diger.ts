@@ -80,6 +80,7 @@ export const NOTIFICATION_SKIP: Readonly<Record<string, string>> = {
   IZIN_YOK: "yetki yetmedi",
   HESAP_KAPALI: "hesap kapalı",
   CIHAZ_YOK: "kayıtlı cihaz yoktu",
+  OKUNDU: "önceden okunduğu için telefona gönderilmedi",
 };
 
 /** Dışa aktarma kümesi adları: bulut kataloğundaki her kök projeksiyon + bulutta doğan küme (`labels.test` §4 eşler). */

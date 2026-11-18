@@ -18,7 +18,13 @@ import { useSession } from "../state/session";
 import { useRemote } from "../state/useRemote";
 import { GroupNote } from "./diger/parts";
 import { BlokBasligi, BosDurum, IconTile, ListeBlogu, ListeSatiri, Rozet, STATUS_ROZET_TONU } from "./ortak";
-import { statusEntry } from "../lib/labels";
+import { statusEntry, type StatusEntry } from "../lib/labels";
+
+/** Liste rozeti: gönderim anında okunmuş satır (`ATLANDI` · `OKUNDU`) "Atlandı" değil "Okundu" görünür (saha 2026-11-18). */
+export function notificationBadge(n: { readonly durum: string; readonly atlamaNedeni: string | null }): StatusEntry {
+  if (n.durum === "ATLANDI" && n.atlamaNedeni === "OKUNDU") return { label: "Okundu", tone: "bilgi" };
+  return statusEntry(n.durum);
+}
 import { DOMAIN_TONE } from "./tokens";
 import { Banner, Button } from "./kit";
 import { makeStyles, useTokens } from "./theme-context";
@@ -212,6 +218,7 @@ export function NotificationHistory() {
             const look = notificationKind(n.tur);
             const why = n.atlamaNedeni ? NOTIFICATION_SKIP[n.atlamaNedeni] ?? n.atlamaNedeni : null;
             const yeni = unread(n);
+            const badge = notificationBadge(n);
             return (
               <Pressable key={n.id} disabled={!route && !yeni} onPress={() => open(n, route)} accessibilityRole={route ? "link" : "button"}
                 accessibilityLabel={[yeni ? "Okunmadı" : null, n.baslik, n.metin].filter(Boolean).join(", ")} testID={`bildirim-${n.id}`}
@@ -224,7 +231,7 @@ export function NotificationHistory() {
                   </View>
                   <Text style={s.histBody}>{n.metin}</Text>
                   <View style={s.histMeta}>
-                    <Rozet label={statusEntry(n.durum).label} tone={STATUS_ROZET_TONU[statusEntry(n.durum).tone]} accessibilityLabel={`Durum: ${statusEntry(n.durum).label}`} />
+                    <Rozet label={badge.label} tone={STATUS_ROZET_TONU[badge.tone]} accessibilityLabel={`Durum: ${badge.label}`} testID={`bildirim-durum-${n.id}`} />
                     <Text style={s.histTime}>{why ? `${formatAgo(n.olusturulma)} · ${why}` : formatAgo(n.olusturulma)}</Text>
                   </View>
                 </View>

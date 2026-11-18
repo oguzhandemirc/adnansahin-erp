@@ -2,7 +2,7 @@
 // alınabilir), ağ çağrısı tx DIŞINDA yapılır, sonuç yalnız kendi claim'imiz hâlâ duruyorsa yazılır (count 0 → başka
 // tur almış, dokunulmaz). Gönderim anında kural YENİDEN verilir: hesap aktif mi · bildirim/tür açık mı · izin yetiyor
 // mu (doğuştan sonra düşürülen izin/ayar da tutar) · sessiz saat (sessizde gönderilmez, bitişe ertelenir; deneme
-// hakkı yanmaz). Geçersiz cihaz pasife çekilir; Expo bileti alınan teslim makbuz yoklamasına girer (`notification-receipts`). Günlüğe yalnız sayı ve kısa kod düşer — belirteç/anahtar DÜŞMEZ.
+// hakkı yanmaz) · gönderim anında okunmuşsa (`read_at` dolu) gönderilmez, `ATLANDI`/`OKUNDU` olur. Geçersiz cihaz pasife çekilir; Expo bileti alınan teslim makbuz yoklamasına girer (`notification-receipts`). Günlüğe yalnız sayı ve kısa kod düşer — belirteç/anahtar DÜŞMEZ.
 import { Prisma, type DevicePlatform } from "@prisma/client";
 import { effectivePermissions } from "../catalog/permissions";
 import { NOTIFICATION_KINDS, type NotificationKind } from "../wire/api";
@@ -15,6 +15,8 @@ import { RECEIPT_DELAY_MS } from "./notification-receipts";
 import { loadFacilitySettings, resolveSettings } from "./notification-settings.service";
 
 export const MAX_ATTEMPTS = 5;
+/** Gönderim anında okunmuş satırın son durumu: `ATLANDI` + bu neden ("okundu — gönderilmedi"). */
+export const SKIP_READ = "OKUNDU";
 const CLAIM_MS = 2 * 60_000;
 const BATCH = 50;
 const BACKOFF_MIN = [1, 5, 15, 60];
@@ -28,6 +30,7 @@ interface Claimed {
   route: string | null;
   attempts: number;
   origin: string;
+  read_at: Date | null;
 }
 
 export interface DeliveryTotals {
@@ -55,12 +58,14 @@ async function claim(ctx: CloudContext, tesisId: string, nowMs: number, until: D
          FOR UPDATE SKIP LOCKED)
       UPDATE notifications n SET status = 'GONDERILIYOR', claim_until = ${until}::timestamptz, attempts = n.attempts + 1, updated_at = now()
         FROM due WHERE n.id = due.id
-      RETURNING n.id, n.account_id, n.kind, n.title, n.body, n.route, n.attempts, n.origin`,
+      RETURNING n.id, n.account_id, n.kind, n.title, n.body, n.route, n.attempts, n.origin, n.read_at`,
   );
 }
 
 async function decide(ctx: CloudContext, tesisId: string, n: Claimed, nowMs: number): Promise<Decision> {
   if (!(NOTIFICATION_KINDS as readonly string[]).includes(n.kind)) return { kind: "ATLA", reason: "TUR_BILINMIYOR" };
+  // Kişi bildirimi zaten gördü (panelde ya da telefonda okundu; sessiz saatte beklerken de): push GİTMEZ (saha 2026-11-18).
+  if (n.read_at !== null) return { kind: "ATLA", reason: SKIP_READ };
   return withTesis(ctx.app, { tesisId, projections: [FACILITY_TIMEZONE_SOURCE] }, async (tx) => {
     const account = await tx.account.findUnique({ where: { id: n.account_id }, select: { status: true, permissions: true } });
     if (!account || account.status !== "AKTIF") return { kind: "ATLA", reason: "HESAP_KAPALI" };

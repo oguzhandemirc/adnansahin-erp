@@ -1,7 +1,8 @@
 // =============================================================================
 // BİLDİRİM KURALLARI BEKÇİSİ (B5) — her kural negatif + pozitif:
 //   §1 tekrar gönderim YOK: aynı olay iki turda tek satır, tek gönderim (pozitif: yeni gün yeni olay)
-//   §2 sessiz saatte gönderilmez → bitişe ertelenir (deneme hakkı yanmaz); bitişte gider · sessiz kapalı → hemen gider
+//   §2 sessiz saatte gönderilmez → bitişe ertelenir (deneme hakkı yanmaz); bitişte gider · sessiz kapalı → hemen gider ·
+//      ertelendikten sonra sessiz kapatılırsa hemen gider (§2e) · gönderim anında okunmuşsa gitmez, ATLANDI/OKUNDU (§2f)
 //   §3 kapalı türe / "bildirim yok"a gönderilmez (ATLANDI) · açık tür gider · sonradan açılınca eski olay GİTMEZ
 //   §4 izinsiz hesaba gitmez: stok eşiği bildirimi yalnız stok izinli hesaba; doğuştan sonra izni
 //      düşürülen hesaba gönderim anında da gitmez
@@ -12,8 +13,8 @@
 import { randomUUID } from "node:crypto";
 import { withTesis } from "../src/lib/tenant";
 import { RecordingTransport } from "../src/push/transports";
-import { ayar, ayarYaz, anlikYaz, bildirimler, cihazKaydet, GECIKEN, simdikiSessiz, tur } from "./lib/bildirim-fikstur";
-import { hesapKur, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi } from "./lib/test-ortam";
+import { ayar, ayarYaz, anlikYaz, bildirimler, cihazKaydet, GECIKEN, simdikiSessiz, tur, type BildirimSatiri } from "./lib/bildirim-fikstur";
+import { api, hesapKur, kontrol, ortamKur, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi } from "./lib/test-ortam";
 
 const OZET_SIPARIS = ["bulut:ozet:oku", "bulut:siparis:oku"];
 const DAY = 86_400_000;
@@ -73,6 +74,25 @@ async function main(): Promise<void> {
     o.saat.ilerlet(25 * 60_000);
     const s3 = await tur(o, k.tesisId, t);
     kontrol("§2d ⭐ pozitif: bitişten sonra gider", s3.sent === 1 && t.sent.length === 3, JSON.stringify(s3));
+    // Saha 2026-11-18: sessiz saati sonradan KAPATAN kişinin ertelenmiş bildirimi eski ertelemeyle beklememeli.
+    const tq = new RecordingTransport();
+    o.saat.ilerlet(DAY);
+    await ayarYaz(o, a, ayar({ sessiz: simdikiSessiz(o.saat.simdi(), 120) }));
+    const e1 = await tur(o, k.tesisId, tq);
+    await ayarYaz(o, a, ayar());
+    const e2 = await tur(o, k.tesisId, tq);
+    kontrol("§2e ⭐ ertelendikten sonra sessiz saat kapatılınca hemen gider (eski erteleme beklenmez)", e1.deferred === 1 && e2.sent === 1 && tq.sent.length === 1, JSON.stringify({ e1, e2 }));
+    // Gönderim anında okunmuş (panelde/telefonda görülmüş) satıra push GİTMEZ: ATLANDI · OKUNDU.
+    o.saat.ilerlet(DAY);
+    await ayarYaz(o, a, ayar({ sessiz: simdikiSessiz(o.saat.simdi(), 30) }));
+    const o1 = await tur(o, k.tesisId, tq);
+    const okunacak = (await bildirimler(o, k.tesisId)).at(-1)! as BildirimSatiri & { id: string };
+    const okundu = await api(o, "POST", `/api/bildirimler/${okunacak.id}/okundu`, { belirtec: a.belirtec, govde: {} });
+    o.saat.ilerlet(35 * 60_000);
+    const o2 = await tur(o, k.tesisId, tq);
+    const okunan = (await bildirimler(o, k.tesisId)).find((n) => (n as BildirimSatiri & { id: string }).id === okunacak.id)!;
+    kontrol("§2f ⭐ ertelenmişken okunan bildirim gönderilmez (ATLANDI · OKUNDU)", o1.deferred === 1 && okundu.status === 200 && o2.sent === 0 && okunan.status === "ATLANDI" && okunan.skipReason === "OKUNDU" && tq.sent.length === 1, JSON.stringify({ o1, ok: okundu.status, o2, s: okunan.status, r: okunan.skipReason }));
+    await ayarYaz(o, a, ayar());
 
     console.log("\n§3 kapalı tür / bildirim yok");
     o.saat.ilerlet(DAY);

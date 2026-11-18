@@ -51,6 +51,21 @@ describe("bildirim listesi — okundu", () => {
     expect(screen.queryByTestId(`bildirim-yeni-${ID1}`)).toBeNull();
   });
 
+  it("⭐ gönderim anında okunmuş satır (ATLANDI · OKUNDU) rozeti 'Okundu', nedeni yazılır; düz atlanan 'Atlandı'", () => {
+    mockList.data = {
+      kayitlar: [
+        { ...item(ID1, "2026-11-18T00:30:00.000Z"), durum: "ATLANDI", atlamaNedeni: "OKUNDU" },
+        { ...item(ID2, null), durum: "ATLANDI", atlamaNedeni: "CIHAZ_YOK" },
+      ],
+      sonraki: null,
+      okunmamis: 0,
+    };
+    render(<NotificationHistory />);
+    expect(screen.getByTestId(`bildirim-durum-${ID1}`).props.accessibilityLabel).toBe("Durum: Okundu");
+    expect(screen.getByText(/önceden okunduğu için telefona gönderilmedi/)).toBeTruthy();
+    expect(screen.getByTestId(`bildirim-durum-${ID2}`).props.accessibilityLabel).toBe("Durum: Atlandı");
+  });
+
   it("okunmuş satıra dokunmak okundu ucunu çağırmaz", async () => {
     mockList.data = { kayitlar: [item(ID2, "2026-11-17T10:00:00.000Z", "/siparisler")], sonraki: null, okunmamis: 0 };
     render(<NotificationHistory />);

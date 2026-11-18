@@ -100,17 +100,33 @@ export async function requestFactoryPreferences(ctx: CloudContext, s: SessionCon
   return getSettingsView(ctx, s, webPushKey);
 }
 
+/**
+ * Ayar değişince sessiz saate ERTELENMİŞ satırlar (`BEKLIYOR` ∧ deneme hakkı yanmamış ∧ vadesi ileride) şimdiye
+ * çekilir; gönderici kuralı YENİ ayarla yeniden verir (hâlâ sessizse yine erteler). Saha 2026-11-18: sessiz saati
+ * kapatan kişinin bildirimi eski ertelemeyle sabahı bekliyordu. Yeniden deneme bekleyen (deneme > 0) satıra
+ * dokunulmaz. `accountId` null = tesis varsayılanı değişti (bütün hesaplar).
+ */
+export async function recheckDeferred(tx: Tx, tesisId: string, accountId: string | null, nowMs: number): Promise<number> {
+  const now = new Date(nowMs);
+  const r = await tx.notification.updateMany({
+    where: { tesisId, ...(accountId ? { accountId } : {}), status: "BEKLIYOR", attempts: 0, nextAttemptAt: { gt: now } },
+    data: { nextAttemptAt: now },
+  });
+  return r.count;
+}
+
 const json = (v: NotificationSettings | null) => (v === null ? Prisma.DbNull : (v as unknown as Prisma.InputJsonValue));
 
 /** Hesabın kendi ayarı (null = tesis varsayılanına dön). Tam yerine koyma: tekrarı aynı sonuç. */
 export async function setOwnSettings(ctx: CloudContext, s: SessionContext, settings: NotificationSettings | null, webPushKey: string | null): Promise<NotificationSettingsView> {
-  await withTesis(ctx.app, { tesisId: s.tesisId }, (tx) =>
-    tx.notificationPreference.upsert({
+  await withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => {
+    await tx.notificationPreference.upsert({
       where: { tesisId_accountId: { tesisId: s.tesisId, accountId: s.accountId } },
       create: { tesisId: s.tesisId, accountId: s.accountId, settings: json(settings) },
       update: { settings: json(settings) },
-    }),
-  );
+    });
+    await recheckDeferred(tx, s.tesisId, s.accountId, ctx.now());
+  });
   await recordAudit(ctx.app, { tesisId: s.tesisId, actor: accountActor(s.accountId), event: "BILDIRIM_AYARI", entity: "NotificationPreference", entityId: s.accountId, summary: { varsayilanaDon: settings === null } });
   return getSettingsView(ctx, s, webPushKey);
 }
@@ -119,9 +135,10 @@ export async function setOwnSettings(ctx: CloudContext, s: SessionContext, setti
 export async function setFacilityDefaults(ctx: CloudContext, s: SessionContext, settings: NotificationSettings, webPushKey: string | null): Promise<NotificationSettingsView> {
   if (!s.permissions.has("bulut:hesap:yonet")) throw forbidden();
   const data = settings as unknown as Prisma.InputJsonValue;
-  await withTesis(ctx.app, { tesisId: s.tesisId }, (tx) =>
-    tx.notificationDefaults.upsert({ where: { tesisId: s.tesisId }, create: { tesisId: s.tesisId, settings: data, updatedById: s.accountId }, update: { settings: data, updatedById: s.accountId } }),
-  );
+  await withTesis(ctx.app, { tesisId: s.tesisId }, async (tx) => {
+    await tx.notificationDefaults.upsert({ where: { tesisId: s.tesisId }, create: { tesisId: s.tesisId, settings: data, updatedById: s.accountId }, update: { settings: data, updatedById: s.accountId } });
+    await recheckDeferred(tx, s.tesisId, null, ctx.now());
+  });
   await recordAudit(ctx.app, { tesisId: s.tesisId, actor: accountActor(s.accountId), event: "BILDIRIM_TESIS_VARSAYILANI", entity: "NotificationDefaults", entityId: s.tesisId });
   return getSettingsView(ctx, s, webPushKey);
 }
