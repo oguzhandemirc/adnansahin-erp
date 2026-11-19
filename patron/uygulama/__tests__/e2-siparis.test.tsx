@@ -330,6 +330,8 @@ describe("§7 P6 sipariş araması + görünüm süzgeci (modal)", () => {
     for (const o of LIST_SEARCH.siparis!.suzgec!.secenekler) {
       const id = `siparis-suzgec-secici-ana-${o.deger}`;
       if (o.alan === "gecikmis") expect(screen.queryByTestId(id)).toBeNull(); // gecikme görünümü çizilmez
+      // Ters eşitlik ("İptaller hariç") yalnız `suzgecDegerleri` beyan eden bulutta (bu sunucu beyan etmiyor → 400 olurdu).
+      else if (o.degil) expect(screen.queryByTestId(id)).toBeNull();
       else expect(screen.getByTestId(id)).toBeTruthy();
     }
     view.unmount();
