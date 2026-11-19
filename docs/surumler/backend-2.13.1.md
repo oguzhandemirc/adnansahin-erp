@@ -1,8 +1,8 @@
 # Backend `2.13.1`
 
-**Paket:** `(paketleme yazar)`
-**SHA256:** `(paketleme yazar)`
-**Commit:** `(paketleme yazar)`
+**Paket:** `tekserp-backend-20261119_030133-a7237270.zip`
+**SHA256:** `AC877DD18771BF734C705122DB450F87D7AA76246572787209D023D39D98448E`
+**Commit:** `a7237270`
 **İçerik:** 2.13.0 paketinin bütün içeriği + bildirim metinlerinde miktar (saha kusuru 2026-11-18) + patron telefonuna giden anlıklarda yeni alanlar (Ek — patron verisi, 2026-11-19). Panel kodunda değişiklik yok.
 **Önceki saha sürümü:** **2.13.0** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.13.0 ve 371 migration olduğunu ÖLÇER — farklıysa DUR).
 
