@@ -1,6 +1,6 @@
 // ÖRNEK VERİ — yalnız geliştirme önizlemesi (`kapi.ts`). Bütün adlar açıkça uydurmadır ("Örnek", "Deneme",
 // "Numune"…); gerçek müşteri/kişi adı YOKTUR. Tel şekli uygulamanın okuyucularıyla aynı (savunmalı okunur).
-import { LIST_SORT, type CustomerSummary, type CustomerSummaryPeriod, type CustomerSummaryPeriodCounts, type CustomerSummaryResponse, type FacilityStatus, type LoginResponse, type ProjectionRecord } from "../api/wire";
+import { LIST_SEARCH, LIST_SORT, type CustomerSummary, type CustomerSummaryPeriod, type CustomerSummaryPeriodCounts, type CustomerSummaryResponse, type FacilityStatus, type LoginResponse, type ProjectionRecord } from "../api/wire";
 
 const GUN = 86_400_000;
 const once = (gun: number, saat = 0): string => new Date(Date.now() - gun * GUN - saat * 3_600_000).toISOString();
@@ -37,6 +37,8 @@ export function ornekOturum(): FacilityStatus {
       aranabilir: ["cari-kart", "siparis", "sevkiyat", "is-emri"],
       siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])),
       uyelikSuzgecleri: { cariKartId: ["is-emri"], siparisId: ["is-emri"], fasonFirmaId: ["is-emri"] },
+      // Yeni bulut gibi: her listenin tanıdığı `?suzgec=` değerleri (ör. "İptaller hariç").
+      suzgecDegerleri: Object.fromEntries(Object.entries(LIST_SEARCH).map(([p, s]) => [p, [...(s.suzgec?.secenekler ?? []), ...(s.ekSuzgecler ?? []).flatMap((g) => g.secenekler)].map((o) => o.deger)])),
     },
     simdiGuncelle: true,
   };

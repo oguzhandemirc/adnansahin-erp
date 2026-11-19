@@ -40,7 +40,8 @@ function listele(projeksiyon: string, q: Query | undefined) {
   const secenekler = [...(spec?.suzgec?.secenekler ?? []), ...(spec?.ekSuzgecler ?? []).flatMap((g) => g.secenekler)];
   for (const d of typeof q?.suzgec === "string" ? q.suzgec.split(",") : []) {
     const opt = secenekler.find((o) => o.deger === d);
-    if (opt) kayitlar = kayitlar.filter((r) => (r.kayit as Record<string, unknown>)[opt.alan] === opt.esit);
+    // `degil`: ters eşitlik (bulut `IS DISTINCT FROM`; alanı taşımayan kayıt da girer).
+    if (opt) kayitlar = kayitlar.filter((r) => ((r.kayit as Record<string, unknown>)[opt.alan] === opt.esit) !== !!opt.degil);
   }
   const alanlar = spec?.alanlar ?? ["ad"];
   if (ara) kayitlar = kayitlar.filter((r) => alanlar.some((a) => String((r.kayit as Record<string, unknown>)[a] ?? "").toLocaleLowerCase("tr").includes(ara)));
