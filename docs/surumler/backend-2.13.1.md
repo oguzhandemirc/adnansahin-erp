@@ -46,7 +46,7 @@ Metin varlığın durum tablosundan okunur; sipariş yaratma kodu DEĞİŞMEDİ.
 ## 5. Kurulum notu
 
 - **Beklenen kesinti:** ≈ 70 sn (migration yok).
-- **KURULUM SIRASI:** ÖNCE patron bulutu imajı (Ek — patron verisi, D maddesi + cari özeti yanıtı), SONRA bu paket; eski bulut yeni alanları zararsız saklar (bkz. Ek), ters sıra da veri bozmaz.
+- **KURULUM SIRASI:** ÖNCE patron bulutu imajı (Ek — patron verisi, D maddesi + cari özeti yanıtı), SONRA bu paket. Sıra ZORUNLU: paket `sevkiyat-icerigi` projeksiyonunu da gönderir (b937033f) ve bu adı tanımayan eski bulut imajı onu reddeder, eşitleme turları kısmi düşer (ölçüldü 2026-11-19: canlı imaj a735a107, bf4fe196'yı içermiyor). Bulut geri alınırsa fabrika da 2.13.0'a geri alınır. Öteki yeni alanları eski bulut zararsız saklar (bkz. Ek).
 - **Kurulum yöntemi:** 2.13.0 ile aynı (paketin kendi `kur.ps1` + `uzaktan-kos.ps1`i).
 - **Bu sürüme özel:** yeni ayar anahtarı yok; `.env`e DOKUNMAZ; `notifications.enabled` değeri korunur.
 - **Sınırlar (her sürümde geçerli):** `migrate reset`/reseed/DB drop YOK · uygulanmış migration'a dokunma ·
@@ -55,7 +55,7 @@ Metin varlığın durum tablosundan okunur; sipariş yaratma kodu DEĞİŞMEDİ.
 
 ## 6. Geri alma
 
-`kur.ps1 -GeriAl` 2.13.0'ı geri koyar; bildirim metinleri yeniden miktarsız olur, başka fark yok.
+`kur.ps1 -GeriAl` 2.13.0'ı geri koyar (uzaktan, görev üzerinden koşumda onay sorusu asılı kaldığı için çalışan biçim `-GeriAl -Zorla`dır — provada ölçüldü 2026-11-19: 16 sn, kesinti 5 sn; §5'teki "birlikte kullanma" yasağı elle, etkileşimli koşum içindir); bildirim metinleri yeniden miktarsız olur, başka fark yok.
 
 ## 7. Doğrulama — kurulumdan sonra rapor edilecekler
 
