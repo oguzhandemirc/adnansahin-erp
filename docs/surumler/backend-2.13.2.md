@@ -172,3 +172,12 @@ müdahale edebilmeliyiz" — sonradan "Paylaştır"a basmadan.
   `clientToken` replay aynı kaydı döndürür, paylaştırma/defter ikinci kez yazılmaz.
 - **Açık:** Düzenle (`PUT /work-orders/:id`) yolu `orderLineAllocations[].allocatedQty`yi hâlâ doğrulamadan yazar; panel
   orada miktar göndermez. [bekçi: test_workorder_order_allocation §12]
+
+### Ek — aynı gecenin bulut imajı: Cariler sıralaması (fabrika paketi DEĞİŞMEDİ)
+
+Bu backend paketi (`202cdc65`) aynen kalır; aynı kurulumda geçilecek bulut imajı `adnan-patron:ed9d4a8cc664` olur
+(önceki aday `a340068c5225` kurulmaz). İmaj yalnız uygulama API'sine Cariler sütun sıralamasını ekler (`1ac6a7c6`): rol ve
+durum fabrikanın mevcut bayraklarından (`musteriRolu`·`tedarikciRolu`·`fasonRolu`, `aktif`), sevk yönü, kayıt tarihi ve
+kişisel alt satırdan yetkili/telefon — ikincisi yalnız kişisel izinli hesaba beyan edilir, izinsize 403. Bulut hesap
+yapmaz, yeni alan/projeksiyon ve bulut göçü YOK; fabrika gönderdiği alanları değiştirmez. Uygulama (`ed9d4a8c`) başlığı
+yalnız bulut alanı beyan ediyorsa açar (eski bulutta kapalı). [bekçi: patron/sunucu test_veri_tablosu §1g–§3m]
