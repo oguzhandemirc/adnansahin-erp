@@ -1,63 +1,64 @@
 // Konum listesi ("Üretimdeki toplar nerede?" satırına dokununca): o konumdaki AÇIK iş emirleri — Müşteri · Kumaş/renk ·
-// Top · Metre · Sipariş · Gündür. Süzme SUNUCUDA (`is-emri` aşama süzgeci; boyahane firmasında `fasonFirmaId` üyelik
-// süzgeci — beyan yoksa parametre gönderilmez ve not düşülür). Top/metre o konumun `asamaTop` satırıdır (fabrikanın
-// sayısı); gün yalnız boyahanede (gönderimden bu yana, renksiz). "Sipariş" iş emrinin siparişidir: ilk no "+N",
-// bağsızsa "Siparişsiz (stok)". Telefonda iki satırlı kart, geniş ekranda (≥ 600) tam sütunlu tablo.
+// Top · Metre · Sipariş · (Boyahane) · Gündür. Kapsam süzgeci SUNUCUDA (`is-emri` aşama süzgeci; boyahane firmasında
+// `fasonFirmaId` üyelik süzgeci — beyan yoksa parametre gönderilmez ve not düşülür). Top/metre o konumun `asamaTop`
+// satırıdır (fabrikanın sayısı); gün yalnız boyahanede (gönderimden bu yana, renksiz). "Sipariş" iş emrinin siparişidir:
+// ilk no "+N", bağsızsa "Siparişsiz (stok)".
+// 2026-11-20 (kullanıcı kuralı: her veri tablosunda sütun seçimi + arama + süzgeç + başlıktan sıralama): liste BÜTÜN
+// sayfalarıyla yüklenir (`useTumListe`, Fason ekranıyla aynı) ve ortak yerel tabloyla çizilir — küme tam olduğundan
+// sıralama/süzme istemcide doğrudur. Her genişlikte TABLO (iki satırlı kart kalktı: "liste = tablo"); sütun seçimi +
+// sıralama cihazda (`tablo.konum`), arama + süzgeç (Müşteri · Kumaş · Sipariş · Boyahane) bu açılışta.
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Text, useWindowDimensions, View } from "react-native";
+import { useMemo } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
 import type { ProjectionRecord } from "../../../src/api/wire";
 import { Screen } from "../../../src/ui/Frame";
 import { MODULE_ICON } from "../../../src/ui/icons";
 import { fasonFirmCell, locationRowText, type Kayit } from "../../../src/ui/is-emri/gorunum";
 import { openRecord } from "../../../src/ui/nav";
-import { BlokBasligi, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
+import { BlokBasligi } from "../../../src/ui/ortak";
+import { useTumListe } from "../../../src/ui/fason/useTumListe";
 import { useListCapability } from "../../../src/ui/siparis/capabilities";
 import { ListStates, StaleNote } from "../../../src/ui/siparis/parts";
-import { useRemoteList } from "../../../src/ui/siparis/useRemoteList";
-import type { SutunTanimi } from "../../../src/ui/tablo/model";
-import { TabloBasligi, TabloGovdesi, TabloSatiri } from "../../../src/ui/tablo/VeriTablosu";
-import { makeStyles } from "../../../src/ui/theme-context";
+import { useYerelTablo, YerelTablo } from "../../../src/ui/tablo/useYerelTablo";
+import type { YerelSutun } from "../../../src/ui/tablo/yerelTablo";
+import { makeStyles, useTokens } from "../../../src/ui/theme-context";
 import { space, typography } from "../../../src/ui/tokens";
 import { locationTitle, stageOfParams } from "../../../src/ui/uretim/nerede";
 
 type Param = { asama?: string; fasonFirmaId?: string; firma?: string };
+type Satir = { readonly id: string; readonly r: ProjectionRecord; readonly x: ReturnType<typeof locationRowText>; readonly firma: string };
 
 const k = (r: ProjectionRecord): Kayit => (typeof r.kayit === "object" && r.kayit !== null ? (r.kayit as Kayit) : {});
 const ASAMALAR = new Set(["KURSUN", "TAMBUR", "FASON"]);
-/** Tablonun tam sütunlu çizildiği genişlik (altında satır kartı). */
-const TABLO_MIN = 600;
-/** Sipariş no dar kartta tirede bölünmesin (U+2011 bölünmez tire). */
-const noBreak = (s: string) => s.replace(/-/g, "\u2011");
-/** Kartın alt yazısı: 1. satır kumaş · renk, 2. satır sipariş (müşteri yoksa başlıkta) · gün; boşsa tek satır. */
-const cardSecondLine = (x: { musteri: string; kumas: string; siparis: string; gun: string | null }): string => {
-  const alt = [x.musteri === "—" ? null : noBreak(x.siparis), x.gun].filter(Boolean).join(" · ");
-  return alt ? `${x.kumas}\n${alt}` : x.kumas;
-};
+
+/** Sütunlar (SAF): Boyahane yalnız firma seçilmemiş fason konumunda, Gündür yalnız fasonda. */
+export function konumSutunlari(fason: boolean, firmaSecili: boolean): YerelSutun<Satir>[] {
+  return [
+    { key: "musteri", baslik: "Müşteri", agirlik: 1.5, satir: 2, suzgec: true, hucre: (y) => y.x.musteri },
+    { key: "kumas", baslik: "Kumaş / renk", agirlik: 1.6, satir: 2, suzgec: true, hucre: (y) => y.x.kumas },
+    { key: "top", baslik: "Top", agirlik: 0.5, sayi: true, hucre: (y) => y.x.top },
+    { key: "metre", baslik: "Metre", agirlik: 0.75, sayi: true, hucre: (y) => y.x.metre },
+    { key: "siparis", baslik: "Sipariş", agirlik: 1.3, suzgec: true, hucre: (y) => y.x.siparis },
+    ...(fason && !firmaSecili ? [{ key: "firma", baslik: "Boyahane", agirlik: 1.2, suzgec: true as const, hucre: (y: Satir) => y.firma }] : []),
+    ...(fason ? [{ key: "gun", baslik: "Gündür", agirlik: 0.8, hucre: (y: Satir) => y.x.gun ?? "—" }] : []),
+  ];
+}
 
 export default function LocationWorkOrders() {
   const router = useRouter();
   const p = useLocalSearchParams<Param>();
   const cap = useListCapability();
-  const { width } = useWindowDimensions();
   const s = useStyles();
+  const t = useTokens();
   const asama = p.asama && ASAMALAR.has(p.asama) ? p.asama : undefined;
   const firmaBeyanli = cap.memberFilter("is-emri", "fasonFirmaId");
   const firma = p.fasonFirmaId && firmaBeyanli ? p.fasonFirmaId : undefined;
   const stage = stageOfParams({ asama, fasonFirmaId: p.fasonFirmaId });
   // Firma satırında aşama süzülmez: iş emrinin şu anki adımı başka olsa da topları o firmada olabilir.
-  const list = useRemoteList("is-emri", { suzgec: ["ACIK", firma ? undefined : asama].filter(Boolean).join(","), fasonFirmaId: firma });
-  const rows = list.items.map((r) => ({ r, x: locationRowText(k(r), stage) }));
-  const tablo = width >= TABLO_MIN;
-  const sutunlar: readonly SutunTanimi<(typeof rows)[number]>[] = [
-    { key: "musteri", baslik: "Müşteri", agirlik: 1.5, satir: 2, hucre: (y) => y.x.musteri },
-    { key: "kumas", baslik: "Kumaş / renk", agirlik: 1.6, satir: 2, hucre: (y) => y.x.kumas },
-    { key: "top", baslik: "Top", agirlik: 0.5, sayi: true, hucre: (y) => y.x.top },
-    { key: "metre", baslik: "Metre", agirlik: 0.75, sayi: true, hucre: (y) => y.x.metre },
-    { key: "siparis", baslik: "Sipariş", agirlik: 1.3, hucre: (y) => y.x.siparis },
-    ...(stage === "fason" && !p.fasonFirmaId ? [{ key: "firma", baslik: "Boyahane", agirlik: 1.2, hucre: (y: (typeof rows)[number]) => fasonFirmCell(k(y.r)) }] : []),
-    ...(stage === "fason" ? [{ key: "gun", baslik: "Gündür", agirlik: 0.8, hucre: (y: (typeof rows)[number]) => y.x.gun ?? "—" }] : []),
-  ];
-  const sayi = list.hasMore ? undefined : rows.length;
+  const list = useTumListe("is-emri", { suzgec: ["ACIK", firma ? undefined : asama].filter(Boolean).join(","), fasonFirmaId: firma }, true);
+  const rows = useMemo(() => list.items.map((r): Satir => ({ id: r.id, r, x: locationRowText(k(r), stage), firma: fasonFirmCell(k(r)) })), [list.items, stage]);
+  const sutunlar = useMemo(() => konumSutunlari(stage === "fason", !!p.fasonFirmaId), [stage, p.fasonFirmaId]);
+  const tablo = useYerelTablo({ anahtar: "tablo.konum", sutunlar, aramaIpucu: "Müşteri, kumaş, sipariş ara", testID: "konum-tablo", sayfa: 60 }, rows);
 
   return (
     <Screen
@@ -66,7 +67,6 @@ export default function LocationWorkOrders() {
       back
       onRefresh={list.reload}
       refreshing={list.refreshing}
-      onEndReached={list.loadMore}
       subtitle={
         <View style={{ gap: space.xs }}>
           {p.fasonFirmaId && !firmaBeyanli ? <Text style={s.not}>Bulut firma süzgecini henüz tanımıyor; boyahanedeki bütün iş emirleri gösteriliyor.</Text> : null}
@@ -74,40 +74,15 @@ export default function LocationWorkOrders() {
         </View>
       }
     >
-      {rows.length > 0 && tablo ? (
-        <View testID="konum-tablo">
-          <BlokBasligi baslik="Açık iş emirleri" sayi={sayi} />
-          <TabloBasligi testID="konum" sutunlar={sutunlar} siralama={null} siralanabilir={[]} onSirala={() => undefined} />
-          <TabloGovdesi testID="konum-govde">
-            {rows.map((y, i) => (
-              <TabloSatiri key={y.r.id} sutunlar={sutunlar} kayit={y} ayrac={i > 0} onPress={() => openRecord(router, "is-emri", y.r.id)} testID={`konum-${y.r.id}`} />
-            ))}
-          </TabloGovdesi>
-        </View>
-      ) : null}
-      {rows.length > 0 && !tablo ? (
-        <ListeBlogu baslik="Açık iş emirleri" sayi={sayi} testID="konum-liste">
-          {rows.map((y, i) => (
-            <ListeSatiri
-              key={y.r.id}
-              birincil={y.x.musteri === "—" ? y.x.siparis : y.x.musteri}
-              ikincil={cardSecondLine(y.x)}
-              ikiSatir
-              deger={`${y.x.metre} m`}
-              ayrac={i > 0}
-              ok={false}
-              onPress={() => openRecord(router, "is-emri", y.r.id)}
-              accessibilityLabel={[y.x.musteri, y.x.kumas, `${y.x.top} top`, `${y.x.metre} metre`, y.x.siparis, y.x.gun].filter(Boolean).join(", ")}
-              testID={`konum-${y.r.id}`}
-            />
-          ))}
-        </ListeBlogu>
-      ) : null}
-      <ListStates list={list} empty="Bu konumda açık iş emri yok" icon={MODULE_ICON.uretim.icon} iskeletSatir={4} testID="konum" />
+      {rows.length > 0 ? <BlokBasligi baslik="Açık iş emirleri" sayi={list.tam ? rows.length : undefined} /> : null}
+      <YerelTablo tablo={tablo} onPress={(y) => openRecord(router, "is-emri", y.id)} satirTestID={(y) => `konum-${y.id}`} />
+      {!list.tam && rows.length > 0 && !list.error ? <ActivityIndicator style={s.yukleniyor} color={t.color.primary} accessibilityLabel="Yükleniyor" testID="konum-yukleniyor" /> : null}
+      <ListStates list={{ ...list, hasMore: false, loadingMore: false }} empty="Bu konumda açık iş emri yok" icon={MODULE_ICON.uretim.icon} iskeletSatir={4} testID="konum" />
     </Screen>
   );
 }
 
 const useStyles = makeStyles((t) => ({
   not: { ...typography.footnote, color: t.color.textMuted },
+  yukleniyor: { minHeight: 44, marginVertical: space.s },
 }));
