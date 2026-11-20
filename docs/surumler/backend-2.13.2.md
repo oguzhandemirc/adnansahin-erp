@@ -59,8 +59,8 @@ kullanılmaz). Sevk partisinin tek okuyucusu `cloud-sync/packing-lot-facts.ts`.
   `cuval` ve `sevkiyat` listelerinin bulut arama/süzgeç beyanı (`LIST_SEARCH`) bu alanlara dayanmaz; değişmedi.
 - **Kurulum yöntemi:** 2.13.1 ile aynı (paketin kendi `kur.ps1` + `uzaktan-kos.ps1`i).
 - **Bu sürüme özel:** yeni ayar anahtarı yok; `.env`e DOKUNMAZ.
-- **İlk eşitleme turu:** iki katalog artışı (`cuval` 2, `sevkiyat-icerigi` 2) kurulumdan sonraki ilk turda bu iki
-  projeksiyonu bir kez TAM gönderir. `sevkiyat-icerigi` ağır satırdır (birim 100 kök); TAM gönderim saklama penceresindeki
+- **İlk eşitleme turu:** katalog sürümü artan HER projeksiyon kurulumdan sonraki ilk turda bir kez TAM gönderilir:
+  `cuval` 2, `sevkiyat-icerigi` 2, `is-emri` 5, `siparis-kalemi` 2 (Ek A7), `sevkiyat` 2 (Ek A5), `siparis` 5 (Ek A6). `sevkiyat-icerigi` ağır satırdır (birim 100 kök); TAM gönderim saklama penceresindeki
   sevkiyat sayısı kadar sürer — provada süre ölçülür.
 - **Sınırlar (her sürümde geçerli):** `migrate reset`/reseed/DB drop YOK · uygulanmış migration'a dokunma ·
   postgres/node süreçlerini `Stop-Process` ile durdurma · `C:\TeksERP\pgsql\bin` JUNCTION'dır, recursive SİLİNMEZ ·
@@ -79,3 +79,31 @@ bulut eski satırları bir sonraki değişikliğe kadar yeni alanlarla saklar �
 - uygulamada Çuvallar ekranında Parti sütunu (ör. `DNZ-084`) ve Parti süzgeci; sevkiyat ayrıntısında çuvalın partisi
 - `backend-err-*.log` (en yenisi) — yeni hata yok
 - ölçülen kesinti
+
+## 8. Ekler (aynı sürüm, migration yok, yalnız alan EKLEME)
+
+### Ek A7 — iş emrinden siparişe paylaştırma (`is-emri` 4 → 5, `siparis-kalemi` 1 → 2)
+
+Kullanıcı (2026-11-20): "telefonda siparişin tamamını görüyoruz, paylaştırılmış hâlini değil".
+
+- **Alan:** `is-emri.siparisPaylari: [{ siparisId, siparisNo, siparisKalemiId, musteriAdi, urunAdi, renkAdi,
+  siparisMetre, paylastirilanMetre (number|null), gosterilenMetre }]` — kalem başına bir öğe.
+  `siparis-kalemi.isEmriPaylari: [{ isEmriId, isEmriNo, paylastirilanMetre (number|null), gosterilenMetre }]`.
+  Mevcut `siparisMetre` (İE toplamı) DEĞİŞMEZ.
+- **Kaynak:** açık bağlar (`ACTIVE_ORDER_LINK`), küme ve sıra `WO_ORDER_LINKS_SELECT` ile aynı (`WO_ORDER_SHARES_SELECT`,
+  `cloud-sync/work-order-facts.ts`) → `siparisIdleri` ile aynı sıra. `siparisMetre` = kalemin `quantity`si;
+  `paylastirilanMetre` = `plannedQtyOf(allocatedQty)` (0 → null) — Tambur bağlamı `plannedQty` de artık bunu çağırır
+  (`tambur.service`, davranış aynı); `gosterilenMetre` = `orderLineDisplayQty` (tablet Tambur kuralının sunucu ikizi,
+  `order-link-allocation.helper`; bekçi mobil dosyasıyla aynı matriste eşitliği ölçer). Birim dönüşümü yok (MT dışı
+  kalemde paylaştırma zaten 0 → gösterilen = kalem miktarı).
+- **Değişiklik izleme:** paylaştırma yazımı `updateMany` ile bağ satırının `updatedAt`ini ilerletir (ölçüldü) →
+  `is-emri` `via(work_order_to_order_lines.workOrderId)` (zaten vardı) ve `siparis-kalemi`ne eklenen
+  `via(work_order_to_order_lines.orderLineId)`. Kalem ürün/renk adı değişince İE de yeniden gider (`WOS_OF_ITEMS/COLORS`
+  açık bağlı kalem yolu eklendi). İE numarası değişmediği için `isEmriPaylari` `work_orders` kaynağına bağlanmadı.
+- **Uyum:** bulut satırları şemasız jsonb saklar; yeni alanlar bulut imajı gerektirmez. Eski uygulama alanı görmezden
+  gelir; yeni uygulama alan yoksa (fabrika 2.13.1) sipariş metresine düşmelidir.
+- **Yük:** öğe başına ≈ 290 B (`siparisPaylari`), ≈ 120 B (`isEmriPaylari`); İE başına tipik 1–3 bağ → satır başına
+  ≲ 1 KB artış. Ek sorgu: `is-emri` türeticisinde yok (aynı bağ sorgusunun seçimi genişledi), `siparis-kalemi`
+  türeticisinde paket başına 1 `findMany`. TAM gönderim süresi provada ölçülür.
+- **Provada bakılacak:** paylaştırması olan bir İE'de telefon satırında `gosterilenMetre` = panel "Düzenle"deki metre;
+  panelden paylaştırmayı değiştirip bir sonraki turda İE ve kalem satırının yeniden geldiği.

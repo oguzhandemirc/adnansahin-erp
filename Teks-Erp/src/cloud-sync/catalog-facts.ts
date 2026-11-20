@@ -20,8 +20,11 @@ const WO_OF_ORDERS =
 
 const WOS_OF_CUSTOMERS =
   'SELECT DISTINCT l."workOrderId" AS root_id FROM "work_order_to_order_lines" l JOIN "order_lines" ol ON ol."id" = l."orderLineId" JOIN "orders" o ON o."id" = ol."orderId" WHERE o."customerId" = ANY($1::uuid[]) AND l."unlinkedAt" IS NULL';
-const WOS_OF_ITEMS = 'SELECT w."id" AS root_id FROM "work_orders" w WHERE w."targetItemId" = ANY($1::uuid[])';
-const WOS_OF_COLORS = 'SELECT w."id" AS root_id FROM "work_orders" w WHERE w."targetColorId" = ANY($1::uuid[])';
+// Hedef ürün/renk + (2.13.2, `siparisPaylari.urunAdi/renkAdi`) açık bağlı sipariş kaleminin ürünü/rengi.
+const woLinesOf = (col: string): string =>
+  `UNION SELECT l."workOrderId" AS root_id FROM "work_order_to_order_lines" l JOIN "order_lines" ol ON ol."id" = l."orderLineId" WHERE ol."${col}" = ANY($1::uuid[]) AND l."unlinkedAt" IS NULL`;
+const WOS_OF_ITEMS = `SELECT w."id" AS root_id FROM "work_orders" w WHERE w."targetItemId" = ANY($1::uuid[]) ${woLinesOf("itemId")}`;
+const WOS_OF_COLORS = `SELECT w."id" AS root_id FROM "work_orders" w WHERE w."targetColorId" = ANY($1::uuid[]) ${woLinesOf("colorId")}`;
 const WOS_OF_STATIONS = 'SELECT DISTINCT s."workOrderId" AS root_id FROM "work_order_steps" s WHERE s."stationId" = ANY($1::uuid[])';
 // Fason firma adı/kategorisi: firmada açık (iptalsiz, doğrudan sevk edilmemiş, kalanı kapanmamış) kalemi olan topların İE'leri.
 const rollsAtFirms = (firms: string): string =>
@@ -108,10 +111,14 @@ export const FACTS: readonly RecordProjection[] = [
       derived("acikMiktar", "helpers/order-line-scope.helper isActiveLine + isMeasuredLine: quantity − shippedQty (ölçülmeyen birimde null)", ["order_lines"]),
       derived("urunAdi", NAME_OF("Item"), ["items"]),
       derived("renkAdi", NAME_OF("Color"), ["colors"]),
+      // 2 (2.13.2): kalemi karşılayan iş emirleri — `is-emri.siparisPaylari`nin kalem tarafı (izin bulut:siparis:oku).
+      derived("isEmriPaylari", "work-order-facts shareMeters (order-link-allocation.helper plannedQtyOf + orderLineDisplayQty): ACTIVE_ORDER_LINK bağları, WO_ORDER_SHARES_SELECT sırası → {isEmriId, isEmriNo, paylastirilanMetre, gosterilenMetre}", ["work_order_to_order_lines", "work_orders"]),
     ],
     sources: [self("order_lines"), lookup("items", "id", LINES_OF_ITEMS, "ürün adı değişince kalemleri yeniden gider"),
-      lookup("colors", "id", LINES_OF_COLORS, "renk adı değişince kalemleri yeniden gider")],
-    deletion: "DAMGA", permission: "bulut:siparis:oku", retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 1,
+      lookup("colors", "id", LINES_OF_COLORS, "renk adı değişince kalemleri yeniden gider"),
+      via("work_order_to_order_lines", "orderLineId", "bağ/kopma/paylaştırma (`allocatedQty` updateMany updatedAt yazar); İE numarası değişmez")],
+    // 2 (2026-11-20, backend 2.13.2): `isEmriPaylari` EKLENDİ — sürüm artışı bir kez TAM gönderim ister.
+    deletion: "DAMGA", permission: "bulut:siparis:oku", retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 2,
   },
   {
     name: "sevkiyat", kind: "KAYIT", role: "OLGU", root: { table: "shipments", model: "Shipment" },
@@ -239,6 +246,9 @@ export const FACTS: readonly RecordProjection[] = [
       derived("fasonFirmaIdleri", "loadOpenFasonOfWorkOrders: AT_SUBCONTRACTOR topların açık kalemlerinin firmaları (tekil, sıralı)", ["subcontractor_dispatch_items", "subcontractor_dispatches", "rolls"]),
       // 4 (2026-11-19): YALNIZ EKLENDİ — "fason" satırının firma payı; toplamı asamaTop "fason" satırına eşit (bekçi).
       derived("fasonFirmaPayi", "work-order-facts loadRollStagesOfWorkOrders: asamaTop \"fason\" topları × topun outstandingItemOfOpenDispatch kaleminin firması (en son sevk) + firma kategori kodları; kalemsiz top fasonFirmaId null", ["rolls", "batches", "subcontractor_dispatch_items", "subcontractor_dispatches", "subcontractor_receipt_items", "subcontractor_receipts", "subcontractor_category_links", "subcontractor_categories"]),
+      // 5 (2026-11-20, backend 2.13.2): YALNIZ EKLENDİ — siparişe paylaştırılan metre (kullanıcı: "telefonda siparişin
+      // tamamını görüyoruz, paylaştırılmış hâlini değil"). `siparisMetre` DEĞİŞMEZ (paylaştırmadan okumaz).
+      derived("siparisPaylari", "work-order-facts orderSharesOf (WO_ORDER_SHARES_SELECT = WO_ORDER_LINKS_SELECT kümesi/sırası) + shareMeters: paylastirilanMetre = order-link-allocation.helper plannedQtyOf (Tambur plannedQty), gosterilenMetre = orderLineDisplayQty (tablet Tambur kuralı)", ["work_order_to_order_lines", "order_lines", "orders", "customers", "items", "colors"]),
     ],
     sources: [self("work_orders"),
       via("work_order_steps", "workOrderId"),
@@ -248,8 +258,8 @@ export const FACTS: readonly RecordProjection[] = [
       lookup("order_lines", "id", WO_OF_ORDER_LINES),
       lookup("orders", "id", WO_OF_ORDERS),
       lookup("customers", "id", WOS_OF_CUSTOMERS, "cari adı değişince açık bağlı iş emirleri yeniden gider"),
-      lookup("items", "id", WOS_OF_ITEMS, "ürün adı değişince iş emirleri yeniden gider"),
-      lookup("colors", "id", WOS_OF_COLORS, "renk adı değişince iş emirleri yeniden gider"),
+      lookup("items", "id", WOS_OF_ITEMS, "ürün adı değişince iş emirleri (hedef + açık bağlı kalem) yeniden gider"),
+      lookup("colors", "id", WOS_OF_COLORS, "renk adı değişince iş emirleri (hedef + açık bağlı kalem) yeniden gider"),
       lookup("stations", "id", WOS_OF_STATIONS, "istasyon türü/kalite yeteneği değişince aşama yeniden hesaplanır"),
       lookup("subcontractors", "id", WOS_OF_SUBCONTRACTORS, "fason firma adı değişince açık kalemli iş emirleri yeniden gider"),
       lookup("subcontractor_categories", "id", WOS_OF_SUBCONTRACTOR_CATEGORIES, "kategori adı değişince (küçük tablo, filigran indekssiz)")],
@@ -257,6 +267,7 @@ export const FACTS: readonly RecordProjection[] = [
     // 2 (2026-11-06): TAM gönderim; `cariKartIdleri` yalnız açık sipariş bağından (≤5), bağsız İE'de boş.
     // 3 (2026-11-13): patron İE ekranı alanları EKLENDİ (açık, kapanış, müşteri/sipariş, aşama, fason) — TAM gönderim.
     // 4 (2026-11-19, backend 2.13.1): `fasonFirmaPayi` EKLENDİ — sürüm artışı bir kez TAM gönderim ister.
-    retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 4,
+    // 5 (2026-11-20, backend 2.13.2): `siparisPaylari` EKLENDİ — aynı yol.
+    retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 5,
   },
 ];

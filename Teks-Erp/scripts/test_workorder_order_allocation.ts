@@ -14,13 +14,15 @@
 //  §8 Koparılan bağ toplamdan düşer
 //  §9 Klon (parti ayırma, orderMode=keep) paylaştırmayı taşımaz → 0
 //  §10 CANCELLED iş emri → 409 WO_PLAN_FROZEN
-//  §11 `shippedQty` · bulut `siparisMetre` (= `orderedMeters`, aynı türetme) + İE/sipariş bulut satırının tamamı önce-sonra AYNI
+//  §11 `shippedQty` · bulut `siparisMetre` (= `orderedMeters`, aynı türetme) + İE (`siparisPaylari` hariç)/sipariş bulut
+//      satırı önce-sonra AYNI; 2.13.2: `siparisPaylari` planlanan metresi Tambur `plannedQty` ile aynı (§11e)
 //
 // NEGATİF SONDALAR (2026-11-16, elle bozulup koşuldu, geri alındı):
 //  S1 helper'da `assertAllocationWithinBasisTx` içindeki `allocated.gt(basis)` → `false` → §2b/§7 kırmızı.
 //  S2 replace'teki `if (wanted === undefined) continue;` silinip `?? 0` geri kondu → §4 kırmızı.
 //  S3 tambur `plannedQty` yerine `Number(ol.quantity)` yazıldı → §5 kırmızı.
 //  S4 klonda `allocatedQty: 0` yerine kaynak miktarı kopyalandı → §9 kırmızı.
+//  S5 (2026-11-20) `shareMeters` paylastirilanMetre'yi `Number(allocatedQty)` ile yazdı (0 → 0, null değil) → §11e kırmızı.
 // =============================================================================
 import prisma from "../src/lib/prisma";
 import { WorkOrderService } from "../src/services/workorder.service";
@@ -116,7 +118,11 @@ async function main(): Promise<void> {
       const ie = await buildRecords(isEmriP, [wo], NOW);
       const sp = await buildRecords(siparisP, [orderIds[0]], NOW);
       const lines = await prisma.orderLine.findMany({ where: { id: { in: [L1, L2] } }, select: { id: true, shippedQty: true, quantity: true }, orderBy: { id: "asc" } });
-      return { ie: JSON.stringify(ie.rows.get("is-emri") ?? []), sp: JSON.stringify(sp.rows.get("siparis") ?? []), lines: JSON.stringify(lines) };
+      // 2.13.2: `siparisPaylari` paylaştırmayı BİLEREK taşır (kullanıcı isteği) — "aynen" karşılaştırması onun dışındaki alanlardır.
+      const ieRows = JSON.parse(JSON.stringify(ie.rows.get("is-emri") ?? [])) as Array<Record<string, unknown>>;
+      const paylar = ieRows.map((r) => r.siparisPaylari);
+      const ieRest = ieRows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== "siparisPaylari")));
+      return { ie: JSON.stringify(ieRest), paylar, sp: JSON.stringify(sp.rows.get("siparis") ?? []), lines: JSON.stringify(lines) };
     };
 
     // ── §1 tavan ──
@@ -210,9 +216,20 @@ async function main(): Promise<void> {
     await link.unlinkOrderLine(wo, L3, ADMIN);
     const after = await shot();
     check("§11a sipariş satırı miktar + shippedQty aynen", before.lines === after.lines);
-    check("§11b bulut is-emri satırı (siparisMetre dahil) aynen", before.ie === after.ie, before.ie === after.ie ? "" : `${before.ie.slice(0, 300)} ≠ ${after.ie.slice(0, 300)}`);
+    check("§11b bulut is-emri satırı (siparisMetre dahil; siparisPaylari HARİÇ) aynen", before.ie === after.ie, before.ie === after.ie ? "" : `${before.ie.slice(0, 300)} ≠ ${after.ie.slice(0, 300)}`);
     check("§11c bulut siparis satırı aynen", before.sp === after.sp);
-    check("§11d bulut yükünde paylaştırma alanı YOK", !/allocat|paylast/i.test(after.ie + after.sp));
+    check("§11d paylaştırma YALNIZ is-emri.siparisPaylari'nda (sipariş satırında ve İE'nin diğer alanlarında yok)", !/allocat|paylast/i.test(after.ie + after.sp));
+    // 2.13.2: bulutun planlanan metresi Tambur bağlamının `plannedQty`siyle AYNI (tek tanım `plannedQtyOf`).
+    const ctx11 = await tambur.getTamburContext(card.barcode, { allowEmptyStep: true });
+    const tamburLines = ctx11.data.orders.flatMap((o) => o.lines) as { lineId: string; orderedQty: number; plannedQty: number | null }[];
+    const cloudPay = ((after.paylar[0] ?? []) as Array<{ siparisKalemiId: string; siparisMetre: number; paylastirilanMetre: number | null }>);
+    const payDiff = tamburLines.filter((t) => {
+      const c = cloudPay.find((x) => x.siparisKalemiId === t.lineId);
+      return !c || c.paylastirilanMetre !== t.plannedQty || c.siparisMetre !== t.orderedQty;
+    });
+    check("§11e bulut siparisPaylari.paylastirilanMetre/siparisMetre = Tambur plannedQty/orderedQty (her satır)",
+      tamburLines.length >= 2 && cloudPay.length === tamburLines.length && payDiff.length === 0 && cloudPay.some((c) => c.paylastirilanMetre === 800) && cloudPay.some((c) => c.paylastirilanMetre === null),
+      JSON.stringify(cloudPay));
 
     // ── §9 klon ──
     console.log("\n§9 Klon");

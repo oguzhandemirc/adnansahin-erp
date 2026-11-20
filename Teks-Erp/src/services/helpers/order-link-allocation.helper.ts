@@ -3,7 +3,8 @@
 // =============================================================================
 // Paylaştırma yalnız PLANDIR: açık bağ satırının `allocatedQty` kolonunda durur.
 // Top↔sipariş bağı YARATMAZ; `SackAllocation`, `OrderLine.shippedQty`, iş emri
-// `orderedMeters` ve patron bulutu `siparisMetre` bundan OKUNMAZ.
+// `orderedMeters` ve patron bulutu `siparisMetre` bundan OKUNMAZ. Bulut yalnız
+// gösterim için `siparisPaylari`/`isEmriPaylari` taşır (2.13.2, `plannedQtyOf`).
 //
 // Kurallar (kullanıcı kararı 2026-11-16):
 //   • Tavan = iş emrine giren ham metre (`computeWoInput`); top yoksa `targetQuantity`;
@@ -56,6 +57,26 @@ export interface AllocationEntry {
 
 const D = (v: Prisma.Decimal.Value): Prisma.Decimal => new Prisma.Decimal(v);
 const fmt = (d: Prisma.Decimal): string => `${Number(d.toDecimalPlaces(3)).toLocaleString("tr-TR")} m`;
+
+/**
+ * Bağın PLANLANAN metresi (okuma yüzü, tek tanım): `allocatedQty` > 0 ise o, 0 = paylaştırma yok → null.
+ * Tambur bağlamı `plannedQty` ve patron bulutu `paylastirilanMetre` bunu çağırır.
+ */
+export function plannedQtyOf(allocatedQty: Prisma.Decimal.Value | null | undefined): number | null {
+  const n = allocatedQty == null ? 0 : Number(allocatedQty);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Ön planda gösterilecek metre — tablet Tambur kuralının (`mobil/src/screens/Modules/Tambur/orderLineDisplayQty.ts`)
+ * SUNUCU İKİZİ; iki tanımın eşitliğini `test_patron_bulut_is_emri` aynı matriste ölçer. Planlanan > 0 ise o,
+ * yoksa siparişin metresi (negatif/boş → 0).
+ */
+export function orderLineDisplayQty(line: { orderedQty: number; plannedQty: number | null | undefined }): { qty: number; planned: boolean } {
+  const planned = line.plannedQty;
+  if (typeof planned === "number" && Number.isFinite(planned) && planned > 0) return { qty: planned, planned: true };
+  return { qty: Math.max(0, line.orderedQty || 0), planned: false };
+}
 
 /** Paylaştırma tavanı — tek tanım. */
 export async function readAllocationBasis(

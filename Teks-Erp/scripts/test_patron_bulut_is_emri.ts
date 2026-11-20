@@ -1,5 +1,5 @@
 // =============================================================================
-// BEKÇİ — PATRON BULUTU İŞ EMRİ SATIRI (`is-emri` katalog 3) + `fason-acik` kırılımı
+// BEKÇİ — PATRON BULUTU İŞ EMRİ SATIRI (`is-emri` katalog 5) + `fason-acik` kırılımı + kalem `isEmriPaylari`
 // Çalıştır: npx tsx scripts/run-all-tests.ts test_patron_bulut_is_emri
 // =============================================================================
 //  §1 Katalog: yeni alanlar türetilmiş olarak var, sürüm 3, finans sözcüğü yok; yeni ad/fason kaynakları değişiklik
@@ -16,15 +16,25 @@
 //  S3 `primaryWorkOrderOfRoll` yalnız `producedInStep`e daraltıldı (fason topunun müşterisi kayboldu) → 4 ✗ (§4).
 //  S4 (2026-11-19) firma payında açık kalemsiz fason topu atlandı → 2 ✗ (§2 null satırı + §3 toplam eşitliği).
 //  S5 (2026-11-19) her top ilk kalemin firmasına yazıldı → 1 ✗ (§2 firma başına pay).
+//  §5 (2.13.2, katalog 5) `siparisPaylari` + `siparis-kalemi.isEmriPaylari` (katalog 2): değer = bağ/paylaştırma eşitliği,
+//     gösterilen metre = tablet `orderLineDisplayQty` (mobil dosyası AYNI matriste koşulur), panelden Düzenle sonrası
+//     bağ satırının filigranı ilerler ve iki projeksiyonun değişiklik taraması kökü KİRLİ bulur.
+//  S6 (2026-11-20) `plannedQtyOf` `> 0` → `>= 0` (0 paylaştırma "planlı" sayıldı) → 2 ✗ (§5 siparisPaylari + isEmriPaylari null).
+//  S7 (2026-11-20) `siparis-kalemi` `via(work_order_to_order_lines)` kaynağı silindi → 2 ✗ (§1 kaynak + §5 Düzenle sonrası kalem kirli).
+//  S8 (2026-11-20) sunucu `orderLineDisplayQty` `> 0` → `>= 0` → 1 ✗ (§5 tablet ikizi matrisi, vaka {300, 0}).
 // =============================================================================
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { RollStatus } from "@prisma/client";
 import prisma from "../src/lib/prisma";
 import { findRecordProjection } from "../src/cloud-sync/projections";
 import { buildRecords } from "../src/cloud-sync/record-builder";
 import { buildSubcontractOpenData } from "../src/cloud-sync/snapshot-fason";
 import { seal } from "../src/cloud-sync/snapshots";
-import { mapToRoots } from "../src/cloud-sync/change-scan";
+import { collectProjectionChanges, mapToRoots, positionsAfterFull } from "../src/cloud-sync/change-scan";
+import type { StoredWatermark } from "../src/cloud-sync/watermarks";
+import { orderLineDisplayQty as serverDisplayQty } from "../src/services/helpers/order-link-allocation.helper";
+import { workOrderLinkService } from "../src/services/workorder-link.service";
 
 let pass = 0;
 let fail = 0;
@@ -95,7 +105,8 @@ async function setup() {
   await step(woB, 1, sTambur, "COMPLETED");
   const d1 = await step(woD, 1, sOtherQc, "PENDING");
   // Bağlar: önce O2 (C2) sonra O1 (C1) → bağlanma sırası C2, C1.
-  await prisma.workOrderToOrderLine.create({ data: { workOrderId: woA, orderLineId: o2.lineId, createdAt: new Date(now - 3 * DAY) } });
+  // O2 bağına 60 m paylaştırılmış (§5); O1 paylaştırmasız.
+  await prisma.workOrderToOrderLine.create({ data: { workOrderId: woA, orderLineId: o2.lineId, allocatedQty: 60, createdAt: new Date(now - 3 * DAY) } });
   await prisma.workOrderToOrderLine.create({ data: { workOrderId: woA, orderLineId: o1.lineId, createdAt: new Date(now - 1 * DAY) } });
   // Koparılmış bağ girmez.
   await prisma.workOrderToOrderLine.create({ data: { workOrderId: woD, orderLineId: o1.lineId, unlinkedAt: new Date() } });
@@ -213,10 +224,13 @@ async function main(): Promise<void> {
   console.log("\n§1 Katalog");
   const p = findRecordProjection("is-emri")!;
   const NEW = ["acik", "kapanisTarihi", "musteriAdi", "musteriAdlari", "siparisIdleri", "siparisNolari", "urunAdi", "renkAdi", "asama", "asamaTop",
-    "topSayisi", "metre", "fasonFirmaId", "fasonFirmaAdi", "fasonKategoriler", "fasonGonderim", "fasonFirmaIdleri", "fasonFirmaPayi"];
+    "topSayisi", "metre", "fasonFirmaId", "fasonFirmaAdi", "fasonKategoriler", "fasonGonderim", "fasonFirmaIdleri", "fasonFirmaPayi", "siparisPaylari"];
   const wires = p.derived.map((d) => d.wire);
-  check("yeni alanların hepsi türetilmiş olarak var; eskiler duruyor", [...NEW, "cariKartIdleri", "aktifIstasyonId", "uretilenMetre"].every((w) => wires.includes(w)), wires.join(","));
-  check("katalog sürümü 4 (fasonFirmaPayi eki)", p.catalogVersion === 4, `${p.catalogVersion}`);
+  check("yeni alanların hepsi türetilmiş olarak var; eskiler duruyor", [...NEW, "cariKartIdleri", "aktifIstasyonId", "uretilenMetre", "siparisMetre"].every((w) => wires.includes(w)), wires.join(","));
+  check("katalog sürümü 5 (siparisPaylari eki)", p.catalogVersion === 5, `${p.catalogVersion}`);
+  const kp = findRecordProjection("siparis-kalemi")!;
+  check("siparis-kalemi katalog 2 + isEmriPaylari türevi + bağ kaynağı (orderLineId)", kp.catalogVersion === 2 && kp.derived.some((d) => d.wire === "isEmriPaylari") &&
+    kp.sources.some((s) => s.table === "work_order_to_order_lines" && s.root.kind === "column" && s.root.column === "orderLineId"), `${kp.catalogVersion}`);
   check("finans sözcüğü yok", !wires.some((w) => FINANCE.test(w)));
   const srcTables = new Set(p.sources.map((s) => s.table));
   const needSrc = ["rolls", "customers", "items", "colors", "stations", "subcontractors", "subcontractor_categories", "orders", "work_order_to_order_lines"];
@@ -268,6 +282,53 @@ async function main(): Promise<void> {
       ]), j(A.fasonFirmaPayi));
     check("fasonFirmaPayi: açık kalemi olmayan fason topu null firma satırında (toplam kaybolmaz)",
       j(D.fasonFirmaPayi) === j([{ fasonFirmaId: null, kategoriKodlari: [], top: 1, metre: 12.5 }]) && j(D.asamaTop) === j([{ anahtar: "fason", top: 1, metre: 12.5 }]), `${j(D.fasonFirmaPayi)} ${j(D.asamaTop)}`);
+
+    console.log("\n§5 Siparişe paylaştırma (siparisPaylari · isEmriPaylari)");
+    const pay = (siparisId: string, no: string, kalemId: string, musteri: string, siparisMetre: number, paylastirilanMetre: number | null, gosterilenMetre: number) =>
+      ({ siparisId, siparisNo: `${S}${no}`, siparisKalemiId: kalemId, musteriAdi: `${S}Müşteri ${musteri}`, urunAdi: `${S}Kumaş`, renkAdi: `${S}Renk`, siparisMetre, paylastirilanMetre, gosterilenMetre });
+    check("siparisPaylari: bağlanma sırası (O2, O1); O2 paylaştırılan 60 → gösterilen 60; O1 paylaştırmasız → null, gösterilen sipariş metresi 100",
+      j(A.siparisPaylari) === j([pay(fxIds.o2.orderId, "O2", fxIds.o2.lineId, "C2", 100, 60, 60), pay(fxIds.o1.orderId, "O1", fxIds.o1.lineId, "C1", 100, null, 100)]), j(A.siparisPaylari));
+    check("siparisPaylari: koparılmış bağ girmez; siparisMetre (İE toplamı) paylaştırmadan okunmaz (200)", j(D.siparisPaylari) === "[]" && Number(A.siparisMetre) === 200, `${j(D.siparisPaylari)} ${String(A.siparisMetre)}`);
+    const kp5 = findRecordProjection("siparis-kalemi")!;
+    const kalemRows = async () => new Map(asRows((await buildRecords(kp5, [fxIds.o1.lineId, fxIds.o2.lineId], Date.now())).rows.get("siparis-kalemi")).map((r) => [r.id, r]));
+    let kr = await kalemRows();
+    check("isEmriPaylari: O2 kalemi ← İE A 60/60; O1 kalemi ← İE A null/100 (koparılmış D bağı yok)",
+      j(kr.get(fxIds.o2.lineId)?.isEmriPaylari) === j([{ isEmriId: fxIds.woA, isEmriNo: `${S}A`, paylastirilanMetre: 60, gosterilenMetre: 60 }]) &&
+      j(kr.get(fxIds.o1.lineId)?.isEmriPaylari) === j([{ isEmriId: fxIds.woA, isEmriNo: `${S}A`, paylastirilanMetre: null, gosterilenMetre: 100 }]),
+      `${j(kr.get(fxIds.o2.lineId)?.isEmriPaylari)} ${j(kr.get(fxIds.o1.lineId)?.isEmriPaylari)}`);
+
+    // Tablet kuralı ile sunucu ikizi AYNI matriste (mobil dosyası tip-yalnız içe aktarım taşır; tsx çalışma anında yükler).
+    const mobilePath = path.join(__dirname, "..", "..", "mobil", "src", "screens", "Modules", "Tambur", "orderLineDisplayQty.ts");
+    const mobile = (await import(mobilePath)) as { orderLineDisplayQty: (l: { orderedQty: number; plannedQty?: number | null }) => { qty: number; planned: boolean } };
+    const matrix: Array<{ orderedQty: number; plannedQty: number | null }> = [
+      { orderedQty: 1000, plannedQty: 250 }, { orderedQty: 1000, plannedQty: null }, { orderedQty: 300, plannedQty: 0 },
+      { orderedQty: 300, plannedQty: -5 }, { orderedQty: 300, plannedQty: Number.NaN }, { orderedQty: -10, plannedQty: null },
+      { orderedQty: 0, plannedQty: 0.001 }, { orderedQty: 480.5, plannedQty: 1200 },
+    ];
+    const differs = matrix.filter((m) => j(mobile.orderLineDisplayQty(m)) !== j(serverDisplayQty(m)));
+    check(`gösterilen metre: sunucu ikizi tablet orderLineDisplayQty ile aynı (${matrix.length} vaka)`, differs.length === 0, j(differs));
+
+    // Panelden Düzenle (paylaştırma yazımı) → iş emri + kalem satırı yeniden gider.
+    const t0 = new Date();
+    const storedOf = (proj: typeof p): Map<string, StoredWatermark> =>
+      new Map(positionsAfterFull(proj, t0).map((w) => [w.source, { source: w.source, at: w.at ?? null, tie: w.tie ?? null, catalogVersion: null, digest: null, retentionFrom: null }]));
+    const storedIe = storedOf(p);
+    const storedKalem = storedOf(kp5);
+    await new Promise((r) => setTimeout(r, 15));
+    await workOrderLinkService.setOrderLinkAllocations(fxIds.woA, [{ orderLineId: fxIds.o1.lineId, allocatedQty: 25 }]);
+    const linkRow = await prisma.workOrderToOrderLine.findFirstOrThrow({ where: { workOrderId: fxIds.woA, orderLineId: fxIds.o1.lineId, unlinkedAt: null }, select: { updatedAt: true, allocatedQty: true } });
+    check("Düzenle: bağ satırının filigranı (updatedAt) ilerler", linkRow.updatedAt > t0 && Number(linkRow.allocatedQty) === 25, linkRow.updatedAt.toISOString());
+    const h1 = new Date(Date.now() + 1);
+    const chIe = await collectProjectionChanges(p, storedIe, h1);
+    const chKalem = await collectProjectionChanges(kp5, storedKalem, h1);
+    check("Düzenle: is-emri değişiklik taraması İE A'yı kirli bulur", chIe.dirty.has(fxIds.woA), [...chIe.dirty].length.toString());
+    check("Düzenle: siparis-kalemi taraması O1 kalemini kirli bulur (O2 kalemi değişmedi → temiz)", chKalem.dirty.has(fxIds.o1.lineId) && !chKalem.dirty.has(fxIds.o2.lineId), j([...chKalem.dirty]));
+    const A2 = asRows((await buildRecords(p, [fxIds.woA], Date.now())).rows.get("is-emri"))[0]!;
+    kr = await kalemRows();
+    check("Düzenle sonrası değer: O1 payı 25/25, O2 aynen 60/60; siparisMetre aynen",
+      j(A2.siparisPaylari) === j([pay(fxIds.o2.orderId, "O2", fxIds.o2.lineId, "C2", 100, 60, 60), pay(fxIds.o1.orderId, "O1", fxIds.o1.lineId, "C1", 100, 25, 25)]) &&
+      j(kr.get(fxIds.o1.lineId)?.isEmriPaylari) === j([{ isEmriId: fxIds.woA, isEmriNo: `${S}A`, paylastirilanMetre: 25, gosterilenMetre: 25 }]) && Number(A2.siparisMetre) === 200,
+      j(A2.siparisPaylari));
 
     console.log("\n§3 Bağımsız SQL ↔ kurucu (DB'deki HER iş emri)");
     const allIds = (await prisma.workOrder.findMany({ select: { id: true } })).map((w) => w.id);

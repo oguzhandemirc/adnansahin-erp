@@ -17,6 +17,7 @@
 import { ACTIVE_OPERATION } from "./helpers/roll-operation.helper";
 import { ACTIVE_ROLL_PROPERTY, inheritRollPropertiesTx } from "./helpers/property-revoke.helper";
 import { ACTIVE_ORDER_LINK } from "./helpers/order-link.helper";
+import { plannedQtyOf } from "./helpers/order-link-allocation.helper";
 import { WAREHOUSE_STOCK_STATUSES } from "./helpers/warehouse-stock.helper";
 import { postStockMove, qtyYazilabilir } from "./helpers/warehouse-ledger.helper";
 import { postOpenFabricChildEntryTx } from "./helpers/production-entry-ledger.helper";
@@ -4061,7 +4062,7 @@ export class TamburService {
         width: ol.width !== null ? Number(ol.width) : null,
         orderedQty: Number(ol.quantity),
         // Sunucu hesaplar: 0 = paylaştırma yok → null (istemci hesaplamaz).
-        plannedQty: Number(link.allocatedQty) > 0 ? Number(link.allocatedQty) : null,
+        plannedQty: plannedQtyOf(link.allocatedQty),
         cutNote: ol.cutNote ?? null,
         pieceLengthM: ol.pieceLengthM !== null ? Number(ol.pieceLengthM) : null,
         requiredProperties: ol.requiredProperties.map((rp) => ({

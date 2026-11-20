@@ -15,7 +15,7 @@ import { deriveOrderUretim, type Uretim } from "../services/helpers/order-nerede
 import { loadNeredeContext, placesOf, rollsOfOrder, type NeredeLoad, type NeredeLoadRow } from "../services/helpers/order-nerede-load.helper";
 import {
   isOpenWorkOrderStatus, loadCloseDates, loadOpenFasonOfWorkOrders, loadRollStagesOfWorkOrders, metreNumber, NO_FASON,
-  STAGE_STATION_SELECT, uretimStepName, workOrderStage, WO_ORDER_LINKS_SELECT,
+  orderSharesOf, shareMeters, STAGE_STATION_SELECT, uretimStepName, workOrderStage, WO_ORDER_SHARES_SELECT,
 } from "./work-order-facts";
 import { shipmentContentDerived } from "./shipment-content";
 import { loadPackingLots, partiOf } from "./packing-lot-facts";
@@ -114,9 +114,23 @@ async function orderDerived(rows: readonly RawRow[], nowMs: number): Promise<Der
 async function orderLineDerived(rows: readonly RawRow[]): Promise<DerivedValues> {
   const items = await displayNames("item", rows.map((r) => r.itemId));
   const colors = await displayNames("color", rows.map((r) => r.colorId));
+  // 2 (2.13.2): kalemi karşılayan iş emirleri — `is-emri.siparisPaylari` ile aynı bağ kümesi/sırası ve metre üçlüsü.
+  const links = await prisma.workOrderToOrderLine.findMany({
+    where: { orderLineId: { in: ids(rows) }, ...ACTIVE_ORDER_LINK },
+    orderBy: WO_ORDER_SHARES_SELECT.orderBy,
+    select: { orderLineId: true, workOrderId: true, allocatedQty: true, workOrder: { select: { workOrderNumber: true } } },
+  });
+  const qtyOf = new Map(rows.map((r) => [r.id, r.quantity as Prisma.Decimal.Value]));
+  const sharesOf = new Map<string, Array<{ isEmriId: string; isEmriNo: string; paylastirilanMetre: number | null; gosterilenMetre: number }>>();
+  for (const l of links) {
+    const m = shareMeters(qtyOf.get(l.orderLineId) ?? 0, l.allocatedQty);
+    const arr = sharesOf.get(l.orderLineId) ?? [];
+    arr.push({ isEmriId: l.workOrderId, isEmriNo: l.workOrder.workOrderNumber, paylastirilanMetre: m.paylastirilanMetre, gosterilenMetre: m.gosterilenMetre });
+    sharesOf.set(l.orderLineId, arr);
+  }
   const out: DerivedValues = new Map();
   for (const r of rows) {
-    const names = { urunAdi: items.get(r.itemId as string) ?? null, renkAdi: colors.get(r.colorId as string) ?? null };
+    const names = { urunAdi: items.get(r.itemId as string) ?? null, renkAdi: colors.get(r.colorId as string) ?? null, isEmriPaylari: sharesOf.get(r.id) ?? [] };
     const line = { cancelledAt: r.cancelledAt as Date | null, unit: r.unit as ItemUnit };
     if (!isMeasuredLine(line)) {
       out.set(r.id, { acikMiktar: null, ...names });
@@ -207,7 +221,8 @@ async function workOrderDerived(rows: readonly RawRow[]): Promise<DerivedValues>
         orderBy: { stepSequence: "asc" },
       },
       // Seçim liste ekranıyla aynı (`WO_LIST_ORDER_CUSTOMER`); aktif bağ yüklemi tek kaynaktan (koparılmış bağ girmez).
-      orderLinks: { where: ACTIVE_ORDER_LINK, orderBy: WO_ORDER_LINKS_SELECT.orderBy, select: WO_ORDER_LINKS_SELECT.select },
+      // 2.13.2: `WO_ORDER_SHARES_SELECT` = aynı küme/sıra + kalem metresi, ürün/renk adı, `allocatedQty` (siparisPaylari).
+      orderLinks: { where: ACTIVE_ORDER_LINK, orderBy: WO_ORDER_SHARES_SELECT.orderBy, select: WO_ORDER_SHARES_SELECT.select },
     },
   });
   // Yöntem canlı dosyada `private`; dosyaya dokunmamak için öğe erişimiyle çağrılır (TS kaçışı, çalışma anı farkı yok).
@@ -249,6 +264,7 @@ async function workOrderDerived(rows: readonly RawRow[]): Promise<DerivedValues>
       metre: metreNumber(asamaTop.reduce((m, a) => m.plus(a.metre), D0())),
       ...(fason.get(w.id) ?? NO_FASON),
       fasonFirmaPayi: fasonShares.get(w.id) ?? [],
+      siparisPaylari: orderSharesOf(w.orderLinks),
     });
   }
   return out;

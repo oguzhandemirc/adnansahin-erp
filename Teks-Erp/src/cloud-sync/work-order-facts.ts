@@ -9,7 +9,8 @@ import { ACTIVE_ORDER_LINK } from "../services/helpers/order-link.helper";
 import { KURSUN_FLOW_STEP_WHERE, TAMBUR_FLOW_STEP_WHERE } from "../services/helpers/production-flow-where.helper";
 import { STEP_QUALITY_SELECT, stepCanApplyQuality } from "../services/helpers/quality-station.helper";
 import { OPEN_WORK_ORDER_STATUSES } from "../services/helpers/live-ref-where.helper";
-import { rollupWorkOrderCustomers, type WorkOrderCustomerRef } from "../services/helpers/work-order-customers.helper";
+import { rollupWorkOrderCustomers, sortLinksByLinkedAt, type WorkOrderCustomerRef } from "../services/helpers/work-order-customers.helper";
+import { orderLineDisplayQty, plannedQtyOf } from "../services/helpers/order-link-allocation.helper";
 import { whereRollsOfWorkOrders } from "../services/helpers/workorder-rolls.helper";
 
 /** Aşama kırılımının SABİT sırası (tel sözleşmesi). */
@@ -211,6 +212,51 @@ export const WO_ORDER_LINKS_SELECT = {
     orderLine: { select: { order: { select: { id: true, orderNumber: true, customer: { select: { id: true, name: true } } } } } },
   },
 } as const satisfies Prisma.WorkOrder$orderLinksArgs;
+
+/**
+ * 2.13.2 (`is-emri.siparisPaylari`): `WO_ORDER_LINKS_SELECT` ile AYNI bağ kümesi ve sıra; kalem kimliği/metresi,
+ * ürün/renk adı ve paylaştırılan metre (`allocatedQty`) eklenir. `siparisIdleri`/`siparisMetre` bundan etkilenmez.
+ */
+export const WO_ORDER_SHARES_SELECT = {
+  where: WO_ORDER_LINKS_SELECT.where,
+  orderBy: WO_ORDER_LINKS_SELECT.orderBy,
+  select: {
+    ...WO_ORDER_LINKS_SELECT.select,
+    allocatedQty: true,
+    orderLine: {
+      select: {
+        id: true, quantity: true, item: { select: { name: true } }, color: { select: { name: true } },
+        order: WO_ORDER_LINKS_SELECT.select.orderLine.select.order,
+      },
+    },
+  },
+} as const satisfies Prisma.WorkOrder$orderLinksArgs;
+
+/** `siparisPaylari` / `isEmriPaylari` ortak metre üçlüsü: planlanan (`plannedQtyOf`) + gösterilen (`orderLineDisplayQty`). */
+export function shareMeters(orderedQty: Prisma.Decimal.Value, allocatedQty: Prisma.Decimal.Value): { siparisMetre: number; paylastirilanMetre: number | null; gosterilenMetre: number } {
+  const siparisMetre = Number(orderedQty);
+  const paylastirilanMetre = plannedQtyOf(allocatedQty);
+  return { siparisMetre, paylastirilanMetre, gosterilenMetre: orderLineDisplayQty({ orderedQty: siparisMetre, plannedQty: paylastirilanMetre }).qty };
+}
+
+export interface SiparisPayi {
+  siparisId: string; siparisNo: string; siparisKalemiId: string; musteriAdi: string | null; urunAdi: string | null; renkAdi: string | null;
+  siparisMetre: number; paylastirilanMetre: number | null; gosterilenMetre: number;
+}
+type ShareLink = Prisma.WorkOrderToOrderLineGetPayload<{ select: typeof WO_ORDER_SHARES_SELECT.select }>;
+
+/** İE'nin etkin bağları → kalem başına pay (bağlanma sırası `sortLinksByLinkedAt`, `siparisIdleri` ile aynı). */
+export function orderSharesOf(links: readonly ShareLink[]): SiparisPayi[] {
+  return sortLinksByLinkedAt(links).map((l) => ({
+    siparisId: l.orderLine.order.id,
+    siparisNo: l.orderLine.order.orderNumber,
+    siparisKalemiId: l.orderLine.id,
+    musteriAdi: l.orderLine.order.customer?.name ?? null,
+    urunAdi: l.orderLine.item?.name ?? null,
+    renkAdi: l.orderLine.color?.name ?? null,
+    ...shareMeters(l.orderLine.quantity, l.allocatedQty),
+  }));
+}
 
 /** İE'nin müşterileri — `cariKartIdleri`/`musteriAdi` ile AYNI çözüm (`rollupWorkOrderCustomers`, bağlanma sırası, ≤5). */
 export async function loadWorkOrderCustomers(woIds: readonly string[]): Promise<Map<string, WorkOrderCustomerRef[]>> {
