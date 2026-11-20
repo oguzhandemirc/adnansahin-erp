@@ -11,7 +11,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useState } from "react";
 import { Animated, FlatList, Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { Tutamak, useAsagiCekKapat } from "../AsagiCekKapat";
+import { Tutamak, useAsagiCekKapat, type ListeBaglari } from "../AsagiCekKapat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { katla } from "../../ses/metin";
 import { haptic } from "../haptics";
@@ -43,7 +43,8 @@ export function SuzgecSayfasi(p: {
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
-  // Tutma çubuğu + başlıktan aşağı çekince kapanır (liste kaydırması bozulmaz).
+  // Aşağı çekince kapanır: tutma çubuğu + başlıktan her zaman, gövdeden o an görünen liste (alanlar · seçenekler ·
+  // tarih) en üstteyken; liste aşağıdaysa hareket kaydırmadır.
   const cek = useAsagiCekKapat(p.onClose, p.visible);
   const [taslak, setTaslak] = useState<Readonly<Record<string, string>>>({});
   const [alan, setAlan] = useState<string | null>(null);
@@ -72,9 +73,9 @@ export function SuzgecSayfasi(p: {
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={grup ? geri : p.onClose}>
       <View style={s.backdrop}>
         <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Vazgeç" testID={`${p.testID}-kapat`} />
-        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.m }]} accessibilityViewIsModal testID={p.testID}>
-          <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID={`${p.testID}-tutamak`} /></View>
-          <View style={s.head} {...cek.panHandlers}>
+        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.m }]} accessibilityViewIsModal testID={p.testID} {...cek.govde}>
+          <View {...cek.tutamak}><Tutamak onClose={p.onClose} testID={`${p.testID}-tutamak`} /></View>
+          <View style={s.head} {...cek.tutamak}>
             {grup ? (
               <Pressable onPress={geri} hitSlop={8} style={s.geri} accessibilityRole="button" accessibilityLabel="Alanlara dön" testID={`${p.testID}-geri`}>
                 <Ionicons name="chevron-back" size={24} color={t.tint} />
@@ -97,7 +98,7 @@ export function SuzgecSayfasi(p: {
           </View>
           {grup?.tur === "tarih" ? (
             <TarihSecenekleri
-              key={grup.anahtar} secili={gecerliDegerler(grup, taslak[grup.anahtar])[0]} testID={`${p.testID}-${grup.anahtar}`}
+              key={grup.anahtar} secili={gecerliDegerler(grup, taslak[grup.anahtar])[0]} testID={`${p.testID}-${grup.anahtar}`} liste={cek.liste}
               onSec={(v) => {
                 setTaslak((x) => suzgecAta(x, grup.anahtar, v ? [v] : []));
                 geri();
@@ -105,7 +106,7 @@ export function SuzgecSayfasi(p: {
             />
           ) : grup ? (
             <Secenekler
-              grup={grup} secili={gecerliDegerler(grup, taslak[grup.anahtar])} ara={ara} setAra={setAra} testID={p.testID}
+              grup={grup} secili={gecerliDegerler(grup, taslak[grup.anahtar])} ara={ara} setAra={setAra} testID={p.testID} liste={cek.liste}
               onSec={(xs) => {
                 setTaslak((x) => suzgecAta(x, grup.anahtar, xs));
                 // Tek seçimli alanda seçim yapılınca alan listesine dönülür (bir dokunuş az).
@@ -113,7 +114,7 @@ export function SuzgecSayfasi(p: {
               }}
             />
           ) : (
-            <ScrollView style={s.list} contentContainerStyle={s.listInner} testID={`${p.testID}-alanlar`}>
+            <ScrollView style={s.list} contentContainerStyle={s.listInner} testID={`${p.testID}-alanlar`} {...cek.liste}>
               {p.gruplar.map((g, i) => {
                 const ozet = secimOzeti(g, taslak[g.anahtar]);
                 const dolu = ozet !== "Tümü";
@@ -154,6 +155,8 @@ function Secenekler(p: {
   readonly setAra: (v: string) => void;
   readonly onSec: (xs: string[]) => void;
   readonly testID: string;
+  /** Sayfanın aşağı çekme kancasına kaydırma konumu (`useAsagiCekKapat`). */
+  readonly liste: ListeBaglari;
 }) {
   const t = useTokens();
   const s = useStyles();
@@ -179,6 +182,7 @@ function Secenekler(p: {
         initialNumToRender={20}
         windowSize={7}
         testID={`${p.testID}-${grup.anahtar}-liste`}
+        {...p.liste}
         ListHeaderComponent={p.ara.trim() ? null : (
           <SecenekSatiri etiket="Tümü" on={tumu} coklu={!!grup.coklu} onPress={() => p.onSec([])} testID={`${p.testID}-${grup.anahtar}-tumu`} />
         )}

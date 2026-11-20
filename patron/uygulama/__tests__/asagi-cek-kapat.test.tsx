@@ -6,9 +6,15 @@
 // §5 kaydedilmemiş formlu sayfalar (yeni cari, iki adımlı doğrulama) ÇEKİLMEZ (yanlışlıkla kapanıp yazılan silinmesin).
 // NEGATİF SONDA (2026-11-20, koşuldu, ısırdı): `kapanirMi` fiske koşulunu atınca §1; kancada `etkin` denetimi atılınca
 // §2b; Suzgec'te `useAsagiCekKapat` çağrısı onClose yerine boş işlevle kurulunca §3 kırmızı.
+// 2026-11-21 sayfanın HER YERİNDEN çekme: §6 saf gövde kararı (liste üstte + aşağı → başlar; liste aşağıda / yatay
+// baskın / yukarı / klavye açık → başlamaz) · §7 süzgeçte gövde çekmesi listenin kaydırma konumunu izler, tutamak her
+// zaman çeker, klavye açıkken gövde çekişi klavyeyi kapatır · §8 BEKÇİ: `<Modal` içeren her dosya kancaya bağlı
+// (gövde + dikey listesi varsa liste), istisnalar açık listede.
+// NEGATİF SONDA (2026-11-21, koşuldu, ısırdı): `govdeCekmesiBaslarMi`'den `listeUstte` atılınca §6 + §7; OzelAralik'ten
+// `{...cek.govde}` silinince §8 kırmızı.
 import { fireEvent, render, renderHook, screen } from "@testing-library/react-native";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import { PanResponder, type PanResponderCallbacks, type PanResponderGestureState } from "react-native";
 
 const mockList = jest.fn();
@@ -26,6 +32,8 @@ const { OzelRenkSayfasi } = require("../src/ui/gorunum/RenkSecici") as typeof im
 const { SesOnBilgi } = require("../src/ui/ses/SesOnBilgi") as typeof import("../src/ui/ses/SesOnBilgi");
 const { Picker } = require("../src/ui/Picker") as typeof import("../src/ui/Picker");
 const { KutuEkleSayfasi } = require("../src/ui/pano/Duzenleyici") as typeof import("../src/ui/pano/Duzenleyici");
+const { OzelAralikSayfasi } = require("../src/ui/cari/OzelAralik") as typeof import("../src/ui/cari/OzelAralik");
+const { Keyboard } = require("react-native") as typeof import("react-native");
 
 const g = (dy: number, vy = 0, dx = 0) => ({ dx, dy, vx: 0, vy, moveX: 0, moveY: 0, x0: 0, y0: 0, numberActiveTouches: 1, stateID: 1, _accountsForMovesUpTo: 0 }) as PanResponderGestureState;
 // PanResponder kurulumlarını yakala: her kanca bir kez kurar (useMemo).
@@ -88,6 +96,7 @@ describe("§3 alt sayfalar", () => {
     { ad: "tek seçim", tutamak: "cs-tutamak", kapat: "cs-kapat", ciz: (f) => <ChoiceSheet visible title="Dönem" choices={[{ key: "a", label: "A" }]} value="a" onSelect={jest.fn()} onClose={f} testIDPrefix="cs-" /> },
     { ad: "özel renk", tutamak: "ozel-renk-tutamak", ciz: (f) => <OzelRenkSayfasi visible baslangic="#123456" onClose={f} onSave={jest.fn()} /> },
     { ad: "ses ön bilgi", tutamak: "ses-onbilgi-tutamak", ciz: (f) => <SesOnBilgi visible onDevam={jest.fn()} onVazgec={f} /> },
+    { ad: "cari özel aralık", tutamak: "cari-ozel-tutamak", kapat: "cari-ozel-kapat", ciz: (f) => <OzelAralikSayfasi visible secili={null} onSec={jest.fn()} onClose={f} /> },
   ];
   it.each(SAYFALAR)("$ad: tutma çubuğu görünür ve 'Kapat'; çekme eşik üstünde kapatır, altında kapatmaz", ({ tutamak, ciz }) => {
     const onClose = jest.fn();
@@ -133,5 +142,119 @@ describe("§5 kaydedilmemiş formlu sayfalar çekilmez", () => {
   it.each(["src/ui/siparis/YeniCariSayfasi.tsx", "src/ui/IkiAdimliDogrulama.tsx"])("%s", (dosya) => {
     const s = readFileSync(join(__dirname, "..", dosya), "utf8");
     expect(s).not.toMatch(/allowSwipeDismissal|useAsagiCekKapat/);
+  });
+});
+
+describe("§6 saf gövde kararı", () => {
+  const d = (listeUstte: boolean, klavye = false) => ({ listeUstte, klavye });
+  it("liste en üstte + aşağı çekiş → başlar", () => {
+    expect(C.govdeCekmesiBaslarMi({ dx: 0, dy: 20 }, d(true))).toBe(true);
+  });
+  it("liste aşağıdayken başlamaz (hareket listenin kaydırmasıdır)", () => {
+    expect(C.govdeCekmesiBaslarMi({ dx: 0, dy: 20 }, d(false))).toBe(false);
+  });
+  it("yatay baskın (çip şeridi) başlamaz", () => {
+    expect(C.govdeCekmesiBaslarMi({ dx: 40, dy: 20 }, d(true))).toBe(false);
+  });
+  it("yukarı çekiş ve küçük hareket (dokunuş) başlamaz", () => {
+    expect(C.govdeCekmesiBaslarMi({ dx: 0, dy: -40 }, d(true))).toBe(false);
+    expect(C.govdeCekmesiBaslarMi({ dx: 0, dy: C.CEKME.baslangic }, d(true))).toBe(false);
+  });
+  it("klavye açıkken başlamaz", () => {
+    expect(C.govdeCekmesiBaslarMi({ dx: 0, dy: 20 }, d(true, true))).toBe(false);
+  });
+  it("kaydırma ≤ 0 (iOS üst taşması dahil) en üsttür", () => {
+    expect(C.listeUstteMi(0)).toBe(true);
+    expect(C.listeUstteMi(-12)).toBe(true);
+    expect(C.listeUstteMi(1)).toBe(false);
+  });
+});
+
+describe("§7 süzgeç: gövdeden çekme", () => {
+  const ciz = (onClose = jest.fn()) => {
+    render(<SuzgecSayfasi visible testID="sz" gruplar={[{ anahtar: "ana", etiket: "Durum", secenekler: [{ deger: "A", etiket: "A" }] }]} secim={{}} onUygula={jest.fn()} onClose={onClose} />);
+    // Kanca önce tutamak, sonra gövde yanıtlayıcısını kurar.
+    return { tutamak: kurulumlar[kurulumlar.length - 2]!, govde: kurulumlar[kurulumlar.length - 1]!, onClose };
+  };
+  const kaydir = (y: number) => fireEvent.scroll(screen.getByTestId("sz-alanlar"), { nativeEvent: { contentOffset: { x: 0, y } } });
+  it("liste üstteyken gövde çeker ve eşik üstünde kapatır; iOS sıçraması üstte kapalı", () => {
+    const { govde, onClose } = ciz();
+    expect(baslar(govde, 20)).toBe(true);
+    expect(screen.getByTestId("sz-alanlar").props.bounces).toBe(false);
+    birak(govde, C.CEKME.mesafe + 10);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+  it("liste aşağıdayken gövde çekmez, tutamak/başlık çeker; üste dönünce gövde yeniden çeker", () => {
+    const { govde, tutamak } = ciz();
+    kaydir(120);
+    expect(baslar(govde, 20)).toBe(false);
+    expect(baslar(tutamak, 20)).toBe(true);
+    expect(screen.getByTestId("sz-alanlar").props.bounces).toBe(true);
+    kaydir(0);
+    expect(baslar(govde, 20)).toBe(true);
+  });
+  it("yatay hareket gövdeyi çekmez", () => {
+    const { govde } = ciz();
+    expect(baslar(govde, 20, 60)).toBe(false);
+  });
+  it("seçenek listesine geçince yeni liste en üstte sayılır ve ona bağlıdır", () => {
+    const { govde } = ciz();
+    kaydir(200);
+    expect(baslar(govde, 20)).toBe(false);
+    fireEvent.press(screen.getByTestId("sz-alan-ana"));
+    expect(baslar(govde, 20)).toBe(true);
+    fireEvent.scroll(screen.getByTestId("sz-ana-liste"), { nativeEvent: { contentOffset: { x: 0, y: 80 }, contentSize: { width: 300, height: 2000 }, layoutMeasurement: { width: 300, height: 600 } } });
+    expect(baslar(govde, 20)).toBe(false);
+  });
+  it("klavye açıkken gövde çekişi klavyeyi kapatır, o hareket sayfayı taşımaz", () => {
+    const { govde, tutamak } = ciz();
+    const gorunur = jest.spyOn(Keyboard, "isVisible").mockReturnValue(true);
+    const kapat = jest.spyOn(Keyboard, "dismiss").mockImplementation(() => {});
+    expect(baslar(govde, 20)).toBe(false);
+    expect(kapat).toHaveBeenCalledTimes(1);
+    gorunur.mockReturnValue(false);
+    // Aynı hareket sürerken klavye kapandı: yine taşımaz.
+    expect(baslar(govde, 40)).toBe(false);
+    // Yeni dokunuş: çeker. Tutamak klavye açıkken de çeker.
+    govde.onStartShouldSetPanResponderCapture!(e, g(0));
+    expect(baslar(govde, 20)).toBe(true);
+    gorunur.mockReturnValue(true);
+    expect(baslar(tutamak, 20)).toBe(true);
+  });
+});
+
+describe("§8 BEKÇİ: her Modal aşağı çekme kancasına bağlı", () => {
+  // Bilerek bağlı OLMAYANLAR (gerekçesiyle). Yeni istisna buraya yazılmadan eklenemez.
+  const ISTISNA: Record<string, string> = {
+    "src/ui/siparis/YeniCariSayfasi.tsx": "kaydedilmemiş form: yanlış çekiş yazılanı siler",
+    "src/ui/IkiAdimliDogrulama.tsx": "kaydedilmemiş form: yanlış çekiş yazılanı siler",
+    "src/ui/Cekmece.tsx": "yandan açılan menü çekmecesi; sola kaydırma kapatır (KenarKaydirma)",
+    "src/ui/BaslikMenusu.tsx": "sağ üstte açılan küçük eylem menüsü, alt sayfa değil; perdeye dokunmak kapatır",
+  };
+  const kok = join(__dirname, "..");
+  const yuru = (dir: string): string[] => readdirSync(dir).flatMap((n) => {
+    const p = join(dir, n);
+    if (statSync(p).isDirectory()) return yuru(p);
+    return /\.tsx?$/.test(n) ? [p] : [];
+  });
+  const modalli = [...yuru(join(kok, "src")), ...yuru(join(kok, "app"))]
+    .filter((p) => /<Modal\b/.test(readFileSync(p, "utf8")))
+    .map((p) => relative(kok, p).split(sep).join("/"));
+  it("Modal dosyaları bulundu (tarama boş değil)", () => {
+    expect(modalli.length).toBeGreaterThanOrEqual(10);
+  });
+  it.each(modalli.filter((d) => !(d in ISTISNA)))("%s: kanca + gövde (+ dikey liste varsa liste)", (d) => {
+    const s = readFileSync(join(kok, d), "utf8");
+    expect(s).toMatch(/useAsagiCekKapat\(/);
+    expect(s).toMatch(/\{\.\.\.cek\.govde\}/);
+    const dikeyListe = s.split("\n").some((l) => /<FlatList\b/.test(l) || (/<ScrollView\b/.test(l) && !/\bhorizontal\b/.test(l)));
+    if (dikeyListe) expect(s).toMatch(/cek\.liste/);
+  });
+  it.each(Object.keys(ISTISNA))("istisna hâlâ geçerli (dosya var, Modal içeriyor): %s", (d) => {
+    expect(modalli).toContain(d);
+  });
+  it("liste alt bileşenleri kaydırma konumunu kancaya iletir (süzgeç seçenekleri · tarih)", () => {
+    expect(readFileSync(join(kok, "src/ui/tablo/Suzgec.tsx"), "utf8")).toMatch(/<FlatList[\s\S]*?\{\.\.\.p\.liste\}/);
+    expect(readFileSync(join(kok, "src/ui/tablo/TarihSuzgeci.tsx"), "utf8")).toMatch(/<ScrollView[^>]*\{\.\.\.p\.liste\}/);
   });
 });

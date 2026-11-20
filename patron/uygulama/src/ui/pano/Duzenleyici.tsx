@@ -90,19 +90,20 @@ export function KutuEkleSayfasi({ acik, katalog, ekli, onDegis, onKapat }: {
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
-  // Android: tutma çubuğu + başlıktan aşağı çekince kapanır (iOS'ta sistemin sayfa çekmesi).
+  // Android: aşağı çekince kapanır — tutma çubuğu + başlıktan her zaman, gövdeden liste en üstteyken (iOS'ta sistemin
+  // sayfa çekmesi; liste en üstteyken listeden çekiş de sayfayı kapatır).
   const cek = useAsagiCekKapat(onKapat, acik, !SISTEM_CEKMESI);
   return (
     <Modal visible={acik} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal={SISTEM_CEKMESI} onRequestClose={onKapat}>
-      <RNAnimated.View style={[s.sayfa, cek.kayma]} testID="kutu-ekle-sayfasi">
-        <View style={s.tutamakKabi} {...cek.panHandlers}><Tutamak onClose={onKapat} testID="kutu-ekle-tutamak" /></View>
-        <View style={s.sayfaBas} {...cek.panHandlers}>
+      <RNAnimated.View style={[s.sayfa, cek.kayma]} testID="kutu-ekle-sayfasi" {...cek.govde}>
+        <View style={s.tutamakKabi} {...cek.tutamak}><Tutamak onClose={onKapat} testID="kutu-ekle-tutamak" /></View>
+        <View style={s.sayfaBas} {...cek.tutamak}>
           <Text style={s.sayfaBaslik} accessibilityRole="header">Kutu ekle</Text>
           <Basilabilir onPress={onKapat} style={s.kapat} accessibilityRole="button" accessibilityLabel="Kapat" testID="kutu-ekle-kapat">
             <Text style={[s.kapatYazi, { color: t.color.link }]}>Bitti</Text>
           </Basilabilir>
         </View>
-        <ScrollView contentContainerStyle={[s.sayfaIc, { paddingBottom: insets.bottom + space.xl }]}>
+        <ScrollView contentContainerStyle={[s.sayfaIc, { paddingBottom: insets.bottom + space.xl }]} testID="kutu-ekle-liste" {...cek.liste}>
           {KUTU_GRUPLARI.map((g) => {
             const liste = katalog.filter((k) => k.grup === g);
             if (liste.length === 0) return null;

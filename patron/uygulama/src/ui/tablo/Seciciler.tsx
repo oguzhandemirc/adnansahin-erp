@@ -15,21 +15,21 @@ function AltSayfa(p: { visible: boolean; title: string; onClose: () => void; tes
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
-  // Tutma çubuğu + başlıktan aşağı çekince kapanır (liste kaydırması bozulmaz).
+  // Aşağı çekince kapanır: tutma çubuğu + başlıktan her zaman, gövdeden liste en üstteyken.
   const cek = useAsagiCekKapat(p.onClose, p.visible);
   return (
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={p.onClose}>
       <View style={s.backdrop}>
         <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Kapat" testID={`${p.testID}-kapat`} />
-        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID={p.testID}>
-          <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID={`${p.testID}-tutamak`} /></View>
-          <View style={s.head} {...cek.panHandlers}>
+        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID={p.testID} {...cek.govde}>
+          <View {...cek.tutamak}><Tutamak onClose={p.onClose} testID={`${p.testID}-tutamak`} /></View>
+          <View style={s.head} {...cek.tutamak}>
             <Text style={s.title} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{p.title}</Text>
             <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Bitti" style={({ pressed }) => [s.bitti, pressed && { opacity: BASMA.opaklik }]} testID={`${p.testID}-bitti`}>
               <Text style={[s.bittiYazi, { color: t.tint }]}>Bitti</Text>
             </Pressable>
           </View>
-          <ScrollView style={s.list} contentContainerStyle={s.listInner}>{p.children}</ScrollView>
+          <ScrollView style={s.list} contentContainerStyle={s.listInner} testID={`${p.testID}-liste`} {...cek.liste}>{p.children}</ScrollView>
           {p.alt}
         </Animated.View>
       </View>

@@ -80,9 +80,9 @@ export function OzelRenkSayfasi(p: { readonly visible: boolean; readonly baslang
     <Modal visible={p.visible} transparent animationType="slide" onRequestClose={p.onClose}>
       <View style={s.zemin}>
         <Pressable style={[s.ortu, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Kapat" />
-        <Animated.View style={[s.sayfa, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="ozel-renk-sayfasi">
-          <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID="ozel-renk-tutamak" /></View>
-          <View style={s.bas} {...cek.panHandlers}>
+        <Animated.View style={[s.sayfa, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="ozel-renk-sayfasi" {...cek.govde}>
+          <View {...cek.tutamak}><Tutamak onClose={p.onClose} testID="ozel-renk-tutamak" /></View>
+          <View style={s.bas} {...cek.tutamak}>
             <Text style={s.baslik} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>Özel renk</Text>
             <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" style={s.kapat} testID="ozel-renk-kapat">
               <Ionicons name="close" size={20} color={t.color.textMuted} />

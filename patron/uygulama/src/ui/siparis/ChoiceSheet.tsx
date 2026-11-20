@@ -26,21 +26,21 @@ export function ChoiceSheet<K extends string>(p: {
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
-  // Tutma çubuğu + başlıktan aşağı çekince kapanır (liste kaydırması bozulmaz).
+  // Aşağı çekince kapanır: tutma çubuğu + başlıktan her zaman, gövdeden liste en üstteyken.
   const cek = useAsagiCekKapat(p.onClose, p.visible);
   return (
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={p.onClose}>
       <View style={s.backdrop}>
         <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Kapat" testID={`${p.testIDPrefix}kapat`} />
-        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal>
-          <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID={`${p.testIDPrefix}tutamak`} /></View>
-          <View style={s.head} {...cek.panHandlers}>
+        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal {...cek.govde}>
+          <View {...cek.tutamak}><Tutamak onClose={p.onClose} testID={`${p.testIDPrefix}tutamak`} /></View>
+          <View style={s.head} {...cek.tutamak}>
             <Text style={s.title} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{p.title}</Text>
             <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" style={({ pressed }) => [s.close, pressed && { opacity: BASMA.opaklik }]}>
               <Ionicons name="close" size={20} color={t.textSecondary} />
             </Pressable>
           </View>
-          <ScrollView style={s.list} contentContainerStyle={s.listInner}>
+          <ScrollView style={s.list} contentContainerStyle={s.listInner} testID={`${p.testIDPrefix}liste`} {...cek.liste}>
             {p.choices.map((c, i) => {
               const on = c.key === p.value;
               return (

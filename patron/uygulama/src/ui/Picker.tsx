@@ -75,7 +75,8 @@ function Sheet(p: { label: string; projection: string; spec: ListSearchSpec | un
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
-  // Android: tutma çubuğu + başlıktan aşağı çekince kapanır (iOS'ta sistemin sayfa çekmesi).
+  // Android: aşağı çekince kapanır — tutma çubuğu + başlıktan her zaman, gövdeden liste en üstteyken (iOS'ta sistemin
+  // sayfa çekmesi; liste en üstteyken listeden çekiş de sayfayı kapatır).
   const cek = useAsagiCekKapat(p.onClose, true, !SISTEM_CEKMESI);
   const [term, setTerm] = useState("");
   const [filter, setFilter] = useState<string | null>(p.spec?.suzgec?.varsayilan ?? null);
@@ -83,10 +84,10 @@ function Sheet(p: { label: string; projection: string; spec: ListSearchSpec | un
   const list = useRemoteList(p.projection, { ara: ara || undefined, suzgec: filter ?? undefined });
   return (
     // iOS pageSheet durum çubuğunun ALTINDA açılır: üst güvenli alanı ikinci kez eklemek boş bir bant bırakıyordu.
-    <Animated.View style={[s.sheet, cek.kayma, { paddingTop: Platform.OS === "ios" ? space.xs : Math.max(insets.top, space.xs) }]}>
-      <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID="secici-tutamak" /></View>
+    <Animated.View style={[s.sheet, cek.kayma, { paddingTop: Platform.OS === "ios" ? space.xs : Math.max(insets.top, space.xs) }]} {...cek.govde}>
+      <View {...cek.tutamak}><Tutamak onClose={p.onClose} testID="secici-tutamak" /></View>
       <View style={s.inner}>
-        <View style={s.head} {...cek.panHandlers}>
+        <View style={s.head} {...cek.tutamak}>
           <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" testID="secici-kapat" style={({ pressed }) => [s.headBtn, pressed && { opacity: BASMA.opaklik }]}>
             <Text style={s.headBtnText}>Kapat</Text>
           </Pressable>
@@ -104,7 +105,7 @@ function Sheet(p: { label: string; projection: string; spec: ListSearchSpec | un
           </View>
         ) : null}
       </View>
-      <ScrollView contentContainerStyle={[s.inner, s.listPad, { paddingBottom: insets.bottom + space.xl }]} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[s.inner, s.listPad, { paddingBottom: insets.bottom + space.xl }]} keyboardShouldPersistTaps="handled" testID="secici-liste" {...cek.liste}>
         {list.items.length > 0 ? (
           <ListeBlogu>
             {list.items.map((r, i) => {

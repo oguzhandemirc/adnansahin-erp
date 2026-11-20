@@ -3,6 +3,7 @@
 // klavyeli iki kısa alan. Seçim taslaktır; Süzgeç sayfasının "Uygula"sı işler.
 import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
+import type { ListeBaglari } from "../AsagiCekKapat";
 import { Button, Field } from "../kit";
 import { makeStyles } from "../theme-context";
 import { space, typography } from "../tokens";
@@ -21,6 +22,8 @@ export function TarihSecenekleri(p: {
    * (fabrika açık uçlu aralık almaz). Varsayılan: süzgeç sayfasının bugünkü davranışı.
    */
   readonly yalnizAralik?: boolean;
+  /** Alt sayfanın aşağı çekme kancasına kaydırma konumu (`useAsagiCekKapat().liste`). */
+  readonly liste?: ListeBaglari;
 }) {
   const s = useStyles();
   const elle = p.secili ? ARALIK.exec(p.secili) : null;
@@ -39,7 +42,7 @@ export function TarihSecenekleri(p: {
     p.onSec(v);
   };
   return (
-    <ScrollView style={s.kap} contentContainerStyle={s.ic} keyboardShouldPersistTaps="handled" testID={`${p.testID}-tarih`}>
+    <ScrollView style={s.kap} contentContainerStyle={s.ic} keyboardShouldPersistTaps="handled" testID={`${p.testID}-tarih`} {...p.liste}>
       {p.yalnizAralik ? null : (
         <View style={s.liste}>
           <SecenekSatiri etiket="Tümü" on={!p.secili} coklu={false} onPress={() => p.onSec(null)} testID={`${p.testID}-tumu`} />

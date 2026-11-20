@@ -22,8 +22,8 @@ export function SesOnBilgi(p: { readonly visible: boolean; readonly onDevam: () 
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={p.onVazgec}>
       <View style={s.backdrop}>
         <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onVazgec} accessibilityRole="button" accessibilityLabel="Vazgeç" />
-        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="ses-onbilgi" {...cek.panHandlers}>
-          <Tutamak onClose={p.onVazgec} testID="ses-onbilgi-tutamak" />
+        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="ses-onbilgi" {...cek.govde}>
+          <View {...cek.tutamak}><Tutamak onClose={p.onVazgec} testID="ses-onbilgi-tutamak" /></View>
           <View style={s.head}>
             <View style={[s.ikon, { backgroundColor: t.tint }]}><Ionicons name="mic" size={22} color={t.onTint} /></View>
             <Text style={s.baslik} accessibilityRole="header">Sesle söyle</Text>

@@ -3,7 +3,7 @@
 // Seçenek yalnız üç beyan birden varsa çizilir (`customerRangeSupported`): eski bulut/fabrika ya da izinsiz hesapta yok.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Animated, Modal, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorMessage } from "../../api/client";
 import { createAttempt, runAttempt } from "../../api/attempt";
@@ -13,6 +13,7 @@ import { CUSTOMER_SUMMARY_KEY, customerRangeSupported, requestable } from "../..
 import { useSession } from "../../state/session";
 import { useRemote } from "../../state/useRemote";
 import { usePendingPoll } from "../raporlar/usePendingPoll";
+import { Tutamak, useAsagiCekKapat } from "../AsagiCekKapat";
 import { BASMA } from "../hareket/sabitler";
 import { TarihSecenekleri } from "../tablo/TarihSuzgeci";
 import { makeStyles, useTokens } from "../theme-context";
@@ -147,19 +148,22 @@ export function OzelAralikSayfasi({ visible, secili, onSec, onClose }: { visible
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
+  // Aşağı çekince kapanır: tutma çubuğu + başlıktan her zaman, gövdeden liste en üstteyken (klavye açıksa önce klavye).
+  const cek = useAsagiCekKapat(onClose, visible);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={s.backdrop}>
         <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Kapat" testID="cari-ozel-kapat" />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="cari-ozel-sayfa">
-          <View style={s.head}>
+        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="cari-ozel-sayfa" {...cek.govde}>
+          <View {...cek.tutamak}><Tutamak onClose={onClose} testID="cari-ozel-tutamak" /></View>
+          <View style={s.head} {...cek.tutamak}>
             <Text style={s.title} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>Özel aralık</Text>
             <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" style={({ pressed }) => [s.close, pressed && { opacity: BASMA.opaklik }]}>
               <Ionicons name="close" size={20} color={t.textSecondary} />
             </Pressable>
           </View>
           <TarihSecenekleri
-            yalnizAralik secili={secili ? `${secili.bas}..${secili.son}` : undefined} testID="cari-ozel"
+            yalnizAralik secili={secili ? `${secili.bas}..${secili.son}` : undefined} testID="cari-ozel" liste={cek.liste}
             onSec={(v) => {
               const a = aralikOku(v);
               if (!a) return;
@@ -167,7 +171,7 @@ export function OzelAralikSayfasi({ visible, secili, onSec, onClose }: { visible
               onClose();
             }}
           />
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -191,7 +195,7 @@ const useStyles = makeStyles((t) => ({
   backdrop: { flex: 1, justifyContent: "flex-end" as const },
   scrim: { position: "absolute" as const, top: 0, left: 0, right: 0, bottom: 0 },
   sheet: {
-    backgroundColor: t.surface, borderTopLeftRadius: t.radius.sheet, borderTopRightRadius: t.radius.sheet, paddingHorizontal: space.l, paddingTop: space.m,
+    backgroundColor: t.surface, borderTopLeftRadius: t.radius.sheet, borderTopRightRadius: t.radius.sheet, paddingHorizontal: space.l, paddingTop: space.s,
     maxHeight: "80%" as const, width: "100%" as const, maxWidth: 560, alignSelf: "center" as const, ...t.floatShadow,
   },
   head: { flexDirection: "row" as const, alignItems: "center" as const, minHeight: TOUCH },

@@ -3,8 +3,9 @@
 // önizlemesi alınamayan ek ad + boyutla; silinmiş ekte bağlantı İSTENMEZ, "Ek süresi dolduğu için silindi" yazar.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Modal, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Animated, Image, Modal, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAsagiCekKapat } from "../AsagiCekKapat";
 import type { DestekEk, DestekEkBaglantisi, DestekMesaj } from "../../api/destek-wire";
 import { boyutMetni, destekHataMetni, silinmisEkMetni } from "../../destek/metin";
 import { formatDateTime } from "../../lib/format";
@@ -43,14 +44,16 @@ function TamEkran({ ek, al, onKapat }: { readonly ek: DestekEk; readonly al: EkB
   const s = useStyles();
   const insets = useSafeAreaInsets();
   const { url, hata } = useEkBaglantisi(ek, "original", al, true);
+  // Görsel görüntüleyici alışkanlığı: görseli aşağı çekmek kapatır (kaydırması yok, bütün ekran çeker).
+  const cek = useAsagiCekKapat(onKapat, true);
   return (
     <Modal visible animationType="fade" onRequestClose={onKapat} supportedOrientations={["portrait", "landscape"]}>
-      <View style={s.tamEkran} testID="ek-tam-ekran">
+      <Animated.View style={[s.tamEkran, cek.kayma]} testID="ek-tam-ekran" {...cek.govde}>
         {url ? <Image source={{ uri: url }} style={s.tamGorsel} resizeMode="contain" accessibilityLabel={ek.name} /> : hata ? <Text style={s.tamHata}>{hata}</Text> : <ActivityIndicator color="white" />}
         <Pressable onPress={onKapat} accessibilityRole="button" accessibilityLabel="Kapat" hitSlop={12} style={[s.kapat, { top: insets.top + space.s }]} testID="ek-kapat">
           <Ionicons name="close" size={28} color="white" />
         </Pressable>
-      </View>
+      </Animated.View>
     </Modal>
   );
 }
