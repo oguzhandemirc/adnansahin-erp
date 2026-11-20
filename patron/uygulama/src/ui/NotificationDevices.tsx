@@ -13,7 +13,7 @@ import { safeRoute } from "../lib/notification-form";
 import { permissionView, readPermission, type PermissionState } from "../push/permission";
 import { registerThisDevice } from "../push/register";
 import { NATIVE_PUSH_SOON, pushAvailable } from "../push/support";
-import { BILDIRIM_ETIKETI, okunduSonucu, okunmamisAyarla, useBildirimOkunmamis } from "../state/bildirim-okunmamis";
+import { BILDIRIM_ETIKETI, okunduSonucu, okunmamisAyarla } from "../state/bildirim-okunmamis";
 import { useSession } from "../state/session";
 import { useRemote } from "../state/useRemote";
 import { GroupNote } from "./diger/parts";
@@ -187,8 +187,16 @@ export function NotificationHistory() {
   const readAll = useWrite(useCallback(() => api.notificationReadAll(), [api]));
   const items = list.data?.kayitlar ?? [];
   const unread = (n: NotificationItem) => isUnread(n) && !readHere.has(n.id);
-  const unreadCount = useBildirimOkunmamis();
-  const anyUnread = items.some(unread) || (unreadCount ?? 0) > 0;
+  // Liste açılınca okunmamışlar KENDİLİĞİNDEN okundu sayılır (kullanıcı kararı 2026-11-20: düğme yok, alışılmış yol).
+  // Eski bulut (`okunmamis` yok) → çağrı yok. Ekran başına bir kez; satır vurgusu liste yeniden çekilene dek kalır.
+  const otomatikOkundu = useRef(false);
+  const okunmamisVar = list.data?.okunmamis !== undefined && (list.data.okunmamis > 0 || items.some(isUnread));
+  const tumunuOku = readAll.run;
+  useEffect(() => {
+    if (!okunmamisVar || otomatikOkundu.current) return;
+    otomatikOkundu.current = true;
+    void tumunuOku("tumu").then((r) => { if (r) okunduSonucu(r); });
+  }, [okunmamisVar, tumunuOku]);
   const open = (n: NotificationItem, route: string | null) => {
     if (unread(n)) {
       setReadHere((x) => new Set([...x, n.id]));
@@ -196,23 +204,11 @@ export function NotificationHistory() {
     }
     if (route) router.push(route as never);
   };
-  const markAll = async () => {
-    const r = await readAll.run("tumu");
-    if (r) {
-      okunduSonucu(r);
-      setReadHere(new Set(items.map((n) => n.id)));
-    }
-  };
-  const allButton = anyUnread && list.data?.okunmamis !== undefined ? (
-    <Pressable onPress={() => void markAll()} disabled={readAll.busy} accessibilityRole="button" style={s.allRead} testID="bildirim-tumu-okundu">
-      <Text style={[s.allReadText, { color: t.color.link }]}>Tümünü okundu işaretle</Text>
-    </Pressable>
-  ) : undefined;
   return (
     <View>
       {list.data && items.length === 0 ? <BosDurum icon={EMPTY_ICON.bildirim} baslik="Henüz bildirim yok" /> : null}
       {items.length > 0 ? (
-        <ListeBlogu baslik="Son bildirimler" sag={allButton} ayracli testID="bildirim-gecmisi">
+        <ListeBlogu ayracli testID="bildirim-gecmisi">
           {items.map((n) => {
             const route = safeRoute(n.rota);
             const look = notificationKind(n.tur);
@@ -266,8 +262,6 @@ const useStyles = makeStyles((t) => ({
   dot: { width: 8, height: 8, borderRadius: 4 },
   histTitle: { ...typography.headline, color: t.color.text, flexShrink: 1 },
   unreadTitle: { fontWeight: "700" as const },
-  allRead: { minHeight: TOUCH, justifyContent: "center" as const, paddingHorizontal: space.xs },
-  allReadText: { ...typography.subhead, fontWeight: "600" as const },
   histBody: { ...typography.subhead, color: t.color.textMuted, marginTop: 2 },
   histMeta: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, marginTop: space.s, flexWrap: "wrap" as const },
   histTime: { ...typography.footnote, color: t.textMuted },

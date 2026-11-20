@@ -74,17 +74,23 @@ describe("bildirim listesi — okundu", () => {
     expect(mockPush).toHaveBeenCalledWith("/siparisler");
   });
 
-  it("⭐ 'Tümünü okundu say' yalnız okunmamış varken; basınca hepsi söner, sayaç sunucudan", async () => {
+  it("⭐ liste açılınca okunmamışlar kendiliğinden okundu sayılır (bir kez); düğme ve 'Son bildirimler' başlığı yok", async () => {
     mockReadAll.mockResolvedValue({ guncellenen: 1, okunmamis: 0 });
     mockList.data = { kayitlar: [item(ID1, null)], sonraki: null, okunmamis: 1 };
-    render(<NotificationHistory />);
-    await act(async () => fireEvent.press(screen.getByTestId("bildirim-tumu-okundu")));
+    const { rerender } = render(<NotificationHistory />);
+    await act(async () => undefined);
+    rerender(<NotificationHistory />);
+    await act(async () => undefined);
     expect(mockReadAll).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId(`bildirim-yeni-${ID1}`)).toBeNull();
     expect(screen.queryByTestId("bildirim-tumu-okundu")).toBeNull();
+    expect(screen.queryByText("Son bildirimler")).toBeNull();
+  });
+
+  it("okunmamış yokken okundu çağrısı gitmez", async () => {
     mockList.data = { kayitlar: [item(ID2, "2026-11-17T10:00:00.000Z")], sonraki: null, okunmamis: 0 };
     render(<NotificationHistory />);
-    expect(screen.queryByTestId("bildirim-tumu-okundu")).toBeNull();
+    await act(async () => undefined);
+    expect(mockReadAll).not.toHaveBeenCalled();
   });
 
   it("eski bulut (okunma/okunmamis yok): vurgu yok, düğme yok, okundu çağrısı yok", async () => {

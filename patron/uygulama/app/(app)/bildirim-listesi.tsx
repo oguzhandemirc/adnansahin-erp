@@ -1,5 +1,5 @@
 // Bildirimler — başlık zilinin açtığı SADE liste (saha isteği 2026-11-18): yalnız kişinin bildirimleri (okunmamış
-// vurgulu, "Tümünü okundu işaretle", satıra dokununca okundu + kayda git). Cihaz izni, tür, sessiz saat ve eşikler
+// vurgulu; liste açılınca hepsi okundu sayılır; satıra dokununca okundu + kayda git). Cihaz izni, tür, sessiz saat ve eşikler
 // "Bildirim Ayarları"nda kalır; buradan sağ üstteki "Ayarlar" bağlantısıyla gidilir.
 import { useRouter } from "expo-router";
 import { useCallback } from "react";
