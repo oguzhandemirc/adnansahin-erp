@@ -491,7 +491,15 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
     const sip = x.s.map((j) => ({ id: `s${j + 1}`, no: `SIP-2026-${String(451 - j).padStart(4, "0")}` }));
     const asamaTop = x.top.map(([anahtar, top, metre]) => ({ anahtar, top, metre }));
     const f = "f" in x ? x.f : null;
+    // 2.13.2 paylaştırma: siparişin ilk kalemine bağ; çok siparişli İE'de metre paylaştırılmış (300/500/…), tekte girilmemiş (null).
+    const siparisPaylari = sip.map((y, j) => {
+      const kl = kalem.find((r) => (r.kayit as { siparisId?: string }).siparisId === y.id)!;
+      const kk = kl.kayit as { miktar: number; urunAdi: string; renkAdi: string };
+      const pay = sip.length > 1 ? 300 + j * 200 : null;
+      return { siparisId: y.id, siparisNo: y.no, siparisKalemiId: kl.id, musteriAdi: c?.ad ?? null, urunAdi: kk.urunAdi, renkAdi: kk.renkAdi, siparisMetre: kk.miktar, paylastirilanMetre: pay, gosterilenMetre: pay ?? kk.miktar };
+    });
     return kayit(`w${i + 1}`, {
+      siparisPaylari,
       isEmriNo: `IE-2026-${String(318 - i).padStart(4, "0")}`,
       durum: x.asama === null ? "COMPLETED" : "IN_PROGRESS",
       tur: sip.length > 0 ? "ORDER_PRODUCTION" : "STOCK_PRODUCTION",
@@ -521,6 +529,13 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
       olusturulma: once(i * 4 + 8),
     });
   });
+  // Kalemin tarafı (`siparis-kalemi.isEmriPaylari`): aynı bağlar, iş emri sırasıyla.
+  for (const kl of kalem) {
+    const paylar = isEmri.flatMap((w) => ((w.kayit as { siparisPaylari: { siparisKalemiId: string; paylastirilanMetre: number | null; gosterilenMetre: number }[] }).siparisPaylari)
+      .filter((y) => y.siparisKalemiId === kl.id)
+      .map((y) => ({ isEmriId: w.id, isEmriNo: (w.kayit as { isEmriNo: string }).isEmriNo, paylastirilanMetre: y.paylastirilanMetre, gosterilenMetre: y.gosterilenMetre })));
+    (kl.kayit as Record<string, unknown>).isEmriPaylari = paylar;
+  }
   // İade: yalnız "Örnek Tekstil"de; biri iptal (storno) — sayıma girmez, listede "İptal" rozetiyle.
   const iade = [
     { no: "IA-2026-0042", urun: "Örnek Saten 280 cm", renk: "Krem", metre: "62.50", sebep: "Renk farkı", gun: 4 },

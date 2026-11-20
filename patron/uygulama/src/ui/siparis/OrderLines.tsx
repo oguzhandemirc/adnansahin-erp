@@ -1,13 +1,17 @@
 // Sipariş kalemleri: SUNUCU kimlik süzgeciyle (`siparisId`) okunan liste.
 // Süzgeç yalnız sunucu beyan ettiyse çağrılır (`useListCapability`); istemci listeyi süzmez, değerler fabrikadan.
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
+import { Text } from "react-native";
 import type { ProjectionRecord } from "../../api/wire";
 import { formatNumber, keepPhrases } from "../../lib/format";
 import { unitLabel } from "../../lib/labels/siparis";
 import { MODULE_ICON } from "../icons";
+import { isEmriPaylari, isEmriPayiMetni } from "../is-emri/paylar";
 import { ListeBlogu, ListeSatiri } from "../ortak";
 import { asObj, str } from "./OrderRow";
 import { ListStates } from "./parts";
+import { makeStyles } from "../theme-context";
+import { space, typography } from "../tokens";
 import { useRemoteList, type RemoteList } from "./useRemoteList";
 
 /** Ekranın aşağı çekip tazelemesi (`tick` artar) listeyi de yeniden okur; ilk değer okumaz (ilk yükleme kendiliğinden). */
@@ -51,6 +55,7 @@ export function useOrderLines(siparisId: string | null): RemoteList {
 }
 
 export function OrderLines({ list, tick = 0 }: { list: RemoteList; tick?: number }) {
+  const s = useStyles();
   useReloadOn(tick, list);
   return (
     <>
@@ -58,7 +63,16 @@ export function OrderLines({ list, tick = 0 }: { list: RemoteList; tick?: number
         <ListeBlogu baslik="Kalemler" sayi={list.hasMore ? undefined : list.items.length} testID="siparis-kalemleri">
           {list.items.map((r, i) => {
             const x = lineRowText(r);
-            return <ListeSatiri key={r.id} birincil={x.title} ikincil={x.subtitle ? keepPhrases(x.subtitle) : undefined} ikiSatir deger={x.value} ayrac={i > 0} accessibilityLabel={[x.title, x.subtitle, x.value].filter(Boolean).join(", ")} testID={`kalem-${r.id}`} />;
+            // 2.13.2: kalemi karşılayan iş emirleri ve fabrikanın metresi ("IE-…: bu iş emrinden 300 m"); alan yoksa satır yok.
+            const paylar = isEmriPaylari(asObj(r.kayit)) ?? [];
+            return (
+              <Fragment key={r.id}>
+                <ListeSatiri birincil={x.title} ikincil={x.subtitle ? keepPhrases(x.subtitle) : undefined} ikiSatir deger={x.value} ayrac={i > 0} accessibilityLabel={[x.title, x.subtitle, x.value].filter(Boolean).join(", ")} testID={`kalem-${r.id}`} />
+                {paylar.map((p, j) => (
+                  <Text key={`${p.isEmriId ?? p.isEmriNo}-${j}`} style={s.pay} numberOfLines={1} testID={`kalem-${r.id}-is-emri-${j}`}>{isEmriPayiMetni(p)}</Text>
+                ))}
+              </Fragment>
+            );
           })}
         </ListeBlogu>
       ) : null}
@@ -66,3 +80,7 @@ export function OrderLines({ list, tick = 0 }: { list: RemoteList; tick?: number
     </>
   );
 }
+
+const useStyles = makeStyles((t) => ({
+  pay: { ...typography.caption, color: t.color.textMuted, paddingLeft: space.l, paddingBottom: space.xs },
+}));

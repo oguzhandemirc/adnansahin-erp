@@ -13,6 +13,7 @@ import { useRemote } from "../../../src/state/useRemote";
 import { Screen } from "../../../src/ui/Frame";
 import { KademeliGiris } from "../../../src/ui/hareket";
 import { acik, asamaSayilari, detailRows, fasonFirmCell, fasonGunu, gunMetni, isEmriNo, kumasMetni, NO_ORDER_TEXT, siparisIdleri, siparisNolari, siparissiz, stageAmount, topMetreMetni, whereText, type Kayit } from "../../../src/ui/is-emri/gorunum";
+import { siparisPaylari, siparisPayiSatiri } from "../../../src/ui/is-emri/paylar";
 import { AcilirKart, HataDurumu, Iskelet, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
 import { StaleNote } from "../../../src/ui/siparis/parts";
 import { makeStyles } from "../../../src/ui/theme-context";
@@ -37,6 +38,9 @@ export default function WorkOrderDetail() {
     : [{ id: null as string | null, ad: metin(k.musteriAdi) ?? (siparissiz(k) ? "Stok için üretim" : "—") }];
   const sipNo = siparisNolari(k);
   const sipId = siparisIdleri(k);
+  // 2.13.2: bağ başına fabrikanın metresi (paylaştırma girilmişse belli olur); alan yoksa bugünkü görünüm (yalnız no).
+  const paylar = siparisPaylari(k);
+  const sipSayisi = paylar && paylar.length > 0 ? new Set(paylar.map((p) => p.siparisNo)).size : sipNo.length;
   const sayilar = asamaSayilari(k);
   const firmaIdleri = metinler(k.fasonFirmaIdleri);
   const fasonda = acik(k) && k.asama === "fason" && metin(k.fasonFirmaAdi) !== null;
@@ -67,8 +71,21 @@ export default function WorkOrderDetail() {
           </KademeliGiris>
 
           <KademeliGiris sira={1}>
-            <ListeBlogu baslik="İş emrinin siparişi" sayi={sipNo.length > 1 ? sipNo.length : undefined} testID="is-emri-siparisler">
-              {sipNo.length === 0 ? (
+            <ListeBlogu baslik="İş emrinin siparişi" sayi={sipSayisi > 1 ? sipSayisi : undefined} testID="is-emri-siparisler">
+              {paylar && paylar.length > 0 ? (
+                paylar.map((p, i) => {
+                  const sid = p.siparisId;
+                  const x = siparisPayiSatiri(p, paylar.filter((y) => y.siparisId === p.siparisId).length > 1);
+                  return (
+                    <ListeSatiri
+                      key={`${p.siparisKalemiId ?? p.siparisNo}-${i}`} birincil={p.siparisNo} ikincil={x.ikincil} ikiSatir={!!x.ikincil} deger={x.deger}
+                      icon="document-text-outline" ton="blue" ayrac={i > 0}
+                      onPress={sid ? () => router.push({ pathname: "/siparisler/[id]", params: { id: sid } } as never) : undefined}
+                      testID={`is-emri-siparis-${i}`}
+                    />
+                  );
+                })
+              ) : sipNo.length === 0 ? (
                 <ListeSatiri birincil={siparissiz(k) ? NO_ORDER_TEXT : "—"} icon="document-text-outline" ton="sky" ayrac={false} testID="is-emri-siparissiz" />
               ) : (
                 sipNo.map((no, i) => {
