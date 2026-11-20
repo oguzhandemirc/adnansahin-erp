@@ -3,15 +3,18 @@
 // Ekran `TabloUstu`nü `Screen.sticky`ye, `TabloListesi`ni gövdeye koyar; ikisi aynı sütun tanımından çizilir.
 import { useMemo, useState } from "react";
 import { useWindowDimensions, View, type LayoutChangeEvent } from "react-native";
-import type { ProjectionRecord, ViewPrefKey } from "../../api/wire";
+import type { ListOptions, ListTotals, ProjectionRecord, ViewPrefKey } from "../../api/wire";
+import { factoryDayKey } from "../../lib/factory-time";
+import { useRemote } from "../../state/useRemote";
 import type { IconName } from "../icons";
 import { useDebounced } from "../Picker";
-import { useListCapability } from "../siparis/capabilities";
+import { listCapability } from "../siparis/capabilities";
+import { DEGER_ONEK, degerGrubu, genisSorgu, tarihGrubu } from "./genisSuzgec";
 import { ListStates } from "../siparis/parts";
 import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
 import { useSession } from "../../state/session";
 import type { ListQuery } from "../siparis/useRemoteList";
-import { azamiSutun, etkinSuzgecSayisi, gecerliSecim, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecAta, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
+import { ANA, azamiSutun, etkinSuzgecSayisi, gecerliSecim, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecAta, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
 import { SutunSecici } from "./Seciciler";
 import { EtkinSuzgecler, SuzgecBos, SuzgecSayfasi } from "./Suzgec";
 import { useTabloTercihi } from "./useTabloTercihi";
@@ -23,6 +26,8 @@ export interface VeriTablosuAyari {
   readonly sutunlar: readonly SutunTanimi<ProjectionRecord>[];
   readonly varsayilan: readonly string[];
   readonly aramaIpucu: string;
+  /** (2026-11-20) Sunucu değer süzgeçlerini beyan ediyorsa (yeni bulut: parti/sipariş no da aranır) kullanılan ipucu. */
+  readonly aramaIpucuGenis?: string;
   /** Çizilmeyen süzgeç alanları (ör. termin/gecikme). */
   readonly haricAlanlar?: readonly string[];
   readonly testID: string;
@@ -46,6 +51,10 @@ export interface VeriTablosu {
   readonly suzuldu: boolean;
   /** Kullanıcının süzgeç seçimi etkin mi (arama ve ekranın sabit koşulu sayılmaz). */
   readonly suzgecEtkin: boolean;
+  /** (2026-11-20) Alt şeridin verisi: süzülen kümenin sayısı + toplamları (sunucu beyan etmediyse ya da gelmediyse null). */
+  readonly toplam: { readonly veri: ListTotals; readonly suzulmus: boolean } | null;
+  /** Sunucu bu listede değer süzgecini beyan ediyor mu (yeni bulut). */
+  readonly genis: boolean;
   /** Yalnız süzgeç gruplarını kaldırır; aynı tercihteki kart seçimi (`suzgec.<alan>`) korunur. */
   suzgecTemizle(): void;
   degistir(f: (t: TabloTercihi) => TabloTercihi): void;
@@ -62,13 +71,30 @@ export interface TabloEki {
 }
 
 export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriTablosu {
-  const { facility } = useSession();
+  const { facility, api } = useSession();
   const { width } = useWindowDimensions();
   const azami = azamiSutun(width);
-  const spec = useListCapability().search(ayar.projeksiyon);
+  const cap = listCapability(facility);
+  const spec = cap.search(ayar.projeksiyon);
   const siralanabilir = facility?.liste?.siralama?.[ayar.projeksiyon] ?? [];
   const cokluSuzgec = !!facility?.liste?.siralama;
-  const gs = useMemo(() => gruplar(spec, cokluSuzgec, ayar.haricAlanlar), [spec, cokluSuzgec, ayar.haricAlanlar]);
+  // 2026-11-20: değer süzgeci seçenekleri (yalnız sunucu beyan ettiyse; fabrika alanı göndermiyorsa alan boş → çizilmez).
+  const degerAlanVar = cap.valueFilters(ayar.projeksiyon).length > 0;
+  const secenek = useRemote<ListOptions>(degerAlanVar ? `secenek:${ayar.projeksiyon}` : null, () => api.listOptions(ayar.projeksiyon), { tags: [ayar.projeksiyon] });
+  const gs = useMemo(() => {
+    const c = listCapability(facility);
+    const temel = gruplar(spec, cokluSuzgec, ayar.haricAlanlar);
+    const deger = c.valueFilters(ayar.projeksiyon).flatMap((f) => {
+      const d = secenek.data?.alanlar[f.alan]?.degerler ?? [];
+      return d.length > 0 ? [degerGrubu(f, d)] : [];
+    });
+    const musteri = deger.filter((g) => g.anahtar === `${DEGER_ONEK}musteriAdi`);
+    // Sıra: tarih · ana süzgeç (durum/görünüm) · müşteri · ek gruplar (yön) · içerik alanları (kumaş, renk, en, parti …).
+    return [
+      ...c.dateRanges(ayar.projeksiyon).map(tarihGrubu), ...temel.filter((g) => g.anahtar === ANA), ...musteri,
+      ...temel.filter((g) => g.anahtar !== ANA), ...deger.filter((g) => !musteri.includes(g)),
+    ];
+  }, [facility, spec, cokluSuzgec, ayar.haricAlanlar, ayar.projeksiyon, secenek.data]);
   const keys = useMemo(() => ayar.sutunlar.map((c) => c.key), [ayar.sutunlar]);
   const varsayilan: TabloTercihi = useMemo(() => ({ surum: 1, sutunlar: ayar.varsayilan, siralama: null, suzgec: {} }), [ayar.varsayilan]);
   const temizle = useMemo(() => (ham: unknown) => tercihiTemizle(ham, { varsayilan, sutunlar: keys, azami }), [varsayilan, keys, azami]);
@@ -84,9 +110,15 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
     ...(ek.siralama ? { siralama: ek.siralama } : {}),
   };
   const temel = sunucuSorgusu(etkin, spec ? ara : "", gs, siralanabilir);
+  const genis = genisSorgu(etkin, gs, factoryDayKey());
   const suzgec = [ek.suzgec, temel.suzgec].filter(Boolean).join(",") || undefined;
-  const sorgu: ListQuery = { ...temel, suzgec, ...ek.kimlik };
+  const sorgu: ListQuery = { ...temel, suzgec, ...genis, ...ek.kimlik };
   const list = useRemoteList(ayar.projeksiyon, sorgu, { enabled: pref.hazir });
+  // Alt şerit: listeyle AYNI süzgeç (sıra hariç); yalnız sunucu toplam ucunu beyan ettiyse.
+  const toplamAlanlari = cap.totals(ayar.projeksiyon);
+  const { sirala: _s, yon: _y, ...suzgecSorgusu } = sorgu;
+  const toplamAnahtari = toplamAlanlari && pref.hazir ? `toplam:${ayar.projeksiyon}:${JSON.stringify(suzgecSorgusu)}` : null;
+  const toplam = useRemote<ListTotals>(toplamAnahtari, () => api.listTotals(ayar.projeksiyon, suzgecSorgusu), { tags: [ayar.projeksiyon] });
   const secili = useMemo(() => pref.tercih.sutunlar.flatMap((k) => ayar.sutunlar.filter((c) => c.key === k)), [pref.tercih.sutunlar, ayar.sutunlar]);
   // Kırpılmaz numara sütunları yüklü satırlardan ölçülür; sığmazsa tablo yatay kayar (sütun seçimi korunur).
   const olcu = useTabloOlcusu(secili, list.items, pref.tercih.siralama?.alan);
@@ -94,8 +126,10 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
   return {
     ayar, tercih: pref.tercih, gorunur, gruplar: gs, siralanabilir, aramaVar: !!spec, terim, setTerim, azami, list,
     yatay: olcu.yatay, onLayout: olcu.onLayout,
-    suzuldu: !!sorgu.ara || !!temel.suzgec || Object.values(ek.kimlik ?? {}).some(Boolean),
-    suzgecEtkin: !!temel.suzgec,
+    suzuldu: !!sorgu.ara || !!temel.suzgec || !!genis.secim || !!genis.aralik || Object.values(ek.kimlik ?? {}).some(Boolean),
+    suzgecEtkin: !!temel.suzgec || !!genis.secim || !!genis.aralik,
+    genis: degerAlanVar,
+    toplam: toplamAlanlari && toplam.data ? { veri: toplam.data, suzulmus: !!sorgu.ara || !!temel.suzgec || !!genis.secim || !!genis.aralik } : null,
     suzgecTemizle: () => pref.degistir((t) => ({ ...t, suzgec: Object.fromEntries(Object.entries(t.suzgec).filter(([g]) => !gs.some((x) => x.anahtar === g))) })),
     degistir: pref.degistir,
   };
@@ -110,7 +144,7 @@ export function TabloUstu({ tablo }: { readonly tablo: VeriTablosu }) {
     <View onLayout={tablo.onLayout}>
       <TabloAraclari
         testID={ayar.testID}
-        ara={tablo.aramaVar ? { value: tablo.terim, onChangeText: tablo.setTerim, placeholder: ayar.aramaIpucu } : undefined}
+        ara={tablo.aramaVar ? { value: tablo.terim, onChangeText: tablo.setTerim, placeholder: (tablo.genis && ayar.aramaIpucuGenis) || ayar.aramaIpucu } : undefined}
         suzgecSayisi={etkinSuzgecSayisi(gecerliSecim(tablo.gruplar, tercih.suzgec))}
         onSuzgec={tablo.gruplar.length > 0 ? () => setSuzgecAcik(true) : undefined}
         onSutun={() => setSutunAcik(true)}

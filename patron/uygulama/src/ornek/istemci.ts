@@ -1,7 +1,8 @@
 // Örnek veri istemcisi: `ApiClient`in yerine oturur (endpoints/kancalar aynen çalışır), ağa hiç çıkmaz.
 // Okumalar `veri.ts`ten gelir; yazmalar reddedilir. Kısa gecikme iskelet ve yenileme durumlarını gösterir.
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
-import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, type SyncNowResponse } from "../api/wire";
+import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, LIST_TOTALS, LIST_VALUE_FILTERS, type SyncNowResponse } from "../api/wire";
+import { factoryDayKey } from "../lib/factory-time";
 import { SYNC_NOW_GAP_MS } from "../lib/simdi-guncelle";
 import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_BILDIRIMLER, ORNEK_FABRIKA_TERCIH, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
 
@@ -19,6 +20,52 @@ const bekle = <T,>(v: () => T): Promise<T> =>
   );
 
 const yok = () => new ApiError(404, "ORNEK_YOK", "Örnek veride bu kayıt yok");
+
+/** Değer süzgeci (`secim`) ve tarih aralığı (`aralik`) sunucudaki gibi: dizi üyeliği / metin eşitliği, fabrika günü (İstanbul). */
+function genisSuz<T extends { kayit: unknown }>(kayitlar: T[], q: Query | undefined): T[] {
+  const json = (v: unknown): Record<string, unknown> => (typeof v === "string" ? (JSON.parse(v) as Record<string, unknown>) : {});
+  let out = kayitlar;
+  for (const [alan, degerler] of Object.entries(json(q?.secim))) {
+    const xs = degerler as string[];
+    out = out.filter((r) => {
+      const v = (r.kayit as Record<string, unknown>)[alan];
+      return (Array.isArray(v) ? v : v === null || v === undefined ? [] : [v]).some((x) => xs.includes(String(x)));
+    });
+  }
+  for (const [alan, ar] of Object.entries(json(q?.aralik))) {
+    const [bas, son] = ar as [string | null, string | null];
+    out = out.filter((r) => {
+      const v = (r.kayit as Record<string, unknown>)[alan];
+      if (typeof v !== "string" || !v) return false;
+      const gun = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : factoryDayKey(v);
+      return (!bas || gun >= bas) && (!son || gun <= son);
+    });
+  }
+  return out;
+}
+
+/** `/liste/:p/secenekler` — beyanlı alanların tekil değerleri (Türkçe sıralı). */
+function secenekler(projeksiyon: string) {
+  const hepsi = ORNEK_LISTE()[projeksiyon] ?? [];
+  const alanlar = (LIST_VALUE_FILTERS[projeksiyon] ?? []).map((f) => {
+    const set = new Set<string>();
+    for (const r of hepsi) {
+      const v = (r.kayit as Record<string, unknown>)[f.alan];
+      for (const x of Array.isArray(v) ? v : v === null || v === undefined ? [] : [v]) if (String(x) !== "") set.add(String(x));
+    }
+    return [f.alan, { degerler: [...set].sort((a, b) => a.localeCompare(b, "tr")), kesildi: false }] as const;
+  });
+  return { alanlar: Object.fromEntries(alanlar) };
+}
+
+/** `/liste/:p/toplam` — listeyle aynı süzgeç; satır sayısı + beyanlı alanların toplamı (metin). */
+function toplam(projeksiyon: string, q: Query | undefined) {
+  const alanlar = LIST_TOTALS[projeksiyon];
+  if (!alanlar) throw new ApiError(400, "ORNEK_YOK", "Bu listede toplam yok");
+  const { kayitlar } = listele(projeksiyon, q);
+  const topla = (a: string) => kayitlar.reduce((n, r) => n + (Number((r.kayit as Record<string, unknown>)[a]) || 0), 0);
+  return { adet: kayitlar.length, toplamlar: Object.fromEntries(alanlar.map((a) => [a, String(topla(a))])) };
+}
 
 function listele(projeksiyon: string, q: Query | undefined) {
   const hepsi = ORNEK_LISTE()[projeksiyon] ?? [];
@@ -45,6 +92,7 @@ function listele(projeksiyon: string, q: Query | undefined) {
   }
   const alanlar = spec?.alanlar ?? ["ad"];
   if (ara) kayitlar = kayitlar.filter((r) => alanlar.some((a) => String((r.kayit as Record<string, unknown>)[a] ?? "").toLocaleLowerCase("tr").includes(ara)));
+  kayitlar = genisSuz(kayitlar, q);
   const sirala = typeof q?.sirala === "string" ? q.sirala : null;
   const tur = sirala ? LIST_SORT[projeksiyon]?.[sirala] : undefined;
   if (sirala && tur) {
@@ -89,6 +137,8 @@ function oku(path: string, q: Query | undefined): unknown {
     if (!o) throw yok();
     return o;
   }
+  if (p[0] === "liste" && p[1] && p[2] === "toplam") return toplam(p[1], q);
+  if (p[0] === "liste" && p[1] && p[2] === "secenekler") return secenekler(p[1]);
   if (p[0] === "veri" && p[1] && p[2]) {
     const r = (ORNEK_LISTE()[p[1]] ?? []).find((x) => x.id === p[2]);
     if (!r) throw yok();

@@ -16,6 +16,9 @@ export interface ListQuery {
   readonly suzgec?: string;
   readonly sirala?: string;
   readonly yon?: "artan" | "azalan";
+  /** (2026-11-20) Değer süzgeci + tarih aralığı JSON metni (yalnız sunucu beyan ettiyse). */
+  readonly secim?: string;
+  readonly aralik?: string;
 }
 
 export interface RemoteList {
@@ -42,18 +45,20 @@ const LIMIT = 50;
 export function useRemoteList(projection: string, query: ListQuery = {}, options: { limit?: number; enabled?: boolean; tags?: readonly string[] } = {}): RemoteList {
   const { api } = useSession();
   const limit = options.limit ?? LIMIT;
-  const { durum, cariKartId, siparisId, fasonFirmaId, suzgec, sirala, yon } = query;
+  const { durum, cariKartId, siparisId, fasonFirmaId, suzgec, sirala, yon, secim, aralik } = query;
   const ara = query.ara?.trim() || undefined;
   const enabled = options.enabled ?? true;
   const params = useCallback(
-    (imlec: string | undefined) => ({ imlec, limit, durum, cariKartId, siparisId, fasonFirmaId, ara, suzgec, sirala, yon }),
-    [limit, durum, cariKartId, siparisId, fasonFirmaId, ara, suzgec, sirala, yon],
+    (imlec: string | undefined) => ({ imlec, limit, durum, cariKartId, siparisId, fasonFirmaId, ara, suzgec, sirala, yon, secim, aralik }),
+    [limit, durum, cariKartId, siparisId, fasonFirmaId, ara, suzgec, sirala, yon, secim, aralik],
   );
   // Üyelik süzgeci yalnız varsa eklenir: süzgeçsiz anahtar eskisiyle aynı kalır (saklı kopya geçersizleşmez).
   const ids = [cariKartId, siparisId].map((x) => x ?? "").join(":") + (fasonFirmaId ? `:f${fasonFirmaId}` : "");
   // Sıralamasız anahtar eskisiyle aynı kalır (saklı kopya geçersizleşmez).
   const sortKey = sirala ? `:${sirala}.${yon ?? "artan"}` : "";
-  const key = `veri:${projection}:${durum ?? ""}:${ids}:${suzgec ?? ""}:${limit}${sortKey}`;
+  // Değer/tarih süzgeci yalnız varsa eklenir (süzgeçsiz anahtar eskisiyle aynı).
+  const genis = (secim ? `:s${secim}` : "") + (aralik ? `:a${aralik}` : "");
+  const key = `veri:${projection}:${durum ?? ""}:${ids}:${suzgec ?? ""}:${limit}${sortKey}${genis}`;
 
   // Terimsiz ilk sayfa: saklı kopya + arkadan ağ + etiketle tazeleme.
   const first = useRemote<Page<ProjectionRecord>>(enabled && !ara ? key : null, () => api.list(projection, params(undefined)), { tags: options.tags ?? [projection] });

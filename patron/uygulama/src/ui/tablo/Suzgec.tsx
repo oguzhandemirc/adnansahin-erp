@@ -20,6 +20,7 @@ import { SearchField } from "../siparis/parts";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, space, tabularNums, typography } from "../tokens";
 import { gecerliDegerler, gecerliSecim, secenekDegistir, secenekleriSuz, secimOzeti, suzgecAta, type SuzgecGrubu } from "./model";
+import { TarihSecenekleri } from "./TarihSuzgeci";
 
 /** Dokunma hedefi (≥ 44). */
 const SATIR = 48;
@@ -91,7 +92,15 @@ export function SuzgecSayfasi(p: {
               </Pressable>
             ) : <View style={s.ustDugme} />}
           </View>
-          {grup ? (
+          {grup?.tur === "tarih" ? (
+            <TarihSecenekleri
+              key={grup.anahtar} secili={gecerliDegerler(grup, taslak[grup.anahtar])[0]} testID={`${p.testID}-${grup.anahtar}`}
+              onSec={(v) => {
+                setTaslak((x) => suzgecAta(x, grup.anahtar, v ? [v] : []));
+                geri();
+              }}
+            />
+          ) : grup ? (
             <Secenekler
               grup={grup} secili={gecerliDegerler(grup, taslak[grup.anahtar])} ara={ara} setAra={setAra} testID={p.testID}
               onSec={(xs) => {
@@ -184,7 +193,7 @@ function Secenekler(p: {
   );
 }
 
-function SecenekSatiri(p: { readonly etiket: string; readonly on: boolean; readonly coklu: boolean; readonly ayrac?: boolean; readonly onPress: () => void; readonly testID: string }) {
+export function SecenekSatiri(p: { readonly etiket: string; readonly on: boolean; readonly coklu: boolean; readonly ayrac?: boolean; readonly onPress: () => void; readonly testID: string }) {
   const t = useTokens();
   const s = useStyles();
   const isaret = p.coklu ? (p.on ? "checkbox" : "square-outline") : p.on ? "checkmark" : null;

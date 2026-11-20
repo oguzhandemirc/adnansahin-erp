@@ -1,6 +1,6 @@
 // ÖRNEK VERİ — yalnız geliştirme önizlemesi (`kapi.ts`). Bütün adlar açıkça uydurmadır ("Örnek", "Deneme",
 // "Numune"…); gerçek müşteri/kişi adı YOKTUR. Tel şekli uygulamanın okuyucularıyla aynı (savunmalı okunur).
-import { LIST_SEARCH, LIST_SORT, type CustomerSummary, type CustomerSummaryPeriod, type CustomerSummaryPeriodCounts, type CustomerSummaryResponse, type FacilityStatus, type LoginResponse, type ProjectionRecord } from "../api/wire";
+import { LIST_DATE_RANGES, LIST_SEARCH, LIST_SORT, LIST_TOTALS, LIST_VALUE_FILTERS, type CustomerSummary, type CustomerSummaryPeriod, type CustomerSummaryPeriodCounts, type CustomerSummaryResponse, type FacilityStatus, type LoginResponse, type ProjectionRecord } from "../api/wire";
 
 const GUN = 86_400_000;
 const once = (gun: number, saat = 0): string => new Date(Date.now() - gun * GUN - saat * 3_600_000).toISOString();
@@ -39,6 +39,10 @@ export function ornekOturum(): FacilityStatus {
       uyelikSuzgecleri: { cariKartId: ["is-emri"], siparisId: ["is-emri"], fasonFirmaId: ["is-emri"] },
       // Yeni bulut gibi: her listenin tanıdığı `?suzgec=` değerleri (ör. "İptaller hariç").
       suzgecDegerleri: Object.fromEntries(Object.entries(LIST_SEARCH).map(([p, s]) => [p, [...(s.suzgec?.secenekler ?? []), ...(s.ekSuzgecler ?? []).flatMap((g) => g.secenekler)].map((o) => o.deger)])),
+      // 2026-11-20: değer + tarih süzgeci ve alt şerit toplamı (yeni bulut gibi).
+      degerSuzgecleri: Object.fromEntries(Object.entries(LIST_VALUE_FILTERS).map(([p, fs]) => [p, fs.map((f) => f.alan)])),
+      tarihAraliklari: Object.fromEntries(Object.entries(LIST_DATE_RANGES).map(([p, fs]) => [p, fs.map((f) => f.alan)])),
+      toplamlar: LIST_TOTALS,
     },
     simdiGuncelle: true,
   };
@@ -381,6 +385,16 @@ const URETIM: readonly { readonly tur: string; readonly metin: string }[] = [
   { tur: "IS_EMRI_YOK", metin: "İş emri yok" }, // s8 (iptal sipariş)
 ];
 
+/** Sevkiyat satırlarının 2.13.2 süzgeç dizileri (v1…v6); v6 eski fabrika gibi dizisiz. */
+const ORNEK_SEVK_ICERIK: readonly Record<string, unknown>[] = [
+  { urunAdlari: ["Örnek Saten 280 cm"], renkAdlari: ["Krem"], enler: ["280"], partiAdlari: ["DNZ-084"], partiKodlari: ["PRT-2611-0020"], uretimPartileri: ["P57"], etiketMusterileri: ["Örnek Tekstil A.Ş."], siparisNolari: ["SIP-2026-0451"], depolar: ["Ana depo"] },
+  { urunAdlari: ["Deneme Keten 150 cm"], renkAdlari: ["Antrasit"], enler: ["150"], partiAdlari: [], partiKodlari: [], uretimPartileri: ["P54", "P55"], etiketMusterileri: [], siparisNolari: ["SIP-2026-0450"], depolar: ["Ana depo"] },
+  { urunAdlari: ["Numune Tül 320 cm", "Örnek Saten 280 cm"], renkAdlari: ["Ekru", "Krem"], enler: ["280", "320"], partiAdlari: ["P-1"], partiKodlari: ["PRT-2611-0018"], uretimPartileri: ["P56"], etiketMusterileri: ["Numune Perde San. ve Tic."], siparisNolari: ["SIP-2026-0449", "SIP-2026-0451"], depolar: ["Ana depo", "Yan depo"] },
+  { urunAdlari: ["Taslak Kadife 140 cm"], renkAdlari: ["Lacivert"], enler: ["140"], partiAdlari: [], partiKodlari: [], uretimPartileri: [], etiketMusterileri: ["Taslak Konfeksiyon"], siparisNolari: ["SIP-2026-0448"], depolar: ["Yan depo"] },
+  { urunAdlari: ["Örnek Saten 280 cm"], renkAdlari: ["Beyaz"], enler: ["280"], partiAdlari: ["DNZ-084"], partiKodlari: ["PRT-2611-0020"], uretimPartileri: ["P57"], etiketMusterileri: [], siparisNolari: [], depolar: ["Ana depo"] },
+  {},
+];
+
 export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
   const siparis = DURUMLAR.map((durum, i) => {
     const c = CARILER[i % 4]!;
@@ -410,6 +424,10 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
         iptalTarihi: durum === "CANCELLED" ? once(i, 1) : null,
         olusturulma: once(i * 3 + 1, 2),
         uretim: URETIM[i]!,
+        // 2.13.2: kalemlerin tekil ürün/renk/en değerleri (aşağıdaki örnek kalemlerle tutarlı).
+        urunAdlari: ["Örnek Saten 280 cm", "Deneme Keten 150 cm", "Numune Tül 320 cm"].slice(0, 1 + (i % 3)).sort(),
+        renkAdlari: ["Krem", "Antrasit", "Ekru"].slice(0, 1 + (i % 3)).sort(),
+        enler: ["280", "150", "320"].slice(0, 1 + (i % 3)).sort(),
       },
     );
   });
@@ -447,6 +465,8 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
       toplamKg: [512.4, 121, 880.5, 402, 330.2, 1044][i],
       disFaturaNo: i === 0 ? null : `FTR-2026-${String(812 - i).padStart(5, "0")}`,
       faturalanma: i === 0 ? null : once(i - 1, 1),
+      // 2.13.2 süzgeç dizileri (fabrikanın içerikten tekil, sıralı değerleri) — süzgeç/arama önizlemesi için.
+      ...ORNEK_SEVK_ICERIK[i]!,
     }),
   );
   // İş emri: fabrikanın türettiği hâliyle (açık/aşama/aşama sayıları/kimlik dizileri); biri siparişsiz, biri kapanmış.

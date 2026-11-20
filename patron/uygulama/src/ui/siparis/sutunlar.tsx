@@ -33,9 +33,9 @@ export const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   // Üretimde nerede (fabrika cümlesi; "Fasonda – <firma> · +1 yerde daha" uzun olabilir → 2 satır). Eski fabrika "—".
   { key: "uretim", baslik: "Üretim", ad: "Üretim durumu", agirlik: 1.6, satir: 2, hucre: (r) => uretimMetni(k(r)) },
   { key: "kalem", baslik: "Kalem", ad: "Kalem sayısı", agirlik: 0.7, sayi: true, sirala: "kalemSayisi", hucre: (r) => sayi(k(r).kalemSayisi) },
-  { key: "yon", baslik: "Yön", agirlik: 0.9, hucre: (r) => YON[str(k(r).yon) ?? ""] ?? "—" },
+  { key: "yon", baslik: "Yön", agirlik: 0.9, sirala: "yon", hucre: (r) => YON[str(k(r).yon) ?? ""] ?? "—" },
   {
-    key: "durum", baslik: "Durum", agirlik: 1.35, hucre: (r) => siparisDurumu(k(r).durum).label,
+    key: "durum", baslik: "Durum", agirlik: 1.35, sirala: "durum", hucre: (r) => siparisDurumu(k(r).durum).label,
     ogeler: (r) => <DurumHucresi durum={k(r).durum} />,
     // Rozet kırpılmaz: sütun en uzun kısa etiketin ("Onay bekliyor") genişliğinde sabit.
     rozet: { etiketler: Object.values(ORDER_STATUS_KISA), metin: (r) => siparisDurumu(k(r).durum).kisa },
@@ -43,12 +43,12 @@ export const SIPARIS_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   // 2026-11-17 ek sütunlar (seçicide KAPALI): telin kendi alanları, biçimlenir — hesap yok. Sevk BRÜT (fabrika).
   { key: "acik", baslik: "Açık m", ad: "Açık miktar (m)", agirlik: 1.1, sayi: true, sirala: "acikMiktar", hucre: (r) => sayi(k(r).acikMiktar) },
   { key: "sevk", baslik: "Sevk m", ad: "Sevk edilen (m, brüt)", agirlik: 1.1, sayi: true, sirala: "sevkMiktari", hucre: (r) => sayi(k(r).sevkMiktari) },
-  { key: "toplam", baslik: "Toplam m", ad: "Sipariş toplamı (m)", agirlik: 1.1, sayi: true, hucre: (r) => sayi(k(r).toplamMiktar) },
+  { key: "toplam", baslik: "Toplam m", ad: "Sipariş toplamı (m)", agirlik: 1.1, sayi: true, sirala: "toplamMiktar", hucre: (r) => sayi(k(r).toplamMiktar) },
   // Termin düz tarih: gecikme vurgusu/rozeti YOK (kullanıcı kararı sürer).
-  { key: "termin", baslik: "Termin", agirlik: 1, hucre: (r) => formatDate(k(r).termin) },
-  { key: "tamam", baslik: "Tamamlanma", ad: "Tamamlanma tarihi", agirlik: 1.1, hucre: (r) => formatDate(k(r).tamamlanma) },
-  { key: "iptal", baslik: "İptal", ad: "İptal tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).iptalTarihi) },
-  { key: "kayit", baslik: "Kayıt", ad: "Kayıt tarihi", agirlik: 1, hucre: (r) => formatDate(k(r).olusturulma) },
+  { key: "termin", baslik: "Termin", agirlik: 1, sirala: "termin", hucre: (r) => formatDate(k(r).termin) },
+  { key: "tamam", baslik: "Tamamlanma", ad: "Tamamlanma tarihi", agirlik: 1.1, sirala: "tamamlanma", hucre: (r) => formatDate(k(r).tamamlanma) },
+  { key: "iptal", baslik: "İptal", ad: "İptal tarihi", agirlik: 1, sirala: "iptalTarihi", hucre: (r) => formatDate(k(r).iptalTarihi) },
+  { key: "kayit", baslik: "Kayıt", ad: "Kayıt tarihi", agirlik: 1, sirala: "olusturulma", hucre: (r) => formatDate(k(r).olusturulma) },
 ];
 
 /** Cari ayrıntısındaki sipariş tablosu (Siparişler sekmesi + Özet'teki açık siparişler): müşteri sütunu yok (aynı cari). */

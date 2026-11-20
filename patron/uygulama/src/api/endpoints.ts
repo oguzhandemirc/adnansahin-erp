@@ -29,7 +29,9 @@ import type {
   SnapshotRefresh,
   SyncNowResponse,
   TestNotificationResult,
+  ListOptions,
   ListSortDir,
+  ListTotals,
   ViewPrefKey,
   ViewPreference,
 } from "./wire";
@@ -48,6 +50,10 @@ export const ENDPOINTS = {
   twoFactorDisable: ["post", "/oturum/dogrulama/kapat"],
   list: ["get", "/veri/:projeksiyon"],
   record: ["get", "/veri/:projeksiyon/:id"],
+  /** (2026-11-20) Süzülen kümenin sayısı + satır sayılarının toplamı; yalnız `liste.toplamlar` beyan eden sunucuda. */
+  listTotals: ["get", "/liste/:projeksiyon/toplam"],
+  /** (2026-11-20) Değer süzgeci seçenekleri; yalnız `liste.degerSuzgecleri` beyan eden sunucuda. */
+  listOptions: ["get", "/liste/:projeksiyon/secenekler"],
   snapshot: ["get", "/anlik/:projeksiyon"],
   /** M2a: `cari-ozeti` anlığından tek müşteri; anlık hiç gelmediyse 404. */
   customerSummary: ["get", "/cari-ozeti/:cariKartId"],
@@ -117,10 +123,14 @@ export interface ListParams {
   /** Sunucu sıralaması (`LIST_SORT`); yalnız sunucu `liste.siralama`da beyan ettiyse gönderilir. */
   readonly sirala?: string;
   readonly yon?: ListSortDir;
+  /** (2026-11-20) Değer süzgeci JSON'u (`?secim=`); yalnız sunucu `liste.degerSuzgecleri` beyan ettiyse. */
+  readonly secim?: string;
+  /** (2026-11-20) Tarih aralığı JSON'u (`?aralik=`); yalnız sunucu `liste.tarihAraliklari` beyan ettiyse. */
+  readonly aralik?: string;
 }
 
 export function createApi(c: ApiClient) {
-  const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, siparisId: p.siparisId, fasonFirmaId: p.fasonFirmaId, ara: p.ara, suzgec: p.suzgec, sirala: p.sirala, yon: p.yon });
+  const q = (p: ListParams): Query => ({ imlec: p.imlec, limit: p.limit, durum: p.durum, cariKartId: p.cariKartId, siparisId: p.siparisId, fasonFirmaId: p.fasonFirmaId, ara: p.ara, suzgec: p.suzgec, sirala: p.sirala, yon: p.yon, secim: p.secim, aralik: p.aralik });
   return {
     /** Fabrika kullanıcı adı + fabrika parolası. Ret: 401 `GIRIS_BASARISIZ` · 401 `DOGRULAMA_KODU_GEREKLI` · 503 `FABRIKA_BAGLANTISI_YOK`. */
     login: (b: LoginRequest) => c.post<LoginResponse>(pathOf("login"), b),
@@ -131,6 +141,9 @@ export function createApi(c: ApiClient) {
     twoFactorConfirm: (totp: string) => c.post<TwoFactorStatus>(pathOf("twoFactorConfirm"), { totp }),
     twoFactorDisable: (b: { parola: string; totp: string }) => c.post<TwoFactorStatus>(pathOf("twoFactorDisable"), b),
     list: (projeksiyon: string, p: ListParams = {}) => c.get<Page<ProjectionRecord>>(pathOf("list", { projeksiyon }), q(p)),
+    /** Süzgeç parametreleri listeyle aynı (imleç/sıra hariç). */
+    listTotals: (projeksiyon: string, p: ListParams = {}) => c.get<ListTotals>(pathOf("listTotals", { projeksiyon }), q(p)),
+    listOptions: (projeksiyon: string) => c.get<ListOptions>(pathOf("listOptions", { projeksiyon })),
     record: (projeksiyon: string, id: string) => c.get<ProjectionRecord>(pathOf("record", { projeksiyon, id })),
     snapshot: (projeksiyon: string) => c.get<Snapshot>(pathOf("snapshot", { projeksiyon })),
     customerSummary: (cariKartId: string) => c.get<CustomerSummaryResponse>(pathOf("customerSummary", { cariKartId })),

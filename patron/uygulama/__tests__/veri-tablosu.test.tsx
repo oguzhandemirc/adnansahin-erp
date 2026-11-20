@@ -136,11 +136,11 @@ describe("§2 ekran: sıralama ve süzgeç SUNUCUDA", () => {
     expect(screen.queryByTestId("siparis-ok-sevkToplam")).toBeNull();
   });
 
-  it("sıralanamayan sütun (durum) düğme değildir; sunucu sıralamayı beyan etmezse hiçbir başlık düğme değildir", async () => {
+  it("sıralanamayan sütun (üretim) düğme değildir; sunucu sıralamayı beyan etmezse hiçbir başlık düğme değildir", async () => {
     mockList.mockResolvedValue(page());
     const v = render(<Orders />);
     await settle();
-    expect(screen.getByTestId("siparis-sutun-durum").props.accessibilityRole).toBeUndefined();
+    expect(screen.getByTestId("siparis-sutun-uretim").props.accessibilityRole).toBeUndefined();
     expect(screen.getByTestId("siparis-sutun-no").props.accessibilityRole).toBe("button");
     v.unmount();
     mockSession.facility = { ...SIRALI, liste: { ...SIRALI.liste, siralama: undefined } };

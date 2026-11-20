@@ -2,6 +2,7 @@
 // sunucu sorgusu. Süzme/sıralama/arama SUNUCUDA: buradaki tek iş tercihi sorgu parametresine çevirmektir.
 import type { ReactNode } from "react";
 import type { ListFilterOption, ListSearchSpec, ListSortDir } from "../../api/wire";
+import { suzgecGrubuMu, tarihOzeti, tarihSecimiGecerli } from "./genisSuzgec";
 
 export interface Siralama {
   readonly alan: string;
@@ -72,6 +73,11 @@ export interface SuzgecGrubu {
    * grubundan tek seçim") → sunucu listelerinde tek seçim.
    */
   readonly coklu?: boolean;
+  /**
+   * (2026-11-20) Tarih aralığı alanı: seçenekler hazır dönemlerdir, ayrıca elle iki tarih girilir; saklı değer dönem
+   * anahtarı ya da "YYYY-MM-DD..YYYY-MM-DD" (`genisSuzgec.ts`). Sunucuya `?aralik=` ile gider.
+   */
+  readonly tur?: "tarih";
 }
 
 export const ANA = "ana";
@@ -86,6 +92,7 @@ export const secimYaz = (xs: readonly string[]): string => xs.join(SECIM_AYIRICI
 
 /** Grupta saklı seçimden yalnız hâlâ seçeneği olan değerler (kalmamış değer süzmez). */
 export function gecerliDegerler(g: SuzgecGrubu, v: string | undefined): string[] {
+  if (g.tur === "tarih") return tarihSecimiGecerli(v) ? [v] : [];
   const xs = secimDegerleri(v).filter((d) => g.secenekler.some((o) => o.deger === d));
   return g.coklu ? xs : xs.slice(0, 1);
 }
@@ -102,6 +109,7 @@ export function gecerliSecim(gs: readonly SuzgecGrubu[], secim: Readonly<Record<
 export function secimOzeti(g: SuzgecGrubu, v: string | undefined): string {
   const xs = gecerliDegerler(g, v);
   if (xs.length === 0) return "Tümü";
+  if (g.tur === "tarih") return tarihOzeti(xs[0]!);
   return xs.map((d) => g.secenekler.find((o) => o.deger === d)?.etiket ?? d).join(", ");
 }
 
@@ -305,7 +313,8 @@ export interface SunucuSorgusu {
  * grup/değer gönderilmez (sunucu 400 verirdi). Sıralama yalnız sunucu o alanı beyan ettiyse.
  */
 export function sunucuSorgusu(t: TabloTercihi, ara: string, gs: readonly SuzgecGrubu[], siralanabilir: readonly string[]): SunucuSorgusu {
-  const degerler = gs.flatMap((g) => {
+  // Değer/tarih grupları `?suzgec=`e girmez (`genisSorgu` ayrı parametre üretir).
+  const degerler = gs.filter(suzgecGrubuMu).flatMap((g) => {
     const v = t.suzgec[g.anahtar];
     return v && g.secenekler.some((o) => o.deger === v) ? [v] : [];
   });

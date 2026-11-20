@@ -24,9 +24,13 @@ import { useSnapshot } from "../../src/ui/pano/useSnapshot";
 import { SEVK_KARTLARI, sevkKartDegistir, sevkKartlari, sevkKartSifirla, type SevkKartKey } from "../../src/ui/sevkiyat/gorunum";
 import { SEVKIYAT_SUTUNLARI, SEVK_LISTE_VARSAYILAN } from "../../src/ui/sevkiyat/sutunlar";
 import { VisibilityPicker } from "../../src/ui/tablo/Seciciler";
+import { ListeToplamSatiri } from "../../src/ui/tablo/ListeToplamSatiri";
 import { TabloListesi, TabloUstu, useVeriTablosu } from "../../src/ui/tablo/useVeriTablosu";
 import { makeStyles, useTokens } from "../../src/ui/theme-context";
 import { TOUCH, space, typography } from "../../src/ui/tokens";
+
+// 2026-11-20: alt şerit — süzülen sevkiyatların sayısı + fabrikanın satır başına top/metre (BRÜT) toplamı (bulut toplam ucu).
+const SEVK_TOPLAM_BIRIMLERI = { topSayisi: UNIT.top, toplamMetre: UNIT.metre } as const;
 
 const DONEMLER = PERIODS.map((x) => ({ key: x.key, etiket: x.label }));
 
@@ -36,6 +40,7 @@ const SEVK_TABLO_AYARI = {
   sutunlar: SEVKIYAT_SUTUNLARI,
   varsayilan: SEVK_LISTE_VARSAYILAN,
   aramaIpucu: "Sevk no ya da müşteri",
+  aramaIpucuGenis: "Sevk no, müşteri, parti ya da sipariş no",
   testID: "sevk",
 } as const;
 
@@ -88,6 +93,7 @@ export default function Shipments() {
       onRefresh={refresh} refreshing={tablo.list.refreshing || summary.refreshing}
       onEndReached={tablo.list.loadMore} headerSecondary={kartlarEylemi ? [kartlarEylemi] : undefined} subtitle={ozet}
       sticky={<TabloUstu tablo={tablo} />}
+      footer={<ListeToplamSatiri toplam={tablo.toplam} adi="sevkiyat" birimler={SEVK_TOPLAM_BIRIMLERI} testID="sevk-toplam" />}
     >
       <TabloListesi tablo={tablo} onPress={(r) => openRecord(router, "sevkiyat", r.id)} bos="Henüz sevkiyat yok" bosSuzgecli="Bu süzgeçte sevkiyat yok" icon={MODULE_ICON.sevkiyat.icon} />
       <Text style={s.not}>Sevk rakamları brüttür; iadeler ayrı belgeyle izlenir.</Text>
