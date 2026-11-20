@@ -7,6 +7,7 @@ import { LinkableLinesTable } from "./LinkableLinesTable";
 import {
   buildLinkAllocations,
   createBasisSummary,
+  NO_BASIS_TEXT,
   pickedToLinkable,
   previewAllocation,
   type AllocationPreview,
@@ -47,11 +48,14 @@ export function CreateAllocationSection({
   qty,
   onQty,
   error,
+  targetEnabled = true,
 }: {
   state: CreateAllocationState;
   qty: Readonly<Record<string, string>>;
   onQty: (id: string, v: string) => void;
   error: string | null;
+  /** Fabrikada hedef metre alanı açık mı — tavan yokken şeridin cümlesi buna göre. */
+  targetEnabled?: boolean;
 }) {
   const selected = useMemo(() => new Set(state.lines.map((l) => l.id)), [state.lines]);
   return (
@@ -66,7 +70,10 @@ export function CreateAllocationSection({
         <div className="max-h-[40vh] overflow-auto rounded-md border">
           <LinkableLinesTable lines={state.lines} selected={selected} qty={qty} onQty={onQty} />
         </div>
-        <AllocationSummaryBar preview={state.preview} />
+        <AllocationSummaryBar
+          preview={state.preview}
+          noBasisText={targetEnabled ? NO_BASIS_TEXT.createTargetEmpty : NO_BASIS_TEXT.createTargetOff}
+        />
         {error && <Callout tone="danger">{error}</Callout>}
       </div>
     </FormSection>

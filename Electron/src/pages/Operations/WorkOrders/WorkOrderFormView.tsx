@@ -607,6 +607,7 @@ export function WorkOrderFormView({
                 qty={allocQty}
                 onQty={setLineAllocQty}
                 error={allocError}
+                targetEnabled={targetQuantityEnabled}
               />
             )}
             {/* Sipariş bağlantısı — YALNIZ edit modunda bölüm. Create'te başlıktaki

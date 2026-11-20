@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   allocationErrorText,
+  allocationLineNote,
   buildLinkAllocations,
   canShowAllocate,
   createBasisSummary,
@@ -59,6 +60,43 @@ describe("sayı dönüşümü — sunucu METİN (Decimal), kullanıcı virgül o
     expect(parseAllocationInput("1.250")).toBeNull();
     expect(parseAllocationInput("-5")).toBeNull();
     expect(parseAllocationInput("abc")).toBeNull();
+  });
+  // B3 (2026-11-20 gözle deneme): "1.500" binlik mi (1500) ondalık mı (1,5)? Belirsiz → REDDEDİLİR;
+  // 1,5 diye SESSİZCE kaydolmaz. Kural sayım alanıyla ortak (`parseCountedQty`), burada değişmez.
+  it.each([
+    ["1.500", null],
+    ["1.500,5", null],
+    ["1500", 1500],
+    ["1500,5", 1500.5],
+    ["12.5", 12.5],
+    ["12,5", 12.5],
+  ] as const)("B3 ölçümü: %s → %s", (text, want) => {
+    expect(parseAllocationInput(text)).toBe(want);
+  });
+});
+
+describe("allocationLineNote — satır altındaki cümle (B2 açık aşımı · B3 biçim)", () => {
+  it("B2: açık 1500, yazılan 5000 → engellemeyen sarı uyarı", () => {
+    expect(allocationLineNote("5000", 1500)).toEqual({
+      tone: "warn",
+      text: "Siparişin açık miktarı 1500 m; 5000 m yazdınız.",
+    });
+  });
+  it("NEGATİF SONDA: açığa eşit/altı, boş, metre dışı (openQty null) → cümle YOK", () => {
+    expect(allocationLineNote("1500", 1500)).toBeNull();
+    expect(allocationLineNote("1499,5", 1500)).toBeNull();
+    expect(allocationLineNote("", 1500)).toBeNull();
+    expect(allocationLineNote("5000", null)).toBeNull();
+    expect(allocationLineNote("5000", undefined)).toBeNull();
+  });
+  it("B3: '1.500' → kırmızı neden + doğru yazım; '12.5' → okunan değerin yankısı", () => {
+    expect(allocationLineNote("1.500", 1500)?.tone).toBe("danger");
+    expect(allocationLineNote("1.500", 1500)?.text).toContain("1500 ya da 1500,5");
+    expect(allocationLineNote("12.5", 1500)).toEqual({ tone: "muted", text: "12,5 m olarak okundu." });
+    expect(allocationLineNote("12,5", 1500)).toBeNull();
+  });
+  it("noktalı girdi açığı aşarsa uyarı kazanır (değeri zaten söyler)", () => {
+    expect(allocationLineNote("2000.5", 1500)?.tone).toBe("warn");
   });
 });
 
@@ -167,6 +205,9 @@ describe("yeni iş emri formu yardımcıları", () => {
   });
   it("fullQtyText: 'Tamamı' siparişin açığı; metre dışı/açıksız boş", () => {
     expect(fullQtyText({ openQty: 250.5, measured: true })).toBe("250,5");
+    // Binlik ayracı YOK — "Tamamı"nın yazdığı metin aynı ayrıştırıcıdan geri aynı sayı olarak döner.
+    expect(fullQtyText({ openQty: 1500, measured: true })).toBe("1500");
+    expect(parseAllocationInput(fullQtyText({ openQty: 1500, measured: true }))).toBe(1500);
     expect(fullQtyText({ openQty: 0, measured: true })).toBe("");
     expect(fullQtyText({ openQty: null, measured: false })).toBe("");
   });

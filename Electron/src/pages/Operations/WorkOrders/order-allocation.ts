@@ -48,6 +48,41 @@ export function parseAllocationInput(text: string): number | null {
 /** Metre metni (binlik yok, 1 ondalığa kadar). */
 export const fmtM = (n: number): string => formatNumber(n, 1);
 
+export interface AllocationLineNote {
+  tone: "danger" | "warn" | "muted";
+  text: string;
+}
+
+/**
+ * Satırdaki metre kutusunun ALTINDA görünen tek cümle (`null` = basma). Öncelik:
+ *  1. Geçersiz biçim (ör. "1.500" — TR binlik mi, 1,5 mi belirsiz → REDDEDİLİR) → nedeni + doğru yazım.
+ *  2. Siparişin AÇIK metresini aşan değer → engellemeyen uyarı (paylaştırma yalnız plandır;
+ *     sunucu da reddetmez, yanıtta uyarı döner).
+ *  3. Noktalı ama kabul edilen girdi ("12.5") → okunan değerin yankısı ("12,5 m olarak okundu").
+ */
+export function allocationLineNote(text: string, openQty: number | null | undefined): AllocationLineNote | null {
+  const v = parseAllocationInput(text);
+  if (v === null) {
+    return { tone: "danger", text: "Binlik ayracı kullanmayın: 1500 ya da 1500,5 yazın (virgül ondalıktır)." };
+  }
+  if (v <= 0) return null;
+  if (openQty != null && v > openQty + 0.0005) {
+    return { tone: "warn", text: `Siparişin açık miktarı ${fmtM(openQty)} m; ${fmtM(v)} m yazdınız.` };
+  }
+  if (text.includes(".")) return { tone: "muted", text: `${fmtM(v)} m olarak okundu.` };
+  return null;
+}
+
+/** Tavan yokken özet şeridinin tek satırı (yanıltıcı "tavan" gösterilmez). */
+export const NO_BASIS_TEXT = {
+  /** Yeni iş emri, hedef metre alanı açık ama boş. */
+  createTargetEmpty: "Hedef metre girilmedi — toplam sınırı yok.",
+  /** Yeni iş emri, hedef metre alanı fabrikada kapalı. */
+  createTargetOff: "Toplam sınırı yok — iş emrine top girince giren metre sınır olur.",
+  /** Var olan iş emri: top yok ve hedef metre yok. */
+  existing: "Hedef metre girilmedi ve iş emrine top girmedi — toplam sınırı yok.",
+} as const;
+
 /** Tavan türünün kısa etiketi: INPUT "Giren" · TARGET "Hedef" · NONE (tavan yok) null. */
 export function basisLabel(kind: OrderAllocationSummary["basisKind"] | undefined): string | null {
   if (kind === "INPUT") return "Giren";

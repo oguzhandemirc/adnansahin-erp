@@ -78,6 +78,7 @@ export function LinkableLinesTable({
                   value={qty[l.id] ?? ""}
                   onChange={(v) => onQty(l.id, v)}
                   fullValue={fullQtyText(l)}
+                  openQty={l.openQty}
                 />
               ) : (
                 <div className="text-right text-[11px] text-muted-foreground">metre dışı</div>

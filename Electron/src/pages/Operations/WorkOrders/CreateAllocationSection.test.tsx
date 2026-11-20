@@ -43,10 +43,38 @@ describe("CreateAllocationSection — yeni iş emrinde paylaştırma", () => {
     expect(screen.getByTestId("allocation-summary")).toHaveTextContent("100 m fazla");
   });
 
-  it("hedef yok → tavan yok, boş satır gövdeye girmez", () => {
+  it("hedef yok → tavan yok, boş satır gövdeye girmez; şerit tek cümle söyler (B1)", () => {
     renderWithProviders(<Harness target={null} />);
     expect(last?.allocations).toEqual([]);
     expect(last?.preview.basis).toBeNull();
-    expect(screen.getByTestId("allocation-summary")).toHaveTextContent("tavan yok");
+    const bar = screen.getByTestId("allocation-summary");
+    expect(bar).toHaveTextContent("Hedef metre girilmedi — toplam sınırı yok.");
+    expect(bar).not.toHaveTextContent("Hedef 0");
+    expect(bar).not.toHaveTextContent("Kalan");
+  });
+
+  it("B2: açığı aşan satır altında sarı uyarı, kayıt engellenmez; açık içindeki satırda uyarı YOK", async () => {
+    renderWithProviders(<Harness target={null} />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("SIP-A bu iş emrine bağlanacak metre"), "5000");
+    await user.type(screen.getByLabelText("SIP-B bu iş emrine bağlanacak metre"), "300");
+    expect(screen.getByText("Siparişin açık miktarı 600 m; 5000 m yazdınız.")).toBeInTheDocument();
+    expect(screen.queryByText(/Siparişin açık miktarı 300 m/)).toBeNull();
+    expect(last?.invalid).toBe(false);
+    expect(last?.allocations).toEqual([
+      { orderLineId: "a", allocatedQty: 5000 },
+      { orderLineId: "b", allocatedQty: 300 },
+    ]);
+  });
+
+  it("B3: '1.500' kırmızı ve nedenli (gövdeye girmez); '12.5' okunan değeri yankılar", async () => {
+    renderWithProviders(<Harness target={null} />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("SIP-A bu iş emrine bağlanacak metre"), "1.500");
+    expect(screen.getByLabelText("SIP-A bu iş emrine bağlanacak metre")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(/Binlik ayracı kullanmayın/)).toBeInTheDocument();
+    expect(last?.invalid).toBe(true);
+    await user.type(screen.getByLabelText("SIP-B bu iş emrine bağlanacak metre"), "12.5");
+    expect(screen.getByText("12,5 m olarak okundu.")).toBeInTheDocument();
   });
 });

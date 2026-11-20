@@ -193,6 +193,7 @@ function AllocateLinksTable({
                     label={`${orderNo} paylaştırılan metre`}
                     value={qty[l.orderLineId] ?? ""}
                     onChange={(v) => onQty(l.orderLineId, v)}
+                    openQty={open}
                   />
                 ) : (
                   <div className="text-right text-[11px] text-muted-foreground">metre dışı</div>
