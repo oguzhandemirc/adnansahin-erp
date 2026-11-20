@@ -163,7 +163,9 @@ describe("§3 ayrıntı", () => {
     fireEvent.press(screen.getByTestId("is-emri-ayrinti-basligi"));
     await settle();
     expect(screen.getByTestId("is-emri-ayrinti-basligi").props.accessibilityState).toEqual(expect.objectContaining({ expanded: true }));
-    expect(within(screen.getByTestId("is-emri-asama-fason")).getByText("14 top · 1.690 m")).toBeTruthy();
+    // 2026-11-20: aşama sayıları Aşama · Top · Metre tablosu (dört özellik: sütunlar, arama, süzgeç, başlıktan sıralama).
+    expect(screen.getByTestId("is-emri-asama-fason").props.accessibilityLabel).toBe("Aşama: Fasonda, Top: 14, Metre: 1.690");
+    for (const id of ["is-emri-asama-tablo-ara-ac", "is-emri-asama-tablo-suzgec", "is-emri-asama-tablo-sutunlar", "is-emri-asama-tablo-sutun-metre"]) expect(screen.getByTestId(id)).toBeTruthy();
     expect(screen.queryByTestId("is-emri-asama-kursun")).toBeNull();
     expect(within(screen.getByTestId("is-emri-bilgi-tur")).getByText("Siparişe üretim")).toBeTruthy();
     expect(within(screen.getByTestId("is-emri-bilgi-hedef")).getByText("2.400 m")).toBeTruthy();

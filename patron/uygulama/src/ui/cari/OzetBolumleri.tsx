@@ -3,8 +3,8 @@
 // sayılar fabrikanın `cari-ozeti` anlığından, listeler sunucu süzgecinden. Para yok; birimler toplanmaz.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { Pressable, Text, useWindowDimensions, View } from "react-native";
-import type { CustomerSummary, CustomerSummaryPeriod, CustomerSummaryPeriodCounts, CustomerSummaryPeriodKey, CustomerSummaryResponse, UnitQuantity } from "../../api/wire";
+import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from "react-native";
+import type { CustomerSummary, CustomerSummaryPeriod, ProjectionRecord, CustomerSummaryPeriodCounts, CustomerSummaryPeriodKey, CustomerSummaryResponse, UnitQuantity } from "../../api/wire";
 import { formatDate, formatNumber } from "../../lib/format";
 import { UNIT } from "../../lib/labels/siparis";
 import { useSession } from "../../state/session";
@@ -18,6 +18,7 @@ import { yerelSutunlar, type YerelSutun } from "../tablo/yerelTablo";
 import { asObj, str } from "../siparis/OrderRow";
 import { ListStates } from "../siparis/parts";
 import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
+import { useTumListe } from "../fason/useTumListe";
 import { BASMA } from "../hareket/sabitler";
 import { ChoiceSheet } from "../siparis/ChoiceSheet";
 import { makeStyles, useTokens } from "../theme-context";
@@ -61,7 +62,6 @@ export function donemAraligi(r: Pick<CustomerSummaryResponse, "donemler" | "uret
 }
 export const OZET_ILK = 5;
 export const URUN_TUMU = 10;
-const IADE_SAYFA = 25;
 
 /** Fabrika birim kodu → kısa etiket (`MT` → m); tanınmayan kod küçük harfle. */
 export const birimEtiketi = (b: string): string => UNIT[b] ?? b.toLowerCase();
@@ -312,30 +312,44 @@ export function AcikSiparislerBolumu({ list, sayi: adet, onAc, onTumu }: { list:
   );
 }
 
-function IadeSatiri({ r, ayrac }: { r: { id: string; kayit: unknown }; ayrac: boolean }) {
-  const k = asObj(r.kayit);
-  const iptal = str(k.iptalTarihi) !== null;
-  return (
-    <ListeSatiri
-      birincil={str(k.iadeNo) ?? "İade"}
-      ikincil={[str(k.urunAdi), str(k.renkAdi), str(k.sebepAdi)].filter(Boolean).join(" · ") || undefined}
-      deger={`${formatNumber(k.metre, 1)} m`}
-      rozet={iptal ? <Rozet label="İptal" /> : undefined}
-      ayrac={ayrac}
-      testID={`cari-iade-${r.id}`}
-    />
-  );
-}
+const iadeK = (r: ProjectionRecord) => asObj(r.kayit);
+const iadeIptal = (r: ProjectionRecord) => str(iadeK(r).iptalTarihi) !== null;
+const iadeMetre = (r: ProjectionRecord): number | null => {
+  const v = iadeK(r).metre;
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+};
+
+/**
+ * İade sütunları (2026-11-20, "dördünü de çevir"): bugünkü satırın bilgisi (iade no · ürün · renk · sebep · metre · İptal
+ * rozeti) ayrı sütunlar; tarih seçilebilir. Her değer iade kaydının alanı; satır = iade edilen top.
+ */
+export const IADE_SUTUNLARI: readonly YerelSutun<ProjectionRecord>[] = [
+  { key: "no", baslik: "İade no", agirlik: 1.3, kirpilmaz: 12, hucre: (r) => str(iadeK(r).iadeNo) ?? "İade" },
+  { key: "tarih", baslik: "Tarih", agirlik: 0.9, siraDegeri: (r) => { const t = str(iadeK(r).olusturulma); return t ? Date.parse(t) : null; }, hucre: (r) => { const t = str(iadeK(r).olusturulma); return t ? formatDate(t) : "—"; } },
+  { key: "urun", baslik: "Ürün", agirlik: 1.8, satir: 2, suzgec: true, hucre: (r) => str(iadeK(r).urunAdi) ?? "—" },
+  { key: "renk", baslik: "Renk", agirlik: 1.1, suzgec: true, hucre: (r) => str(iadeK(r).renkAdi) ?? "—" },
+  { key: "sebep", baslik: "Sebep", agirlik: 1.3, satir: 2, suzgec: true, hucre: (r) => str(iadeK(r).sebepAdi) ?? "—" },
+  { key: "metre", baslik: "Metre", agirlik: 0.9, sayi: true, siraDegeri: iadeMetre, hucre: (r) => `${formatNumber(iadeK(r).metre, 1)} m` },
+  {
+    key: "durum", baslik: "Durum", agirlik: 0.8, suzgec: (r) => [iadeIptal(r) ? "İptal" : "Geçerli"], suzgecEtiketi: "Durum",
+    siraDegeri: (r) => (iadeIptal(r) ? "İptal" : null), hucre: (r) => (iadeIptal(r) ? "İptal" : "—"),
+    ogeler: (r) => (iadeIptal(r) ? <Rozet label="İptal" /> : <Text>—</Text>),
+  },
+];
+export const IADE_VARSAYILAN: readonly string[] = ["no", "urun", "renk", "sebep", "metre", "durum"];
 
 /**
  * İadeler: satırlar `GET /veri/iade?cariKartId=` (iade edilen top başına bir satır); sayı özetten (liste sayılmaz).
- * "Tümü" kart içinde sayfalı listeyi açar (ayrı iade ekranı yok). `destek` false = bulut iade süzgecini beyan etmiyor.
+ * Kapalıyken ilk 5 (pencere); "Tümü" kart içinde BÜTÜN listeyi yükler (`useTumListe`; yerel tablo tam küme ister).
+ * `destek` false = bulut iade süzgecini beyan etmiyor. Alt toplam: fabrikanın özet sayısı başlıkta (liste toplanmaz).
  */
 export function IadelerBolumu({ cariKartId, destek, enabled, iade }: { cariKartId: string; destek: boolean; enabled: boolean; iade?: { adet: number; metre: number } }) {
   const s = useStyles();
+  const t = useTokens();
   const [acik, setAcik] = useState(false);
   const ilk = useRemoteList("iade", { cariKartId }, { enabled: enabled && destek, limit: OZET_ILK });
-  const hepsi = useRemoteList("iade", { cariKartId }, { enabled: enabled && destek && acik, limit: IADE_SAYFA });
+  const hepsi = useTumListe("iade", { cariKartId }, enabled && destek && acik);
   if (!destek || ilk.notFound) return <HenuzGelmedi baslik="İadeler" neyi="İade listesi" testID="cari-iade-gelmedi" />;
   if (ilk.forbidden) return null;
   if (ilk.loading) return <View style={s.bolum}><Iskelet bicim="liste" satir={2} testID="cari-iade-yukleniyor" /></View>;
@@ -347,9 +361,10 @@ export function IadelerBolumu({ cariKartId, destek, enabled, iade }: { cariKartI
       </ListeBlogu>
     );
   }
-  // "Tümü" açılınca büyük sayfa gelene kadar ilk 5 durur (zıplama yok).
-  const liste = acik && hepsi.items.length > 0 ? hepsi : ilk;
-  const satirlar = acik ? liste.items : ilk.items.slice(0, OZET_ILK);
+  // "Tümü" açılınca bütün liste gelene kadar ilk 5 durur (zıplama yok; yarım kümede yerel süzgeç yalan söylemesin).
+  const hepsiHazir = acik && hepsi.tam;
+  const satirlar = hepsiHazir ? hepsi.items : ilk.items.slice(0, OZET_ILK);
+  const pencere = !hepsiHazir && ilk.hasMore;
   const ozetMetni = iade ? `${sayi(iade.adet, 0)} top · ${sayi(iade.metre)} m` : null;
   const sag = (
     <View style={s.sagSira}>
@@ -358,11 +373,15 @@ export function IadelerBolumu({ cariKartId, destek, enabled, iade }: { cariKartI
     </View>
   );
   return (
-    <View>
-      <ListeBlogu baslik="İadeler" sag={sag} testID="cari-iade">
-        {satirlar.map((r, i) => <IadeSatiri key={r.id} r={r} ayrac={i > 0} />)}
-      </ListeBlogu>
-      {acik && liste === hepsi ? <ListStates list={hepsi} empty="Bu müşterinin iadesi yok" icon={MODULE_ICON.sevkiyat.icon} testID="cari-iade-sayfa" /> : null}
+    <View style={s.bolum} testID="cari-iade">
+      <BlokBasligi baslik="İadeler" sag={sag} />
+      <KisaTablo
+        sutunlar={IADE_SUTUNLARI} varsayilan={IADE_VARSAYILAN} satirlar={satirlar} anahtar="tablo.cari-iade" aramaIpucu="İade no, ürün, sebep ara"
+        birim="iade" testID="cari-iade-tablo" satirTestID={(r) => `cari-iade-${r.id}`}
+        pencereNotu={pencere ? `gösterilen ${OZET_ILK} iade içinde; hepsi için Tümü` : undefined}
+      />
+      {acik && !hepsi.tam && !hepsi.error ? <ActivityIndicator color={t.color.primary} accessibilityLabel="Yükleniyor" testID="cari-iade-sayfa-yukleniyor" /> : null}
+      {acik && hepsi.error ? <ListStates list={{ ...hepsi, hasMore: false, loadingMore: false }} empty="Bu müşterinin iadesi yok" icon={MODULE_ICON.sevkiyat.icon} testID="cari-iade-sayfa" /> : null}
     </View>
   );
 }

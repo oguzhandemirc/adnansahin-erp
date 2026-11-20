@@ -4,7 +4,7 @@
 // Altında KAPALI gelen "Üretim ayrıntıları": no, tür, durum, açılış, hedef, en, giren/üretilen/sipariş metresi, aşama
 // başına top · metre. Hepsi fabrikanın alanları; ekran yalnız etikete çevirir (yeniden hesap yok; termin/gecikme yok).
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { moduleVisible } from "../../../src/lib/access";
 import { formatNumber } from "../../../src/lib/format";
@@ -12,10 +12,12 @@ import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { Screen } from "../../../src/ui/Frame";
 import { KademeliGiris } from "../../../src/ui/hareket";
-import { acik, asamaSayilari, detailRows, fasonFirmCell, fasonGunu, gunMetni, isEmriNo, kumasMetni, NO_ORDER_TEXT, siparisIdleri, siparisNolari, siparissiz, stageAmount, topMetreMetni, whereText, type Kayit } from "../../../src/ui/is-emri/gorunum";
+import { acik, asamaSayilari, detailRows, fasonFirmCell, fasonGunu, gunMetni, isEmriNo, kumasMetni, NO_ORDER_TEXT, siparisIdleri, siparisNolari, siparissiz, stageAmount, topMetreMetni, whereText, type AsamaSayisi, type Kayit } from "../../../src/ui/is-emri/gorunum";
 import { siparisPaylari, siparisPayiSatiri } from "../../../src/ui/is-emri/paylar";
 import { AcilirKart, HataDurumu, Iskelet, ListeBlogu, ListeSatiri } from "../../../src/ui/ortak";
 import { StaleNote } from "../../../src/ui/siparis/parts";
+import { KisaTablo } from "../../../src/ui/tablo/KisaTablo";
+import type { YerelSutun } from "../../../src/ui/tablo/yerelTablo";
 import { makeStyles } from "../../../src/ui/theme-context";
 import { space, typography } from "../../../src/ui/tokens";
 
@@ -132,17 +134,34 @@ export default function WorkOrderDetail() {
                 </View>
               ))}
               {sayilar.length > 0 ? <Text style={s.alt}>Toplar nerede?</Text> : null}
-              {sayilar.map((a) => (
-                <View key={a.anahtar} style={s.bilgi} testID={`is-emri-asama-${a.anahtar}`}>
-                  <Text style={s.etiket} numberOfLines={1}>{a.etiket}</Text>
-                  <Text style={s.deger} numberOfLines={1}>{`${formatNumber(a.top, 0)} top${a.metre !== null ? ` · ${formatNumber(a.metre, 0)} m` : ""}`}</Text>
-                </View>
-              ))}
+              {sayilar.length > 0 ? <AsamaTablosu sayilar={sayilar} /> : null}
             </AcilirKart>
           </KademeliGiris>
         </>
       ) : null}
     </Screen>
+  );
+}
+
+type AsamaSatiri = AsamaSayisi & { readonly id: string };
+
+/**
+ * "Toplar nerede?" aşama sayıları (2026-11-20, "dördünü de çevir"): Aşama · Top · Metre dört özellikli kısa tablo. Sayılar
+ * fabrikanın `asamaTop` satırları; alt toplam YOK — iş emrinin top/metre toplamı fabrikanın (kartın açıklaması).
+ */
+export const ASAMA_SUTUNLARI: readonly YerelSutun<AsamaSatiri>[] = [
+  { key: "asama", baslik: "Aşama", agirlik: 1.6, suzgec: true, hucre: (a) => a.etiket },
+  { key: "top", baslik: "Top", agirlik: 0.7, sayi: true, siraDegeri: (a) => a.top, hucre: (a) => formatNumber(a.top, 0) },
+  { key: "metre", baslik: "Metre", agirlik: 0.9, sayi: true, siraDegeri: (a) => a.metre, hucre: (a) => (a.metre === null ? "—" : formatNumber(a.metre, 0)) },
+];
+
+function AsamaTablosu({ sayilar }: { readonly sayilar: readonly AsamaSayisi[] }) {
+  const satirlar = useMemo(() => sayilar.map((a) => ({ ...a, id: a.anahtar })), [sayilar]);
+  return (
+    <KisaTablo
+      sutunlar={ASAMA_SUTUNLARI} satirlar={satirlar} anahtar="tablo.is-emri-asama" aramaIpucu="Aşama ara" birim="aşama"
+      testID="is-emri-asama-tablo" satirTestID={(a) => `is-emri-asama-${a.anahtar}`}
+    />
   );
 }
 

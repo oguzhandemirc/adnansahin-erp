@@ -1,18 +1,25 @@
 // Sipariş kalemleri: SUNUCU kimlik süzgeciyle (`siparisId`) okunan liste.
-// Süzgeç yalnız sunucu beyan ettiyse çağrılır (`useListCapability`); istemci listeyi süzmez, değerler fabrikadan.
-import { Fragment, useEffect, useRef } from "react";
-import { Text } from "react-native";
+// Süzgeç yalnız sunucu beyan ettiyse çağrılır (`useListCapability`); değerler fabrikadan.
+// 2026-11-20 (kullanıcı: "dördünü de çevir"): kalemler dört özellikli yerel tablo (sütun seçimi + arama + süzgeç + başlıktan
+// sıralama). Yerelde süzülüp sıralandığı için liste TAM kümedir (`useTumListe`: bütün sayfalar). Kalemi karşılayan iş
+// emirlerinin metresi (2.13.2 `isEmriPaylari`) satırın altında aynen kalır. Alt toplam YOK: birimler toplanmaz ve telefon
+// türev sayı üretmez (siparişin toplamı/açığı zaten fabrikanın kartlarında).
+import { useEffect, useMemo, useRef } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
 import type { ProjectionRecord } from "../../api/wire";
-import { formatNumber, keepPhrases } from "../../lib/format";
+import { formatNumber } from "../../lib/format";
 import { unitLabel } from "../../lib/labels/siparis";
 import { MODULE_ICON } from "../icons";
 import { isEmriPaylari, isEmriPayiMetni } from "../is-emri/paylar";
-import { ListeBlogu, ListeSatiri } from "../ortak";
+import { useTumListe } from "../fason/useTumListe";
+import { BlokBasligi } from "../ortak";
 import { asObj, str } from "./OrderRow";
 import { ListStates } from "./parts";
-import { makeStyles } from "../theme-context";
+import { KisaTablo } from "../tablo/KisaTablo";
+import type { YerelSutun } from "../tablo/yerelTablo";
+import { makeStyles, useTokens } from "../theme-context";
 import { space, typography } from "../tokens";
-import { useRemoteList, type RemoteList } from "./useRemoteList";
+import type { RemoteList } from "./useRemoteList";
 
 /** Ekranın aşağı çekip tazelemesi (`tick` artar) listeyi de yeniden okur; ilk değer okumaz (ilk yükleme kendiliğinden). */
 export function useReloadOn(tick: number, list: RemoteList): void {
@@ -25,6 +32,7 @@ export function useReloadOn(tick: number, list: RemoteList): void {
 }
 
 const present = (v: unknown): boolean => (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && v.trim() !== "");
+const sayiOf = (v: unknown): number | null => (present(v) ? Number(v) : null);
 
 /** Kalem satırı metinleri: ürün adı (yoksa "—") · renk · miktar + birim; iptal kalemde açık miktar yok. */
 export function lineRowText(r: ProjectionRecord) {
@@ -48,39 +56,86 @@ export function lineRowText(r: ProjectionRecord) {
   };
 }
 
-/** Kalemler bloğu (tek satır: ürün · renk/sevk/açık · miktar); başlık sayısı yüklenen satır kadar. */
-/** Kalem listesi sayfanın tepesinde açılır: başlık kaydıyla AYNI ANDA yüklenir (ardışık iki bekleme + geç beliren blok olmasın). */
-export function useOrderLines(siparisId: string | null): RemoteList {
-  return useRemoteList("siparis-kalemi", { siparisId: siparisId ?? undefined }, { tags: ["siparis-kalemi", "siparis"], enabled: siparisId !== null });
+const kayit = (r: ProjectionRecord) => asObj(r.kayit);
+const iptal = (r: ProjectionRecord) => str(kayit(r).iptalTarihi) !== null;
+const miktarHucre = (r: ProjectionRecord, alan: string) => (present(kayit(r)[alan]) ? `${formatNumber(kayit(r)[alan])} ${unitLabel(kayit(r).birim)}` : "—");
+
+/**
+ * Kalem sütunları (SAF; her değer telin alanı). Miktar/Sevk/Açık sıralaması yalnız gösterim sırasıdır (birimler toplanmaz;
+ * Birim süzgeci ayırır). İptal kalemde açık miktar "—" (bugünkü satır metniyle aynı).
+ */
+export const KALEM_SUTUNLARI: readonly YerelSutun<ProjectionRecord>[] = [
+  { key: "urun", baslik: "Ürün", agirlik: 2, satir: 2, suzgec: true, hucre: (r) => str(kayit(r).urunAdi) ?? "—" },
+  { key: "renk", baslik: "Renk", agirlik: 1.2, suzgec: true, hucre: (r) => str(kayit(r).renkAdi) ?? "—" },
+  {
+    key: "miktar", baslik: "Miktar", agirlik: 1.1, sayi: true, siraDegeri: (r) => sayiOf(kayit(r).miktar),
+    suzgec: (r) => [unitLabel(kayit(r).birim)], suzgecEtiketi: "Birim", hucre: (r) => miktarHucre(r, "miktar"),
+  },
+  { key: "sevk", baslik: "Sevk", ad: "Sevk edilen", agirlik: 1, sayi: true, siraDegeri: (r) => sayiOf(kayit(r).sevkMiktari), hucre: (r) => miktarHucre(r, "sevkMiktari") },
+  { key: "acik", baslik: "Açık", ad: "Açık miktar", agirlik: 1, sayi: true, siraDegeri: (r) => (iptal(r) ? null : sayiOf(kayit(r).acikMiktar)), hucre: (r) => (iptal(r) ? "—" : miktarHucre(r, "acikMiktar")) },
+  { key: "durum", baslik: "Durum", agirlik: 0.9, suzgec: true, hucre: (r) => (iptal(r) ? "İptal edildi" : "Etkin") },
+  { key: "en", baslik: "En", ad: "En (cm)", agirlik: 0.7, sayi: true, siraDegeri: (r) => sayiOf(kayit(r).en), hucre: (r) => (present(kayit(r).en) ? `${formatNumber(kayit(r).en, 0)} cm` : "—") },
+  { key: "parca", baslik: "Parça", ad: "Parça boyu", agirlik: 0.8, sayi: true, siraDegeri: (r) => sayiOf(kayit(r).parcaBoyu), hucre: (r) => (present(kayit(r).parcaBoyu) ? `${formatNumber(kayit(r).parcaBoyu, 0)} m` : "—") },
+  { key: "musteride", baslik: "Müşteride", ad: "Müşterinin ürün/renk adı", agirlik: 1.4, satir: 2, hucre: (r) => [str(kayit(r).musteriUrunAdi), str(kayit(r).musteriRenkAdi)].filter(Boolean).join(" ") || "—" },
+  {
+    key: "isEmri", baslik: "İş emirleri", ad: "Karşılayan iş emirleri", agirlik: 1.4, satir: 2, siraDegeri: false,
+    suzgec: (r) => (isEmriPaylari(kayit(r)) ?? []).map((p) => p.isEmriNo), suzgecEtiketi: "İş emri",
+    hucre: (r) => (isEmriPaylari(kayit(r)) ?? []).map((p) => p.isEmriNo).join(", ") || "—",
+  },
+];
+
+/**
+ * Varsayılan görünür sütunlar = bugünkü satırın bilgisi: ürün · renk · miktar · sevk · açık; durum yalnız iptal kalem
+ * varsa, en/parça/müşteride yalnız veride varsa (bugün de yalnız o zaman yazılıyordu). İş emirleri satırın altında.
+ */
+export function kalemVarsayilan(xs: readonly ProjectionRecord[]): string[] {
+  const var_ = (alan: string) => xs.some((r) => present(kayit(r)[alan]));
+  return [
+    "urun", "renk", "miktar", "sevk", "acik",
+    ...(xs.some(iptal) ? ["durum"] : []),
+    ...(var_("en") ? ["en"] : []),
+    ...(var_("parcaBoyu") ? ["parca"] : []),
+    ...(var_("musteriUrunAdi") || var_("musteriRenkAdi") ? ["musteride"] : []),
+  ];
 }
 
-export function OrderLines({ list, tick = 0 }: { list: RemoteList; tick?: number }) {
+/** Kalem listesi sayfanın tepesinde açılır: başlık kaydıyla AYNI ANDA yüklenir; bütün sayfalar (yerel tablo tam küme ister). */
+export function useOrderLines(siparisId: string | null): RemoteList & { readonly tam: boolean } {
+  return useTumListe("siparis-kalemi", { siparisId: siparisId ?? undefined }, siparisId !== null, { tags: ["siparis-kalemi", "siparis"] });
+}
+
+export function OrderLines({ list, tick = 0 }: { list: RemoteList & { readonly tam?: boolean }; tick?: number }) {
   const s = useStyles();
+  const t = useTokens();
   useReloadOn(tick, list);
+  const tam = list.tam ?? !list.hasMore;
+  const varsayilan = useMemo(() => kalemVarsayilan(list.items), [list.items]);
   return (
     <>
       {list.items.length > 0 ? (
-        <ListeBlogu baslik="Kalemler" sayi={list.hasMore ? undefined : list.items.length} testID="siparis-kalemleri">
-          {list.items.map((r, i) => {
-            const x = lineRowText(r);
-            // 2.13.2: kalemi karşılayan iş emirleri ve fabrikanın metresi ("IE-…: bu iş emrinden 300 m"); alan yoksa satır yok.
-            const paylar = isEmriPaylari(asObj(r.kayit)) ?? [];
-            return (
-              <Fragment key={r.id}>
-                <ListeSatiri birincil={x.title} ikincil={x.subtitle ? keepPhrases(x.subtitle) : undefined} ikiSatir deger={x.value} ayrac={i > 0} accessibilityLabel={[x.title, x.subtitle, x.value].filter(Boolean).join(", ")} testID={`kalem-${r.id}`} />
-                {paylar.map((p, j) => (
-                  <Text key={`${p.isEmriId ?? p.isEmriNo}-${j}`} style={s.pay} numberOfLines={1} testID={`kalem-${r.id}-is-emri-${j}`}>{isEmriPayiMetni(p)}</Text>
-                ))}
-              </Fragment>
-            );
-          })}
-        </ListeBlogu>
+        <View testID="siparis-kalemleri">
+          <BlokBasligi baslik="Kalemler" sayi={tam ? list.items.length : undefined} />
+          <KisaTablo
+            sutunlar={KALEM_SUTUNLARI} varsayilan={varsayilan} satirlar={list.items} anahtar="tablo.siparis-kalem" aramaIpucu="Ürün, renk, iş emri ara"
+            birim="kalem" testID="siparis-kalem-tablo" satirTestID={(r) => `kalem-${r.id}`}
+            ekMetin={(r) => (isEmriPaylari(kayit(r)) ?? []).map(isEmriPayiMetni).join(" ")}
+            acilir={(r) => {
+              // 2.13.2: kalemi karşılayan iş emirleri ve fabrikanın metresi ("IE-…: bu iş emrinden 300 m"); alan yoksa satır yok.
+              const paylar = isEmriPaylari(kayit(r)) ?? [];
+              return paylar.length === 0 ? null : paylar.map((p, j) => (
+                <Text key={`${p.isEmriId ?? p.isEmriNo}-${j}`} style={s.pay} numberOfLines={1} testID={`kalem-${r.id}-is-emri-${j}`}>{isEmriPayiMetni(p)}</Text>
+              ));
+            }}
+          />
+          {!tam && !list.error ? <ActivityIndicator style={s.yukleniyor} color={t.color.primary} accessibilityLabel="Yükleniyor" testID="siparis-kalem-yukleniyor" /> : null}
+        </View>
       ) : null}
-      <ListStates list={list} empty="Bu siparişin kalemi yok" icon={MODULE_ICON.siparisler.icon} iskeletSatir={2} testID="siparis-kalem" />
+      <ListStates list={{ ...list, hasMore: false, loadingMore: false }} empty="Bu siparişin kalemi yok" icon={MODULE_ICON.siparisler.icon} iskeletSatir={2} testID="siparis-kalem" />
     </>
   );
 }
 
 const useStyles = makeStyles((t) => ({
   pay: { ...typography.caption, color: t.color.textMuted, paddingLeft: space.l, paddingBottom: space.xs },
+  yukleniyor: { minHeight: 44, marginVertical: space.s },
 }));

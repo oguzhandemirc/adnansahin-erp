@@ -34,6 +34,8 @@ export function KisaTablo<R extends { readonly id: string }>(p: {
   readonly acilir?: (r: R) => ReactNode;
   /** Tablonun altında (ör. "Daha fazla", boş/hata durumu). */
   readonly alt?: ReactNode;
+  /** Satır test kimliği (yoksa `<testID>-satir-<id>`); listeden tabloya çevrilen yüzey eski kimliği korur. */
+  readonly satirTestID?: (r: R) => string;
 }) {
   const tablo = useYerelTablo(
     {
@@ -42,5 +44,5 @@ export function KisaTablo<R extends { readonly id: string }>(p: {
     },
     p.satirlar,
   );
-  return <YerelTablo tablo={tablo} onPress={p.onPress} acilir={p.acilir} alt={p.alt} />;
+  return <YerelTablo tablo={tablo} onPress={p.onPress} acilir={p.acilir} alt={p.alt} satirTestID={p.satirTestID} />;
 }

@@ -253,10 +253,12 @@ describe("§6 P6 sipariş kalemleri (sunucu `siparisId` süzgeci)", () => {
     render(<OrderDetail />);
     await settle();
     expect(mockList).toHaveBeenCalledWith("siparis-kalemi", expect.objectContaining({ siparisId: ID1 }));
+    // 2026-11-20: kalemler dört özellikli tablo; iptal kalem varken Durum sütunu varsayılanda görünür.
     expect(screen.getByText("Penye Örme")).toBeTruthy();
     expect(screen.getByText("1.250,5 m")).toBeTruthy();
-    expect(screen.getByText(/Renk Lacivert · .*Açık 250 m/)).toBeTruthy();
-    expect(screen.getByTestId("kalem-k2").props.accessibilityLabel).toBe("—, İptal edildi · Renk —, 40 kg"); // P5 adları gelmemiş, iptal kalem: açık miktar yok
+    expect(screen.getByTestId("kalem-k1").props.accessibilityLabel).toBe("Ürün: Penye Örme, Renk: Lacivert, Miktar: 1.250,5 m, Sevk edilen: —, Açık miktar: 250 m, Durum: Etkin");
+    expect(screen.getByTestId("kalem-k2").props.accessibilityLabel).toBe("Ürün: —, Renk: —, Miktar: 40 kg, Sevk edilen: —, Açık miktar: —, Durum: İptal edildi"); // P5 adları gelmemiş, iptal kalem: açık miktar yok
+    for (const id of ["siparis-kalem-tablo-ara-ac", "siparis-kalem-tablo-suzgec", "siparis-kalem-tablo-sutunlar", "siparis-kalem-tablo-sutun-miktar"]) expect(screen.getByTestId(id)).toBeTruthy();
     expect(screen.queryByTestId("siparis-kalem-ozeti")).toBeNull();
   });
 

@@ -11,6 +11,7 @@
 //     `SutunSecici` + `SuzgecSayfasi` + `<TabloAraclari` (`ara=`, `onSuzgec=`) taşımalı; her `<TabloBasligi` bloğu
 //     `onSirala=` + `siralanabilir=` verir.
 //   • Her yerde yasak: `siralanabilir={[]}` · `onSirala={() => undefined}` (sıralamayı söken iki kalıp).
+//   • Listeden tabloya çevrilmiş yüzeyler (`ZORUNLU_TABLOLAR`) kendi anahtarlı tablosunu taşır (düz listeye dönüş kırmızı).
 // Muafiyet yalnız `MUAF` listesinden ve gerekçeyle (şu an boş). Tarayıcı saftır; negatif sondalar sentetik kaynakla.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -26,6 +27,24 @@ const ELLE_BAGLI: readonly string[] = [
 ];
 /** Dört özellikten muaf tablo dosyaları (dosya → gerekçe). Boş olması beklenir. */
 const MUAF: Readonly<Record<string, string>> = {};
+
+/**
+ * Listeden tabloya çevrilmiş yüzeyler (2026-11-20, kullanıcı: "Dördünü de çevir"): dosya → cihaz tercihi anahtarı. Dosya
+ * bu anahtarla bir `<KisaTablo>` (ya da `useYerelTablo`) taşımalı — düz listeye geri dönüş kırmızıdır.
+ */
+export const ZORUNLU_TABLOLAR: Readonly<Record<string, string>> = {
+  "src/ui/siparis/OrderLines.tsx": "tablo.siparis-kalem", // sipariş ayrıntısı · kalemler
+  "src/ui/siparis/OrderWorkOrders.tsx": "tablo.siparis-is-emri", // sipariş ayrıntısı · siparişin iş emirleri
+  "src/ui/cari/OzetBolumleri.tsx": "tablo.cari-iade", // cari ayrıntısı · iadeler
+  "app/(app)/is-emirleri/[id].tsx": "tablo.is-emri-asama", // iş emri ayrıntısı · aşama sayıları
+};
+
+/** SAF: zorunlu tablo dosyası o anahtarlı tabloyu taşıyor mu (yoksa bulgu). */
+export function zorunluTabloDenetimi(dosya: string, kaynak: string, anahtar: string): Bulgu[] {
+  const kisa = JSX_BLOK(kaynak, "<KisaTablo").some((b) => b.includes(`anahtar="${anahtar}"`));
+  const yerel = new RegExp(`useYerelTablo[\\s\\S]*?anahtar:\\s*"${anahtar.replace(/[.]/g, "\\.")}"`).test(kaynak);
+  return kisa || yerel ? [] : [{ dosya, neden: `${anahtar} tablosu yok (düz listeye dönmüş)` }];
+}
 
 export interface Bulgu {
   readonly dosya: string;
@@ -106,7 +125,19 @@ describe("bekçi: her veri tablosunda dört özellik", () => {
     expect(Object.keys(MUAF)).toEqual([]);
   });
 
+  it("listeden tabloya çevrilen dört yüzey tablo olarak kalır (sipariş kalemleri · siparişin iş emirleri · cari iadeleri · aşama sayıları)", () => {
+    const bulgular = Object.entries(ZORUNLU_TABLOLAR).flatMap(([d, a]) => zorunluTabloDenetimi(d, kaynak(d), a));
+    expect(bulgular).toEqual([]);
+  });
+
   describe("negatif sondalar (sentetik kaynak)", () => {
+    it("düz listeye dönen zorunlu yüzey yakalanır; anahtarı başka tablo da yakalanır", () => {
+      const liste = `<ListeBlogu baslik="Kalemler">{xs.map((r) => <ListeSatiri birincil={r.ad} />)}</ListeBlogu>`;
+      expect(zorunluTabloDenetimi("src/x.tsx", liste, "tablo.siparis-kalem").map((x) => x.neden)).toEqual(["tablo.siparis-kalem tablosu yok (düz listeye dönmüş)"]);
+      expect(zorunluTabloDenetimi("src/x.tsx", `<KisaTablo anahtar="tablo.baska" />`, "tablo.siparis-kalem")).toHaveLength(1);
+      expect(zorunluTabloDenetimi("src/x.tsx", `<KisaTablo sutunlar={S} anahtar="tablo.siparis-kalem" />`, "tablo.siparis-kalem")).toEqual([]);
+    });
+
     it("siralanabilir={[]} ve onSirala={() => undefined} yakalanır", () => {
       const k = `<TabloBasligi testID="x" sutunlar={s} siralama={null} siralanabilir={[]} onSirala={() => undefined} />`;
       const n = tabloDenetimi("app/ornek.tsx", k, ["app/ornek.tsx"]).map((x) => x.neden).join("|");

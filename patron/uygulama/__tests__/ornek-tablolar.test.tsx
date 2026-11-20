@@ -7,7 +7,7 @@ import type { ReactElement } from "react";
 
 const { createOrnekClient } = jest.requireActual("../src/ornek/istemci") as typeof import("../src/ornek/istemci");
 const { createApi } = require("../src/api/endpoints") as typeof import("../src/api/endpoints");
-const { ornekOturum, ORNEK_ANLIK } = require("../src/ornek/veri") as typeof import("../src/ornek/veri");
+const { ornekOturum, ORNEK_ANLIK, ORNEK_LISTE } = require("../src/ornek/veri") as typeof import("../src/ornek/veri");
 
 const mockOturum = ornekOturum();
 const mockSession = {
@@ -96,5 +96,41 @@ describe("örnek veri: tablolar dolu açılır", () => {
     await settle(10);
     expect(satirSayisi("cari-sevkiyatlar-satir-")).toBeGreaterThan(0);
     expect(satirSayisi("cari-acik-tablo-satir-")).toBeGreaterThan(0);
+  });
+
+  // 2026-11-20 ("dördünü de çevir"): listeden tabloya çevrilen dört yüzey örnek kipte dolu ve araçlı açılır.
+  it("Cari ayrıntısı (c1): iadeler tablosu dolu (iptal dahil), araçlar görünür", async () => {
+    mockParams = { id: "c1" };
+    { const E = ekran("../app/(app)/cariler/[id]"); render(<E />); }
+    await settle(10);
+    const iadeler = (ORNEK_LISTE().iade ?? []).filter((r) => (r.kayit as { cariKartId?: string }).cariKartId === "c1");
+    expect(satirSayisi("cari-iade-i")).toBe(Math.min(iadeler.length, 5));
+    for (const id of ["cari-iade-tablo-ara-ac", "cari-iade-tablo-suzgec", "cari-iade-tablo-sutunlar", "cari-iade-tablo-sutun-metre"]) expect(screen.getByTestId(id)).toBeTruthy();
+  });
+
+  it("Sipariş ayrıntısı (s3): kalemler (iş emri payıyla) ve siparişin iş emirleri tabloları dolu", async () => {
+    mockParams = { id: "s3" };
+    { const E = ekran("../app/(app)/siparisler/[id]"); render(<E />); }
+    await settle(10);
+    const L = ORNEK_LISTE();
+    const kalemler = L["siparis-kalemi"]!.filter((r) => (r.kayit as { siparisId?: string }).siparisId === "s3");
+    expect(kalemler.length).toBeGreaterThan(1);
+    for (const r of kalemler) expect(screen.getByTestId(`kalem-${r.id}`)).toBeTruthy();
+    expect(satirSayisi(`kalem-${kalemler[0]!.id}-is-emri-`)).toBeGreaterThan(0);
+    const ieler = L["is-emri"]!.filter((r) => ((r.kayit as { siparisIdleri?: string[] }).siparisIdleri ?? []).includes("s3"));
+    for (const r of ieler) expect(screen.getByTestId(`siparis-is-emri-${r.id}`)).toBeTruthy();
+    for (const t of ["siparis-kalem-tablo", "siparis-is-emri-tablo"]) for (const ek of ["-ara-ac", "-suzgec", "-sutunlar"]) expect(screen.getByTestId(t + ek)).toBeTruthy();
+  });
+
+  it("İş emri ayrıntısı (w1): 'Üretim ayrıntıları' açılınca aşama sayıları tablosu", async () => {
+    mockParams = { id: "w1" };
+    { const E = ekran("../app/(app)/is-emirleri/[id]"); render(<E />); }
+    await settle(4);
+    fireEvent.press(screen.getByTestId("is-emri-ayrinti-basligi"));
+    await settle(2);
+    expect(screen.getByTestId("is-emri-asama-fason")).toBeTruthy();
+    expect(screen.getByTestId("is-emri-asama-depo")).toBeTruthy();
+    expect(screen.queryByTestId("is-emri-asama-kursun")).toBeNull(); // sıfır toplu aşama çizilmez
+    for (const ek of ["-ara-ac", "-suzgec", "-sutunlar", "-sutun-top"]) expect(screen.getByTestId(`is-emri-asama-tablo${ek}`)).toBeTruthy();
   });
 });
