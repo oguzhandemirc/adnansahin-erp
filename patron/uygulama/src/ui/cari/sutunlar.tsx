@@ -35,15 +35,17 @@ export const CARI_SUTUNLARI: readonly SutunTanimi<ProjectionRecord>[] = [
   { key: "il", baslik: "İl", agirlik: 1, sirala: "il", hucre: (r) => str(k(r).il) ?? "—" },
   { key: "ilce", baslik: "İlçe", agirlik: 1, sirala: "ilce", hucre: (r) => str(k(r).ilce) ?? "—" },
   { key: "ulke", baslik: "Ülke", agirlik: 1, sirala: "ulke", hucre: (r) => str(k(r).ulke) ?? "—" },
-  { key: "rol", baslik: "Rol", agirlik: 1.3, hucre: (r) => cariRoles(k(r)).map((x) => x.label).join(", ") || "—", ogeler: (r) => <RolHucresi r={r} />,
+  // 2026-11-20: kalan sütunlar da SUNUCUDA sıralanır; başlık yalnız bulut `/oturum` `liste.siralama`da alanı beyan
+  // ediyorsa açılır (eski bulut / kişisel izni olmayan hesap → o sütun sıralanmaz). Rol/Durum bulutta bayrak sırası.
+  { key: "rol", baslik: "Rol", agirlik: 1.3, sirala: "rol", hucre: (r) => cariRoles(k(r)).map((x) => x.label).join(", ") || "—", ogeler: (r) => <RolHucresi r={r} />,
     // İlk rol rozeti + "+n" (aralık 4 + 12 pt iki karakter ≈ 20 pt pay).
     rozet: { etiketler: CARI_ROLES.map((x) => x.label), metin: (r) => cariRoles(k(r))[0]?.label ?? "—", ek: 20 } },
-  { key: "durum", baslik: "Durum", agirlik: 0.9, hucre: (r) => (k(r).aktif === false ? "Pasif" : "Aktif") },
-  // 2026-11-17 eklenenler (KAPALI gelir); bulut bunlara sıralama beyan etmez → sıralanmaz.
-  { key: "yon", baslik: "Sevk yönü", ad: "Varsayılan sevk yönü", agirlik: 1, hucre: (r) => (str(k(r).varsayilanYon) ? destinationLabel(k(r).varsayilanYon) : "—") },
-  { key: "yetkili", baslik: "Yetkili", agirlik: 1.4, satir: 2, hucre: (r) => str(kisisel(r).yetkili) ?? "—" },
-  { key: "telefon", baslik: "Telefon", agirlik: 1.3, hucre: (r) => str(kisisel(r).telefon) ?? "—" },
-  { key: "kayit", baslik: "Kayıt", ad: "Kayıt tarihi", agirlik: 0.9, hucre: (r) => (str(k(r).olusturulma) ? formatDate(k(r).olusturulma) : "—") },
+  { key: "durum", baslik: "Durum", agirlik: 0.9, sirala: "aktif", hucre: (r) => (k(r).aktif === false ? "Pasif" : "Aktif") },
+  // 2026-11-17 eklenenler (KAPALI gelir).
+  { key: "yon", baslik: "Sevk yönü", ad: "Varsayılan sevk yönü", agirlik: 1, sirala: "varsayilanYon", hucre: (r) => (str(k(r).varsayilanYon) ? destinationLabel(k(r).varsayilanYon) : "—") },
+  { key: "yetkili", baslik: "Yetkili", agirlik: 1.4, satir: 2, sirala: "yetkili", hucre: (r) => str(kisisel(r).yetkili) ?? "—" },
+  { key: "telefon", baslik: "Telefon", agirlik: 1.3, sirala: "telefon", hucre: (r) => str(kisisel(r).telefon) ?? "—" },
+  { key: "kayit", baslik: "Kayıt", ad: "Kayıt tarihi", agirlik: 0.9, sirala: "olusturulma", hucre: (r) => (str(k(r).olusturulma) ? formatDate(k(r).olusturulma) : "—") },
 ];
 
 export const CARI_VARSAYILAN_SUTUN: readonly string[] = ["ad", "il", "rol"];

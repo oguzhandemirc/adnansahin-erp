@@ -1,7 +1,7 @@
 // Örnek veri istemcisi: `ApiClient`in yerine oturur (endpoints/kancalar aynen çalışır), ağa hiç çıkmaz.
 // Okumalar `veri.ts`ten gelir; yazmalar reddedilir. Kısa gecikme iskelet ve yenileme durumlarını gösterir.
 import { ApiError, type ApiClient, type DownloadedFile, type Query } from "../api/client";
-import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, LIST_TOTALS, LIST_VALUE_FILTERS, type SyncNowResponse } from "../api/wire";
+import { LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, LIST_SORT_FLAGS, LIST_SORT_SUBROW, LIST_TOTALS, LIST_VALUE_FILTERS, type SyncNowResponse } from "../api/wire";
 import { factoryDayKey } from "../lib/factory-time";
 import { SYNC_NOW_GAP_MS } from "../lib/simdi-guncelle";
 import { ORNEK_ANLIK, ORNEK_BILDIRIM, ORNEK_BILDIRIMLER, ORNEK_FABRIKA_TERCIH, ORNEK_CARI_OZETI, ORNEK_GELEN, ORNEK_LISTE, ORNEK_RAPORLAR, ornekGiris, ornekOturum } from "./veri";
@@ -98,7 +98,11 @@ function listele(projeksiyon: string, q: Query | undefined) {
   if (sirala && tur) {
     const yon = q?.yon === "azalan" ? -1 : 1;
     const deger = (r: (typeof kayitlar)[number]) => {
-      const v = (r.kayit as Record<string, unknown>)[sirala];
+      // Bulutla aynı: bayrak = alanlar sırayla `true` → "0"; alt satır alanı `kisisel`den (2026-11-20).
+      const bayraklar = tur === "bayrak" ? (LIST_SORT_FLAGS[projeksiyon]?.[sirala] ?? []) : [];
+      if (bayraklar.length > 0) return bayraklar.map((f) => ((r.kayit as Record<string, unknown>)[f] === true ? "0" : "1")).join("");
+      const kaynak = LIST_SORT_SUBROW[projeksiyon]?.[sirala] ? (r as { kisisel?: unknown }).kisisel : r.kayit;
+      const v = ((kaynak ?? {}) as Record<string, unknown>)[sirala];
       if (v === null || v === undefined || v === "") return null;
       return tur === "sayi" ? Number(v) : String(v);
     };
