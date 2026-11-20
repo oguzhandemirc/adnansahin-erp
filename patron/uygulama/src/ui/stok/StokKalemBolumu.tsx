@@ -7,7 +7,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import {
   gorunenKalemler, gorunenToplar, kaleminToplari, kgVar, KIM_NEREDE_ANAHTARLARI, stokBolumu, stokSuzgecDurumu,
-  type Bolum, type Gorunum, type Kalem, type StokBolumu,
+  type Bolum, type Gorunum, type Kalem, type StokBolumu, type Top,
 } from "../../lib/stok-kalem";
 import { UNIT } from "../../lib/labels/uretim";
 import { qty } from "../pano/read";
@@ -16,10 +16,12 @@ import { useSnapshot } from "../pano/useSnapshot";
 import { azamiSutun, etkinSuzgecSayisi, gecerliSecim, sonrakiSiralama, sutunDegistir, sutunTasi, suzgecAta, type SutunTanimi } from "../tablo/model";
 import { SutunSecici } from "../tablo/Seciciler";
 import { EtkinSuzgecler, SuzgecBos, SuzgecSayfasi } from "../tablo/Suzgec";
+import { KisaTablo } from "../tablo/KisaTablo";
 import { useTabloTercihi } from "../tablo/useTabloTercihi";
+import type { YerelSutun } from "../tablo/yerelTablo";
 import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useTabloOlcusu, type YatayEksen } from "../tablo/VeriTablosu";
 import { makeStyles, useTokens } from "../theme-context";
-import { space, tabularNums, typography } from "../tokens";
+import { space, typography } from "../tokens";
 import {
   bolumOf, gorunumOf, gorunumTemizle, kalemTemizle, KALEM_SIRALANABILIR, KALEM_SUTUNLARI, topTemizle, TOP_SIRALANABILIR, TOP_SUTUNLARI, VARSAYILAN_SUTUN,
 } from "./sutunlar";
@@ -176,20 +178,30 @@ function SayfaliListe<R>(p: {
   );
 }
 
-/** Açılan kalemin topları: top no · metre · parti · yaş (en yaşlı önce, fabrikanın sırası). */
+/**
+ * Açılan kalemin topları (2026-11-20: liste → tablo, dört özellik): Top no · Metre · Parti · Yaş varsayılan (bugünkü dört
+ * alan), Depo · Kg seçilebilir (telin alanları, türev yok). Sıra varsayılan fabrikanın (en yaşlı önce); sütun seçimi +
+ * sıralama cihazda (`tablo.stok-kalem-toplari`), arama + Parti/Depo süzgeci açılışta. Kalem tam kümedir ⇒ yerelde doğru.
+ */
+const KALEM_TOP_SUTUNLARI: readonly YerelSutun<Top>[] = [
+  { key: "topNo", baslik: "Top no", agirlik: 1.4, kirpilmaz: 12, hucre: (x) => x.topNo ?? "—" },
+  { key: "metre", baslik: "Metre", agirlik: 0.9, sayi: true, hucre: (x) => `${qty(x.metre)} ${UNIT.metre}`, siraDegeri: (x) => x.metre },
+  { key: "parti", baslik: "Parti", agirlik: 0.9, suzgec: true, hucre: (x) => x.parti ?? "—" },
+  { key: "gun", baslik: "Yaş", ad: "Yaş (gün)", agirlik: 0.8, sayi: true, hucre: (x) => (x.gun === null ? "—" : `${x.gun} ${UNIT.gun}`), siraDegeri: (x) => x.gun },
+  { key: "depo", baslik: "Depo", agirlik: 1, suzgec: true, hucre: (x) => x.depo ?? "—" },
+  { key: "kg", baslik: "Kg", agirlik: 0.7, sayi: true, hucre: (x) => (x.kg === null ? "—" : qty(x.kg)), siraDegeri: (x) => x.kg },
+];
+const KALEM_TOP_VARSAYILAN = ["topNo", "metre", "parti", "gun"];
+
 function KalemToplari({ b, kalem }: { readonly b: StokBolumu; readonly kalem: Kalem }) {
   const s = useStyles();
   const toplar = kaleminToplari(b, kalem.anahtar);
   return (
-    <View style={s.toplar} testID={`stok-kalem-toplar-${kalem.anahtar}`}>
-      {toplar.map((x) => (
-        <View key={x.id} style={s.topSatir} accessible accessibilityLabel={`Top ${x.topNo ?? "numarasız"}, ${qty(x.metre)} metre, ${x.gun ?? "yaşı bilinmeyen"} gün`}>
-          <Text style={[s.topYazi, s.topNo]} numberOfLines={1}>{x.topNo ?? "—"}</Text>
-          <Text style={[s.topYazi, s.sayi]}>{`${qty(x.metre)} ${UNIT.metre}`}</Text>
-          <Text style={[s.topYazi, s.parti]} numberOfLines={1}>{x.parti ?? ""}</Text>
-          <Text style={[s.topYazi, s.sayi]}>{x.gun === null ? "—" : `${x.gun} ${UNIT.gun}`}</Text>
-        </View>
-      ))}
+    <View style={s.toplar}>
+      <KisaTablo
+        sutunlar={KALEM_TOP_SUTUNLARI} varsayilan={KALEM_TOP_VARSAYILAN} satirlar={toplar} anahtar="tablo.stok-kalem-toplari"
+        aramaIpucu="Top no, parti, depo ara" birim="top" kompakt testID={`stok-kalem-toplar-${kalem.anahtar}`}
+      />
     </View>
   );
 }
@@ -203,11 +215,5 @@ const useStyles = makeStyles((t) => ({
   bos: { ...typography.footnote, color: t.color.textMuted, paddingVertical: space.l, textAlign: "center" as const },
   dahaFazla: { minHeight: 44, alignItems: "center" as const, justifyContent: "center" as const, marginBottom: space.m },
   dahaYazi: { ...typography.callout, fontWeight: "600" as const },
-  toplar: { backgroundColor: t.surfaceAlt, paddingVertical: space.xs, paddingLeft: space.l, paddingRight: space.s },
-  topSatir: { flexDirection: "row" as const, alignItems: "center" as const, minHeight: 30, gap: space.s },
-  topYazi: { ...typography.footnote, color: t.textSecondary },
-  topNo: { flex: 1.6, color: t.text },
-  // Sola dayalı (kullanıcı kararı 2026-11-18, tablolarla aynı); rakamlar tabular.
-  sayi: { flex: 1, ...tabularNums },
-  parti: { flex: 0.8 },
+  toplar: { backgroundColor: t.surfaceAlt, paddingVertical: space.xs, paddingHorizontal: space.s },
 }));

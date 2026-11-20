@@ -143,6 +143,31 @@ describe("§2 ekran", () => {
     expect(screen.queryByTestId(`stok-kalem-toplar-${K1}`)).toBeNull();
   });
 
+  // 2026-11-20: açılan topları tablo + dört özellik (sütunlar · arama · Parti/Depo süzgeci · başlıktan sıralama).
+  it("kalemin topları tablo: Metre başlığı değere göre sıralar (30 < 31,2 < 40), arama ve süzgeç, sütun seçici", async () => {
+    const AsyncStorage = require("@react-native-async-storage/async-storage") as { clear: () => Promise<void> };
+    await AsyncStorage.clear();
+    render(<Stock />);
+    await flush();
+    fireEvent.press(screen.getByTestId(`stok-kalem-satir-${K1}`));
+    await flush();
+    const t = `stok-kalem-toplar-${K1}`;
+    const sira = () => screen.getAllByTestId(new RegExp(`^${t.replace(/[|]/g, "\\|")}-satir-`)).map((x) => String(x.props.testID).slice(-1)).join("");
+    expect(sira()).toBe("123");
+    fireEvent.press(screen.getByTestId(`${t}-sutun-metre`));
+    await flush();
+    expect(sira()).toBe("321");
+    fireEvent.press(screen.getByTestId(`${t}-ara-ac`));
+    fireEvent.changeText(screen.getByTestId(`${t}-ara`), "p08");
+    expect(sira()).toBe("3");
+    fireEvent.changeText(screen.getByTestId(`${t}-ara`), "");
+    fireEvent.press(screen.getByTestId(`${t}-suzgec`));
+    expect(screen.getByTestId(`${t}-suzgec-secici`)).toBeTruthy();
+    fireEvent.press(screen.getByTestId(`${t}-sutunlar`));
+    expect(screen.getByTestId(`${t}-sutun-secici`)).toBeTruthy();
+    await AsyncStorage.clear();
+  });
+
   it("Ham segmenti ham kalemleri, Top bazında topları tek tek gösterir; arama süzer", async () => {
     render(<Stock />);
     await flush();
