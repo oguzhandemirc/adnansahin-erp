@@ -181,7 +181,7 @@ export const DELIBERATELY_EXCLUDED: Readonly<Record<string, string>> = {
   printed_documents: "belge içeriği", label_templates: "şablon", traveler_card_templates: "şablon",
   batches: "v2 adayı (parti izleme raporu isteğe bağlı); 2.13.2: top satırında yalnız batchNumber GÖSTERİLİR (stok-kalem, cuval-deposu, sevkiyat-icerigi)",
   purchase_orders: "v2 adayı (alış siparişi)", purchase_order_lines: "v2 adayı (alış siparişi)",
-  goods_receipts: "v2 adayı (mal kabul)", sack_allocations: "sevk karşılama pivotu — sipariş sevkMiktari türetilmiş olarak gider",
+  goods_receipts: "v2 adayı (mal kabul)", sack_allocations: "sevk karşılama pivotu — sipariş sevkMiktari türetilmiş olarak gider; 2.13.2: `sevkiyat.siparisNolari`nın değişiklik kaynağı (createdAt), kök değil",
   subcontractor_dispatches: "fason — v1'de özet 'fason' bölümü", subcontractor_dispatch_items: "fason — aynı",
   subcontractor_receipts: "fason — aynı", subcontractor_receipt_items: "fason — aynı",
   exchange_rates: "kur tablosu — finans",

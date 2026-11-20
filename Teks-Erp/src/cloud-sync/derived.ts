@@ -17,7 +17,7 @@ import {
   isOpenWorkOrderStatus, loadCloseDates, loadOpenFasonOfWorkOrders, loadRollStagesOfWorkOrders, metreNumber, NO_FASON,
   orderSharesOf, shareMeters, STAGE_STATION_SELECT, uretimStepName, workOrderStage, WO_ORDER_SHARES_SELECT,
 } from "./work-order-facts";
-import { shipmentContentDerived } from "./shipment-content";
+import { loadShipmentFacets, shipmentContentDerived, shipmentFacets } from "./shipment-content";
 import { loadPackingLots, partiOf } from "./packing-lot-facts";
 
 type RawRow = Record<string, unknown> & { id: string };
@@ -160,6 +160,8 @@ async function shipmentDerived(rows: readonly RawRow[]): Promise<DerivedValues> 
   for (const l of links) ordersById.set(l.shipmentId, [...(ordersById.get(l.shipmentId) ?? []), l.orderId]);
   const customers = await displayNames("customer", rows.map((r) => r.customerId));
   const customerOf = new Map(rows.map((r) => [r.id, r.customerId as string]));
+  // 2 (2.13.2): süzgeç dizileri — içerikle aynı top kümesi, toplu okuma (`shipment-content` loadShipmentFacets).
+  const facets = await loadShipmentFacets(shipIds);
   const out: DerivedValues = new Map();
   for (const id of shipIds) {
     const t = totals.get(id);
@@ -171,6 +173,7 @@ async function shipmentDerived(rows: readonly RawRow[]): Promise<DerivedValues> 
       topSayisi: grossRollCount(c?.rolls ?? 0, c?.returns ?? 0),
       siparisIdleri: ordersById.get(id) ?? [],
       musteriAdi: customers.get(customerOf.get(id) ?? "") ?? null,
+      ...(facets.get(id) ?? shipmentFacets([], [])),
     });
   }
   return out;

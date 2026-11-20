@@ -107,3 +107,33 @@ Kullanıcı (2026-11-20): "telefonda siparişin tamamını görüyoruz, paylaşt
   türeticisinde paket başına 1 `findMany`. TAM gönderim süresi provada ölçülür.
 - **Provada bakılacak:** paylaştırması olan bir İE'de telefon satırında `gosterilenMetre` = panel "Düzenle"deki metre;
   panelden paylaştırmayı değiştirip bir sonraki turda İE ve kalem satırının yeniden geldiği.
+
+### Ek A5 — sevkiyat listesi süzgeç dizileri (`sevkiyat` 1 → 2)
+
+Sevkiyat LİSTESİ kumaş/renk/en/parti/sipariş/depo ile süzülüp aransın diye satıra içerikten tekil diziler EKLENDİ.
+
+- **Alan:** `urunIdleri` + `urunAdlari`, `renkIdleri` + `renkAdlari` (kimlik/ad çiftleri AYNI sırada: `urunAdlari[i]` =
+  `urunIdleri[i]`nin adı; sıra ada göre tr, eşitlikte kimlik), `enler` (sayı, artan), `partiAdlari` + `partiKodlari`
+  (sevk partisi, aynı sırada), `uretimPartileri` (`Batch.batchNumber`, yalnız gösterim/metin), `etiketMusterileri`,
+  `siparisNolari`, `depolar`. Hepsi tekil + kararlı sıralı (içerik değişmedikçe dizi değişmez); boşsa `[]`.
+- **Kaynak:** `sevkiyat-icerigi` ile AYNI top kümesi — çuvalların BRÜT içeriği (canlı toplar + iptal edilmemiş, canlı
+  kümede olmayan iadeler `prevSackId` ile) + çuvalsız toplar; **hayalet top (`yok`) sayılmaz**; iade satırının
+  ürün/renk/eni iade anındaki değerdir. Toplu okuma `cloud-sync/shipment-content.ts` `loadShipmentFacets` (birim başına
+  4 sorgu; top ek kolonları `loadRollExtras`, parti `loadPackingLots` içerikle ortak), saf biçim `shipmentFacets` +
+  `cloud-sync/facet-arrays.ts`. Panel servisi kök başına ÇAĞRILMAZ; eşitliği bekçi DB'deki her sevkiyatta içerik
+  kaydıyla ölçer. `siparisNolari` çuvalların ETKİN tahsislerinden (`SackAllocation` → kalem → sipariş) gelir —
+  mevcut `siparisIdleri` (`shipment_orders`, sevkiyatın seçili siparişleri) ile aynı küme olmak ZORUNDA DEĞİL (tahsis
+  düşmeyen seçili sipariş `siparisIdleri`nde var, `siparisNolari`nda yok). `depolar` = çuvalların `warehouseId` deposu.
+- **Değişiklik izleme:** mevcut `sacks`/`rolls`/`roll_returns` via + `shipment_orders` işareti; eklenen kaynaklar:
+  `items`, `colors` (topun/iadenin ürünü-rengi), `customers` (sevkiyat carisine ek olarak topun etiket müşterisi),
+  `packing_groups`, `warehouses`, `sack_allocations` (**`createdAt` filigranı**: tabloda `updatedAt` yok; damgalama
+  `clearedAt` her yolda aynı tx'te sevkiyat/çuval/bağ yazar → mevcut kaynaklar yakalar). `batches.batchNumber` ve
+  `orders.orderNumber` doğuşta materyalize edilir, değişmez → kaynak değil.
+- **Uyum:** bulut satırı şemasız saklar, imaj gerekmez. Diziyle SÜZMEK için bulutta yeni üyelik süzgeci gerekir
+  (bugün yalnız `is-emri` için `LIST_MEMBER_FILTERS`) — o iş bulut tarafındadır; o gelene kadar alanlar yalnız taşınır.
+- **Yük (ölçüldü, yerel test DB, sentetik 586 sevkiyat · 1758 çuval · 8790 top):** `loadShipmentFacets(586)` 70–121 ms;
+  TAM sayfa `buildRecords(sevkiyat, 586)` 91 ms, 586 satır 532 KB (satır başı ≈ 930 B, dizilerle). Kıyas: kök başına panel
+  servisi 2,9 ms/sevkiyat (≈ 1,7 sn). Ad değişimi: yaygın bir ürün/renk/etiket carisinin adı değişirse o ürünlü bütün
+  sevkiyat satırları (saklama penceresinde) yeniden gider — seyrek, satır hafif.
+- **Provada bakılacak:** ilk tur `sevkiyat` TAM süresi; birkaç sevkiyatta dizilerin uygulamadaki sevkiyat ayrıntısıyla
+  (çuval içerikleri) aynı ürün/renk/en/partiyi söylediği.

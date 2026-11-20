@@ -4,7 +4,7 @@
 // `tutar`/`doviz` ve kalem `birimFiyat` kolonları YOK; iş emri `sevkeHazir` yok (kavram yok),
 // `cariKartIdleri` yalnız sipariş bağından.
 
-import { col, derived, lookup, self, via, type RecordProjection } from "./projection-types";
+import { col, derived, ID_TIE, lookup, self, via, type RecordProjection } from "./projection-types";
 
 // ── OLGU projeksiyonları ──────────────────────────────────────────────────────
 // Top adımı değişince (üretilen/bulunduğu adım) o iş emri yeniden gider.
@@ -66,6 +66,21 @@ const RETURNS_OF_REASONS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHERE
 const SACKS_OF_LOTS = 'SELECT s."id" AS root_id FROM "sacks" s WHERE s."packingGroupId" = ANY($1::uuid[])';
 const SHIPMENTS_OF_LOTS =
   'SELECT DISTINCT s."shipmentId" AS root_id FROM "sacks" s WHERE s."packingGroupId" = ANY($1::uuid[]) AND s."shipmentId" IS NOT NULL';
+// 2.13.2 `sevkiyat` süzgeç dizileri: topun (canlı · çuvalı sevkiyatta · iade satırı) ürün/renk/etiket müşterisi adı ve
+// çuvalın deposu değişince o sevkiyatlar yeniden gider. Ad değişimi seyrek; yaygın bir ürünün adı yüzlerce sevkiyatı
+// yeniden gönderir (bilinçli: liste satırı hafiftir, içerik kaydı bunu yapmaz).
+const shipmentsOfRollCol = (col: string, retCol: string | null): string =>
+  `SELECT r."shipmentId" AS root_id FROM "rolls" r WHERE r."${col}" = ANY($1::uuid[]) AND r."shipmentId" IS NOT NULL ` +
+  `UNION SELECT s."shipmentId" AS root_id FROM "rolls" r JOIN "sacks" s ON s."id" = r."sackId" WHERE r."${col}" = ANY($1::uuid[]) AND s."shipmentId" IS NOT NULL ` +
+  (retCol
+    ? `UNION SELECT rr."fromShipmentId" AS root_id FROM "roll_returns" rr WHERE rr."${retCol}" = ANY($1::uuid[]) AND rr."fromShipmentId" IS NOT NULL`
+    : `UNION SELECT rr."fromShipmentId" AS root_id FROM "roll_returns" rr JOIN "rolls" r ON r."id" = rr."rollId" WHERE r."${col}" = ANY($1::uuid[]) AND rr."fromShipmentId" IS NOT NULL`);
+const SHIPMENTS_OF_ITEMS = shipmentsOfRollCol("itemId", "itemId");
+const SHIPMENTS_OF_COLORS = shipmentsOfRollCol("colorId", "colorId");
+// Cari adı: sevkiyatın carisi + topun etiket müşterisi (iade satırında topun güncel etiketi, içerikle aynı).
+const SHIPMENTS_OF_CUSTOMERS_OR_LABELS = `${SHIPMENTS_OF_CUSTOMERS} UNION ${shipmentsOfRollCol("labelCustomerId", null)}`;
+const SHIPMENTS_OF_WAREHOUSES = 'SELECT DISTINCT s."shipmentId" AS root_id FROM "sacks" s WHERE s."warehouseId" = ANY($1::uuid[]) AND s."shipmentId" IS NOT NULL';
+const SHIPMENTS_OF_SACK_ALLOCATIONS = 'SELECT DISTINCT s."shipmentId" AS root_id FROM "sacks" s WHERE s."id" = ANY($1::uuid[]) AND s."shipmentId" IS NOT NULL';
 const NAME_OF =(model: string): string => `cloud-sync/derived displayNames: ${model}.name (BOYUT \`ad\` ile aynı kolon)`;
 
 export const FACTS: readonly RecordProjection[] = [
@@ -132,15 +147,41 @@ export const FACTS: readonly RecordProjection[] = [
       derived("topSayisi", "helpers/shipment-gross-totals.helper grossRollCount (canlı + iptal edilmemiş iade)", ["rolls", "roll_returns"]),
       derived("siparisIdleri", "shipment_orders kümesi (listShipments `_count.orders` ile aynı; isActive yalnız PLANNED denormudur, süzülmez)", ["shipment_orders"]),
       derived("musteriAdi", NAME_OF("Customer"), ["customers"]),
+      // 2 (2.13.2): liste süzgeci/araması için içerikten tekil diziler — `sevkiyat-icerigi` ile AYNI top kümesi
+      // (çuvalların BRÜT içeriği + çuvalsız toplar, hayalet hariç), toplu okuma `shipment-content` loadShipmentFacets.
+      ...([
+        ["urunIdleri", "Roll/RollReturn.itemId (kimliğe göre tekil, urunAdlari ile aynı sırada: ada göre)", ["rolls", "roll_returns", "sacks"]],
+        ["urunAdlari", "Item.name (urunIdleri[i]nin adı)", ["rolls", "roll_returns", "sacks", "items"]],
+        ["renkIdleri", "Roll/RollReturn.colorId (renkAdlari ile aynı sırada)", ["rolls", "roll_returns", "sacks"]],
+        ["renkAdlari", "Color.name (renkIdleri[i]nin adı)", ["rolls", "roll_returns", "sacks", "colors"]],
+        ["enler", "Roll/RollReturn.width (tekil, artan sayı)", ["rolls", "roll_returns", "sacks"]],
+        ["partiAdlari", "packing-lot-facts loadPackingLots: çuvalların PackingGroup.name (partiKodlari ile aynı sırada)", ["sacks", "packing_groups"]],
+        ["partiKodlari", "packing-lot-facts loadPackingLots: PackingGroup.code", ["sacks", "packing_groups"]],
+        ["uretimPartileri", "loadRollExtras: Batch.batchNumber (yalnız gösterim/metin)", ["rolls", "roll_returns", "sacks", "batches"]],
+        ["etiketMusterileri", "loadRollExtras: Roll.labelCustomer.name", ["rolls", "roll_returns", "sacks", "customers"]],
+        ["siparisNolari", "çuvalların ACTIVE_SACK_ALLOCATION tahsisleri → OrderLine → Order.orderNumber", ["sacks", "sack_allocations", "order_lines", "orders"]],
+        ["depolar", "çuvalların Warehouse.name", ["sacks", "warehouses"]],
+      ] as const).map(([w, h, reads]) => derived(w, `cloud-sync/shipment-content loadShipmentFacets → shipmentFacets: ${h}`, reads)),
     ],
     sources: [self("shipments"),
       via("sacks", "shipmentId", "ESKİ sevkiyat ayrılmada görünmez → sacks_sync_parent_moved tetikleyicisi"),
       via("rolls", "shipmentId", "ESKİ sevkiyat ayrılmada görünmez → rolls_sync_parent_moved tetikleyicisi"),
       via("roll_returns", "fromShipmentId"),
-      lookup("customers", "id", SHIPMENTS_OF_CUSTOMERS, "cari adı değişince sevkiyatları yeniden gider")],
+      lookup("customers", "id", SHIPMENTS_OF_CUSTOMERS_OR_LABELS, "cari adı değişince sevkiyatları + (2) topu o etiket müşterili sevkiyatlar yeniden gider"),
+      // 2 (2.13.2) süzgeç dizilerinin kaynakları:
+      lookup("items", "id", SHIPMENTS_OF_ITEMS, "ürün adı değişince o ürünlü toplu/iadeli sevkiyatlar"),
+      lookup("colors", "id", SHIPMENTS_OF_COLORS, "renk adı değişince o renkli toplu/iadeli sevkiyatlar"),
+      lookup("packing_groups", "id", SHIPMENTS_OF_LOTS, "parti adı/kodu değişince çuvalları o sevkiyatta olanlar (küçük tablo, filigran indekssiz)"),
+      lookup("warehouses", "id", SHIPMENTS_OF_WAREHOUSES, "depo adı değişince çuvalı o depoda olan sevkiyatlar (küçük tablo)"),
+      // Tahsis satırında `updatedAt` YOK: doğuş `createdAt` filigranıyla (indekssiz; tablo çuval sayısı mertebesinde).
+      // Damgalama (`clearedAt`) her yolda aynı tx'te kök/çuval/bağ yazar: sevk iptali `shipments.status` (self) ·
+      // çuval çıkarma `sacks.shipmentId` (via) · sipariş kümesi yenileme `shipment_orders` işareti + yeni satırların createdAt'i.
+      { table: "sack_allocations", watermark: "createdAt", tieBreaker: ID_TIE,
+        root: { kind: "lookup", keyColumn: "sackId", sql: SHIPMENTS_OF_SACK_ALLOCATIONS }, note: "tahsis doğuşu → çuvalın sevkiyatı (siparisNolari)" }],
     markedBy: [{ table: "shipment_orders", trigger: "shipment_orders_sync_dirty" }],
+    // 2 (2026-11-20, backend 2.13.2): süzgeç dizileri EKLENDİ — sürüm artışı bir kez TAM gönderim ister.
     deletion: "YOK", permission: "bulut:sevkiyat:oku",
-    retention: { wireFields: ["cikisTarihi", "olusturulma"], sql: 'COALESCE(t."dispatchedAt", t."createdAt")' }, catalogVersion: 1,
+    retention: { wireFields: ["cikisTarihi", "olusturulma"], sql: 'COALESCE(t."dispatchedAt", t."createdAt")' }, catalogVersion: 2,
   },
   {
     // 2026-11-19 (Adnan'a özgü sözleşme genişletmesi): sevkiyatın çuval → top kırılımı, panelin sevkiyat ayrıntısıyla

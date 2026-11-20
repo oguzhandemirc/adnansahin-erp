@@ -14,15 +14,22 @@
 //  §7 (2.13.2) Sevk partisi: içerik çuvalında partiAdi/partiKodu/partiDurumu/ambalajNo, topta üretim `parti` (batchNumber);
 //     partisizde null; `cuval` KAYIT aynı alanlar; packing_groups kaynağı doğru kökleri kirletir; ad/durum değişimi
 //     filigranı ilerletir ve yeniden kurulan satır yeni değeri taşır; iki projeksiyonda katalog sürümü 2.
+//  §8 (2.13.2) `sevkiyat` süzgeç dizileri (katalog 2): fikstür değerleri; DB'deki her sevkiyatta içerik kaydıyla eşitlik
+//     (hayalet hariç, iade BRÜT, başka sevkiyatın çuvalını gösteren iade yok); ad/depo/parti kaynakları kökü kirletir;
+//     yalnız tahsis satırı doğunca (`sack_allocations.createdAt`) sevkiyat kirli ve yeni sipariş no gelir.
 //
 // NEGATİF SONDALAR (2026-11-19, elle bozulup koşuldu, hepsi KIRMIZI): `bekci-sonda` notu commit mesajında.
+//  S8a (2026-11-20) loadShipmentFacets hayalet süzgeci kaldırıldı → 2 ✗ (§8 fikstür + içerik eşitliği).
+//  S8b (2026-11-20) başka sevkiyatın çuvalını gösteren iade atlanmadı → 2 ✗ (§8 içerik eşitliği + ikinci sevkiyat).
+//  S8c (2026-11-20) `sack_allocations` kaynağı katalogdan çıkarıldı → 1 ✗ (§8 yeni tahsis → kirli).
 // =============================================================================
 import prisma from "../src/lib/prisma";
 import { findRecordProjection } from "../src/cloud-sync/projections";
 import { DERIVERS } from "../src/cloud-sync/derived";
 import { buildRecords } from "../src/cloud-sync/record-builder";
 import { toUnits } from "../src/cloud-sync/packing";
-import { mapToRoots } from "../src/cloud-sync/change-scan";
+import { collectProjectionChanges, mapToRoots, positionsAfterFull } from "../src/cloud-sync/change-scan";
+import { buildShipmentContent } from "../src/cloud-sync/shipment-content";
 import { shippingService } from "../src/services/shipping.service";
 import { ensureTestAdmin } from "./fixture-test-user";
 
@@ -35,7 +42,8 @@ function check(l: string, ok: boolean, x = ""): void {
 
 const FINANCE = /fiyat|tutar|bakiye|maliyet|odeme|doviz|kdv|price|amount|balance|cost|paid|payment|currency|vat|tax/i;
 const STAMP = `TEST-SVKI-${Date.now()}-`;
-const fx = { customers: [] as string[], items: [] as string[], colors: [] as string[], rolls: [] as string[], sacks: [] as string[], shipments: [] as string[], returns: [] as string[], groups: [] as string[], wos: [] as string[] };
+const fx = { customers: [] as string[], items: [] as string[], colors: [] as string[], rolls: [] as string[], sacks: [] as string[], shipments: [] as string[], returns: [] as string[], groups: [] as string[], wos: [] as string[],
+  warehouses: [] as string[], orders: [] as string[] };
 
 type J = Record<string, unknown>;
 const isObj = (v: unknown): v is J => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -65,14 +73,25 @@ async function setup(now: Date) {
   const wo = await prisma.workOrder.create({ data: { workOrderNumber: `${STAMP}WO`, status: "IN_PROGRESS", targetItemId: item.id }, select: { id: true } });
   fx.wos.push(wo.id);
   const batch = await prisma.batch.create({ data: { batchNumber: `${STAMP}P54`, workOrderId: wo.id }, select: { id: true } });
-  const sack1 = await prisma.sack.create({ data: { sackNo: `${STAMP}CV1`, customerId: cust.id, shipmentId: ship.id, seq: 1, weightKg: 30, packingGroupId: lot.id, packageNo: 3 }, select: { id: true } });
+  // §8: çuval 1 bir depoda ve bir siparişe tahsisli; çuvalsız top ikinci ürün/renk ve başka en.
+  const wh = await prisma.warehouse.create({ data: { code: `T${String(Date.now()).slice(-10)}W`, name: `${STAMP}Depo` }, select: { id: true } });
+  fx.warehouses.push(wh.id);
+  const item2 = await prisma.item.create({ data: { code: `${STAMP}I2`, name: `${STAMP}Astar`, itemType: "FABRIC" }, select: { id: true } });
+  fx.items.push(item2.id);
+  const color2 = await prisma.color.create({ data: { code: `${STAMP}K2`, name: `${STAMP}Bej` }, select: { id: true } });
+  fx.colors.push(color2.id);
+  const order = await prisma.order.create({ data: { orderNumber: `${STAMP}SIP`, customerId: cust.id, status: "APPROVED" }, select: { id: true } });
+  fx.orders.push(order.id);
+  const line = await prisma.orderLine.create({ data: { orderId: order.id, itemId: item.id, colorId: color.id, quantity: 200, unit: "MT" }, select: { id: true } });
+  const sack1 = await prisma.sack.create({ data: { sackNo: `${STAMP}CV1`, customerId: cust.id, shipmentId: ship.id, seq: 1, weightKg: 30, packingGroupId: lot.id, packageNo: 3, warehouseId: wh.id }, select: { id: true } });
   const sack2 = await prisma.sack.create({ data: { sackNo: `${STAMP}CV2`, customerId: cust.id, shipmentId: ship.id, seq: 2 }, select: { id: true } });
   fx.sacks.push(sack1.id, sack2.id);
+  await prisma.sackAllocation.create({ data: { sackId: sack1.id, sackNo: `${STAMP}CV1`, orderLineId: line.id, qty: 150 } });
   let i = 0;
-  const roll = async (qty: number, o: { sackId: string | null; shipmentId: string | null; status: "SHIPPED" | "WAREHOUSE" | "SCRAP"; kg?: number; labelCustomerId?: string; batchId?: string }) => {
+  const roll = async (qty: number, o: { sackId: string | null; shipmentId: string | null; status: "SHIPPED" | "WAREHOUSE" | "SCRAP"; kg?: number; labelCustomerId?: string; batchId?: string; width?: number; itemId?: string; colorId?: string }) => {
     i++;
     const r = await prisma.roll.create({
-      data: { itemId: item.id, colorId: color.id, initialQty: qty, currentQty: qty, width: 150, status: o.status, entrySource: "SUPPLIER_RECEIPT", barcode: `${STAMP}R${i}`,
+      data: { itemId: o.itemId ?? item.id, colorId: o.colorId ?? color.id, initialQty: qty, currentQty: qty, width: o.width ?? 150, status: o.status, entrySource: "SUPPLIER_RECEIPT", barcode: `${STAMP}R${i}`,
         sackId: o.sackId, shipmentId: o.shipmentId, weightKg: o.kg ?? null, labelCustomerId: o.labelCustomerId ?? null, batchId: o.batchId ?? null },
       select: { id: true },
     });
@@ -83,9 +102,10 @@ async function setup(now: Date) {
   const r2 = await roll(50, { sackId: sack1.id, shipmentId: ship.id, status: "SHIPPED" });
   const r3 = await roll(70, { sackId: sack2.id, shipmentId: ship.id, status: "SHIPPED" });
   // Hayalet: çuval kaydında ama fiziksel olarak yok (SCRAP).
-  const r4 = await roll(5, { sackId: sack2.id, shipmentId: ship.id, status: "SCRAP" });
-  // Çuvalsız sevk edilmiş top.
-  const r5 = await roll(40, { sackId: null, shipmentId: ship.id, status: "SHIPPED" });
+  // §8: hayaletin eni (999) süzgeç dizilerine GİRMEZ.
+  const r4 = await roll(5, { sackId: sack2.id, shipmentId: ship.id, status: "SCRAP", width: 999 });
+  // Çuvalsız sevk edilmiş top (§8: ikinci ürün/renk, en 160).
+  const r5 = await roll(40, { sackId: null, shipmentId: ship.id, status: "SHIPPED", width: 160, itemId: item2.id, colorId: color2.id });
   // İade alınan top: FK'lar NULL (iade akışı gibi), iz `prevSackId`te.
   const r6 = await roll(25, { sackId: null, shipmentId: null, status: "WAREHOUSE" });
   // İptal edilen iade: hiç görünmez.
@@ -94,7 +114,16 @@ async function setup(now: Date) {
   const live = await prisma.rollReturn.create({ data: { ...base, rollId: r6, qty: 25, prevSackId: sack1.id }, select: { id: true } });
   const gone = await prisma.rollReturn.create({ data: { ...base, rollId: r7, qty: 10, prevSackId: sack1.id, cancelledAt: now, cancelledById: user.id }, select: { id: true } });
   fx.returns.push(live.id, gone.id);
-  return { ship: ship.id, sack1: sack1.id, sack2: sack2.id, lot: lot.id, lotCode: lot.code, r1, r2, r3, r4, r5, r6, r7 };
+  // §8 ikinci sevkiyat: çuvalsız (legacy, prevSackId yok) iade en 170 + başka sevkiyatın çuvalını gösteren iade (içerikte yok).
+  const ship2 = await prisma.shipment.create({ data: { shipmentNo: `${STAMP}S2`, customerId: cust.id, status: "DISPATCHED", dispatchedAt: now }, select: { id: true } });
+  fx.shipments.push(ship2.id);
+  const r8 = await roll(30, { sackId: null, shipmentId: null, status: "WAREHOUSE", width: 170 });
+  const r9 = await roll(30, { sackId: null, shipmentId: null, status: "WAREHOUSE", width: 180 });
+  const legacy = await prisma.rollReturn.create({ data: { ...base, fromShipmentId: ship2.id, rollId: r8, qty: 30, width: 170 }, select: { id: true } });
+  const foreign = await prisma.rollReturn.create({ data: { ...base, fromShipmentId: ship2.id, rollId: r9, qty: 30, width: 180, prevSackId: sack2.id }, select: { id: true } });
+  fx.returns.push(legacy.id, foreign.id);
+  return { ship: ship.id, sack1: sack1.id, sack2: sack2.id, lot: lot.id, lotCode: lot.code, r1, r2, r3, r4, r5, r6, r7,
+    item: item.id, item2: item2.id, color: color.id, color2: color2.id, wh: wh.id, line: line.id, label: label.id, ship2: ship2.id };
 }
 
 async function main(): Promise<void> {
@@ -187,6 +216,62 @@ async function main(): Promise<void> {
     const k1b = cp ? plain((await buildRecords(cp, [f.sack1], now.getTime())).rows.get("cuval")?.[0]) : null;
     check("yeniden kurulan cuval satırı yeni adı ve durumu taşır", isObj(k1b) && k1b.partiAdi === `${STAMP}DNZ-085` && k1b.partiDurumu === "OPEN", j(k1b));
 
+    console.log("\n§8 `sevkiyat` süzgeç dizileri (2.13.2, katalog 2)");
+    const FACETS = ["urunIdleri", "urunAdlari", "renkIdleri", "renkAdlari", "enler", "partiAdlari", "partiKodlari", "uretimPartileri", "etiketMusterileri", "siparisNolari", "depolar"];
+    check("sevkiyat katalog 2 + 11 dizi türevi", sp?.catalogVersion === 2 && FACETS.every((w) => sp.derived.some((d) => d.wire === w)), String(sp?.catalogVersion));
+    const facetRow = async (id: string): Promise<J> => plain((await buildRecords(sp!, [id], Date.now())).rows.get("sevkiyat")?.[0]) as J;
+    const s8 = await facetRow(f.ship);
+    const exp8 = {
+      urunIdleri: [f.item2, f.item], urunAdlari: [`${STAMP}Astar`, `${STAMP}Kumaş`], renkIdleri: [f.color2, f.color], renkAdlari: [`${STAMP}Bej`, `${STAMP}Renk`],
+      enler: [150, 160], partiAdlari: [`${STAMP}DNZ-085`], partiKodlari: [f.lotCode], uretimPartileri: [`${STAMP}P54`],
+      etiketMusterileri: [`${STAMP}Etiket`], siparisNolari: [`${STAMP}SIP`], depolar: [`${STAMP}Depo`],
+    };
+    const got8 = Object.fromEntries(FACETS.map((k) => [k, s8[k]]));
+    check("⭐ fikstür değerleri: kimlik/ad çiftleri ada göre aynı sırada; hayalet eni (999) ve iptal iade yok; parti/depo/sipariş çuvaldan", j(got8) === j(exp8), j(got8));
+
+    // İçerik kaydıyla eşitlik — DB'deki HER sevkiyat (içerik panel servisinden; diziler toplu okumadan).
+    const allShips = (await prisma.shipment.findMany({ select: { id: true } })).map((s) => s.id);
+    const listRows = new Map(((await buildRecords(sp!, allShips, Date.now())).rows.get("sevkiyat") ?? []).map((r) => plain(r) as J).map((r) => [r.id as string, r]));
+    const uniq = (xs: unknown[]): string => j([...new Set(xs.filter((x) => x !== null && x !== undefined).map(String))].sort());
+    const diffs: string[] = [];
+    for (const id of allShips) {
+      const c = plain(await buildShipmentContent(id)) as J;
+      const sacksC = (Array.isArray(c.cuvallar) ? c.cuvallar : []).filter(isObj);
+      const topsC = [...sacksC.flatMap((s) => (Array.isArray(s.toplar) ? s.toplar : []).filter(isObj)), ...(Array.isArray(c.cuvalsizToplar) ? c.cuvalsizToplar : []).filter(isObj)].filter((t) => t.yok !== true);
+      const r = listRows.get(id) ?? {};
+      const pairsOk = (Array.isArray(r.urunIdleri) && Array.isArray(r.urunAdlari) && r.urunIdleri.length === r.urunAdlari.length) && (Array.isArray(r.renkIdleri) && Array.isArray(r.renkAdlari) && r.renkIdleri.length === r.renkAdlari.length);
+      const same =
+        pairsOk &&
+        uniq(r.urunAdlari as unknown[]) === uniq(topsC.map((t) => t.urun)) &&
+        uniq(r.renkAdlari as unknown[]) === uniq(topsC.map((t) => t.renk)) &&
+        uniq((r.enler as unknown[]).map((e) => Number(e))) === uniq(topsC.map((t) => (t.en === null ? null : Number(t.en)))) &&
+        uniq(r.uretimPartileri as unknown[]) === uniq(topsC.map((t) => t.parti)) &&
+        uniq(r.etiketMusterileri as unknown[]) === uniq(topsC.map((t) => t.etiketMusteri)) &&
+        uniq(r.partiKodlari as unknown[]) === uniq(sacksC.map((s) => s.partiKodu));
+      if (!same) diffs.push(id);
+    }
+    check(`⭐ dizi değerleri = içerik kaydı (${allShips.length} sevkiyat)`, allShips.length >= 2 && diffs.length === 0, diffs.slice(0, 3).join(","));
+    const s2 = listRows.get(f.ship2) ?? {};
+    check("ikinci sevkiyat: çuvalsız legacy iade dahil (170), başka sevkiyatın çuvalını gösteren iade hariç (180)", j(s2.enler) === "[170]", j(s2.enler));
+
+    // Değişince yeniden gönderim: kaynak eşlemeleri + tahsis doğuşu (createdAt filigranı).
+    const srcOf = (t: string) => sp!.sources.find((s) => s.table === t);
+    const rootsOf = async (t: string, keys: string[]): Promise<string[]> => { const s = srcOf(t); return s ? mapToRoots(s.root, keys) : []; };
+    check("ürün / renk / etiket müşterisi / depo / parti adı değişince sevkiyat kirli",
+      (await rootsOf("items", [f.item2])).includes(f.ship) && (await rootsOf("colors", [f.color2])).includes(f.ship) &&
+      (await rootsOf("customers", [f.label])).includes(f.ship) && (await rootsOf("warehouses", [f.wh])).includes(f.ship) && (await rootsOf("packing_groups", [f.lot])).includes(f.ship));
+    const t8 = new Date();
+    const stored8 = new Map(positionsAfterFull(sp!, t8).map((w) => [w.source, { source: w.source, at: w.at ?? null, tie: w.tie ?? null, catalogVersion: null, digest: null, retentionFrom: null }]));
+    await new Promise((res) => setTimeout(res, 15));
+    const order2 = await prisma.order.create({ data: { orderNumber: `${STAMP}SIP2`, customerId: fx.customers[0]!, status: "APPROVED" }, select: { id: true } });
+    fx.orders.push(order2.id);
+    const line2 = await prisma.orderLine.create({ data: { orderId: order2.id, itemId: f.item, colorId: f.color, quantity: 80, unit: "MT" }, select: { id: true } });
+    await prisma.sackAllocation.create({ data: { sackId: f.sack2, sackNo: `${STAMP}CV2`, orderLineId: line2.id, qty: 70 } });
+    const ch8 = await collectProjectionChanges(sp!, stored8, new Date(Date.now() + 1));
+    check("⭐ yeni tahsis (yalnız sack_allocations satırı) → sevkiyat kirli", ch8.dirty.has(f.ship), j([...ch8.dirty]));
+    const s8b = await facetRow(f.ship);
+    check("yeniden kurulan satır yeni siparişi taşır (sıralı)", j(s8b.siparisNolari) === j([`${STAMP}SIP`, `${STAMP}SIP2`]), j(s8b.siparisNolari));
+
     console.log("\n§6 Paketleme");
     const fake = Array.from({ length: 250 }, (_, k) => ({ id: `00000000-0000-4000-8000-${String(k).padStart(12, "0")}` }));
     const units = toUnits({ projection: p, built: new Map([["sevkiyat-icerigi", fake]]), removed: [], full: null });
@@ -194,7 +279,11 @@ async function main(): Promise<void> {
   } finally {
     await prisma.rollReturn.deleteMany({ where: { id: { in: fx.returns } } });
     await prisma.roll.deleteMany({ where: { id: { in: fx.rolls } } });
+    await prisma.sackAllocation.deleteMany({ where: { sackId: { in: fx.sacks } } });
     await prisma.sack.deleteMany({ where: { id: { in: fx.sacks } } });
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: fx.orders } } });
+    await prisma.order.deleteMany({ where: { id: { in: fx.orders } } });
+    await prisma.warehouse.deleteMany({ where: { id: { in: fx.warehouses } } });
     await prisma.shipment.deleteMany({ where: { id: { in: fx.shipments } } });
     await prisma.packingGroup.deleteMany({ where: { id: { in: fx.groups } } });
     await prisma.batch.deleteMany({ where: { workOrderId: { in: fx.wos } } });
