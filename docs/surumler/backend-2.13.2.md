@@ -137,3 +137,20 @@ Sevkiyat LİSTESİ kumaş/renk/en/parti/sipariş/depo ile süzülüp aransın di
   sevkiyat satırları (saklama penceresinde) yeniden gider — seyrek, satır hafif.
 - **Provada bakılacak:** ilk tur `sevkiyat` TAM süresi; birkaç sevkiyatta dizilerin uygulamadaki sevkiyat ayrıntısıyla
   (çuval içerikleri) aynı ürün/renk/en/partiyi söylediği.
+
+### Ek A6 — sipariş listesi süzgeç dizileri (`siparis` 4 → 5)
+
+- **Alan:** `urunIdleri` + `urunAdlari`, `renkIdleri` + `renkAdlari` (kimlik/ad çiftleri AYNI sırada, ada göre tr),
+  `enler` (sayı, artan). Biçim `sevkiyat` dizileriyle ortak (`cloud-sync/facet-arrays.ts`); boşsa `[]`.
+- **Kaynak ve kalem kapsamı:** siparişin kalemleri, kapsam mevcut `kalemSayisi` türeviyle AYNI —
+  `order-line-scope.helper` `isActiveLine` (iptal edilmemiş kalem; ölçü birimi süzülmez, KG kalemin ürünü de girer).
+  İptal edilmiş kalemin ürünü/rengi/eni dizilere girmez; eni boş kalem `enler`e girmez. Okuma `orderDerived`in
+  zaten koşan kalem sorgusunun seçimi genişletilerek (ek sorgu YOK). Sipariş/müşteri yaratma koduna dokunulmadı.
+- **Değişiklik izleme:** kalem ekleme/iptal/düzeltme mevcut `via(order_lines.orderId)` ile; eklenen `items` ve
+  `colors` kaynakları ad değişince o ürünlü/renkli kalemi olan siparişleri yeniden gönderir.
+- **Uyum:** bulut satırı şemasız saklar, imaj gerekmez; diziyle süzmek için bulutta üyelik süzgeci gerekir (bulut işi).
+  Eski uygulama alanları görmezden gelir.
+- **Yük:** satır başına tipik 1–3 kalemle ≈ 200–400 B artış; ek sorgu yok. Ad değişiminde o ürünün geçtiği bütün
+  siparişler (saklama penceresinde) yeniden gider — seyrek.
+- **Provada bakılacak:** ilk tur `siparis` TAM süresi (sürüm 5); birkaç siparişte dizilerin uygulamadaki kalemlerle
+  aynı ürün/renk/eni söylediği, iptal kalemin görünmediği.

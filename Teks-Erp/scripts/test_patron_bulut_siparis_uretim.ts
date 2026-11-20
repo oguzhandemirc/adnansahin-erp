@@ -1,5 +1,5 @@
 // =============================================================================
-// BEKÇİ — PATRON BULUTU SİPARİŞ "ÜRETİM" CÜMLESİ (`siparis.uretim`, katalog 4)
+// BEKÇİ — PATRON BULUTU SİPARİŞ "ÜRETİM" CÜMLESİ (`siparis.uretim`, katalog 4) + SÜZGEÇ DİZİLERİ (katalog 5)
 // Çalıştır: npx tsx scripts/run-all-tests.ts test_patron_bulut_siparis_uretim
 // =============================================================================
 //  §1 Katalog: `uretim` türetilmiş alan, sürüm 4, finans sözcüğü yok; değişiklik kaynakları top · İE · bağ ·
@@ -14,6 +14,10 @@
 //     → 2 ✗ (§2 O3 "Kurşun" · §3 panel "İş emri açılmadı").
 //  S2 `deriveOrderUretim` içindeki `NEREDE_ACTIVE_WO` süzgeci silindi (iptal İE sayılır) → 1 ✗ (§2 O2 "Sevke hazır").
 //  S3 `uretimStepName` istasyon adına döndürüldü (kaba aşama yok) → 1 ✗ (§2 O5 "…TAMBUR1 · +3 yerde daha").
+//  §4 (2.13.2, katalog 5) süzgeç dizileri: `kalemSayisi` kapsamı (iptal edilmemiş kalem); O1 fikstürü + DB'deki her
+//     siparişte bağımsız SQL ile aynı küme; ürün/renk adı kaynağı o kalemli siparişi kirletir.
+//  S4 (2026-11-20) dizi kapsamı bütün kalemlere genişletildi (iptal dahil) → 2 ✗ (§4 O1 + bağımsız SQL).
+//  S5 (2026-11-20) `items` kaynağı katalogdan çıkarıldı → 1 ✗ (§4 ad kaynağı).
 // =============================================================================
 import { RollStatus } from "@prisma/client";
 import prisma from "../src/lib/prisma";
@@ -165,7 +169,16 @@ async function setup() {
   await link(w8, o8.line);
   await roll("R8", RollStatus.SHIPPED, { producedInStepId: await step(w8, 1, sTambur1) });
 
-  return { o1, o2, o3, o4, o5, o6, o7, o8, w3, w4, r3, r4f, f1, sKursun, o3line: o3.line };
+  // §4 (2.13.2): O1'e ikinci ürün/renk (en 160) + İPTAL edilmiş kalem (en 999, ayrı ürün) — iptal dizilere girmez.
+  const item2 = (await prisma.item.create({ data: { code: `${S}I2`, name: `${S}Astar`, itemType: "FABRIC" }, select: { id: true } })).id;
+  const item3 = (await prisma.item.create({ data: { code: `${S}I3`, name: `${S}İptalKumaş`, itemType: "FABRIC" }, select: { id: true } })).id;
+  const color2 = (await prisma.color.create({ data: { code: `${S}K2`, name: `${S}Bej` }, select: { id: true } })).id;
+  fx.items.push(item2, item3);
+  fx.colors.push(color2);
+  await prisma.orderLine.create({ data: { orderId: o1.id, itemId: item2, colorId: color2, quantity: 50, unit: "MT", width: 160 } });
+  await prisma.orderLine.create({ data: { orderId: o1.id, itemId: item3, colorId: color2, quantity: 10, unit: "MT", width: 999, cancelledAt: new Date() } });
+
+  return { o1, o2, o3, o4, o5, o6, o7, o8, w3, w4, r3, r4f, f1, sKursun, o3line: o3.line, item, item2, item3, color, color2 };
 }
 
 async function main(): Promise<void> {
@@ -173,7 +186,7 @@ async function main(): Promise<void> {
   const p = findRecordProjection("siparis")!;
   const spec = p.derived.find((x) => x.wire === "uretim");
   check("`uretim` türetilmiş alan olarak var; eski alanlar duruyor", !!spec && ["acik", "toplamMiktar", "musteriAdi", "acikMiktar"].every((w) => p.derived.some((x) => x.wire === w)));
-  check("katalog sürümü 4", p.catalogVersion === 4, `${p.catalogVersion}`);
+  check("katalog sürümü 5 (2.13.2 süzgeç dizileri)", p.catalogVersion === 5, `${p.catalogVersion}`);
   check("finans sözcüğü yok", !p.derived.some((x) => FINANCE.test(x.wire)));
   const src = new Map(p.sources.map((s) => [s.table, s]));
   const need = ["orders", "order_lines", "customers", "rolls", "work_orders", "work_order_to_order_lines", "stations", "subcontractors"];
@@ -223,6 +236,37 @@ async function main(): Promise<void> {
       return u.tur === "FASON" && !n.text.startsWith(u.metin.split(" · ")[0]!);
     });
     check(`telefon türü panel türüyle aynı (${fx.orders.length} sipariş, "Tamamlandı" hariç)`, diff.length === 0, diff.map((id) => `${j(rows.get(id))} ≠ ${j(panel.get(id))}`).join(" | "));
+
+    console.log("\n§4 Süzgeç dizileri (2.13.2, katalog 5)");
+    const FACETS = ["urunIdleri", "urunAdlari", "renkIdleri", "renkAdlari", "enler"];
+    check("diziler türetilmiş alan olarak var", FACETS.every((w) => p.derived.some((x) => x.wire === w)));
+    type FRow = Record<string, unknown> & { id: string };
+    const frows = new Map((JSON.parse(JSON.stringify(built.rows.get("siparis") ?? [])) as FRow[]).map((r) => [r.id, r]));
+    const O1 = frows.get(f.o1.id)!;
+    const got = Object.fromEntries(FACETS.map((k) => [k, O1[k]]));
+    const exp4 = { urunIdleri: [f.item2, f.item], urunAdlari: [`${S}Astar`, `${S}Kumaş`], renkIdleri: [f.color2, f.color], renkAdlari: [`${S}Bej`, `${S}Renk`], enler: [160] };
+    check("⭐ O1: etkin kalemler (iptal kalemin ürünü/eni YOK), çiftler ada göre aynı sırada, eni boş kalem enlere girmez", j(got) === j(exp4), j(got));
+    check("kalem kapsamı kalemSayisi ile aynı (O1: 2 etkin kalem)", O1.kalemSayisi === 2, String(O1.kalemSayisi));
+    // Bağımsız SQL: DB'deki HER siparişte iptal edilmemiş kalemlerin ürün/renk/en kümesi.
+    const allIds = (await prisma.order.findMany({ select: { id: true } })).map((o) => o.id);
+    const all = new Map((JSON.parse(JSON.stringify((await buildRecords(p, allIds, Date.now())).rows.get("siparis") ?? [])) as FRow[]).map((r) => [r.id, r]));
+    const sqlRows = await prisma.$queryRawUnsafe<Array<{ id: string; items: string[] | null; colors: string[] | null; widths: string[] | null }>>(`
+      SELECT o."id"::text AS id,
+        array_agg(DISTINCT l."itemId"::text) FILTER (WHERE l."cancelledAt" IS NULL) AS items,
+        array_agg(DISTINCT l."colorId"::text) FILTER (WHERE l."cancelledAt" IS NULL AND l."colorId" IS NOT NULL) AS colors,
+        array_agg(DISTINCT round(l."width", 3)::text) FILTER (WHERE l."cancelledAt" IS NULL AND l."width" IS NOT NULL) AS widths
+      FROM "orders" o LEFT JOIN "order_lines" l ON l."orderId" = o."id" GROUP BY o."id"`);
+    const set = (xs: unknown): string => j([...new Set(((xs as unknown[] | null) ?? []).map((x) => String(Number.isNaN(Number(x)) ? x : Number(x))))].sort());
+    const fdiff = sqlRows.filter((s) => {
+      const r = all.get(s.id);
+      return !r || set(r.urunIdleri) !== set(s.items) || set(r.renkIdleri) !== set(s.colors) || set(r.enler) !== set(s.widths) ||
+        (r.urunAdlari as unknown[]).length !== (r.urunIdleri as unknown[]).length || (r.renkAdlari as unknown[]).length !== (r.renkIdleri as unknown[]).length;
+    });
+    check(`⭐ bağımsız SQL ile aynı küme (${sqlRows.length} sipariş)`, sqlRows.length >= 8 && fdiff.length === 0, fdiff.slice(0, 3).map((s) => s.id).join(","));
+    const safeRoots = async (t: string, keys: string[]): Promise<string[]> => (src.has(t) ? roots(t, keys) : []);
+    check("ürün/renk adı değişince o kalemli sipariş kirlenir (items/colors kaynağı)",
+      (await safeRoots("items", [f.item2])).includes(f.o1.id) && (await safeRoots("colors", [f.color2])).includes(f.o1.id) && !(await safeRoots("items", [f.item2])).includes(f.o2.id),
+      `items ${src.has("items")} · colors ${src.has("colors")}`);
   } finally {
     await cleanup();
   }

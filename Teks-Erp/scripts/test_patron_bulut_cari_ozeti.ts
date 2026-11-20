@@ -132,7 +132,7 @@ async function main(): Promise<void> {
   check("`iade` kayıt projeksiyonu var (kök roll_returns)", iade?.root.table === "roll_returns");
   check("`cari-ozeti` anlığı katalogda", SNAPSHOT_PROJECTIONS.some((p) => p.name === "cari-ozeti"));
   const siparis = findRecordProjection("siparis");
-  check("siparişte `acik` + `toplamMiktar` türevi + katalog sürümü 4 (uretim)", !!siparis?.derived.some((d) => d.wire === "acik") && !!siparis?.derived.some((d) => d.wire === "toplamMiktar") && siparis?.catalogVersion === 4);
+  check("siparişte `acik` + `toplamMiktar` türevi + katalog sürümü 5 (uretim · 2.13.2 diziler)", !!siparis?.derived.some((d) => d.wire === "acik") && !!siparis?.derived.some((d) => d.wire === "toplamMiktar") && siparis?.catalogVersion === 5);
   const iadeNames = iade ? [...iade.columns.map((c) => `${c.wire}←${c.source}`), ...iade.derived.map((d) => d.wire)] : [];
   check("iade: finans sözcüğü yok", iadeNames.length > 5 && !iadeNames.some((n) => FINANCE.test(n)), iadeNames.join(","));
   check("iade: serbest metin (reasonText/note) ve kişi (receivedById) GİTMEZ", iade !== undefined && !iade.columns.some((c) => ["reasonText", "note", "receivedById", "cancelReason"].includes(c.source)));

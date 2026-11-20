@@ -19,6 +19,7 @@ import {
 } from "./work-order-facts";
 import { loadShipmentFacets, shipmentContentDerived, shipmentFacets } from "./shipment-content";
 import { loadPackingLots, partiOf } from "./packing-lot-facts";
+import { idNamePairs, uniqSortedNumbers } from "./facet-arrays";
 
 type RawRow = Record<string, unknown> & { id: string };
 export type DerivedValues = Map<string, Record<string, unknown>>;
@@ -77,20 +78,31 @@ async function orderUretim(
   return out;
 }
 
+/** Sipariş süzgeç dizileri (2.13.2): ETKİN kalemlerden (`kalemSayisi` kapsamı) ürün/renk çiftleri + en; biçim `facet-arrays`. */
+function orderLineFacets(lines: ReadonlyArray<{ itemId: string; colorId: string | null; width: Prisma.Decimal | null; item: { name: string } | null; color: { name: string } | null }>) {
+  const [urunIdleri, urunAdlari] = idNamePairs(lines.map((l) => ({ id: l.itemId, ad: l.item?.name })));
+  const [renkIdleri, renkAdlari] = idNamePairs(lines.map((l) => ({ id: l.colorId, ad: l.color?.name })));
+  return { urunIdleri, urunAdlari, renkIdleri, renkAdlari, enler: uniqSortedNumbers(lines.map((l) => l.width)) };
+}
+
 async function orderDerived(rows: readonly RawRow[], nowMs: number): Promise<DerivedValues> {
   const lines = await prisma.orderLine.findMany({
     where: { orderId: { in: ids(rows) } },
     select: {
       orderId: true, quantity: true, shippedQty: true, unit: true, cancelledAt: true,
+      // 5 (2.13.2): süzgeç dizileri — `kalemSayisi` ile AYNI kalem kapsamı (`isActiveLine`).
+      itemId: true, colorId: true, width: true, item: { select: { name: true } }, color: { select: { name: true } },
       // Aktif bağ yüklemi tek kaynaktan (koparılmış bağ girmez) — panelin liste `defaultInclude`uyla aynı seçim.
       workOrderLinks: { where: ACTIVE_ORDER_LINK, select: { workOrder: { select: { id: true, status: true } } } },
     },
   });
   const byOrder = new Map<string, { open: Prisma.Decimal; total: Prisma.Decimal; count: number }>();
+  const activeLines = new Map<string, typeof lines>();
   for (const l of lines) {
     const acc = byOrder.get(l.orderId) ?? { open: D0(), total: D0(), count: 0 };
     if (isActiveLine(l)) {
       acc.count++;
+      activeLines.set(l.orderId, [...(activeLines.get(l.orderId) ?? []), l]);
       // `acikMiktar` ile `toplamMiktar` AYNI satır kapsamı (aktif ∧ ölçülen) — tek dal, kopya yok.
       if (isMeasuredLine(l)) {
         acc.total = acc.total.plus(dec(l.quantity));
@@ -106,7 +118,7 @@ async function orderDerived(rows: readonly RawRow[], nowMs: number): Promise<Der
     const acc = byOrder.get(r.id) ?? { open: D0(), total: D0(), count: 0 };
     const open = isDeadlineOpenStatus(String(r.status));
     const late = open && daysPastDeadline(r.deadline as Date | null, nowMs) !== null;
-    out.set(r.id, { acikMiktar: acc.open, toplamMiktar: acc.total, kalemSayisi: acc.count, gecikmis: late, acik: open, musteriAdi: customers.get(r.customerId as string) ?? null, uretim: uretim.get(r.id) ?? null });
+    out.set(r.id, { acikMiktar: acc.open, toplamMiktar: acc.total, kalemSayisi: acc.count, gecikmis: late, acik: open, musteriAdi: customers.get(r.customerId as string) ?? null, uretim: uretim.get(r.id) ?? null, ...orderLineFacets(activeLines.get(r.id) ?? []) });
   }
   return out;
 }

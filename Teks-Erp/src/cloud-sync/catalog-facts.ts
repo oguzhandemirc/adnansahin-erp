@@ -54,7 +54,9 @@ const ORDERS_OF_SUBCONTRACTORS = ordersOfWos(`SELECT w.root_id FROM (${WOS_OF_SU
 
 // Görünen ad (cari/ürün/renk) olgu satırında türetilir: ad değişince bağlı kökler yeniden gider.
 const ORDERS_OF_CUSTOMERS = 'SELECT o."id" AS root_id FROM "orders" o WHERE o."customerId" = ANY($1::uuid[])';
-const SHIPMENTS_OF_CUSTOMERS = 'SELECT s."id" AS root_id FROM "shipments" s WHERE s."customerId" = ANY($1::uuid[])';
+const ORDERS_OF_ITEMS = 'SELECT DISTINCT l."orderId" AS root_id FROM "order_lines" l WHERE l."itemId" = ANY($1::uuid[])';
+const ORDERS_OF_COLORS = 'SELECT DISTINCT l."orderId" AS root_id FROM "order_lines" l WHERE l."colorId" = ANY($1::uuid[])';
+const SHIPMENTS_OF_CUSTOMERS ='SELECT s."id" AS root_id FROM "shipments" s WHERE s."customerId" = ANY($1::uuid[])';
 const LINES_OF_ITEMS = 'SELECT l."id" AS root_id FROM "order_lines" l WHERE l."itemId" = ANY($1::uuid[])';
 const LINES_OF_COLORS = 'SELECT l."id" AS root_id FROM "order_lines" l WHERE l."colorId" = ANY($1::uuid[])';
 const RETURNS_OF_CUSTOMERS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHERE r."customerId" = ANY($1::uuid[])';
@@ -103,8 +105,16 @@ export const FACTS: readonly RecordProjection[] = [
       derived("uretim", "helpers/order-nerede-load.helper loadNeredeContext + placesOf(uretimStepName) → order-nerede.helper deriveOrderUretim (aktif bağ, NEREDE_ACTIVE_WO)",
         ["order_lines", "work_order_to_order_lines", "work_orders", "rolls", "batches", "work_order_steps", "stations",
           "subcontractor_dispatch_items", "subcontractor_dispatches", "subcontractor_receipt_items", "subcontractor_receipts", "subcontractors"]),
+      // 5 (2.13.2): liste süzgeç dizileri — `kalemSayisi` ile AYNI kalem kapsamı (isActiveLine: iptal edilmemiş kalem).
+      derived("urunIdleri", "helpers/order-line-scope.helper isActiveLine kalemlerinin itemId'si (facet-arrays idNamePairs: urunAdlari ile aynı sırada, ada göre)", ["order_lines"]),
+      derived("urunAdlari", "isActiveLine kalemlerinin Item.name (urunIdleri[i]nin adı)", ["order_lines", "items"]),
+      derived("renkIdleri", "isActiveLine kalemlerinin colorId'si (renkAdlari ile aynı sırada)", ["order_lines"]),
+      derived("renkAdlari", "isActiveLine kalemlerinin Color.name (renkIdleri[i]nin adı)", ["order_lines", "colors"]),
+      derived("enler", "isActiveLine kalemlerinin width'i (tekil, artan sayı; facet-arrays uniqSortedNumbers)", ["order_lines"]),
     ],
     sources: [self("orders"), via("order_lines", "orderId"), lookup("customers", "id", ORDERS_OF_CUSTOMERS, "cari adı değişince siparişleri yeniden gider"),
+      lookup("items", "id", ORDERS_OF_ITEMS, "ürün adı değişince o ürünlü kalemi olan siparişler (2.13.2 urunAdlari)"),
+      lookup("colors", "id", ORDERS_OF_COLORS, "renk adı değişince o renkli kalemi olan siparişler (2.13.2 renkAdlari)"),
       lookup("rolls", "id", ORDERS_OF_ROLLS, "top hareketi bağlı siparişin üretim cümlesini yeniler (ESKİ İE'nin siparişi ayrılmada görünmez; o İE'nin sonraki top hareketinde düzelir)"),
       lookup("work_orders", "id", ORDERS_OF_WORK_ORDERS, "İE durumu (tamamlandı/iptal) değişince bağlı siparişler"),
       lookup("work_order_to_order_lines", "orderLineId", ORDERS_OF_LINK_LINES, "bağ eklenince/koparılınca"),
@@ -113,7 +123,8 @@ export const FACTS: readonly RecordProjection[] = [
     crossings: [{ name: "termin", sql: 'SELECT o."id" AS root_id FROM "orders" o WHERE o."deadline" >= $1 AND o."deadline" < $2' }],
     // 2 (M2a): `acik` eklendi — TAM gönderim eski satırları doldurur. 3: `toplamMiktar` eklendi (aynı yol).
     // 4 (2026-11-13): `uretim` eklendi (patron "Üretim" sütunu) — aynı yol.
-    deletion: "YOK", permission: "bulut:siparis:oku", retention: { wireFields: ["siparisTarihi"], sql: 't."orderDate"' }, catalogVersion: 4,
+    // 5 (2026-11-20, backend 2.13.2): süzgeç dizileri (urun/renk çiftleri, enler) EKLENDİ — aynı yol.
+    deletion: "YOK", permission: "bulut:siparis:oku", retention: { wireFields: ["siparisTarihi"], sql: 't."orderDate"' }, catalogVersion: 5,
   },
   {
     name: "siparis-kalemi", kind: "KAYIT", role: "OLGU", root: { table: "order_lines", model: "OrderLine" },
