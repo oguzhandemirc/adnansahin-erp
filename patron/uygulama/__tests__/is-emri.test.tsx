@@ -307,4 +307,40 @@ describe("§5 konum listesi", () => {
     expect(await screen.findByText("Örnek Boyahane")).toBeTruthy();
     expect(within(screen.getByTestId("konum-w1")).getByText(/6 gündür/)).toBeTruthy();
   });
+
+  // Dört özellik (2026-11-20): liste BÜTÜN sayfalarıyla yüklenir, sonra sıralama/süzgeç/arama tam kümede çalışır.
+  // Negatif sonda: ikinci sayfa gelmeseydi "w3" (en büyük metre, ikinci sayfada) ilk sıraya çıkamazdı.
+  it("bütün sayfalar yüklenir; Metre başlığı tam kümeyi sıralar; süzgeç + arama + sütun seçimi; telefonda da tablo", async () => {
+    const AsyncStorage = require("@react-native-async-storage/async-storage") as { clear: () => Promise<void> };
+    await AsyncStorage.clear();
+    mockParams = { asama: "KURSUN" };
+    const ie = (metre: number, musteri: string) => ({ ...FASONDA, asama: "kursun", musteriAdi: musteri, asamaTop: [{ anahtar: "kursun", top: 2, metre }] });
+    mockList.mockImplementation(async (_p: string, q: { imlec?: string }) =>
+      q.imlec === "s2"
+        ? page(rec("w3", ie(9000, "Beta Tekstil")))
+        : { kayitlar: [rec("w1", ie(150, "Alfa Tekstil")), rec("w2", ie(40, "Beta Tekstil"))], sonraki: "s2" });
+    render(<Konum />);
+    await settle();
+    await settle();
+    expect(mockList).toHaveBeenCalledWith("is-emri", expect.objectContaining({ imlec: "s2" }));
+    const sira = () => screen.getAllByTestId(/^konum-w/).map((x) => String(x.props.testID).slice("konum-".length)).join(",");
+    expect(sira()).toBe("w1,w2,w3");
+    expect(screen.getByTestId("konum-tablo-govde")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("konum-tablo-sutun-metre"));
+    await settle();
+    expect(sira()).toBe("w2,w1,w3");
+    fireEvent.press(screen.getByTestId("konum-tablo-sutun-metre"));
+    await settle();
+    expect(sira()).toBe("w3,w1,w2");
+    // Arama (az satır → kompakt simge satırı, kutu simgeyle açılır).
+    fireEvent.press(screen.getByTestId("konum-tablo-ara-ac"));
+    fireEvent.changeText(screen.getByTestId("konum-tablo-ara"), "alfa");
+    expect(sira()).toBe("w1");
+    fireEvent.changeText(screen.getByTestId("konum-tablo-ara"), "");
+    // Süzgeç sayfası Müşteri değerlerini tam kümeden sunar; sütun seçici açılır.
+    fireEvent.press(screen.getByTestId("konum-tablo-suzgec"));
+    expect(screen.getByTestId("konum-tablo-suzgec-secici")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("konum-tablo-sutunlar"));
+    expect(screen.getByTestId("konum-tablo-sutun-secici")).toBeTruthy();
+  });
 });
