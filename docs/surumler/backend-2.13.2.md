@@ -154,3 +154,21 @@ Sevkiyat LİSTESİ kumaş/renk/en/parti/sipariş/depo ile süzülüp aransın di
   siparişler (saklama penceresinde) yeniden gider — seyrek.
 - **Provada bakılacak:** ilk tur `siparis` TAM süresi (sürüm 5); birkaç siparişte dizilerin uygulamadaki kalemlerle
   aynı ürün/renk/eni söylediği, iptal kalemin görünmediği.
+
+### Ek — iş emri yaratmada paylaştırma (migration yok, sözleşme alanı mevcut)
+
+Kullanıcı (2026-11-20): "yeni iş emrine sipariş bağlarken bu miktarın ne kadarını bu iş emrine bağlayacaksın hemen orada
+müdahale edebilmeliyiz" — sonradan "Paylaştır"a basmadan.
+
+- **Alan:** `POST /api/work-orders` gövdesindeki MEVCUT `orderLineAllocations: [{ orderLineId, allocatedQty? }]` (öğe biçimi
+  "Sipariş Bağla" `allocations` ile aynı; Zod şeması zaten vardı). Yeni alan/uç YOK.
+- **Davranış:** bağ HEP 0 doğar; `allocatedQty` > 0 olan satırlar AYNI tx'te `applyOrderLinkAllocationsTx` ile yazılır —
+  tavan (top yok → hedef metre, hedef de yoksa tavan yok), aşım 400 `ALLOCATION_OVER_BASIS`, MT dışı satır 400
+  `ALLOCATION_UNIT_NOT_MEASURED`; ret iş emrini (ve refakat kartını) da geri alır. Defter `orderAllocation`
+  FIELD_CHANGED yazar; açık aşımı yanıtta `warnings`; audit `allocationChanges` + `allocation`.
+- **Kapanan delik:** 2.13.2 öncesi create `allocatedQty`yi doğrulamadan doğrudan yazıyordu (panel ve tablet bugün
+  göndermediği için sahada iz yok — canlıda `allocatedQty > 0` olup `orderAllocation` olayı olmayan bağ provada sayılır).
+- **Uyum:** alanı göndermeyen istemci (tablet hızlı iş emri `orderLineIds`, eski panel) birebir eski davranış: bağ 0.
+  `clientToken` replay aynı kaydı döndürür, paylaştırma/defter ikinci kez yazılmaz.
+- **Açık:** Düzenle (`PUT /work-orders/:id`) yolu `orderLineAllocations[].allocatedQty`yi hâlâ doğrulamadan yazar; panel
+  orada miktar göndermez. [bekçi: test_workorder_order_allocation §12]
