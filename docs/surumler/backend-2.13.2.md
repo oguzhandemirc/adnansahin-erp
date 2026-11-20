@@ -1,8 +1,8 @@
 # Backend `2.13.2`
 
-**Paket:** `(paketleme yazar)`
-**SHA256:** `(paketleme yazar)`
-**Commit:** `(paketleme yazar)`
+**Paket:** `tekserp-backend-20261120_041454-215c7010.zip`
+**SHA256:** `C438FA09638B97012B5201FAE4EF85FA2206C10B47A879CD16B4F00FE67A361D`
+**Commit:** `215c7010`
 **İçerik:** 2.13.1 paketinin bütün içeriği + patron telefonuna giden çuval verisinde sevk partisi (ad · kod · durum), ambalaj no ve topların üretim parti no'su (kullanıcı isteği 2026-11-20). Panel kodunda değişiklik yok.
 **Önceki saha sürümü:** **2.13.1** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.13.1 ve 371 migration olduğunu ÖLÇER — farklıysa DUR).
 
