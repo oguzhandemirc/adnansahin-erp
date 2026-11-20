@@ -190,6 +190,28 @@ describe("§5 istasyon sütunları", () => {
     expect(istasyonSutunlari(T({ istasyonSutunlar: "yok,ad" }))).toEqual(["ad"]);
   });
 
+  // Dört özellik (2026-11-20): sütun seçimi profilde kalır, başlıktan sıralama hücre değeriyle, arama + Tür süzgeci.
+  it("istasyon tablosu: Kuyruk başlığı sıralar (18 < 46), arama süzer, Tür süzgeci + sütun seçici açılır; profil sütunu korunur", async () => {
+    mockApi.viewPref.mockResolvedValue({ anahtar: "tablo.is-emri", deger: tercih({ uretimKartlar: "istasyonlar", istasyonSutunlar: "ad,kuyruk,tur" }), guncelleme: null });
+    render(<Production />);
+    await settle();
+    const sira = () => screen.getAllByTestId(/^istasyon-satir-/).map((x) => String(x.props.testID).slice("istasyon-satir-".length)).join(",");
+    expect(sira()).toBe("i1,i4");
+    expect(screen.getByTestId("istasyon-sutun-tur")).toBeTruthy();
+    expect(screen.queryByTestId("istasyon-sutun-aktif")).toBeNull();
+    fireEvent.press(screen.getByTestId("istasyon-sutun-kuyruk"));
+    await settle();
+    expect(sira()).toBe("i4,i1");
+    fireEvent.press(screen.getByTestId("istasyon-ara-ac"));
+    fireEvent.changeText(screen.getByTestId("istasyon-ara"), "ham");
+    expect(sira()).toBe("i1");
+    fireEvent.changeText(screen.getByTestId("istasyon-ara"), "");
+    fireEvent.press(screen.getByTestId("istasyon-suzgec"));
+    expect(screen.getByTestId("istasyon-suzgec-secici")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("istasyon-sutunlar"));
+    expect(screen.getByTestId("istasyon-sutun-secici")).toBeTruthy();
+  });
+
   it("tür hücresi fabrikanın Station.type'ını (INTERNAL/EXTERNAL) okur", () => {
     const tur = ISTASYON_SUTUNLARI.find((c) => c.key === "tur")!.hucre;
     expect(tur({ tur: "EXTERNAL" })).toBe("Dış (fason)");

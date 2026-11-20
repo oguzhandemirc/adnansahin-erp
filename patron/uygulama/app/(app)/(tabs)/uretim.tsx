@@ -9,13 +9,13 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Text, useWindowDimensions, View } from "react-native";
+import { Text, View } from "react-native";
 import { formatNumber } from "../../../src/lib/format";
 import { isEmriTemizle } from "../../../src/ui/is-emri/sutunlar";
-import { AZAMI_SUTUN, siganSutun, sutunDegistir, sutunTasi } from "../../../src/ui/tablo/model";
-import { SutunSecici, VisibilityPicker } from "../../../src/ui/tablo/Seciciler";
+import { yerelSutunlar } from "../../../src/ui/tablo/yerelTablo";
+import { VisibilityPicker } from "../../../src/ui/tablo/Seciciler";
 import { useTabloTercihi, type TabloTercihiDurumu } from "../../../src/ui/tablo/useTabloTercihi";
-import { AracDugmesi, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useYatayEksen } from "../../../src/ui/tablo/VeriTablosu";
+import { useYerelTablo, YerelTabloAlti, YerelTabloAraclari, YerelTabloBasligi, YerelTabloGovdesi, YerelTabloSimgeleri } from "../../../src/ui/tablo/useYerelTablo";
 import {
   ISTASYON_SUTUNLARI, ISTASYON_VARSAYILAN, URETIM_KARTLARI, akisSatirlari, istasyonSutunYaz, istasyonSutunlari, uretimKartDegistir, uretimKartSifirla, uretimKartlari,
   type UretimKartKey,
@@ -231,29 +231,28 @@ export default function Production() {
   );
 }
 
-/** İstasyon başına kuyruk · aktif · bugün (fabrikanın sırasıyla; sıralama/süzme yok — tek belge). Sütunlar seçilir. */
-function IstasyonTablosu({ satirlar, pref }: { readonly satirlar: readonly Readonly<Record<string, unknown>>[]; readonly pref: TabloTercihiDurumu }) {
-  const [acik, setAcik] = useState(false);
-  const eksen = useYatayEksen();
-  const genislik = useWindowDimensions().width;
-  const sutunlar = istasyonSutunlari(pref.tercih);
-  const gorunur = sutunlar.flatMap((k) => ISTASYON_SUTUNLARI.filter((c) => c.key === k));
-  const yatay = gorunur.length > siganSutun(genislik) ? eksen : null;
-  const yaz = (f: (s: readonly string[]) => readonly string[]) => pref.degistir((t) => istasyonSutunYaz(t, f(istasyonSutunlari(t))));
+const ISTASYON_YEREL = yerelSutunlar(ISTASYON_SUTUNLARI, { suzgec: ["tur"] });
+type IstasyonSatiri = Readonly<Record<string, unknown>>;
+const istasyonAnahtari = (r: IstasyonSatiri) => str(r.id) ?? str(r.kod) ?? str(r.ad) ?? "?";
+
+/**
+ * İstasyon başına kuyruk · aktif · bugün. Tek belge = tam küme ⇒ dört özellik yerelde (2026-11-20): sütun seçimi profilde
+ * kalır (`tablo.is-emri` › istasyonSutunlar, bugünkü seçim korunur), başlıktan sıralama cihazda (`tablo.istasyon`;
+ * sırasız = fabrikanın sırası), arama + Tür süzgeci bu açılışta.
+ */
+function IstasyonTablosu({ satirlar, pref }: { readonly satirlar: readonly IstasyonSatiri[]; readonly pref: TabloTercihiDurumu }) {
+  const tablo = useYerelTablo({
+    anahtar: "tablo.istasyon", sutunlar: ISTASYON_YEREL, varsayilan: ISTASYON_VARSAYILAN, aramaIpucu: "İstasyon ara", testID: "istasyon",
+    kompakt: true, simgeDisarida: true, anahtarOf: istasyonAnahtari, birim: "istasyon",
+    sutunDeposu: { sutunlar: istasyonSutunlari(pref.tercih), yaz: (f) => pref.degistir((t) => istasyonSutunYaz(t, f(istasyonSutunlari(t)))) },
+  }, satirlar);
   return (
-    <View testID="bolum-istasyonlar">
-      <BlokBasligi baslik="İstasyonlar" sayi={satirlar.length} sag={<AracDugmesi icon="grid-outline" label="Sütunlar" onPress={() => setAcik(true)} testID="istasyon-sutunlar" />} />
-      <TabloBasligi testID="istasyon" sutunlar={gorunur} siralama={null} siralanabilir={[]} onSirala={() => undefined} yatay={yatay ?? undefined} />
-      <TabloGovdesi testID="istasyon-govde" yatay={yatay ? { eksen: yatay, genislik: toplamGenislik(gorunur) } : undefined}>
-        {satirlar.map((r, n) => <TabloSatiri key={str(r.id) ?? String(n)} yatay={!!yatay} sutunlar={gorunur} kayit={r} ayrac={n > 0} testID={`istasyon-satir-${str(r.id) ?? n}`} />)}
-      </TabloGovdesi>
-      <SutunSecici
-        visible={acik} testID="istasyon-sutun-secici" sutunlar={ISTASYON_SUTUNLARI} gorunur={sutunlar} azami={AZAMI_SUTUN}
-        onDegistir={(k) => yaz((s) => sutunDegistir(s, k, AZAMI_SUTUN))}
-        onTasi={(k, yon) => yaz((s) => sutunTasi(s, k, yon))}
-        onVarsayilan={() => yaz(() => ISTASYON_VARSAYILAN)}
-        onClose={() => setAcik(false)}
-      />
+    <View testID="bolum-istasyonlar" onLayout={tablo.onLayout}>
+      <BlokBasligi baslik="İstasyonlar" sayi={satirlar.length} sag={<YerelTabloSimgeleri tablo={tablo} />} />
+      <YerelTabloAraclari tablo={tablo} />
+      {tablo.gorunen.length > 0 ? <YerelTabloBasligi tablo={tablo} /> : null}
+      <YerelTabloGovdesi tablo={tablo} satirTestID={(r) => `istasyon-satir-${istasyonAnahtari(r)}`} />
+      <YerelTabloAlti tablo={tablo} bosArama="Aramaya uyan istasyon yok" />
     </View>
   );
 }
