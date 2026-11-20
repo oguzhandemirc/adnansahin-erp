@@ -23,6 +23,7 @@ import { asObj, present, str } from "../../../../src/ui/siparis/OrderRow";
 import { CapsuleButton, StaleNote } from "../../../../src/ui/siparis/parts";
 import { SIPARIS_SUTUNLARI } from "../../../../src/ui/siparis/sutunlar";
 import { VisibilityPicker } from "../../../../src/ui/tablo/Seciciler";
+import { ListeToplamSatiri } from "../../../../src/ui/tablo/ListeToplamSatiri";
 import { TabloListesi, TabloUstu, useVeriTablosu } from "../../../../src/ui/tablo/useVeriTablosu";
 import { useTokens } from "../../../../src/ui/theme-context";
 import { TOUCH, space } from "../../../../src/ui/tokens";
@@ -36,6 +37,9 @@ const AYAR = {
   haricAlanlar: ["gecikmis"],
   testID: "siparis",
 } as const;
+
+// 2026-11-20: alt şerit yalnız süzülen sipariş SAYISI (miktar birim karışık olabilir → bulut toplamaz, `LIST_TOTALS.siparis` boş).
+const SIPARIS_TOPLAM_BIRIMLERI = {} as const;
 
 /** Özet şeridi + (seçiliyse) "en çok açık siparişi olan müşteriler"; görünür kartlar tanım sırasıyla, hiç kart serbest. */
 function Ozet({ veri, kartlar }: { veri: unknown; kartlar: readonly SiparisKartKey[] }) {
@@ -100,6 +104,7 @@ export default function Orders() {
       headerRight={yeni ?? undefined}
       headerSecondary={kartlarEylemi ? [kartlarEylemi] : undefined}
       sticky={<TabloUstu tablo={tablo} />}
+      footer={<ListeToplamSatiri toplam={tablo.toplam} adi="sipariş" birimler={SIPARIS_TOPLAM_BIRIMLERI} testID="siparis-toplam" />}
     >
       <TabloListesi tablo={tablo} onPress={(r) => openRecord(router, "siparis", r.id)} bos="Henüz sipariş yok" bosSuzgecli="Bu süzgeçte sipariş yok" icon={MODULE_ICON.siparisler.icon} />
       <VisibilityPicker
