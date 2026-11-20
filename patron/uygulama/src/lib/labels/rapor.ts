@@ -37,6 +37,7 @@ export const REPORT_TITLE: Readonly<Record<string, string>> = {
   "quality/scorecard": "Kalite karnesi",
   "subcontract/scorecard": "Fason karnesi",
   "inventory/scorecard": "Stok ve ölü stok",
+  "customer/summary": "Cari özeti (özel aralık)",
 };
 
 /** Katalogda ad varsa ondan, yoksa sözlükten; ikisi de yoksa "Rapor" (ham anahtar ekrana basılmaz). */
@@ -92,6 +93,7 @@ export function reportPending(s: unknown): boolean {
 export const REPORT_PARAM: Readonly<Record<string, string>> = {
   dateFrom: "Başlangıç",
   dateTo: "Bitiş",
+  cariKartId: "Cari",
   asOf: "Kesit anı",
   from: "Başlangıç",
   to: "Bitiş",

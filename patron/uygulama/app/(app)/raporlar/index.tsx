@@ -7,7 +7,7 @@ import { Text, View } from "react-native";
 import { can } from "../../../src/lib/access";
 import { formatDateTime, formatNumber } from "../../../src/lib/format";
 import { REPORT_FAMILY_LABEL, reportDomain, reportFamily, reportPending, reportTitle } from "../../../src/lib/labels/rapor";
-import { catalogEntries, requestable, type CatalogEntry } from "../../../src/lib/reports";
+import { catalogEntries, listedForRequest, type CatalogEntry } from "../../../src/lib/reports";
 import { useSession } from "../../../src/state/session";
 import { useRemote } from "../../../src/state/useRemote";
 import { useOpenRefresh } from "../../../src/state/useOpenRefresh";
@@ -72,7 +72,7 @@ export default function Reports() {
   const stock = useRemote(can(permissions, "bulut:stok:oku") ? "anlik:stok-karnesi" : null, () => api.snapshot("stok-karnesi"));
   useOpenRefresh();
   const all = catalogEntries(catalog.data?.veri);
-  const kats = kategoriler(all.filter((e) => requestable(e.anahtar, permissions)));
+  const kats = kategoriler(all.filter((e) => listedForRequest(e.anahtar, permissions)));
   const [secim, setSecim] = useState<string | null>(null);
   const secili = kats.find((k) => k.aile === secim) ?? kats[0];
   const requests = mine.data?.kayitlar ?? [];

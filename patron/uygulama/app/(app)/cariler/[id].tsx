@@ -22,6 +22,7 @@ import { kartSecEylemi } from "../../../src/ui/BaslikMenusu";
 import { KademeliGiris } from "../../../src/ui/hareket";
 import { MODULE_ICON } from "../../../src/ui/icons";
 import { AcikSiparislerBolumu, EnCokUrunBolumu, IadelerBolumu, ToplamlarBolumu, useCariOzeti, type Donem } from "../../../src/ui/cari/OzetBolumleri";
+import { useOzelAralik } from "../../../src/ui/cari/OzelAralik";
 import { openRecord } from "../../../src/ui/nav";
 import { AltSekmeler, BlokBasligi, HataDurumu, Iskelet, ListeBlogu, ListeSatiri, Rozet } from "../../../src/ui/ortak";
 import { useListCapability } from "../../../src/ui/siparis/capabilities";
@@ -76,6 +77,8 @@ export default function CustomerDetail() {
   const acikDestek = orders && !!cap.search("siparis")?.suzgec?.secenekler.some((o) => o.deger === "ACIK");
   const acikGorunum = sekme === "siparisler" && gorunum === "ACIK";
   const ozet = useCariOzeti(cariId, orders && hazir && ozetGorunur);
+  // 2.13.2: "Özel aralık" — fabrika istekle hesaplar; bulut/izin/fabrika beyanı yoksa seçenek yok.
+  const ozel = useOzelAralik(cariId, orders && hazir && ozetGorunur);
   // Açık siparişler en ESKİ üstte (bekleyen en uzun iş önce): sunucu `siparisTarihi`ne göre sıralamayı beyan ediyorsa (termine
   // göre sıralama beyanı yok). Beyan etmeyen eski bulutta sunucunun varsayılan sırası.
   const eskiOnce = facility?.liste?.siralama?.siparis?.includes("siparisTarihi") ? { sirala: "siparisTarihi", yon: "artan" as const } : {};
@@ -131,7 +134,7 @@ export default function CustomerDetail() {
           {sekme === "ozet" ? (
             <KademeliGiris sira={1}>
               {orders ? (
-                <ToplamlarBolumu ozet={ozet} donem={donem} onDonem={setDonem} kartlar={TOPLAM_KARTLARI.filter(goster)} donemli={DONEMLI_KARTLAR.some(goster)} />
+                <ToplamlarBolumu ozet={ozet} donem={donem} onDonem={setDonem} kartlar={TOPLAM_KARTLARI.filter(goster)} donemli={DONEMLI_KARTLAR.some(goster)} ozel={ozel} />
               ) : null}
               {acikDestek && goster("acikSiparisler") ? (
                 <AcikSiparislerBolumu list={acik} sayi={ozet.data?.ozet?.acik.siparisSayisi} onAc={(x) => openRecord(router, "siparis", x)}
@@ -148,7 +151,7 @@ export default function CustomerDetail() {
                   />
                 </View>
               ) : null}
-              {orders && goster("enCokUrun") ? <EnCokUrunBolumu ozet={ozet} donem={donem} onDonem={setDonem} /> : null}
+              {orders && goster("enCokUrun") ? <EnCokUrunBolumu ozet={ozet} donem={donem} onDonem={setDonem} ozel={ozel} /> : null}
               {iadeIzni && cariId && goster("iadeler") ? <IadelerBolumu cariKartId={cariId} destek={cap.idFilter("iade", "cariKartId")} enabled={ozetGorunur} iade={ozet.data?.ozet?.tumZamanlar.iade} /> : null}
               {/* "Son siparişler" açık siparişler bölümü görünürken çizilmez (2026-11-19: iki bölüm çoğu satırı yineliyordu);
                   açık bölümü yoksa (eski bulut ya da kart kapalı) son siparişler tek sipariş listesidir. */}

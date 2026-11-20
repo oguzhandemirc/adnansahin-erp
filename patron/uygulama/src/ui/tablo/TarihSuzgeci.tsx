@@ -16,6 +16,11 @@ export function TarihSecenekleri(p: {
   readonly secili: string | undefined;
   readonly onSec: (v: string | null) => void;
   readonly testID: string;
+  /**
+   * Yalnız iki tarih arası (2.13.2, cari özeti "Özel aralık"): hazır dönem satırları çizilmez ve İKİ uç da zorunludur
+   * (fabrika açık uçlu aralık almaz). Varsayılan: süzgeç sayfasının bugünkü davranışı.
+   */
+  readonly yalnizAralik?: boolean;
 }) {
   const s = useStyles();
   const elle = p.secili ? ARALIK.exec(p.secili) : null;
@@ -26,6 +31,7 @@ export function TarihSecenekleri(p: {
     const b = gunOku(bas);
     const e = gunOku(son);
     if (b === undefined || e === undefined) return setHata("Tarihi GG.AA.YYYY biçiminde yazın (ör. 01.11.2026)");
+    if (p.yalnizAralik && (b === null || e === null)) return setHata("Başlangıç ve bitiş tarihini yazın");
     if (b === null && e === null) return setHata("En az bir tarih yazın");
     const v = aralikYaz(b, e);
     if (!v) return setHata("Başlangıç bitişten sonra olamaz");
@@ -34,12 +40,14 @@ export function TarihSecenekleri(p: {
   };
   return (
     <ScrollView style={s.kap} contentContainerStyle={s.ic} keyboardShouldPersistTaps="handled" testID={`${p.testID}-tarih`}>
-      <View style={s.liste}>
-        <SecenekSatiri etiket="Tümü" on={!p.secili} coklu={false} onPress={() => p.onSec(null)} testID={`${p.testID}-tumu`} />
-        {TARIH_DONEMLERI.map((d) => (
-          <SecenekSatiri key={d.deger} etiket={d.etiket} on={p.secili === d.deger} coklu={false} ayrac onPress={() => p.onSec(d.deger)} testID={`${p.testID}-${d.deger}`} />
-        ))}
-      </View>
+      {p.yalnizAralik ? null : (
+        <View style={s.liste}>
+          <SecenekSatiri etiket="Tümü" on={!p.secili} coklu={false} onPress={() => p.onSec(null)} testID={`${p.testID}-tumu`} />
+          {TARIH_DONEMLERI.map((d) => (
+            <SecenekSatiri key={d.deger} etiket={d.etiket} on={p.secili === d.deger} coklu={false} ayrac onPress={() => p.onSec(d.deger)} testID={`${p.testID}-${d.deger}`} />
+          ))}
+        </View>
+      )}
       <Text style={s.baslik}>İki tarih arası</Text>
       <View style={s.ikili}>
         <View style={s.yarim}>

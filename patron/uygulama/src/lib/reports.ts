@@ -12,6 +12,7 @@ export const REPORT_KEY_PERMISSION: Readonly<Record<string, string>> = {
   "quality/scorecard": "bulut:uretim:oku",
   "subcontract/scorecard": "bulut:uretim:oku",
   "inventory/scorecard": "bulut:stok:oku",
+  "customer/summary": "bulut:siparis:oku",
 };
 
 export const REPORTS_NOT_IN_CLOUD: readonly string[] = ["audit/*", "production/operator-performance", "production/uretim-akisi"];
@@ -64,6 +65,31 @@ export function requestable(key: string, perms: readonly string[]): boolean {
   if (REPORTS_NOT_IN_CLOUD.includes(key) || REPORTS_NOT_IN_CLOUD.includes(`${family}/*`)) return false;
   const p = Object.prototype.hasOwnProperty.call(REPORT_KEY_PERMISSION, key) ? REPORT_KEY_PERMISSION[key] : undefined;
   return p !== undefined && perms.includes(p);
+}
+
+/** Cari özeti özel aralığı (fabrika 2.13.2): cari kartının dönem seçicisinden istenir. */
+export const CUSTOMER_SUMMARY_KEY = "customer/summary";
+
+/**
+ * Kendi ekranından istenen raporlar: "Rapor iste" listesinde çizilmez (cari kimliği elle yazdırılmaz); geçmiş istekler
+ * listesinde ve ayrıntısında yine görünür.
+ */
+export const SCREEN_REPORT_KEYS: readonly string[] = [CUSTOMER_SUMMARY_KEY];
+
+/** "Rapor iste" listesinde gösterilebilir mi: izin + ekranlı değil. */
+export function listedForRequest(key: string, perms: readonly string[]): boolean {
+  return requestable(key, perms) && !SCREEN_REPORT_KEYS.includes(key);
+}
+
+/**
+ * Cari özetinde "Özel aralık" sunulur mu — ÜÇ beyanın kesişimi (biri eksikse seçenek çizilmez, istek atılmaz):
+ * bulut anahtarı kabul ediyor (`/oturum` `raporAnahtarlari`; eski bulut göndermez) ∧ hesap isteyebilir (rapor + sipariş
+ * izni) ∧ fabrika hesaplıyor (`rapor-katalogu`nda girdi; eski fabrika göndermez).
+ */
+export function customerRangeSupported(cloudKeys: readonly string[] | undefined, perms: readonly string[], catalogVeri: unknown): boolean {
+  if (!cloudKeys?.includes(CUSTOMER_SUMMARY_KEY)) return false;
+  if (!requestable(CUSTOMER_SUMMARY_KEY, perms)) return false;
+  return catalogEntries(catalogVeri).some((e) => e.anahtar === CUSTOMER_SUMMARY_KEY);
 }
 
 /** Katalog girdisinin tarih dışı parametre adları (nesne anahtarları ya da ad dizisi). */

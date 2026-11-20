@@ -1,6 +1,7 @@
 // Cari kartı "Özet" bölümleri (M2 sözleşmesi): Toplamlar · En çok alınan · Açık siparişler · İadeler. Her bölüm
 // kendi isteği, iskeleti, boş durumu ve hatasıyla yaşar; birinin hatası diğerini düşürmez. Uygulama SAYMAZ:
-// sayılar fabrikanın `cari-ozeti` anlığından, listeler sunucu süzgecinden. Para yok; birimler toplanmaz.
+// sayılar fabrikanın `cari-ozeti` anlığından (özel aralıkta fabrikanın `customer/summary` rapor sonucundan, 2.13.2), listeler
+// sunucu süzgecinden. Para yok; birimler toplanmaz.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from "react-native";
@@ -21,12 +22,14 @@ import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
 import { useTumListe } from "../fason/useTumListe";
 import { BASMA } from "../hareket/sabitler";
 import { ChoiceSheet } from "../siparis/ChoiceSheet";
+import { gunAraligiYazisi, OzelAralikSayfasi, OzelDurumSatiri, type GunAraligi, type OzelAralik } from "./OzelAralik";
 import { makeStyles, useTokens } from "../theme-context";
 import { FONT_SCALE, space, typography } from "../tokens";
 
-export type Donem = CustomerSummaryPeriodKey;
+/** Hazır dönem ya da (2.13.2) fabrikanın istekle hesapladığı özel aralık (`OzelAralik.tsx`). */
+export type Donem = CustomerSummaryPeriodKey | "ozel";
 /** Hazır dönemler (fabrika 2.13.1; sınırları fabrika hesaplar). Sıra seçicide görünen sıradır. */
-export const DONEMLER: readonly { key: Donem; label: string }[] = [
+export const DONEMLER: readonly { key: CustomerSummaryPeriodKey; label: string }[] = [
   { key: "tumZamanlar", label: "Tüm zamanlar" },
   { key: "son12Ay", label: "Son 12 ay" },
   { key: "buAy", label: "Bu ay" },
@@ -38,28 +41,36 @@ export const DONEMLER: readonly { key: Donem; label: string }[] = [
 ];
 
 /** Veride OLAN dönemler (eski fabrika yalnız tüm zamanlar + son 12 ay gönderir; olmayan seçenek çizilmez). */
-export function mevcutDonemler(ozet: CustomerSummary): readonly { key: Donem; label: string }[] {
+export function mevcutDonemler(ozet: CustomerSummary): readonly { key: CustomerSummaryPeriodKey; label: string }[] {
   return DONEMLER.filter((d) => {
     const v = (ozet as unknown as Record<string, unknown>)[d.key];
     return typeof v === "object" && v !== null;
   });
 }
 
-/** Seçili dönemin sayıları; seçim veride yoksa (eski özet) tüm zamanlar. */
+/** Seçili HAZIR dönemin sayıları; seçim veride yoksa (eski özet) ya da özel aralıksa tüm zamanlar. */
 export function donemVerisi(ozet: CustomerSummary, donem: Donem): CustomerSummaryPeriodCounts {
-  return mevcutDonemler(ozet).some((d) => d.key === donem) ? (ozet[donem] as CustomerSummaryPeriodCounts) : ozet.tumZamanlar;
+  const k = mevcutDonemler(ozet).find((d) => d.key === donem)?.key;
+  return k ? (ozet[k] as CustomerSummaryPeriodCounts) : ozet.tumZamanlar;
 }
+
+/** Özel aralık seçili ve sunuluyor mu (destek yoksa seçim tüm zamanlara düşer). */
+const ozelSecili = (donem: Donem, ozel: OzelAralik | undefined): ozel is OzelAralik & { aralik: GunAraligi } =>
+  donem === "ozel" && !!ozel?.destek && !!ozel.aralik;
 
 /**
  * Seçili dönemin tarih aralığı fabrikanın `donemler`inden ("01.11.2026 – 19.11.2026"): açık uç (`bitis` null) = özetin
  * üretildiği fabrika günü (`uretimGunu`; yoksa "bugün"). Tüm zamanlar (başlangıç null) ve sınırı gelmeyen dönem → null.
  */
 export function donemAraligi(r: Pick<CustomerSummaryResponse, "donemler" | "uretimGunu">, donem: Donem): string | null {
+  if (donem === "ozel") return null;
   const s = r.donemler?.[donem];
   if (!s || !s.baslangic) return null;
   const son = s.bitis ? formatDate(s.bitis) : r.uretimGunu ? formatDate(r.uretimGunu) : "bugün";
   return `${formatDate(s.baslangic)} – ${son}`;
 }
+/** Dönem sayfası kapandıktan sonra aralık sayfasının açılma gecikmesi (Modal geçişi). */
+export const ARALIK_SAYFASI_GECIKME_MS = 350;
 export const OZET_ILK = 5;
 export const URUN_TUMU = 10;
 
@@ -134,8 +145,10 @@ function HenuzGelmedi({ baslik, neyi, testID }: { baslik: string; neyi: string; 
  * `kartlar`: görünür toplam kartları (yoksa varsayılan dört). `donemli`: dönem düğmesi çizilsin mi (dönemli bir kart ya da
  * ürün bloğu görünürse). İkisi de boşsa bölüm hiç çizilmez (sıfır kart serbest).
  */
-export function ToplamlarBolumu({ ozet, donem, onDonem, kartlar = ["siparis", "acik", "sevk", "iade"], donemli = true }: {
+export function ToplamlarBolumu({ ozet, donem, onDonem, kartlar = ["siparis", "acik", "sevk", "iade"], donemli = true, ozel }: {
   ozet: Remote<CustomerSummaryResponse>; donem: Donem; onDonem: (d: Donem) => void; kartlar?: readonly string[]; donemli?: boolean;
+  /** (2.13.2) Özel aralık durumu; verilmezse ya da `destek` yoksa seçenek çizilmez. */
+  ozel?: OzelAralik;
 }) {
   const s = useStyles();
   const taban = useKartTabani();
@@ -149,12 +162,17 @@ export function ToplamlarBolumu({ ozet, donem, onDonem, kartlar = ["siparis", "a
   if (!veri) return null;
   const cikanlar = oneCikanlar(veri, kartlar);
   const ekSatirlar = ozetEkSatirlari(veri);
+  // Özel aralıkta sayılar fabrikanın istek sonucundan; beklerken/hatada kartlar çizilmez (eski dönemin sayısı yalan söylemesin).
+  const ozelde = ozelSecili(donem, ozel);
+  const sayilar = ozelde ? (ozel.durum === "hazir" ? ozel.veri : null) : donemVerisi(veri, donem);
   return (
     <View style={s.bolum} testID="cari-toplamlar">
-      {donemli && ozet.data ? <DonemSecici yanit={ozet.data} ozet={veri} donem={donem} onDonem={onDonem} /> : null}
-      {kartlar.length > 0 ? (
+      {donemli && ozet.data ? <DonemSecici yanit={ozet.data} ozet={veri} donem={donem} onDonem={onDonem} ozel={ozel} /> : null}
+      {ozelde ? <OzelDurumSatiri ozel={ozel} /> : null}
+      {kartlar.length > 0 && ozelde && ozel.durum === "yukleniyor" ? <Iskelet bicim="kpi" satir={Math.min(kartlar.length, 4)} testID="cari-ozel-yukleniyor" /> : null}
+      {kartlar.length > 0 && sayilar ? (
         <View style={s.izgara}>
-          {toplamKartlari(veri, donemVerisi(veri, donem)).filter((k) => kartlar.includes(k.key)).map((k) => (
+          {toplamKartlari(veri, sayilar).filter((k) => kartlar.includes(k.key)).map((k) => (
             <StatCard key={k.key} taban={taban} etiket={k.etiket} icon={k.icon} ton={k.ton} degerler={k.degerler} ipucu={k.ipucu} bos={"bos" in k ? k.bos : undefined} testID={`cari-toplam-${k.key}`} />
           ))}
         </View>
@@ -169,15 +187,25 @@ export function ToplamlarBolumu({ ozet, donem, onDonem, kartlar = ["siparis", "a
  * Dönem seçimi. Eski fabrika (yalnız iki dönem): bugünkü küçük bölmeli seçim. 2.13.1+ (8 dönem yan yana sığmaz): tek
  * kompakt "Dönem: Bu ay ▾" düğmesi → alt sayfada veride OLAN dönemler; yanında seçili dönemin aralığı küçük yazıyla.
  */
-function DonemSecici({ yanit, ozet, donem, onDonem }: { yanit: CustomerSummaryResponse; ozet: CustomerSummary; donem: Donem; onDonem: (d: Donem) => void }) {
+function DonemSecici({ yanit, ozet, donem, onDonem, ozel }: { yanit: CustomerSummaryResponse; ozet: CustomerSummary; donem: Donem; onDonem: (d: Donem) => void; ozel?: OzelAralik }) {
   const s = useStyles();
   const t = useTokens();
   const [acik, setAcik] = useState(false);
-  const secenekler = mevcutDonemler(ozet);
-  const secili = secenekler.some((d) => d.key === donem) ? donem : "tumZamanlar";
-  const aralik = donemAraligi(yanit, secili);
-  if (secenekler.length <= 2) return <KompaktSecim items={secenekler} value={secili} onChange={onDonem} testIDPrefix="cari-donem-" accessibilityLabel="Dönem" />;
-  const ad = secenekler.find((d) => d.key === secili)?.label ?? "Tüm zamanlar";
+  const [aralikAcik, setAralikAcik] = useState(false);
+  const hazirlar = mevcutDonemler(ozet);
+  // "Özel aralık" yalnız 8 dönemli fabrikada (2.13.1+) ve üç beyan birden varken (`useOzelAralikDestegi`).
+  const ozelVar = hazirlar.length > 2 && !!ozel?.destek;
+  const secenekler: readonly { key: Donem; label: string }[] = ozelVar ? [...hazirlar, { key: "ozel", label: "Özel aralık…" }] : hazirlar;
+  const ozelde = ozelSecili(donem, ozel);
+  const secili: Donem = ozelde ? "ozel" : hazirlar.some((d) => d.key === donem) ? donem : "tumZamanlar";
+  const aralik = ozelde ? gunAraligiYazisi(ozel.aralik) : donemAraligi(yanit, secili);
+  if (hazirlar.length <= 2) return <KompaktSecim items={hazirlar} value={secili} onChange={onDonem} testIDPrefix="cari-donem-" accessibilityLabel="Dönem" />;
+  const ad = ozelde ? "Özel aralık" : (secenekler.find((d) => d.key === secili)?.label ?? "Tüm zamanlar");
+  const sec = (k: Donem) => {
+    if (k !== "ozel") return onDonem(k);
+    // Dönem sayfası kapanırken ikinci sayfa açılmaz (iOS iki Modal geçişini yutar): kapanış animasyonundan sonra aç.
+    setTimeout(() => setAralikAcik(true), ARALIK_SAYFASI_GECIKME_MS);
+  };
   return (
     <View style={s.donemSatiri}>
       <Pressable
@@ -190,7 +218,16 @@ function DonemSecici({ yanit, ozet, donem, onDonem }: { yanit: CustomerSummaryRe
         <Ionicons name="chevron-down" size={14} color={t.textSecondary} />
       </Pressable>
       {aralik ? <Text style={s.cikanlar} testID="cari-donem-aralik">{aralik}</Text> : null}
-      <ChoiceSheet visible={acik} title="Dönem" choices={secenekler} value={secili} onSelect={onDonem} onClose={() => setAcik(false)} testIDPrefix="cari-donem-" />
+      <ChoiceSheet visible={acik} title="Dönem" choices={secenekler} value={secili} onSelect={sec} onClose={() => setAcik(false)} testIDPrefix="cari-donem-" />
+      {ozelVar && ozel ? (
+        <OzelAralikSayfasi
+          visible={aralikAcik} secili={ozel.aralik} onClose={() => setAralikAcik(false)}
+          onSec={(a) => {
+            ozel.sec(a);
+            onDonem("ozel");
+          }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -254,12 +291,15 @@ export const urunSutunlari = (xs: readonly Urun[]): readonly YerelSutun<Urun>[] 
 /** Açık siparişler penceresi: müşteri dışındaki sipariş sütunları seçilebilir, varsayılan bugünkü beş sütun; Durum ve Yön süzgeç. */
 const ACIK_SUTUNLARI = yerelSutunlar(SIPARIS_SUTUNLARI, { haric: ["musteri"], suzgec: ["durum", "yon"] });
 
-export function EnCokUrunBolumu({ ozet, donem, onDonem }: { ozet: Remote<CustomerSummaryResponse>; donem: Donem; onDonem?: (d: Donem) => void }) {
+export function EnCokUrunBolumu({ ozet, donem, onDonem, ozel }: { ozet: Remote<CustomerSummaryResponse>; donem: Donem; onDonem?: (d: Donem) => void; ozel?: OzelAralik }) {
   const s = useStyles();
   const [tumu, setTumu] = useState(false);
   const veri = ozet.data?.ozet;
   if (!veri) return null;
-  const d = donemVerisi(veri, donem) as Partial<CustomerSummaryPeriod>;
+  // Özel aralıkta liste fabrikanın sonucundan (her aralıkta gelir); beklerken/hatada durum Toplamlar'da.
+  const ozelde = ozelSecili(donem, ozel);
+  if (ozelde && ozel.durum !== "hazir") return null;
+  const d = (ozelde ? ozel.veri : donemVerisi(veri, donem)) as Partial<CustomerSummaryPeriod>;
   // Kısa dönemlerde fabrika "en çok alınan" listesi göndermez (yalnız tüm zamanlar + son 12 ay): boş bant yerine tek satır.
   if (d.enCokUrun === undefined) {
     return (
