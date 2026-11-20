@@ -3,8 +3,8 @@
 // Sayılar tabular rakamlı; hiza `sutunHizasi` (varsayılan her sütun sola, sütun `hiza` ile değiştirir). Başlığa dokunmak sıralamayı döndürür (artan → azalan → kapalı); sıralanamayan
 // sütunun başlığı düğme değildir. Süzme/sıralama SUNUCUDA (`useVeriTablosu`); burada yalnız çizim.
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { Animated, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Basilabilir } from "../hareket";
 import { BASMA } from "../hareket/sabitler";
 import type { IconName } from "../icons";
@@ -22,36 +22,19 @@ const KENAR = space.xs;
 /**
  * Yatay kip: görünür sütun ekrana sığmayınca sütunlar sabit genişlikte çizilir, başlık şeridi ve satırlar AYRI yatay
  * kaydırıcılarda durur (başlık yapışkan şeritte, satırlar gövdede) — biri kaydırılınca öbürü aynı yere çekilir.
- *
- * DONDURULMUŞ İLK SÜTUN (2026-11-19, iPhone'da kayınca Top no ekrandan çıkıyordu): yatay kipte ilk sütun SOLA SABİTTİR.
- *   • Başlıkta ilk hücre kaydırıcının DIŞINDA durur; kaydırıcı yalnız kalan sütunları taşır.
- *   • Gövdede ilk hücre satırın İÇİNDE kalır (satır yüksekliği tek kaynaktan: sarma yapan hücre satırı uzatınca sabit
- *     hücre de aynı boyu alır; iki ayrı sütun yığınında boy eşleme gerekmez, "Daha fazla"/açılır içerik bozulmaz) ve
- *     gövdenin yatay kayma miktarı kadar sağa ötelenir (`kaydirma`, yerel sürücüde) → ekranda yerinde durur, diğer
- *     sütunlar altından geçer. Sağ kenarında ince ayırıcı + gölge.
- * Satırlar eskisi gibi tek liste (sanallaştırma/sayfalama korunur); sığan tabloda (yatay değil) davranış değişmez.
  */
 export interface YatayEksen {
   readonly baslik: RefObject<ScrollView | null>;
   readonly govde: RefObject<ScrollView | null>;
   readonly x: { current: number };
-  /** Gövdenin yatay kayma miktarı (yerel sürücü): sabit ilk hücrenin ötelemesi. */
-  readonly kaydirma: Animated.Value;
 }
 
 export function useYatayEksen(): YatayEksen {
   const baslik = useRef<ScrollView | null>(null);
   const govde = useRef<ScrollView | null>(null);
   const x = useRef(0);
-  const kaydirma = useRef(new Animated.Value(0)).current;
-  return useMemo(() => ({ baslik, govde, x, kaydirma }), [kaydirma]);
+  return useMemo(() => ({ baslik, govde, x }), []);
 }
-
-/** Gövde yatay kipteyse sabit ilk hücrenin ötelemesi; değilse null (satır bugünkü gibi çizilir). */
-const SabitSutun = createContext<Animated.Value | null>(null);
-
-/** Sabit (dondurulmuş) sütunun ekrandaki genişliği: sütun + satırın sol kenarı. */
-export const sabitGenislik = (c: SutunTanimi<never>): number => sutunGenisligi(c) + KENAR;
 
 /**
  * TEK YÖNLÜ eşleme: kaydırmayı yalnız gövde sürer, başlık onu izler. İki yönlü eşlemede iki ScrollView birbirinin
@@ -100,37 +83,20 @@ export function useTabloOlcusu<R>(sutunlar: readonly SutunTanimi<R>[], satirlar:
     const w = Math.round(e.nativeEvent.layout.width);
     if (w > 0) setAlan((a) => (a === w ? a : w));
   }, []);
-  const sirali = useMemo(() => (yatay ? sabitIlk(olculen) : olculen), [yatay, olculen]);
-  return { sutunlar: sirali, yatay, onLayout };
+  return { sutunlar: olculen, yatay, onLayout };
 }
 
-/**
- * Yatay kipte sabitlenecek sütun başa alınır: ilk KIRPILMAZ (numara) sütun, yoksa ilk sütun (zaten başta). Sütun
- * seçimindeki sıra değişmez; yalnız çizim sırası.
- */
-export function sabitIlk<C extends { readonly kirpilmaz?: number }>(sutunlar: readonly C[]): readonly C[] {
-  const i = sutunlar.findIndex((c) => !!c.kirpilmaz);
-  if (i <= 0) return sutunlar;
-  return [sutunlar[i]!, ...sutunlar.slice(0, i), ...sutunlar.slice(i + 1)];
-}
-
-function YatayKaydirici(p: { readonly eksen: YatayEksen; readonly kaynak: "baslik" | "govde"; readonly children: React.ReactNode; readonly testID: string; readonly style?: object }) {
+function YatayKaydirici(p: { readonly eksen: YatayEksen; readonly kaynak: "baslik" | "govde"; readonly children: React.ReactNode; readonly testID: string }) {
   const govde = p.kaynak === "govde";
   const { eksen } = p;
   // Gövde yeniden doğarsa 0'dan başlar: başlık da 0'a döner (yoksa eski konumda kalıp kayık görünür).
   useEffect(() => {
     if (!govde) return;
     eksen.x.current = 0;
-    eksen.kaydirma.setValue(0);
     eksen.baslik.current?.scrollTo({ x: 0, animated: false });
   }, [govde, eksen]);
-  // Gövdenin kayması yerel sürücüde sabit hücrenin ötelemesine bağlanır (JS gecikmesi yok); başlık eşlemesi dinleyicide.
-  const onScroll = useMemo(
-    () => (govde ? Animated.event([{ nativeEvent: { contentOffset: { x: eksen.kaydirma } } }], { useNativeDriver: true, listener: (ev: NativeSyntheticEvent<NativeScrollEvent>) => esle(eksen, ev) }) : undefined),
-    [govde, eksen],
-  );
   return (
-    <Animated.ScrollView
+    <ScrollView
       ref={govde ? eksen.govde : eksen.baslik}
       horizontal
       bounces={false}
@@ -138,14 +104,13 @@ function YatayKaydirici(p: { readonly eksen: YatayEksen; readonly kaynak: "basli
       scrollEnabled={govde}
       showsHorizontalScrollIndicator={govde}
       scrollEventThrottle={16}
-      onScroll={onScroll}
+      onScroll={govde ? (ev) => esle(eksen, ev) : undefined}
       // Başlık (yeniden) çizilince gövdenin bulunduğu yere oturur.
       onContentSizeChange={govde ? undefined : () => eksen.baslik.current?.scrollTo({ x: eksen.x.current, animated: false })}
-      style={p.style}
       testID={p.testID}
     >
       {p.children}
-    </Animated.ScrollView>
+    </ScrollView>
   );
 }
 
@@ -194,60 +159,45 @@ export function TabloBasligi<R>(p: {
   const t = useTokens();
   const s = useStyles();
   const yatay = p.yatay;
-  const hucre = (c: SutunTanimi<R>, i: number, ekStil?: object) => {
-    const alan = c.sirala && p.siralanabilir.includes(c.sirala) ? c.sirala : null;
-    const aktif = alan !== null && p.siralama?.alan === alan ? p.siralama.yon : null;
-    const sag = sutunHizasi(c) === "sag";
-    const yazi = (
-      <Text style={[s.baslikYazi, sag && s.sag, aktif && { color: t.tint }]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>
-        {c.baslik}
-      </Text>
-    );
-    const ok = aktif ? <Ionicons name={aktif === "artan" ? "arrow-up" : "arrow-down"} size={12} color={t.tint} testID={`${p.testID}-ok-${c.key}`} /> : null;
-    const ic = <View style={[s.baslikIc, sag && s.sagaYasli]}>{sag ? ok : null}{yazi}{sag ? null : ok}</View>;
-    const stil = [s.hucre, i > 0 && s.sutunAyrac, sutunBoyu(c, !!yatay), ekStil];
-    if (!alan) return <View key={c.key} style={stil} testID={`${p.testID}-sutun-${c.key}`}>{ic}</View>;
-    return (
-      <Pressable
-        key={c.key}
-        onPress={() => p.onSirala(alan)}
-        style={({ pressed }) => [...stil, pressed && { opacity: BASMA.opaklik }]}
-        accessibilityRole="button"
-        accessibilityLabel={`${c.ad ?? c.baslik} sütununa göre sırala`}
-        accessibilityState={{ selected: aktif !== null }}
-        accessibilityHint={aktif === "artan" ? "Artan; dokununca azalan" : aktif === "azalan" ? "Azalan; dokununca sıralama kalkar" : "Dokununca artan"}
-        hitSlop={{ top: 6, bottom: 6 }}
-        testID={`${p.testID}-sutun-${c.key}`}
-      >
-        {ic}
-      </Pressable>
-    );
-  };
-  if (!yatay || p.sutunlar.length < 2) {
-    const serit = (
-      <View style={[s.baslik, yatay && { width: toplamGenislik(p.sutunlar) }]} testID={`${p.testID}-baslik`} accessibilityRole="header">
-        {p.sutunlar.map((c, i) => hucre(c, i))}
-      </View>
-    );
-    return yatay ? <YatayKaydirici eksen={yatay} kaynak="baslik" testID={`${p.testID}-baslik-kaydirma`}>{serit}</YatayKaydirici> : serit;
-  }
-  // Yatay kip: ilk sütunun başlığı kaydırıcının DIŞINDA (sabit), kalanlar gövdeyle eşli kaydırıcıda.
-  const [ilk, ...kalan] = p.sutunlar;
-  const ilkGenislik = sabitGenislik(ilk as SutunTanimi<never>);
-  return (
-    <View style={[s.baslik, s.baslikYatay]} testID={`${p.testID}-baslik`} accessibilityRole="header">
-      <View style={[s.sabitBaslik, { width: ilkGenislik }]} testID={`${p.testID}-baslik-sabit`}>{hucre(ilk!, 0, [{ width: ilkGenislik - KENAR }, s.sagAyrac])}</View>
-      <YatayKaydirici eksen={yatay} kaynak="baslik" testID={`${p.testID}-baslik-kaydirma`} style={s.esnek}>
-        <View style={[s.baslikIcSerit, { width: toplamGenislik(p.sutunlar) - ilkGenislik }]}>{kalan.map((c, i) => hucre(c, i + 1, i === 0 ? s.ayracsiz : undefined))}</View>
-      </YatayKaydirici>
+  const serit = (
+    <View style={[s.baslik, yatay && { width: toplamGenislik(p.sutunlar) }]} testID={`${p.testID}-baslik`} accessibilityRole="header">
+      {p.sutunlar.map((c, i) => {
+        const alan = c.sirala && p.siralanabilir.includes(c.sirala) ? c.sirala : null;
+        const aktif = alan !== null && p.siralama?.alan === alan ? p.siralama.yon : null;
+        const sag = sutunHizasi(c) === "sag";
+        const yazi = (
+          <Text style={[s.baslikYazi, sag && s.sag, aktif && { color: t.tint }]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE.title}>
+            {c.baslik}
+          </Text>
+        );
+        const ok = aktif ? <Ionicons name={aktif === "artan" ? "arrow-up" : "arrow-down"} size={12} color={t.tint} testID={`${p.testID}-ok-${c.key}`} /> : null;
+        const ic = <View style={[s.baslikIc, sag && s.sagaYasli]}>{sag ? ok : null}{yazi}{sag ? null : ok}</View>;
+        const stil = [s.hucre, i > 0 && s.sutunAyrac, sutunBoyu(c, !!yatay)];
+        if (!alan) return <View key={c.key} style={stil} testID={`${p.testID}-sutun-${c.key}`}>{ic}</View>;
+        return (
+          <Pressable
+            key={c.key}
+            onPress={() => p.onSirala(alan)}
+            style={({ pressed }) => [...stil, pressed && { opacity: BASMA.opaklik }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${c.ad ?? c.baslik} sütununa göre sırala`}
+            accessibilityState={{ selected: aktif !== null }}
+            accessibilityHint={aktif === "artan" ? "Artan; dokununca azalan" : aktif === "azalan" ? "Azalan; dokununca sıralama kalkar" : "Dokununca artan"}
+            hitSlop={{ top: 6, bottom: 6 }}
+            testID={`${p.testID}-sutun-${c.key}`}
+          >
+            {ic}
+          </Pressable>
+        );
+      })}
     </View>
   );
+  return yatay ? <YatayKaydirici eksen={yatay} kaynak="baslik" testID={`${p.testID}-baslik-kaydirma`}>{serit}</YatayKaydirici> : serit;
 }
 
 export function TabloSatiri<R>(p: { readonly sutunlar: readonly SutunTanimi<R>[]; readonly kayit: R; readonly ayrac: boolean; readonly onPress?: () => void; readonly testID: string; readonly yatay?: boolean }) {
   const t = useTokens();
   const s = useStyles();
-  const sabitX = useContext(SabitSutun);
   const etiket = p.sutunlar.map((c) => `${c.ad ?? c.baslik}: ${c.hucre(p.kayit)}`).join(", ");
   return (
     <Pressable
@@ -261,26 +211,13 @@ export function TabloSatiri<R>(p: { readonly sutunlar: readonly SutunTanimi<R>[]
       {p.sutunlar.map((c, i) => {
         const oge = c.ogeler?.(p.kayit);
         const sag = sutunHizasi(c) === "sag";
-        const icerik = oge ?? (
-          <Text style={[s.hucreYazi, i === 0 && s.ilkHucre, (c.sayi || !!c.kirpilmaz) && s.sayi, sag && s.sag]} numberOfLines={c.kirpilmaz ? undefined : (c.satir ?? 1)} maxFontSizeMultiplier={FONT_SCALE.title} testID={c.kirpilmaz ? `kirpilmaz-${c.key}-${p.testID}` : undefined}>
-            {c.hucre(p.kayit)}
-          </Text>
-        );
-        // Sabit ilk hücre: satırın sol kenarını da örter (sola dayalı, satırla aynı boy), gövdenin kayması kadar ötelenir.
-        if (i === 0 && sabitX && p.yatay) {
-          return (
-            <Animated.View
-              key={c.key}
-              style={[s.hucre, s.sabitHucre, { width: sabitGenislik(c as SutunTanimi<never>), transform: [{ translateX: sabitX }] }, sag && s.hucreSag]}
-              testID={`sabit-${p.testID}`}
-            >
-              {icerik}
-            </Animated.View>
-          );
-        }
         return (
-          <View key={c.key} style={[s.hucre, i > 0 && !(i === 1 && sabitX && p.yatay) && s.sutunAyrac, sutunBoyu(c, !!p.yatay), sag && s.hucreSag]}>
-            {icerik}
+          <View key={c.key} style={[s.hucre, i > 0 && s.sutunAyrac, sutunBoyu(c, !!p.yatay), sag && s.hucreSag]}>
+            {oge ?? (
+              <Text style={[s.hucreYazi, i === 0 && s.ilkHucre, (c.sayi || !!c.kirpilmaz) && s.sayi, sag && s.sag]} numberOfLines={c.kirpilmaz ? undefined : (c.satir ?? 1)} maxFontSizeMultiplier={FONT_SCALE.title} testID={c.kirpilmaz ? `kirpilmaz-${c.key}-${p.testID}` : undefined}>
+                {c.hucre(p.kayit)}
+              </Text>
+            )}
           </View>
         );
       })}
@@ -295,9 +232,7 @@ export function TabloGovdesi(p: { readonly children: React.ReactNode; readonly t
   return (
     <View style={s.govde} testID={p.testID}>
       <YatayKaydirici eksen={p.yatay.eksen} kaynak="govde" testID={`${p.testID}-kaydirma`}>
-        <SabitSutun.Provider value={p.yatay.eksen.kaydirma}>
-          <View style={{ width: p.yatay.genislik }}>{p.children}</View>
-        </SabitSutun.Provider>
+        <View style={{ width: p.yatay.genislik }}>{p.children}</View>
       </YatayKaydirici>
     </View>
   );
@@ -351,23 +286,6 @@ const useStyles = makeStyles((t) => ({
     marginBottom: space.m,
   },
   satir: { flexDirection: "row" as const, alignItems: "center" as const, minHeight: TABLO_SATIR, paddingHorizontal: KENAR },
-  // Yatay kipte başlık: sabit hücre + kaydırıcı yan yana; iç boşluk hücrelerde (kaydırma sınırları gövdeyle eşit).
-  baslikYatay: { paddingHorizontal: 0, alignItems: "stretch" as const },
-  sabitBaslik: { paddingLeft: KENAR, flexDirection: "row" as const, alignItems: "center" as const, backgroundColor: t.color.band, zIndex: 1 },
-  sagAyrac: { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: t.separator },
-  esnek: { flex: 1 },
-  baslikIcSerit: { flexDirection: "row" as const, alignItems: "center" as const, paddingRight: KENAR, minHeight: 34 },
-  ayracsiz: { borderLeftWidth: 0 },
-  // Satırın sol kenarını (KENAR) da örter: altından geçen sütun sızmaz. Sağda ince ayırıcı + hafif gölge.
-  sabitHucre: {
-    marginLeft: -KENAR,
-    paddingLeft: KENAR + HUCRE_YATAY / 2,
-    backgroundColor: t.surface,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: t.separator,
-    zIndex: 1,
-    ...(Platform.OS === "ios" ? { shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 2, height: 0 } } : { elevation: 1 }),
-  },
   ayrac: { borderTopWidth: 1, borderTopColor: t.separator },
   // Yoğun tablo gövdesi 13 pt (telefonda 4 sütun sığsın); başlık 12 pt.
   hucreYazi: { ...typography.footnote, color: t.text },
