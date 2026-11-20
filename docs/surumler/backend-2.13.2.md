@@ -170,8 +170,10 @@ müdahale edebilmeliyiz" — sonradan "Paylaştır"a basmadan.
   göndermediği için sahada iz yok — canlıda `allocatedQty > 0` olup `orderAllocation` olayı olmayan bağ provada sayılır).
 - **Uyum:** alanı göndermeyen istemci (tablet hızlı iş emri `orderLineIds`, eski panel) birebir eski davranış: bağ 0.
   `clientToken` replay aynı kaydı döndürür, paylaştırma/defter ikinci kez yazılmaz.
-- **Açık:** Düzenle (`PUT /work-orders/:id`) yolu `orderLineAllocations[].allocatedQty`yi hâlâ doğrulamadan yazar; panel
-  orada miktar göndermez. [bekçi: test_workorder_order_allocation §12]
+- **Düzenle de aynı boğazda:** `PUT /work-orders/:id` gelen `allocatedQty`yi artık doğrudan yazmaz, aynı tx'te
+  `applyOrderLinkAllocationsTx`ten geçirir (yeni hedef metre tavana girer; ret tüm Düzenle'yi geri alır); miktarsız gövde
+  (bugünkü panel) birebir eskisi gibi. create/replace Zod alanı "Sipariş Bağla" ile tek tanım (sonlu, ≥ 0, ≤ 999.999.999 —
+  üstü `Decimal(12,3)` kolona sığmaz, artık Zod 400). [bekçi: test_workorder_order_allocation §12–§14]
 
 ### Ek — aynı gecenin bulut imajı: Cariler sıralaması (fabrika paketi DEĞİŞMEDİ)
 

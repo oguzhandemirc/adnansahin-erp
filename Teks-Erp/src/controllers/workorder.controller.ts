@@ -17,6 +17,10 @@ import { TIMELINE_GROUPS, type TimelineGroup } from "../constants/workorder-even
 import { readFilterList } from "../utils/query-parser";
 import "../types/express-augment";
 
+// Paylaştırma metresi — TEK Zod tanımı: create · replace (Düzenle) · Sipariş Bağla aynı kuralla süzer
+// (2026-11-20). Kolon Decimal(12,3); üst sınır taşmayı 500 yerine 400 yapar.
+const allocatedQtyField = z.number().finite().nonnegative("Metre negatif olamaz").max(999_999_999, "Metre çok büyük");
+
 // Create + quick-start ortak alan şeması. refine'siz tutuluyor ki spread ile
 // (quickStartSchema) yeniden kullanılabilsin — refine ZodEffects'e çevirir, spread'i bozar.
 const workOrderCoreShape = {
@@ -69,7 +73,7 @@ const workOrderCoreShape = {
   orderLineAllocations: z
     .array(z.object({
       orderLineId:  z.string().uuid(),
-      allocatedQty: z.number().nonnegative().optional(),
+      allocatedQty: allocatedQtyField.optional(),
     }))
     .optional(),
   orderLineIds: z.array(z.string().uuid()).optional().nullable(),
@@ -230,7 +234,7 @@ const updateStepPlanningSchema = z.object({
 // ── Sipariş bağlama + hedef düzeltme şemaları (2026-08-17) ───────────────────
 export const orderLineAllocationItem = z.object({
   orderLineId: z.string().uuid("Geçersiz sipariş satırı ID"),
-  allocatedQty: z.number().finite().nonnegative("Metre negatif olamaz").max(999_999_999, "Metre çok büyük"),
+  allocatedQty: allocatedQtyField,
 });
 const linkOrderLinesSchema = z.object({
   orderLineIds: z
@@ -369,7 +373,7 @@ const replaceWorkOrderSchema = z.object({
   orderLineAllocations: z
     .array(z.object({
       orderLineId:  z.string().uuid(),
-      allocatedQty: z.number().nonnegative().optional(),
+      allocatedQty: allocatedQtyField.optional(),
     }))
     .optional(),
   orderLineIds: z.array(z.string().uuid()).optional().nullable(),

@@ -5574,7 +5574,9 @@ export class WorkOrderService {
     if (colorChanging) await assertTargetColorChange(prisma, existing, resolvedTargetColorId);
 
     // ── Transaction: smart merge (steps id-bazlı diff) ───────────────────────
+    let replaceAllocResult: Awaited<ReturnType<typeof applyOrderLinkAllocationsTx>> | null = null;
     const updated = await prisma.$transaction(async (tx) => {
+      replaceAllocResult = null;
       // İLK ifade: 8030 SHARED → kart FOR SHARE (WO satır claim'inden önce, kilit sırası).
       if (resolvedTargetItemId) await assertItemUsableTx(tx, resolvedTargetItemId, replaceItemUsage);
       // ATOMİK CLAIM: tx başında (yıkıcı drop-and-recreate'ten ÖNCE) WO satırını
@@ -5876,17 +5878,22 @@ export class WorkOrderService {
           userId: userId ?? null,
         });
       }
-      for (const l of keptLinks) {
-        const wanted = wantedAlloc.get(l.orderLineId);
-        if (wanted === undefined) continue; // miktar gelmedi → mevcut paylaştırma korunur
-        await tx.workOrderToOrderLine.updateMany({
-          where: { id: l.id, ...ACTIVE_ORDER_LINK },
-          data: { allocatedQty: wanted },
-        });
-      }
+      // Paylaştırma metresi (2026-11-20): doğrudan yazılmaz — giren bağ 0 doğar, gelen miktarlar
+      // aşağıda (iş emri alanları yazıldıktan SONRA, yeni hedef metre tavana girsin) yaratma ve
+      // "Sipariş Bağla" ile AYNI boğazdan geçer. Miktar gelmeyen kalan bağ korunur; miktarsız
+      // gövde (bugünkü panel) bu boğaza hiç girmez → davranışı birebir eskisi gibi.
+      const replaceAllocEntries = [
+        ...keptLinks.flatMap((l) => {
+          const wanted = wantedAlloc.get(l.orderLineId);
+          return wanted === undefined ? [] : [{ orderLineId: l.orderLineId, allocatedQty: wanted }];
+        }),
+        ...enteringAlloc.flatMap((a) =>
+          a.allocatedQty !== undefined && a.allocatedQty > 0 ? [{ orderLineId: a.orderLineId, allocatedQty: a.allocatedQty }] : [],
+        ),
+      ];
       if (enteringAlloc.length > 0) {
         await tx.workOrderToOrderLine.createMany({
-          data: enteringAlloc.map((a) => ({ workOrderId: id, orderLineId: a.orderLineId, allocatedQty: a.allocatedQty ?? 0 })),
+          data: enteringAlloc.map((a) => ({ workOrderId: id, orderLineId: a.orderLineId, allocatedQty: 0 })),
           skipDuplicates: true,
         });
       }
@@ -5949,8 +5956,26 @@ export class WorkOrderService {
       await markTravelerCardDirtyTx(tx, id);
       await recordWorkOrderFieldDiffTx(tx, id, { before, after: wo }, eventCtx);
 
+      // Düzenlemede paylaştırma — tek kaynak `applyOrderLinkAllocationsTx` (tavan 400, MT dışı 400,
+      // defter FIELD_CHANGED, açık aşımı uyarı). Red tüm Düzenle'yi geri alır. WO satırı yukarıdaki
+      // `replaceClaim` ile zaten kilitli.
+      if (replaceAllocEntries.length > 0) {
+        const done = await applyOrderLinkAllocationsTx(tx, id, replaceAllocEntries, {
+          trigger: ORDER_ALLOCATION_TRIGGER,
+          userId,
+          groupId: eventCtx.groupId,
+        });
+        replaceAllocResult = done;
+        const to = new Map(done.changes.map((c) => [c.orderLineId, c.to]));
+        for (const l of wo.orderLinks) {
+          const v = to.get(l.orderLineId);
+          if (v !== undefined) l.allocatedQty = new Prisma.Decimal(v);
+        }
+      }
+
       return wo;
     });
+    const replaceAllocDone = replaceAllocResult as Awaited<ReturnType<typeof applyOrderLinkAllocationsTx>> | null;
 
     await AuditService.log({
       userId,
@@ -5964,17 +5989,21 @@ export class WorkOrderService {
         stepCount: finalSteps.length,
         routeTemplateId: updated.routeTemplateId,
         allocationCount: allocations.length,
+        ...(replaceAllocDone && replaceAllocDone.changes.length > 0
+          ? { allocationChanges: replaceAllocDone.changes, allocation: replaceAllocDone.summary }
+          : {}),
         targetItemId: updated.targetItemId,
         targetColorId: updated.targetColorId,
         targetPropertyIds,
       },
     });
 
+    const warnings = [...replaceWarnings, ...(replaceAllocDone?.warnings ?? [])];
     return {
       success: true,
       data: updated,
       message: `İş emri güncellendi: ${updated.workOrderNumber}`,
-      ...(replaceWarnings.length > 0 ? { warnings: replaceWarnings } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
   }
 

@@ -19,6 +19,10 @@
 //  §12 (2026-11-20) YARATMADA paylaştırma (`create` `orderLineAllocations[].allocatedQty`): aynı tx, aynı boğaz —
 //      yazılır + defter · replay aynı kayıt, defter bir kez · tavan aşımı / KG satır 400 ve iş emri DOĞMAZ ·
 //      eski gövde (`orderLineIds`, tablet) bağ 0 · tavan yok → serbest
+//  §13 (2026-11-20) DÜZENLEDE paylaştırma (`replace` `orderLineAllocations[].allocatedQty`): metresiz gövde birebir
+//      eskisi gibi (§13a-b, düzeltmeden ÖNCE yeşil koşularak sabitlendi) · metre gelirse aynı boğaz: yazım + defter +
+//      açık uyarısı · tavan / KG 400 ve geri alım · giren satırın metresi tavana sayılır
+//  §14 (2026-11-20) create + replace gövdesinde `allocatedQty` Sipariş Bağla ile AYNI Zod alanı (negatif/NaN/sonsuz/1e9 red)
 //
 // NEGATİF SONDALAR (2026-11-16, elle bozulup koşuldu, geri alındı):
 //  S1 helper'da `assertAllocationWithinBasisTx` içindeki `allocated.gt(basis)` → `false` → §2b/§7 kırmızı.
@@ -28,9 +32,16 @@
 //  S5 (2026-11-20) `shareMeters` paylastirilanMetre'yi `Number(allocatedQty)` ile yazdı (0 → 0, null değil) → §11e kırmızı.
 //  S6 (2026-11-20) create'te `applyOrderLinkAllocationsTx` çağrısı atlandı → §12a-d/f-h/j kırmızı (9).
 //  S7 (2026-11-20) create eski doğrudan yazıma döndü (`allocatedQty: a.allocatedQty`, boğaz yok) → §12c/e-h kırmızı.
+//  S8 (2026-11-20) replace'in eski doğrudan yazımı (`updateMany { allocatedQty: wanted }`, boğaz yok) → §13c/d/f/g/h/i
+//      kırmızı (6), §13a/b/e/j yeşil — sabitleme eski kodla geçti.
+//  S9 (2026-11-20) create/replace Zod'u eski `z.number().nonnegative()` → §14 iki red satırı kırmızı (1e9 geçti;
+//      negatif/NaN/sonsuz eski şemada da reddediliyordu — zod 4).
 // =============================================================================
 import { randomUUID } from "node:crypto";
+import type { NextFunction, Request, Response } from "express";
+import { ZodError } from "zod";
 import prisma from "../src/lib/prisma";
+import { WorkOrderController } from "../src/controllers/workorder.controller";
 import { WorkOrderService } from "../src/services/workorder.service";
 import { workOrderLinkService } from "../src/services/workorder-link.service";
 import { TamburService } from "../src/services/tambur.service";
@@ -254,6 +265,8 @@ async function main(): Promise<void> {
     check("§10 CANCELLED → 409 WO_PLAN_FROZEN", h10?.status === 409 && h10.code === "WO_PLAN_FROZEN", JSON.stringify(h10));
 
     await yaratmadaPaylastirma();
+    await duzenlemedePaylastirma();
+    await govdeSozlesmesi();
   } finally {
     await temizle();
   }
@@ -314,6 +327,101 @@ async function yaratmadaPaylastirma(): Promise<void> {
   const c5 = await siparisliWo({ clientToken: randomUUID(), orderLineAllocations: [{ orderLineId: E, allocatedQty: 1500 }] });
   const a5 = await allocOf(c5.id);
   check("§12j tavan yok (NONE) → 1500 kabul", a5.basisKind === "NONE" && (await qtyOf(c5.id, E)) === 1500, JSON.stringify(a5));
+}
+
+// ── §13 DÜZENLEDE paylaştırma (2026-11-20): `PUT /work-orders/:id` `orderLineAllocations[].allocatedQty` ──
+// Bugünkü panel bu yoldan metre göndermez (§13a-b sabitler: metresiz gövde birebir eskisi gibi).
+// Metre gelirse yaratma ile AYNI boğaz (`applyOrderLinkAllocationsTx`): tavan, MT dışı, defter, uyarı.
+async function duzenle(woId: string, links: Pick<CreateBody, "orderLineIds" | "orderLineAllocations">) {
+  const w = await prisma.workOrder.findUniqueOrThrow({ where: { id: woId }, select: { plannedStartDate: true, plannedEndDate: true, targetQuantity: true } });
+  const steps = await prisma.workOrderStep.findMany({ where: { workOrderId: woId }, orderBy: { stepSequence: "asc" }, select: { id: true, stationId: true } });
+  return svc.replace(woId, {
+    type: "ORDER_PRODUCTION", targetItemId: ITEM, width: 180, targetQuantity: w.targetQuantity == null ? null : Number(w.targetQuantity),
+    steps, plannedStartDate: w.plannedStartDate?.toISOString(), plannedEndDate: w.plannedEndDate?.toISOString(), ...links,
+  } as Parameters<typeof svc.replace>[1], ADMIN) as Promise<{ warnings?: string[]; data: unknown }>;
+}
+
+async function duzenlemedePaylastirma(): Promise<void> {
+  console.log("\n§13 Düzenlemede paylaştırma");
+  const wo = await yeniWo(1000);
+  const [P, Q] = await yeniSiparis([{ quantity: 800 }, { quantity: 150 }]);
+  await link.linkOrderLines(wo, [P, Q], ADMIN);
+  await link.setOrderLinkAllocations(wo, [{ orderLineId: P, allocatedQty: 300 }, { orderLineId: Q, allocatedQty: 100 }], ADMIN);
+  const ev0 = await allocEvents(wo);
+
+  // Sabitleme — metresiz gövde (bugünkü panel): miktar korunur, defter/uyarı yok, giren bağ 0.
+  const [N] = await yeniSiparis([{ quantity: 400 }]);
+  const r1 = await duzenle(wo, { orderLineIds: [P, Q, N] });
+  check("§13a orderLineIds gövdesi → P 300 · Q 100 korunur, giren N 0, orderAllocation olayı yok, açık uyarısı yok",
+    (await qtyOf(wo, P)) === 300 && (await qtyOf(wo, Q)) === 100 && (await qtyOf(wo, N)) === 0 && (await allocEvents(wo)) === ev0 &&
+      !(r1.warnings ?? []).some((w) => w.includes("açığı")),
+    `${await qtyOf(wo, P)} / ${await qtyOf(wo, Q)} / ${await qtyOf(wo, N)} · olay ${await allocEvents(wo)}`);
+  const r2 = await duzenle(wo, { orderLineAllocations: [{ orderLineId: P }, { orderLineId: Q }] });
+  check("§13b miktarsız orderLineAllocations → kalan bağ korunur, N koparıldı, olay yok",
+    r2 !== null && (await qtyOf(wo, P)) === 300 && (await qtyOf(wo, Q)) === 100 && (await qtyOf(wo, N)) === null && (await allocEvents(wo)) === ev0);
+
+  // Metre gelirse: yaratma/Sipariş Bağla ile aynı kurallar.
+  const r3 = await duzenle(wo, { orderLineAllocations: [{ orderLineId: P, allocatedQty: 700 }, { orderLineId: Q, allocatedQty: 200 }] });
+  check("§13c 700+200 ≤ hedef 1000 → yazıldı, defterde 2 yeni orderAllocation olayı",
+    (await qtyOf(wo, P)) === 700 && (await qtyOf(wo, Q)) === 200 && (await allocEvents(wo)) === ev0 + 2,
+    `${await qtyOf(wo, P)} / ${await qtyOf(wo, Q)} · olay ${(await allocEvents(wo)) - ev0}`);
+  check("§13d açığı (150 m) aşan Q UYARI alır, engel değil", (r3.warnings ?? []).some((w) => w.includes("açığı")), (r3.warnings ?? []).join(" | "));
+  const respQ = (r3.data as { orderLinks: { orderLineId: string; allocatedQty: unknown }[] }).orderLinks.find((l) => l.orderLineId === Q);
+  check("§13e yanıttaki bağ güncel miktarı taşır (200)", Number(respQ?.allocatedQty) === 200, String(respQ?.allocatedQty));
+
+  const h1 = await hata(() => duzenle(wo, { orderLineAllocations: [{ orderLineId: P, allocatedQty: 900 }, { orderLineId: Q, allocatedQty: 200 }] }));
+  check("§13f 900+200 > hedef 1000 → 400 ALLOCATION_OVER_BASIS", h1?.code === "ALLOCATION_OVER_BASIS" && h1.status === 400, JSON.stringify(h1));
+  check("§13g red → değerler geri alındı (700/200)", (await qtyOf(wo, P)) === 700 && (await qtyOf(wo, Q)) === 200);
+
+  const [K] = await yeniSiparis([{ quantity: 50, unit: "KG" }]);
+  const h2 = await hata(() => duzenle(wo, { orderLineAllocations: [{ orderLineId: P }, { orderLineId: Q }, { orderLineId: K, allocatedQty: 5 }] }));
+  check("§13h giren KG satıra metre → 400 ALLOCATION_UNIT_NOT_MEASURED, bağ kurulmadı",
+    h2?.code === "ALLOCATION_UNIT_NOT_MEASURED" && (await qtyOf(wo, K)) === null, JSON.stringify(h2));
+
+  const [M] = await yeniSiparis([{ quantity: 500 }]);
+  const h3 = await hata(() => duzenle(wo, { orderLineAllocations: [{ orderLineId: P }, { orderLineId: Q }, { orderLineId: M, allocatedQty: 200 }] }));
+  check("§13i giren satırın metresi tavana sayılır: 700+200+200 > 1000 → 400, M bağlanmadı",
+    h3?.code === "ALLOCATION_OVER_BASIS" && (await qtyOf(wo, M)) === null, JSON.stringify(h3));
+  await duzenle(wo, { orderLineAllocations: [{ orderLineId: P, allocatedQty: 0 }, { orderLineId: Q }, { orderLineId: M, allocatedQty: 200 }] });
+  check("§13j P 0'a indi, Q korundu, giren M 200 yazıldı", (await qtyOf(wo, P)) === 0 && (await qtyOf(wo, Q)) === 200 && (await qtyOf(wo, M)) === 200,
+    `${await qtyOf(wo, P)} / ${await qtyOf(wo, Q)} / ${await qtyOf(wo, M)}`);
+}
+
+// ── §14 Gövde sözleşmesi: create ve replace `allocatedQty`yi AYNI Zod kuralıyla süzer ──
+// (Sipariş Bağla `orderLineAllocationItem` ile aynı alan: sonlu, negatif değil, ≤ 999.999.999.)
+async function govdeSozlesmesi(): Promise<void> {
+  console.log("\n§14 Gövde sözleşmesi (Zod)");
+  const ctl = new WorkOrderController();
+  let reached = 0;
+  (ctl as unknown as { service: unknown }).service = {
+    create: async () => { reached++; return {}; },
+    replace: async () => { reached++; return {}; },
+  };
+  const run = async (kind: "create" | "replace", qty: number): Promise<"ok" | "zod" | string> => {
+    let err: unknown = undefined;
+    const body = {
+      type: "ORDER_PRODUCTION", targetItemId: ITEM, steps: [{ stationId: ST_TAMBUR }],
+      orderLineAllocations: [{ orderLineId: randomUUID(), allocatedQty: qty }],
+    };
+    const req = { body, params: { id: randomUUID() }, user: { userId: ADMIN } } as unknown as Request;
+    const res = { status: () => res, json: () => res } as unknown as Response;
+    const before = reached;
+    await ctl[kind](req, res, ((e: unknown) => { err = e; }) as NextFunction);
+    if (err instanceof ZodError) return "zod";
+    if (err) return String(err);
+    return reached === before + 1 ? "ok" : "servis çağrılmadı";
+  };
+  const runAll = async (kind: "create" | "replace", qs: number[]) => {
+    const out: string[] = [];
+    for (const q of qs) out.push(await run(kind, q)); // sıralı: `reached` sayacı paylaşılıyor
+    return out;
+  };
+  for (const kind of ["create", "replace"] as const) {
+    const bad = await runAll(kind, [-1, Number.NaN, Number.POSITIVE_INFINITY, 1_000_000_000]);
+    check(`§14 ${kind}: negatif / NaN / sonsuz / 1e9 metre → Zod reddi, servise inmez`, bad.every((r) => r === "zod"), bad.join(","));
+    const good = await runAll(kind, [0, 12.5, 999_999_999]);
+    check(`§14 ${kind}: 0 / 12,5 / 999.999.999 → geçer`, good.every((r) => r === "ok"), good.join(","));
+  }
 }
 
 async function temizle(): Promise<void> {
