@@ -58,6 +58,11 @@ const RETURNS_OF_CUSTOMERS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHE
 const RETURNS_OF_ITEMS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHERE r."itemId" = ANY($1::uuid[])';
 const RETURNS_OF_COLORS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHERE r."colorId" = ANY($1::uuid[])';
 const RETURNS_OF_REASONS = 'SELECT r."id" AS root_id FROM "roll_returns" r WHERE r."reasonId" = ANY($1::uuid[])';
+// Sevk partisi (paketleme grubu) adı/durumu değişince: partinin çuvalları · çuvalları sevkiyattaysa o sevkiyatlar.
+// Grup yalnız boşken silinir (`packing-lot.service` deleteMany `sacks: none`) ⇒ silmede kirlenecek çuval yok.
+const SACKS_OF_LOTS = 'SELECT s."id" AS root_id FROM "sacks" s WHERE s."packingGroupId" = ANY($1::uuid[])';
+const SHIPMENTS_OF_LOTS =
+  'SELECT DISTINCT s."shipmentId" AS root_id FROM "sacks" s WHERE s."packingGroupId" = ANY($1::uuid[]) AND s."shipmentId" IS NOT NULL';
 const NAME_OF =(model: string): string => `cloud-sync/derived displayNames: ${model}.name (BOYUT \`ad\` ile aynı kolon)`;
 
 export const FACTS: readonly RecordProjection[] = [
@@ -142,15 +147,17 @@ export const FACTS: readonly RecordProjection[] = [
       col("olusturulma", "createdAt")],
     derived: [
       derived("ozet", "cloud-sync/shipment-content: ShippingService.getShipmentById summary (BRÜT) + tartiliCuval (kg'si dolu çuval)", ["sacks", "rolls", "roll_returns", "swatches"]),
-      derived("cuvallar", "cloud-sync/shipment-content: getShipmentById sacks[] (canlı + prevSackId iadeleri, hayalet `yok`) + Roll.weightKg/labelCustomer", ["sacks", "rolls", "roll_returns", "return_reasons", "items", "colors", "customers"]),
-      derived("cuvalsizToplar", "cloud-sync/shipment-content: getShipmentById rolls[] sackId boş", ["rolls", "roll_returns", "items", "colors", "customers"]),
+      derived("cuvallar", "cloud-sync/shipment-content: getShipmentById sacks[] (canlı + prevSackId iadeleri, hayalet `yok`) + Roll.weightKg/labelCustomer + Batch.batchNumber (2: top `parti`) + Sack.packageNo + packing-lot-facts (2: çuval `ambalajNo`/`parti*`)", ["sacks", "rolls", "roll_returns", "return_reasons", "items", "colors", "customers", "batches", "packing_groups"]),
+      derived("cuvalsizToplar", "cloud-sync/shipment-content: getShipmentById rolls[] sackId boş (2: top `parti`)", ["rolls", "roll_returns", "items", "colors", "customers", "batches"]),
     ],
     sources: [self("shipments"),
       via("sacks", "shipmentId", "ESKİ sevkiyat ayrılmada görünmez → sacks_sync_parent_moved tetikleyicisi"),
       via("rolls", "shipmentId", "ESKİ sevkiyat ayrılmada görünmez → rolls_sync_parent_moved tetikleyicisi"),
-      via("roll_returns", "fromShipmentId")],
+      via("roll_returns", "fromShipmentId"),
+      lookup("packing_groups", "id", SHIPMENTS_OF_LOTS, "parti adı/durumu değişince çuvalları o sevkiyatta olan içerikler (küçük tablo, filigran indekssiz)")],
+    // 2 (2026-11-20, backend 2.13.2): çuvala `ambalajNo` + `partiAdi`/`partiKodu`/`partiDurumu`, topa üretim `parti` EKLENDİ.
     deletion: "YOK", permission: "bulut:sevkiyat:oku", unitRoots: 100,
-    retention: { wireFields: ["cikisTarihi", "olusturulma"], sql: 'COALESCE(t."dispatchedAt", t."createdAt")' }, catalogVersion: 1,
+    retention: { wireFields: ["cikisTarihi", "olusturulma"], sql: 'COALESCE(t."dispatchedAt", t."createdAt")' }, catalogVersion: 2,
   },
   {
     name: "dogrudan-sevk", kind: "KAYIT", role: "OLGU", root: { table: "direct_shipments", model: "DirectShipment" },
@@ -169,9 +176,15 @@ export const FACTS: readonly RecordProjection[] = [
     derived: [
       derived("topSayisi", "helpers/sack-content-totals.helper loadSackContentTotals.rollCount (hayaletsiz)", ["rolls"]),
       derived("metre", "helpers/sack-content-totals.helper loadSackContentTotals.totalQty (hayaletsiz)", ["rolls"]),
+      // 2 (2.13.2): sevk partisinin adı/kodu/durumu — tek okuyucu `cloud-sync/packing-lot-facts`.
+      derived("partiAdi", "cloud-sync/packing-lot-facts loadPackingLots: PackingGroup.name", ["packing_groups"]),
+      derived("partiKodu", "cloud-sync/packing-lot-facts loadPackingLots: PackingGroup.code", ["packing_groups"]),
+      derived("partiDurumu", "cloud-sync/packing-lot-facts loadPackingLots: PackingGroup.status (OPEN · CLOSED)", ["packing_groups"]),
     ],
-    sources: [self("sacks"), via("rolls", "sackId", "ESKİ çuval ayrılmada görünmez → rolls_sync_parent_moved tetikleyicisi")],
-    deletion: "DAMGA", permission: "bulut:sevkiyat:oku", retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 1,
+    sources: [self("sacks"), via("rolls", "sackId", "ESKİ çuval ayrılmada görünmez → rolls_sync_parent_moved tetikleyicisi"),
+      lookup("packing_groups", "id", SACKS_OF_LOTS, "parti adı/durumu değişince (yeniden adlandırma, kapanma/açılma) partinin çuvalları yeniden gider (küçük tablo, filigran indekssiz)")],
+    // 2 (2026-11-20, backend 2.13.2): `partiAdi`/`partiKodu`/`partiDurumu` EKLENDİ — sürüm artışı bir kez TAM gönderim ister.
+    deletion: "DAMGA", permission: "bulut:sevkiyat:oku", retention: { wireFields: ["olusturulma"], sql: 't."createdAt"' }, catalogVersion: 2,
   },
   {
     // M2a (Adnan'a özgü sözleşme genişletmesi): iade satırı — top başına bir satır, `metre` iade anındaki metre;

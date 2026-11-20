@@ -79,7 +79,7 @@ const CLOUD_SNAPSHOT_NAMES = new Set([
   "emanet-bakiye", "fason-acik", "hizmet-geliri", "stok-karnesi", "stok-kalem", "cuval-deposu", "acik-siparis-karsilama", "rapor-katalogu", "uretim-akisi", "saglik", "tesis", "cari-ozeti",
 ]);
 const STAMP = `TEST-D3B-${Date.now()}-`;
-const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[], wos: [] as string[], dispatches: [] as string[], sacks: [] as string[], shipments: [] as string[] };
+const fx = { rolls: [] as string[], orders: [] as string[], items: [] as string[], customers: [] as string[], wos: [] as string[], dispatches: [] as string[], sacks: [] as string[], shipments: [] as string[], groups: [] as string[] };
 const NOT_IN_ADNAN =["ozet-finans", "ozet-masraf", "karlilik-ozet", "hizmet-geliri", "emanet-bakiye", "saglik"];
 
 function keysOf(v: unknown, out: Set<string> = new Set()): Set<string> {
@@ -303,6 +303,27 @@ async function main(): Promise<void> {
     pSack?.durum === "SEVKE_ATANDI" && pSack.sevkiyatNo === `${STAMP}SHP` && pSack.kg === 41.5 && pSack.top === 1 && pSack.toplar[0]?.etiketFarkli === false,
     JSON.stringify(pSack));
   check("sevk edilmiş (DISPATCHED) çuval gelmez", dSack(`${STAMP}SD`) === undefined);
+  // 2.13.2: partisiz çuvalda parti alanları null (anahtar VAR), top üretim partisi null.
+  check("partisiz çuval: partiAdi/partiKodu/partiDurumu/ambalajNo null, top parti null",
+    pool !== undefined && pool.partiAdi === null && pool.partiKodu === null && pool.partiDurumu === null && pool.ambalajNo === null && "depo" in pool && s1d?.parti === null,
+    JSON.stringify({ p: pool?.partiAdi, t: s1d?.parti }));
+
+  // 2.13.2 sevk partisi: sevke atanmış çuval bir partide (ad · kod · durum) + ambalaj no; içindeki top üretim partisinde.
+  console.log("\n§3c Çuval deposu — sevk partisi + üretim parti no (2.13.2)");
+  const lot = await prisma.packingGroup.create({ data: { customerId: customer.id, name: `${STAMP}034`, code: `T${String(Date.now()).slice(-12)}`, status: "OPEN" }, select: { id: true, code: true } });
+  fx.groups.push(lot.id);
+  await prisma.sack.update({ where: { id: sackP.id }, data: { packingGroupId: lot.id, packageNo: 7 } });
+  const p0 = await prisma.roll.findFirstOrThrow({ where: { barcode: `${STAMP}P0` }, select: { id: true } });
+  await prisma.roll.update({ where: { id: p0.id }, data: { batchId: batch.id } });
+  const lotBuild = await buildSnapshots({ now, productionOn: true, only: new Set(["cuval-deposu"]) });
+  check("cuval-deposu katı şemadan geçti (yeni alanlar şemada)", lotBuild.errors.length === 0 && lotBuild.snapshots.length === 1, JSON.stringify(lotBuild.errors));
+  const lotSack = (lotBuild.snapshots[0]?.data as unknown as SackDepotData | undefined)?.cuvallar.find((c) => c.id === sackP.id);
+  check("⭐ partili çuval: partiAdi = ad, partiKodu = kalıcı kod, partiDurumu OPEN, ambalajNo 7",
+    lotSack?.partiAdi === `${STAMP}034` && lotSack.partiKodu === lot.code && lotSack.partiDurumu === "OPEN" && lotSack.ambalajNo === 7,
+    JSON.stringify({ a: lotSack?.partiAdi, k: lotSack?.partiKodu, d: lotSack?.partiDurumu, n: lotSack?.ambalajNo }));
+  check("⭐ çuvaldaki top: üretim parti no (batchNumber, yalnız gösterim)", lotSack?.toplar[0]?.parti === `${STAMP}P`, JSON.stringify(lotSack?.toplar[0]));
+  await prisma.roll.update({ where: { id: p0.id }, data: { batchId: null } });
+  await prisma.sack.update({ where: { id: sackP.id }, data: { packingGroupId: null, packageNo: null } });
   const panelCust = (await sackSearchService.searchSacks({ customerId: customer.id })).data as Array<{ id: string }>;
   check("müşterinin çuvalları = panel listesi (havuz + PLANNED)", panelCust.length === depo.cuvallar.filter((c) => c.cariKartId === customer.id).length && panelCust.some((r) => r.id === sackP.id) && !panelCust.some((r) => r.id === sackD.id),
     `panel ${panelCust.length}`);
@@ -409,6 +430,7 @@ main()
     if (fx.rolls.length) await prisma.roll.deleteMany({ where: { id: { in: fx.rolls } } });
     if (fx.sacks.length) await prisma.sack.deleteMany({ where: { id: { in: fx.sacks } } });
     if (fx.shipments.length) await prisma.shipment.deleteMany({ where: { id: { in: fx.shipments } } });
+    if (fx.groups.length) await prisma.packingGroup.deleteMany({ where: { id: { in: fx.groups } } });
     if (fx.wos.length) await prisma.workOrderStep.deleteMany({ where: { workOrderId: { in: fx.wos } } });
     if (fx.wos.length) await prisma.workOrder.deleteMany({ where: { id: { in: fx.wos } } });
     if (fx.items.length) await prisma.item.deleteMany({ where: { id: { in: fx.items } } });

@@ -179,7 +179,7 @@ export const DELIBERATELY_EXCLUDED: Readonly<Record<string, string>> = {
   roll_status_events: "stok hareket defteri v1 dışı (hacim) — rapor isteğiyle", warehouse_movements: "aynı",
   roll_movements: "aynı", roll_operations: "üretim ayrıntısı", work_order_events: "iş emri hareket defteri v1 dışı",
   printed_documents: "belge içeriği", label_templates: "şablon", traveler_card_templates: "şablon",
-  batches: "v2 adayı (parti izleme raporu isteğe bağlı)", packing_groups: "v2 adayı (sevk partisi)",
+  batches: "v2 adayı (parti izleme raporu isteğe bağlı); 2.13.2: top satırında yalnız batchNumber GÖSTERİLİR (stok-kalem, cuval-deposu, sevkiyat-icerigi)",
   purchase_orders: "v2 adayı (alış siparişi)", purchase_order_lines: "v2 adayı (alış siparişi)",
   goods_receipts: "v2 adayı (mal kabul)", sack_allocations: "sevk karşılama pivotu — sipariş sevkMiktari türetilmiş olarak gider",
   subcontractor_dispatches: "fason — v1'de özet 'fason' bölümü", subcontractor_dispatch_items: "fason — aynı",

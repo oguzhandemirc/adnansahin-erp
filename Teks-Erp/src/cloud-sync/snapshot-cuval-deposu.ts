@@ -13,6 +13,7 @@ import { factoryYmd } from "../constants/time";
 import { resolveScopeOr } from "../services/sack-search.service";
 import { loadSackContentTotals, PRESENT_ROLL_WHERE } from "../services/helpers/sack-content-totals.helper";
 import { loadFoldTypeCatalog } from "../services/helpers/fold-type";
+import { loadPackingLots, partiOf, type PartiAlanlari } from "./packing-lot-facts";
 
 export const CUVAL_DURUM = { DEPODA: "DEPODA", SEVKE_ATANDI: "SEVKE_ATANDI" } as const;
 type CuvalDurum = (typeof CUVAL_DURUM)[keyof typeof CUVAL_DURUM];
@@ -20,17 +21,21 @@ type CuvalDurum = (typeof CUVAL_DURUM)[keyof typeof CUVAL_DURUM];
 interface TopWire {
   id: string; topNo: string | null; urun: string; renk: string | null; en: number | null; kat: string | null; kalite: string | null;
   metre: number; kg: number | null; etiketMusteri: string | null; etiketFarkli: boolean;
+  /** 2.13.2: üretim parti no (`Batch.batchNumber`) — yalnız gösterim (benzersiz değil). */
+  parti: string | null;
 }
 interface CuvalWire {
   id: string; cuvalNo: string; cariKartId: string | null; cari: string | null; sube: string | null; durum: CuvalDurum;
   sevkiyatNo: string | null; kg: number | null; top: number; metre: number; olusturulma: string; toplar: TopWire[];
 }
+/** 2.13.2: sevk partisi + ambalaj no + depo adı (kolon okuması; partisiz çuvalda parti alanları null). */
+interface CuvalEk extends PartiAlanlari { ambalajNo: number | null; depo: string | null }
 interface Sayilar { cuval: number; top: number; metre: number; kg: number | null; tartiliCuval: number }
 interface CariWire extends Omit<Sayilar, "tartiliCuval"> { cariKartId: string | null; ad: string }
 export interface SackDepotData {
   ozet: Sayilar & { sevkeAtanan: number };
   cariler: CariWire[];
-  cuvallar: CuvalWire[];
+  cuvallar: Array<CuvalWire & CuvalEk>;
 }
 
 /** Müşterisiz çuvalların kovası (panel cari kapısıyla aynı ad). */
@@ -58,7 +63,8 @@ export async function buildSackDepotData(): Promise<SackDepotData> {
     where: { OR: resolveScopeOr() },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     select: {
-      id: true, sackNo: true, customerId: true, weightKg: true, createdAt: true,
+      id: true, sackNo: true, customerId: true, weightKg: true, createdAt: true, packageNo: true, packingGroupId: true,
+      warehouse: { select: { name: true } },
       customer: { select: { name: true } },
       branch: { select: { name: true } },
       shipment: { select: { shipmentNo: true } },
@@ -75,8 +81,10 @@ export async function buildSackDepotData(): Promise<SackDepotData> {
       color: { select: { name: true } },
       qualityGradeRef: { select: { name: true } },
       labelCustomer: { select: { name: true } },
+      batch: { select: { batchNumber: true } },
     },
   });
+  const lots = await loadPackingLots(sacks.map((s) => s.packingGroupId));
   const foldCatalog = await loadFoldTypeCatalog();
   const foldName = new Map(foldCatalog.values.map((v) => [v.code, v.name]));
   const sackCustomer = new Map(sacks.map((s) => [s.id, s.customerId]));
@@ -92,6 +100,7 @@ export async function buildSackDepotData(): Promise<SackDepotData> {
       metre: Number(r.currentQty), kg: dec(r.weightKg),
       etiketMusteri: r.labelCustomer?.name ?? null,
       etiketFarkli: r.labelCustomerId !== null && cari !== null && r.labelCustomerId !== cari,
+      parti: r.batch?.batchNumber ?? null,
     });
     rollsBySack.set(r.sackId, list);
   }
@@ -99,7 +108,7 @@ export async function buildSackDepotData(): Promise<SackDepotData> {
   const genel = new Toplayici();
   let sevkeAtanan = 0;
   const byCari = new Map<string | null, { ad: string; t: Toplayici }>();
-  const cuvallar: CuvalWire[] = sacks.map((s) => {
+  const cuvallar: Array<CuvalWire & CuvalEk> = sacks.map((s) => {
     const t = totals.get(s.id);
     const top = t?.rollCount ?? 0;
     const metre = t?.totalQty ?? new Prisma.Decimal(0);
@@ -114,6 +123,7 @@ export async function buildSackDepotData(): Promise<SackDepotData> {
       id: s.id, cuvalNo: s.sackNo, cariKartId: s.customerId, cari: s.customer?.name ?? null, sube: s.branch?.name ?? null, durum: state,
       sevkiyatNo: s.shipment?.shipmentNo ?? null, kg: dec(kg), top, metre: Number(metre), olusturulma: factoryYmd(s.createdAt),
       toplar: rollsBySack.get(s.id) ?? [],
+      ...partiOf(lots, s.packingGroupId), ambalajNo: s.packageNo, depo: s.warehouse?.name ?? null,
     };
   });
   // Sıra panel cari kapısıyla aynı: müşterisiz kovası önce, sonra çok çuvallı önce, eşitlikte ad.

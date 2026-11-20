@@ -18,6 +18,7 @@ import {
   STAGE_STATION_SELECT, uretimStepName, workOrderStage, WO_ORDER_LINKS_SELECT,
 } from "./work-order-facts";
 import { shipmentContentDerived } from "./shipment-content";
+import { loadPackingLots, partiOf } from "./packing-lot-facts";
 
 type RawRow = Record<string, unknown> & { id: string };
 export type DerivedValues = Map<string, Record<string, unknown>>;
@@ -163,10 +164,12 @@ async function shipmentDerived(rows: readonly RawRow[]): Promise<DerivedValues> 
 
 async function sackDerived(rows: readonly RawRow[]): Promise<DerivedValues> {
   const totals = await loadSackContentTotals(ids(rows));
+  // 2.13.2: sevk partisinin adı/kodu/durumu (kimlik zaten `partiId` kolonu).
+  const lots = await loadPackingLots(rows.map((r) => r.packingGroupId));
   const out: DerivedValues = new Map();
   for (const r of rows) {
     const t = totals.get(r.id);
-    out.set(r.id, { topSayisi: t?.rollCount ?? 0, metre: t?.totalQty ?? D0() });
+    out.set(r.id, { topSayisi: t?.rollCount ?? 0, metre: t?.totalQty ?? D0(), ...partiOf(lots, r.packingGroupId) });
   }
   return out;
 }

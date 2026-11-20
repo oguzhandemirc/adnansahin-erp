@@ -79,9 +79,13 @@ const SackDepot = z.strictObject({
     id: z.string().uuid(), cuvalNo: Str, cariKartId: z.string().uuid().nullable(), cari: Str.nullable(), sube: Str.nullable(),
     durum: z.enum(["DEPODA", "SEVKE_ATANDI"]), sevkiyatNo: Str.nullable(), kg: Num.nullable(), top: Num, metre: Num,
     olusturulma: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    // 2.13.2: sevk partisi (ad · kalıcı kod · OPEN/CLOSED) + ambalaj no + depo adı; partisizde parti alanları null.
+    partiAdi: Str.nullable(), partiKodu: Str.nullable(), partiDurumu: z.enum(["OPEN", "CLOSED"]).nullable(), ambalajNo: Num.nullable(), depo: Str.nullable(),
     toplar: z.array(z.strictObject({
       id: z.string().uuid(), topNo: Str.nullable(), urun: Str, renk: Str.nullable(), en: Num.nullable(), kat: Str.nullable(), kalite: Str.nullable(),
       metre: Num, kg: Num.nullable(), etiketMusteri: Str.nullable(), etiketFarkli: z.boolean(),
+      // 2.13.2: üretim parti no (yalnız gösterim).
+      parti: Str.nullable(),
     })),
   })),
 });

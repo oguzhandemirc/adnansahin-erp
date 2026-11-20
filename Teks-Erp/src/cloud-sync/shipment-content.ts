@@ -13,6 +13,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { shippingService } from "../services/shipping.service";
 import { SACK_ABSENT_STATUSES } from "../services/helpers/sack-invariants.helper";
+import { loadPackingLots, PARTISIZ, partiOf, type PartiAlanlari } from "./packing-lot-facts";
 
 type RawRow = Record<string, unknown> & { id: string };
 
@@ -54,15 +55,15 @@ type RollView = z.infer<typeof RollRow>;
 const ABSENT: ReadonlySet<string> = new Set<string>(SACK_ABSENT_STATUSES);
 const dec = (v: string | number): Prisma.Decimal => new Prisma.Decimal(v);
 
-interface RollExtra { readonly kg: Prisma.Decimal | null; readonly etiketMusteri: string | null }
+interface RollExtra { readonly kg: Prisma.Decimal | null; readonly etiketMusteri: string | null; readonly parti: string | null }
 
 async function loadRollExtras(rollIds: readonly string[]): Promise<Map<string, RollExtra>> {
   if (rollIds.length === 0) return new Map();
   const found = await prisma.roll.findMany({
     where: { id: { in: [...new Set(rollIds)] } },
-    select: { id: true, weightKg: true, labelCustomer: { select: { name: true } } },
+    select: { id: true, weightKg: true, labelCustomer: { select: { name: true } }, batch: { select: { batchNumber: true } } },
   });
-  return new Map(found.map((r) => [r.id, { kg: r.weightKg, etiketMusteri: r.labelCustomer?.name ?? null }]));
+  return new Map(found.map((r) => [r.id, { kg: r.weightKg, etiketMusteri: r.labelCustomer?.name ?? null, parti: r.batch?.batchNumber ?? null }]));
 }
 
 function topWire(r: RollView, extra: Map<string, RollExtra>) {
@@ -76,11 +77,23 @@ function topWire(r: RollView, extra: Map<string, RollExtra>) {
     metre: dec(r.currentQty),
     kg: x?.kg ?? null,
     etiketMusteri: x?.etiketMusteri ?? null,
+    // 2.13.2: üretim parti no (`Batch.batchNumber`) — YALNIZ gösterim; benzersiz değildir, kimlik/sıra olarak kullanılmaz.
+    parti: x?.parti ?? null,
     iade: r.returned !== undefined,
     iadeTarihi: r.returned?.returnedAt ?? null,
     iadeSebebi: r.returned?.reasonName ?? null,
     yok: r.returned === undefined && r.status !== undefined && ABSENT.has(r.status),
   };
+}
+
+interface SackExtra { readonly ambalajNo: number | null; readonly parti: PartiAlanlari }
+
+/** Çuvalın servis yanıtında olmayan depolanmış kolonları: `packageNo` + sevk partisi (`packing-lot-facts`). */
+async function loadSackExtras(sackIds: readonly string[]): Promise<Map<string, SackExtra>> {
+  if (sackIds.length === 0) return new Map();
+  const found = await prisma.sack.findMany({ where: { id: { in: [...new Set(sackIds)] } }, select: { id: true, packageNo: true, packingGroupId: true } });
+  const lots = await loadPackingLots(found.map((s) => s.packingGroupId));
+  return new Map(found.map((s) => [s.id, { ambalajNo: s.packageNo, parti: partiOf(lots, s.packingGroupId) }]));
 }
 
 /** Tek sevkiyatın tel içeriği: `ozet` + `cuvallar` + `cuvalsizToplar`. */
@@ -89,6 +102,7 @@ export async function buildShipmentContent(shipmentId: string): Promise<Record<s
   const v = ServiceView.parse(JSON.parse(JSON.stringify(res.data)));
   const allRolls = [...v.rolls.map((r) => r.id), ...v.sacks.flatMap((s) => s.rolls.map((r) => r.id))];
   const extra = await loadRollExtras(allRolls);
+  const sackExtra = await loadSackExtras(v.sacks.map((s) => s.id));
   const cuvallar = v.sacks.map((s) => ({
     id: s.id,
     cuvalNo: s.sackNo,
@@ -99,6 +113,9 @@ export async function buildShipmentContent(shipmentId: string): Promise<Record<s
     iadeTop: s.returnedCount,
     iadeMetre: dec(s.returnedQty),
     kartela: s.swatchCount,
+    // 2.13.2: ambalaj no + sevk partisi (kolon okuması).
+    ambalajNo: sackExtra.get(s.id)?.ambalajNo ?? null,
+    ...(sackExtra.get(s.id)?.parti ?? PARTISIZ),
     toplar: s.rolls.map((r) => topWire(r, extra)),
   }));
   // Çuvalsız top: sevkiyata doğrudan bağlı (çuvalı yok) — panelin üst `rolls` dizisinde `sackId` boş olanlar.
