@@ -164,8 +164,10 @@ describe("§4 ekran", () => {
     await act(async () => { fireEvent.press(screen.getByTestId(`cuval-satir-${sid(1)}`)); });
     const ic = screen.getByTestId(`cuval-icerik-${sid(1)}`);
     expect(within(ic).getByText("T-1")).toBeTruthy();
-    expect(within(ic).getAllByText("ÖRNEK SATEN · 280 cm · KREM")).toHaveLength(2);
-    expect(within(ic).getByText("1. Kalite · Etiket: BETA ÖRME")).toBeTruthy();
+    // 2026-11-20: toplar tablo (Kumaş · Renk · En · Kalite · Etiket ayrı sütun).
+    expect(within(ic).getAllByText("ÖRNEK SATEN")).toHaveLength(2);
+    expect(within(ic).getByText("BETA ÖRME")).toBeTruthy();
+    expect(within(ic).getAllByText("1. Kalite")).toHaveLength(2);
     expect(screen.getByTestId(`cuval-top-fark-${tid(2)}`)).toBeTruthy();
     expect(screen.queryByTestId(`cuval-top-fark-${tid(1)}`)).toBeNull();
     // Kart seçimi: "Brüt kg" kapatılınca kart kaybolur (sıfır kart serbest; tercih yalnız cihazda).

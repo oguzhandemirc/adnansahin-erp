@@ -189,21 +189,23 @@ const ORNEK_CARI = {
   taslak: { id: "00000000-0000-4000-8000-0000000000c4", ad: "Taslak Konfeksiyon" },
 } as const;
 type OrnekCuvalTopu = { urun: string; en: number; renk: string; kat: string | null; metre: number; etiket: keyof typeof ORNEK_CARI | null; gun: number };
-type OrnekCuval = { no: string; cari: keyof typeof ORNEK_CARI | null; sevkiyat: string | null; kg: number | null; gun: number; toplar: OrnekCuvalTopu[] };
+// 2.13.2: sevk partisi (ad · kalıcı kod · durum) + ambalaj no; top üretim parti no (`parti`).
+type OrnekParti = { ad: string; kod: string; durum: "OPEN" | "CLOSED"; ambalaj: number };
+type OrnekCuval = { no: string; cari: keyof typeof ORNEK_CARI | null; sevkiyat: string | null; kg: number | null; gun: number; parti: OrnekParti | null; uretimParti: string | null; toplar: OrnekCuvalTopu[] };
 const ORNEK_CUVALLAR: OrnekCuval[] = [
-  { no: "CV1711260004", cari: "numune", sevkiyat: "SVK-2026-0318", kg: 48.6, gun: 0, toplar: [
+  { no: "CV1711260004", cari: "numune", sevkiyat: "SVK-2026-0318", kg: 48.6, gun: 0, parti: { ad: "DNZ-084", kod: "PRT-2611-0020", durum: "OPEN", ambalaj: 2 }, uretimParti: "P57", toplar: [
     { urun: "NUMUNE TÜL", en: 320, renk: "EKRU", kat: "4 Kat", metre: 52.5, etiket: "numune", gun: 3 },
     { urun: "NUMUNE TÜL", en: 320, renk: "EKRU", kat: "4 Kat", metre: 49, etiket: "numune", gun: 3 },
   ] },
-  { no: "CV1611260011", cari: "numune", sevkiyat: null, kg: 61.2, gun: 1, toplar: [
+  { no: "CV1611260011", cari: "numune", sevkiyat: null, kg: 61.2, gun: 1, parti: { ad: "DNZ-084", kod: "PRT-2611-0020", durum: "OPEN", ambalaj: 1 }, uretimParti: "P56", toplar: [
     { urun: "ÖRNEK SATEN", en: 280, renk: "KREM", kat: null, metre: 44.5, etiket: "numune", gun: 2 },
     { urun: "ÖRNEK SATEN", en: 280, renk: "KREM", kat: null, metre: 46, etiket: "taslak", gun: 2 },
     { urun: "ÖRNEK SATEN", en: 280, renk: "KREM", kat: null, metre: 41.5, etiket: null, gun: 5 },
   ] },
-  { no: "CV1511260007", cari: "taslak", sevkiyat: null, kg: null, gun: 2, toplar: [
+  { no: "CV1511260007", cari: "taslak", sevkiyat: null, kg: null, gun: 2, parti: { ad: "P-1", kod: "PRT-2611-0018", durum: "OPEN", ambalaj: 1 }, uretimParti: "P54", toplar: [
     { urun: "TASLAK KADİFE", en: 140, renk: "BORDO", kat: null, metre: 60, etiket: "taslak", gun: 6 },
   ] },
-  { no: "CV1411260002", cari: null, sevkiyat: null, kg: null, gun: 3, toplar: [
+  { no: "CV1411260002", cari: null, sevkiyat: null, kg: null, gun: 3, parti: null, uretimParti: null, toplar: [
     { urun: "DENEME KETEN", en: 150, renk: "GRİ", kat: null, metre: 55.5, etiket: null, gun: 8 },
     { urun: "DENEME KETEN", en: 150, renk: "GRİ", kat: null, metre: 50, etiket: null, gun: 8 },
   ] },
@@ -221,13 +223,14 @@ export function ORNEK_CUVAL_DEPOSU() {
       const etiket = x.etiket ? ORNEK_CARI[x.etiket] : null;
       return {
         id: ornekCuvalTopKimligi(ci, ti), topNo: `${c.no}-${ti + 1}`, urun: x.urun, renk: x.renk, en: x.en, kat: x.kat, kalite: "1. Kalite",
-        metre: x.metre, kg: null, etiketMusteri: etiket?.ad ?? null, etiketFarkli: !!etiket && !!cari && etiket.id !== cari.id,
+        metre: x.metre, kg: null, etiketMusteri: etiket?.ad ?? null, etiketFarkli: !!etiket && !!cari && etiket.id !== cari.id, parti: c.uretimParti,
       };
     });
     return {
       id: `00000000-0000-4000-8000-00000000c${String(ci).padStart(3, "0")}`, cuvalNo: c.no, cariKartId: cari?.id ?? null, cari: cari?.ad ?? null, sube: null,
       durum: c.sevkiyat ? "SEVKE_ATANDI" : "DEPODA", sevkiyatNo: c.sevkiyat, kg: c.kg, top: toplar.length, metre: r1(toplar.reduce((a, x) => a + x.metre, 0)),
       olusturulma: once(c.gun).slice(0, 10), toplar,
+      partiAdi: c.parti?.ad ?? null, partiKodu: c.parti?.kod ?? null, partiDurumu: c.parti?.durum ?? null, ambalajNo: c.parti?.ambalaj ?? null, depo: "Ana Depo",
     };
   });
   const say = (xs: typeof cuvallar) => {
@@ -524,7 +527,7 @@ export function ORNEK_LISTE(): Record<string, ProjectionRecord[]> {
 function ornekSevkIcerikleri(): ProjectionRecord[] {
   const top = (k: string, n: number, o: Record<string, unknown> = {}) => ({
     id: `00000000-0000-4000-8000-0000000d${k}${String(n).padStart(2, "0")}`, topNo: `T${k}${String(n).padStart(3, "0")}`, urun: "ÖRNEK SATEN", renk: "KREM", en: 280,
-    metre: 120, kg: null, etiketMusteri: null, iade: false, iadeTarihi: null, iadeSebebi: null, yok: false, ...o,
+    metre: 120, kg: null, etiketMusteri: null, parti: "P55", iade: false, iadeTarihi: null, iadeSebebi: null, yok: false, ...o,
   });
   const v2Toplar = [
     top("20", 1, { metre: 150, etiketMusteri: "Deneme Kumaş Ltd. Şti." }),
@@ -534,7 +537,7 @@ function ornekSevkIcerikleri(): ProjectionRecord[] {
   const v2 = kayit("v2", {
     id: "v2", sevkNo: "SVK-0450", durum: "DISPATCHED", cikisTarihi: once(0, 2), olusturulma: once(1, 3),
     ozet: { cuval: 1, top: 4, metre: 434, kg: 121, tartiliCuval: 1, iadeTop: 1, iadeMetre: 144, kartela: 0 },
-    cuvallar: [{ id: "00000000-0000-4000-8000-0000000e0201", cuvalNo: "CV1811260021", sira: "1", kg: 121, top: 3, metre: 384, iadeTop: 1, iadeMetre: 144, kartela: 0, toplar: v2Toplar }],
+    cuvallar: [{ id: "00000000-0000-4000-8000-0000000e0201", cuvalNo: "CV1811260021", sira: "1", partiAdi: "034", partiKodu: "PRT-2611-0019", partiDurumu: "CLOSED", ambalajNo: 1, kg: 121, top: 3, metre: 384, iadeTop: 1, iadeMetre: 144, kartela: 0, toplar: v2Toplar }],
     cuvalsizToplar: [top("21", 1, { urun: "DENEME KETEN", renk: "GRİ", en: 150, metre: 50 })],
   });
   const bolum = [5, 5, 4, 4, 4];
@@ -547,6 +550,7 @@ function ornekSevkIcerikleri(): ProjectionRecord[] {
     });
     return {
       id: `00000000-0000-4000-8000-0000000e030${ci + 1}`, cuvalNo: `CV1711260${String(30 + ci)}`, sira: String(ci + 1), kg: kglar[ci],
+      partiAdi: ci < 3 ? "SDK" : "RG-55", partiKodu: ci < 3 ? "PRT-2611-0016" : "PRT-2611-0017", partiDurumu: "CLOSED", ambalajNo: ci < 3 ? ci + 1 : ci - 2,
       top: adet, metre: toplar.reduce((a, x) => a + x.metre, 0), iadeTop: 0, iadeMetre: 0, kartela: 0, toplar,
     };
   });

@@ -93,9 +93,12 @@ describe("§2 ekran", () => {
     const ic = screen.getByTestId(`sevk-icerik-${sid(1)}`);
     expect(within(ic).getByText("Sıra 1 · 48,5 kg brüt")).toBeTruthy();
     expect(within(ic).getByText("T-1")).toBeTruthy();
-    expect(within(ic).getAllByText("ÖRNEK SATEN · 280 cm · KREM")).toHaveLength(3);
-    expect(within(ic).getByText("12 kg · Etiket: ALFA TEKSTİL")).toBeTruthy();
-    expect(within(ic).getByText("Stok etiketi · İade 18.11.2026: Renk farkı")).toBeTruthy();
+    // 2026-11-20: toplar tablo — Kumaş · Renk · En · Kg · Etiket · Not ayrı sütun.
+    expect(within(ic).getAllByText("ÖRNEK SATEN")).toHaveLength(3);
+    expect(within(ic).getAllByText("280 cm")).toHaveLength(3);
+    expect(within(ic).getByText("ALFA TEKSTİL")).toBeTruthy();
+    expect(within(ic).getByText("İade 18.11.2026: Renk farkı")).toBeTruthy();
+    expect(screen.getByTestId(`sevk-topsatir-${tid(1)}`).props.accessibilityLabel).toContain("Kg: 12");
     expect(screen.getByTestId(`sevk-top-iade-${tid(2)}`)).toHaveTextContent("İade");
     expect(screen.getByTestId(`sevk-top-yok-${tid(3)}`)).toHaveTextContent("Çuvalda yok");
     expect(screen.queryByTestId(`sevk-top-iade-${tid(1)}`)).toBeNull();
@@ -103,7 +106,8 @@ describe("§2 ekran", () => {
 
     const cs = screen.getByTestId("sevk-cuvalsiz");
     expect(within(cs).getByText("Çuvalsız  ·  1 top")).toBeTruthy();
-    expect(within(cs).getByText("DENEME KETEN · 150 cm · GRİ")).toBeTruthy();
+    expect(within(cs).getByText("DENEME KETEN")).toBeTruthy();
+    expect(within(cs).getByText("150 cm")).toBeTruthy();
 
     // İkinci çuval açılınca birincisi kapanır; aynı satıra ikinci dokunuş kapatır.
     await act(async () => { fireEvent.press(screen.getByTestId(`sevk-cuval-satir-${sid(2)}`)); });

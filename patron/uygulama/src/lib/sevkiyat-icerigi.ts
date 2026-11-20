@@ -24,6 +24,11 @@ export interface SevkCuvali {
   readonly top: number;
   readonly metre: number;
   readonly iadeTop: number;
+  /** Sevk partisi + ambalaj no (fabrika 2.13.2+; partisizde ve eski fabrikada null). */
+  readonly partiAdi: string | null;
+  readonly partiKodu: string | null;
+  readonly partiDurumu: string | null;
+  readonly ambalajNo: number | null;
   readonly toplar: readonly SevkTopu[];
   /** İçinde hayalet top var mı (fabrikanın top işaretlerinden; sayı değil). */
   readonly yokVar: boolean;
@@ -60,6 +65,7 @@ export function sevkIcerigi(kayit: unknown): SevkIcerigi {
       return {
         id: str(c.id) ?? "", cuvalNo: str(c.cuvalNo) ?? "—", sira: str(c.sira), kg: num(c.kg), top: num(c.top) ?? 0, metre: num(c.metre) ?? 0,
         iadeTop: num(c.iadeTop) ?? 0, toplar, yokVar: toplar.some((t) => t.yok),
+        partiAdi: str(c.partiAdi), partiKodu: str(c.partiKodu), partiDurumu: str(c.partiDurumu), ambalajNo: num(c.ambalajNo),
       };
     }),
     cuvalsizToplar: arr(v.cuvalsizToplar).map(sevkTopuOku),

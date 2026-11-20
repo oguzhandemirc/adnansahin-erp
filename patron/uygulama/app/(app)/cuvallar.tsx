@@ -5,10 +5,10 @@
 // çuval satırına dokunmak içeriği altında açar. Eski fabrikada anlık yok → anlaşılır boş durum.
 // Kart, sütun ve süzgeç seçimi yalnız bu cihazda (`tablo.cuval`, `src/ui/cuval/gorunum.ts`).
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import { can } from "../../src/lib/access";
-import { cariAnahtari, cuvalDeposu, CUVAL_SIRALANABILIR, cuvalSuzgecGruplari, gorunenCuvallar, type Cuval, type CuvalDeposu, type CuvalTopu } from "../../src/lib/cuval-deposu";
+import { cariAnahtari, cuvalDeposu, CUVAL_SIRALANABILIR, cuvalSuzgecGruplari, cuvalToplami, gorunenCuvallar, type Cuval, type CuvalDeposu, type CuvalTopu } from "../../src/lib/cuval-deposu";
 import { UNIT } from "../../src/lib/labels/uretim";
 import { useSession } from "../../src/state/session";
 import { Screen } from "../../src/ui/Frame";
@@ -16,12 +16,13 @@ import { kartSecEylemi } from "../../src/ui/BaslikMenusu";
 import { Basilabilir, KademeliGiris } from "../../src/ui/hareket";
 import { MODULE_ICON } from "../../src/ui/icons";
 import { CuvalToplari, type TopIsareti } from "../../src/ui/cuval/CuvalToplari";
+import { CuvalToplamSatiri, type CuvalAltToplam } from "../../src/ui/cuval/CuvalToplamSatiri";
 import { BlokBasligi, ListeBlogu, ListeSatiri, Rozet, StatCard } from "../../src/ui/ortak";
 import { qty } from "../../src/ui/pano/read";
 import { SnapshotGate } from "../../src/ui/pano/SnapshotGate";
 import { useSnapshot } from "../../src/ui/pano/useSnapshot";
 import {
-  CUVAL_KARTLARI, CUVAL_SUTUNLARI, CUVAL_VARSAYILAN_SUTUN, cuvalKartDegistir, cuvalKartlari, cuvalKartSifirla, cuvalTemizle, ETIKET_FARKLI, type CuvalKartKey,
+  CUVAL_KARTLARI, CUVAL_SUTUNLARI, CUVAL_VARSAYILAN_SUTUN, cuvalKartDegistir, doluSutunlar, cuvalKartlari, cuvalKartSifirla, cuvalTemizle, ETIKET_FARKLI, type CuvalKartKey,
 } from "../../src/ui/cuval/gorunum";
 import { azamiSutun, etkinSuzgecSayisi, gecerliSecim, siganSutun, sonrakiSiralama, suzgecAta, suzgecSec, sutunDegistir, sutunTasi, type SutunTanimi } from "../../src/ui/tablo/model";
 import { SutunSecici, VisibilityPicker } from "../../src/ui/tablo/Seciciler";
@@ -46,10 +47,12 @@ export default function Cuvallar() {
   const pref = useCihazTercihi("tablo.cuval", useMemo(() => cuvalTemizle(azami), [azami]));
   const [kartSecici, setKartSecici] = useState(false);
   const kartlarEylemi = kartSecEylemi(() => setKartSecici(true), "cuval-kart-sec");
+  // Alt şerit görünen (süzülen) satırların toplamı; içerik hesaplayıp buraya bildirir (şerit ekranın altında sabit).
+  const [toplam, setToplam] = useState<CuvalAltToplam | null>(null);
   return (
-    <Screen module="cuvallar" onRefresh={snap.reload} refreshing={snap.refreshing} headerSecondary={[kartlarEylemi]}>
+    <Screen module="cuvallar" onRefresh={snap.reload} refreshing={snap.refreshing} headerSecondary={[kartlarEylemi]} footer={snap.data ? <CuvalToplamSatiri toplam={toplam} /> : undefined}>
       <SnapshotGate remote={snap} variant="list" rows={4} empty={CUVAL_BOS} testID="cuval">
-        {(veri) => <Icerik d={cuvalDeposu(veri)} pref={pref} azami={azami} />}
+        {(veri) => <Icerik d={cuvalDeposu(veri)} pref={pref} azami={azami} onToplam={setToplam} />}
       </SnapshotGate>
       <Text style={s.not}>Salt izleme: çuvala ekleme, çıkarma ve sevk panelden yapılır. Kg çuvalın brüt tartısıdır.</Text>
       <VisibilityPicker
@@ -63,7 +66,7 @@ export default function Cuvallar() {
   );
 }
 
-function Icerik({ d, pref, azami }: { readonly d: CuvalDeposu; readonly pref: TabloTercihiDurumu; readonly azami: number }) {
+function Icerik({ d, pref, azami, onToplam }: { readonly d: CuvalDeposu; readonly pref: TabloTercihiDurumu; readonly azami: number; readonly onToplam: (t: CuvalAltToplam | null) => void }) {
   const s = useStyles();
   const genislik = useWindowDimensions().width;
   const eksen = useYatayEksen();
@@ -78,7 +81,13 @@ function Icerik({ d, pref, azami }: { readonly d: CuvalDeposu; readonly pref: Ta
   const yalnizKartlar = (v: Readonly<Record<string, string>>) => Object.fromEntries(Object.entries(v).filter(([k]) => !gruplar.some((g) => g.anahtar === k)));
   const suzgecTemizle = () => pref.degistir((v) => ({ ...v, suzgec: yalnizKartlar(v.suzgec) }));
   const satirlar = useMemo(() => gorunenCuvallar(d, ara, suzgec, pref.tercih.siralama), [d, ara, suzgec, pref.tercih.siralama]);
-  const gorunur = pref.tercih.sutunlar.flatMap((k) => CUVAL_SUTUNLARI.filter((c) => c.key === k));
+  const gorunur = doluSutunlar(pref.tercih.sutunlar, d.cuvallar).flatMap((k) => CUVAL_SUTUNLARI.filter((c) => c.key === k));
+  const suzulmus = ara.trim() !== "" || etkinSuzgecSayisi(suzgec) > 0;
+  const alt = useMemo<CuvalAltToplam | null>(() => (d.cuvallar.length === 0 ? null : { etiket: suzulmus ? "Süzülen" : "Toplam", sayilar: cuvalToplami(satirlar) }), [d.cuvallar.length, suzulmus, satirlar]);
+  // Değer anahtarıyla: üst ekran her çizimde belgeyi yeniden okur (yeni nesne) — aynı toplam yeniden bildirilmez (döngü yok).
+  const altAnahtar = alt ? JSON.stringify(alt) : "";
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnız değer değişince
+  useEffect(() => { onToplam(alt); }, [altAnahtar, onToplam]);
   const yatay = gorunur.length > siganSutun(genislik) ? eksen : null;
   const cariSec = (deger: string | null) => pref.degistir((v) => ({ ...v, suzgec: suzgecSec(v.suzgec, "cari", deger) }));
 
@@ -135,7 +144,7 @@ function Icerik({ d, pref, azami }: { readonly d: CuvalDeposu; readonly pref: Ta
       ) : null}
       <TabloAraclari
         testID="cuval"
-        ara={{ value: ara, onChangeText: setAra, placeholder: "Çuval no, cari, top no, ürün ara" }}
+        ara={{ value: ara, onChangeText: setAra, placeholder: "Çuval no, parti, cari, top no, ürün ara" }}
         suzgecSayisi={etkinSuzgecSayisi(suzgec)}
         onSuzgec={() => setSuzgecAcik(true)}
         onSutun={() => setSutunAcik(true)}
