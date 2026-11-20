@@ -17,7 +17,8 @@ import type { ListQuery } from "../siparis/useRemoteList";
 import { ANA, azamiSutun, etkinSuzgecSayisi, gecerliSecim, gruplar, sonrakiSiralama, sunucuSorgusu, sutunDegistir, sutunTasi, suzgecAta, tercihiTemizle, type Siralama, type SutunTanimi, type SuzgecGrubu, type TabloTercihi } from "./model";
 import { SutunSecici } from "./Seciciler";
 import { EtkinSuzgecler, SuzgecBos, SuzgecSayfasi } from "./Suzgec";
-import { useTabloTercihi } from "./useTabloTercihi";
+import { useCihazTercihi } from "./useCihazTercihi";
+import { useTabloTercihi, type TabloTercihiDurumu } from "./useTabloTercihi";
 import { TabloAraclari, TabloBasligi, TabloGovdesi, TabloSatiri, toplamGenislik, useTabloOlcusu, type YatayEksen } from "./VeriTablosu";
 
 export interface VeriTablosuAyari {
@@ -67,13 +68,36 @@ export interface VeriTablosu {
 export interface TabloEki {
   readonly suzgec?: string;
   readonly siralama?: Siralama;
+  /** Kullanıcı başlıktan sıralama seçmediyse kullanılan sıra (ör. açık siparişler en eski önce); seçimi ezmez. */
+  readonly varsayilanSiralama?: Siralama;
   readonly kimlik?: Pick<ListQuery, "cariKartId" | "siparisId" | "fasonFirmaId">;
 }
 
+function useTemizle(ayar: Pick<VeriTablosuAyari, "sutunlar" | "varsayilan">, azami: number) {
+  const keys = useMemo(() => ayar.sutunlar.map((c) => c.key), [ayar.sutunlar]);
+  const varsayilan: TabloTercihi = useMemo(() => ({ surum: 1, sutunlar: ayar.varsayilan, siralama: null, suzgec: {} }), [ayar.varsayilan]);
+  return useMemo(() => (ham: unknown) => tercihiTemizle(ham, { varsayilan, sutunlar: keys, azami }), [varsayilan, keys, azami]);
+}
+
+/** Liste ekranının tablosu: tercih profilde (`ayar.anahtar`, bulutun sabit anahtar listesi). */
 export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriTablosu {
+  const azami = azamiSutun(useWindowDimensions().width);
+  const pref = useTabloTercihi(ayar.anahtar, useTemizle(ayar, azami));
+  return useVeriTablosuIc(ayar, ek, pref, azami);
+}
+
+/**
+ * Aynı sunucu tablosu, tercih YALNIZ CİHAZDA (`cihazAnahtari`): bir ayrıntı ekranının içindeki sunucu sayfalı liste
+ * (ör. cari kartının Siparişler/Sevkiyatlar sekmesi) — bulut tercih anahtar listesi sabit, ana listenin seçimi ezilmez.
+ */
+export function useCihazVeriTablosu(ayar: VeriTablosuAyari & { readonly cihazAnahtari: string }, ek: TabloEki = {}): VeriTablosu {
+  const azami = azamiSutun(useWindowDimensions().width);
+  const pref = useCihazTercihi(ayar.cihazAnahtari, useTemizle(ayar, azami));
+  return useVeriTablosuIc(ayar, ek, pref, azami);
+}
+
+function useVeriTablosuIc(ayar: VeriTablosuAyari, ek: TabloEki, pref: TabloTercihiDurumu, azami: number): VeriTablosu {
   const { facility, api } = useSession();
-  const { width } = useWindowDimensions();
-  const azami = azamiSutun(width);
   const cap = listCapability(facility);
   const spec = cap.search(ayar.projeksiyon);
   const siralanabilir = facility?.liste?.siralama?.[ayar.projeksiyon] ?? [];
@@ -84,7 +108,8 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
   const gs = useMemo(() => {
     const c = listCapability(facility);
     const temel = gruplar(spec, cokluSuzgec, ayar.haricAlanlar);
-    const deger = c.valueFilters(ayar.projeksiyon).flatMap((f) => {
+    // `haricAlanlar` değer süzgecini de dışarıda tutar (ör. tek carinin listesinde Müşteri alanı).
+    const deger = c.valueFilters(ayar.projeksiyon).filter((f) => !ayar.haricAlanlar?.includes(f.alan)).flatMap((f) => {
       const d = secenek.data?.alanlar[f.alan]?.degerler ?? [];
       return d.length > 0 ? [degerGrubu(f, d)] : [];
     });
@@ -95,10 +120,6 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
       ...temel.filter((g) => g.anahtar !== ANA), ...deger.filter((g) => !musteri.includes(g)),
     ];
   }, [facility, spec, cokluSuzgec, ayar.haricAlanlar, ayar.projeksiyon, secenek.data]);
-  const keys = useMemo(() => ayar.sutunlar.map((c) => c.key), [ayar.sutunlar]);
-  const varsayilan: TabloTercihi = useMemo(() => ({ surum: 1, sutunlar: ayar.varsayilan, siralama: null, suzgec: {} }), [ayar.varsayilan]);
-  const temizle = useMemo(() => (ham: unknown) => tercihiTemizle(ham, { varsayilan, sutunlar: keys, azami }), [varsayilan, keys, azami]);
-  const pref = useTabloTercihi(ayar.anahtar, temizle);
   const [terim, setTerim] = useState("");
   const ara = useDebounced(terim.trim(), 300);
   // Ekranın sabit değeri bir grubu doldurduysa tercihin o gruptaki değeri gönderilmez (sunucu grup başına tek değer alır).
@@ -107,7 +128,7 @@ export function useVeriTablosu(ayar: VeriTablosuAyari, ek: TabloEki = {}): VeriT
   const etkin: TabloTercihi = {
     ...pref.tercih,
     suzgec: Object.fromEntries(Object.entries(pref.tercih.suzgec).filter(([g]) => !dolu.includes(g))),
-    ...(ek.siralama ? { siralama: ek.siralama } : {}),
+    ...(ek.siralama ? { siralama: ek.siralama } : !pref.tercih.siralama && ek.varsayilanSiralama ? { siralama: ek.varsayilanSiralama } : {}),
   };
   const temel = sunucuSorgusu(etkin, spec ? ara : "", gs, siralanabilir);
   const genis = genisSorgu(etkin, gs, factoryDayKey());

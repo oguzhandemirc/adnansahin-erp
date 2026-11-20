@@ -60,7 +60,8 @@ describe("boş durumlar", () => {
   const TAG = /<(Empty|ListStates|RemoteList)\b[\s\S]*?\/>|<SnapshotGate\b[^>]*>/g;
   const elements = SOURCES.flatMap((f) => [...readFileSync(f, "utf8").matchAll(TAG)].map((m) => ({ f: f.slice(ROOT.length + 1), src: m[0] })));
   it("tarayıcı gerçekten eleman buluyor (sonda)", () => {
-    expect(elements.length).toBeGreaterThan(15);
+    // 2026-11-20: cari kartının üç `ListStates`i ortak sunucu tablosuna (`TabloListesi`) taşındı → eşik 12.
+    expect(elements.length).toBeGreaterThan(12);
   });
   it("simge çıplak ad değil: EMPTY_ICON ya da alan simgesi", () => {
     const bad = elements.filter((e) => /\b(icon|emptyIcon)="/.test(e.src)).map((e) => e.f);

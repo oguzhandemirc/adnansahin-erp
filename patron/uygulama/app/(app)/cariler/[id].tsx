@@ -29,8 +29,10 @@ import { cariRowText } from "../../../src/ui/siparis/CustomerRow";
 import { asObj, str } from "../../../src/ui/siparis/OrderRow";
 import { ListStates, StaleNote } from "../../../src/ui/siparis/parts";
 import { CARI_SIPARIS_SUTUNLARI, SIPARIS_SUTUNLARI } from "../../../src/ui/siparis/sutunlar";
-import { CARI_SEVK_SUTUNLARI, OZET_SEVK_SUTUNLARI, SEVKIYAT_SUTUNLARI } from "../../../src/ui/sevkiyat/sutunlar";
-import { KisaTablo, sutunSec } from "../../../src/ui/tablo/KisaTablo";
+import { OZET_SEVK_SUTUNLARI, SEVKIYAT_SUTUNLARI } from "../../../src/ui/sevkiyat/sutunlar";
+import { CariSevkTablosu, CariSiparisTablosu } from "../../../src/ui/cari/CariListeTablolari";
+import { KisaTablo } from "../../../src/ui/tablo/KisaTablo";
+import { yerelSutunlar } from "../../../src/ui/tablo/yerelTablo";
 import { KompaktSecim } from "../../../src/ui/KompaktSecim";
 import { useRemoteList } from "../../../src/ui/siparis/useRemoteList";
 import { makeStyles, useTokens } from "../../../src/ui/theme-context";
@@ -41,9 +43,11 @@ type SiparisGorunum = "tumu" | "ACIK";
 const SIPARIS_GORUNUMLERI = [{ key: "tumu" as const, label: "Tümü" }, { key: "ACIK" as const, label: "Açık" }];
 const OZET_SATIR = 5;
 // Satırlar ortak tablonun sütun tanımlarından (liste ekranlarıyla aynı biçim/hücre; elle kopya yok), hepsi sola dayalı.
-const SIPARIS_TABLO = sutunSec(SIPARIS_SUTUNLARI, CARI_SIPARIS_SUTUNLARI);
-const SEVK_TABLO = sutunSec(SEVKIYAT_SUTUNLARI, CARI_SEVK_SUTUNLARI);
-const OZET_SEVK_TABLO = sutunSec(SEVKIYAT_SUTUNLARI, OZET_SEVK_SUTUNLARI);
+// Özet'in kısa tabloları ekranın tanımlı penceresidir ("son 5") ⇒ yerel tablo (sütun seçimi + sıralama cihazda, arama +
+// süzgeç bu pencerede); Siparişler/Sevkiyatlar sekmeleri sunucu sayfalı ⇒ sunucu tablosu (`CariListeTablolari`).
+const OZET_SIPARIS_TABLO = yerelSutunlar(SIPARIS_SUTUNLARI, { haric: ["musteri"], suzgec: ["durum", "yon"] });
+const OZET_SEVK_TABLO = yerelSutunlar(SEVKIYAT_SUTUNLARI, { haric: ["musteri"], suzgec: ["durum", "yon"] });
+const pencere = (ne: string) => `gösterilen son ${OZET_SATIR} ${ne} içinde; hepsi için Tümü`;
 
 export default function CustomerDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -75,7 +79,7 @@ export default function CustomerDetail() {
   // Açık siparişler en ESKİ üstte (bekleyen en uzun iş önce): sunucu `siparisTarihi`ne göre sıralamayı beyan ediyorsa (termine
   // göre sıralama beyanı yok). Beyan etmeyen eski bulutta sunucunun varsayılan sırası.
   const eskiOnce = facility?.liste?.siralama?.siparis?.includes("siparisTarihi") ? { sirala: "siparisTarihi", yon: "artan" as const } : {};
-  const acik = useRemoteList("siparis", { cariKartId: cariId ?? undefined, suzgec: "ACIK", ...eskiOnce }, { enabled: acikDestek && hazir && (ozetGorunur || acikGorunum), limit: 25 });
+  const acik = useRemoteList("siparis", { cariKartId: cariId ?? undefined, suzgec: "ACIK", ...eskiOnce }, { enabled: acikDestek && hazir && ozetGorunur, limit: 25 });
   const iadeIzni = can(permissions, "bulut:sevkiyat:oku");
   const acikSayi = ozet.data?.ozet?.acik.siparisSayisi;
   const sonSiparisGorunur = orders && goster("sonSiparisler") && !(acikDestek && goster("acikSiparisler"));
@@ -138,7 +142,10 @@ export default function CustomerDetail() {
               {shipments && goster("sonSevkiyatlar") && sevk.items.length > 0 ? (
                 <View style={s.bolum}>
                   <BlokBasligi baslik="Son sevkiyatlar" sag={<Text style={s.tumu} onPress={() => setSekme("sevkiyatlar")} accessibilityRole="link">Tümü</Text>} />
-                  <KisaTablo sutunlar={OZET_SEVK_TABLO} satirlar={sevk.items.slice(0, OZET_SATIR)} onPress={sevkAc} testID="cari-sevkiyatlar" />
+                  <KisaTablo
+                    sutunlar={OZET_SEVK_TABLO} varsayilan={OZET_SEVK_SUTUNLARI} satirlar={sevk.items.slice(0, OZET_SATIR)} anahtar="tablo.cari-ozet-sevkiyat"
+                    aramaIpucu="Sevk no ara" pencereNotu={pencere("sevkiyat")} onPress={sevkAc} testID="cari-sevkiyatlar"
+                  />
                 </View>
               ) : null}
               {orders && goster("enCokUrun") ? <EnCokUrunBolumu ozet={ozet} donem={donem} onDonem={setDonem} /> : null}
@@ -149,7 +156,10 @@ export default function CustomerDetail() {
               {sonSiparisGorunur && recent.items.length > 0 ? (
                 <View style={s.bolum}>
                   <BlokBasligi baslik="Son siparişler" sag={<Text style={s.tumu} onPress={() => setSekme("siparisler")} accessibilityRole="link">Tümü</Text>} />
-                  <KisaTablo sutunlar={SIPARIS_TABLO} satirlar={recent.items.slice(0, OZET_SATIR)} onPress={siparisAc} testID="cari-siparisler" />
+                  <KisaTablo
+                    sutunlar={OZET_SIPARIS_TABLO} varsayilan={CARI_SIPARIS_SUTUNLARI} satirlar={recent.items.slice(0, OZET_SATIR)} anahtar="tablo.cari-ozet-siparis"
+                    aramaIpucu="Sipariş no ara" pencereNotu={pencere("sipariş")} onPress={siparisAc} testID="cari-siparisler"
+                  />
                 </View>
               ) : null}
             </KademeliGiris>
@@ -164,21 +174,14 @@ export default function CustomerDetail() {
                   {acikGorunum && acikSayi !== undefined ? <Text style={s.sayi} testID="cari-siparis-acik-sayi">{`${acikSayi} açık sipariş`}</Text> : null}
                 </View>
               ) : null}
-              {acikGorunum ? (
-                <KisaTablo sutunlar={SIPARIS_TABLO} satirlar={acik.items} onPress={siparisAc} testID="cari-siparis-acik"
-                  alt={<ListStates list={acik} empty="Açık sipariş yok" icon={MODULE_ICON.siparisler.icon} testID="cari-siparis-acik" />} />
-              ) : (
-                <KisaTablo sutunlar={SIPARIS_TABLO} satirlar={recent.items} onPress={siparisAc} testID="cari-siparis-tumu"
-                  alt={<ListStates list={recent} empty="Bu cariye ait sipariş yok" icon={MODULE_ICON.siparisler.icon} testID="cari-siparis" />} />
-              )}
+              {cariId ? <CariSiparisTablosu key={gorunum} cariKartId={cariId} acik={acikGorunum} eskiOnce={eskiOnce.sirala ? { alan: eskiOnce.sirala, yon: eskiOnce.yon } : undefined} /> : null}
             </KademeliGiris>
           ) : null}
 
           {sekme === "sevkiyatlar" ? (
             <KademeliGiris sira={1}>
               <View style={s.ustBosluk} />
-              <KisaTablo sutunlar={SEVK_TABLO} satirlar={sevk.items} onPress={sevkAc} testID="cari-sevk-tumu"
-                alt={<ListStates list={sevk} empty="Bu cariye sevkiyat yok" icon={MODULE_ICON.sevkiyat.icon} testID="cari-sevk" />} />
+              {cariId ? <CariSevkTablosu cariKartId={cariId} /> : null}
             </KademeliGiris>
           ) : null}
 

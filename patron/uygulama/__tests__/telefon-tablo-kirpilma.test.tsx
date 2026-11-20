@@ -5,6 +5,8 @@
 import { render, screen } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 
+// Kısa tablo sütun seçimini cihazda saklar (tesis + hesap kapsamlı anahtar) → oturum gerekir.
+jest.mock("../src/state/session", () => ({ useSession: () => ({ facility: null }) }));
 let mockWidth = 393;
 jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
   __esModule: true,
@@ -104,7 +106,7 @@ describe("393 pt: sipariş tablosu çizimi (iPhone ekran görüntüsündeki 4 s�
 
   it("başlık hücresi başlığın genişliğinden daralmaz; durum sütunu rozet genişliğinde sabit (yatay kip dahil)", () => {
     mockWidth = 393;
-    render(<KisaTablo testID="t" sutunlar={dort() as never} satirlar={SIP as never} />);
+    render(<KisaTablo anahtar="tablo.test" testID="t" sutunlar={dort() as never} satirlar={SIP as never} />);
     for (const c of M.sutunlariOlc(dort(), SIP as never)) {
       const st = flat(`t-sutun-${c.key}`);
       const en = st.width ?? st.minWidth ?? 0;

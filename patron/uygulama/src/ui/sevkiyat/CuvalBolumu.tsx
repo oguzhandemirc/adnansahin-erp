@@ -146,7 +146,7 @@ function Icerik({ d }: { readonly d: SevkIcerigi }) {
             </>
           ) : null}
           <KisaTablo
-            testID="sevk-cuval"
+            testID="sevk-cuval" anahtar="tablo.sevk-cuval"
             sutunlar={sutunlar}
             satirlar={satirlar.slice(0, adet)}
             onPress={(c) => setAcik((a) => (a === c.id ? null : c.id))}

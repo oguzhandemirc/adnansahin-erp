@@ -114,12 +114,13 @@ function YatayKaydirici(p: { readonly eksen: YatayEksen; readonly kaynak: "basli
   );
 }
 
-export function AracDugmesi(p: { icon: IconName; label: string; rozet?: number; etkin?: boolean; onPress: () => void; testID: string }) {
+/** `kucuk`: az satırlı tablonun simge satırı ya da blok başlığı (32 pt; dokunma payı hitSlop ile 44). */
+export function AracDugmesi(p: { icon: IconName; label: string; rozet?: number; etkin?: boolean; kucuk?: boolean; onPress: () => void; testID: string }) {
   const t = useTokens();
   const s = useStyles();
   return (
-    <Basilabilir onPress={p.onPress} style={[s.arac, p.etkin && { borderColor: t.tint, backgroundColor: t.tintContainer }]} accessibilityRole="button" accessibilityLabel={p.rozet ? `${p.label}, ${p.rozet} etkin` : p.label} testID={p.testID}>
-      <Ionicons name={p.icon} size={20} color={p.etkin ? t.tint : t.textSecondary} />
+    <Basilabilir onPress={p.onPress} hitSlop={p.kucuk ? 6 : undefined} style={[s.arac, p.kucuk && s.aracKucuk, p.etkin && { borderColor: t.tint, backgroundColor: t.tintContainer }]} accessibilityRole="button" accessibilityLabel={p.rozet ? `${p.label}, ${p.rozet} etkin` : p.label} testID={p.testID}>
+      <Ionicons name={p.icon} size={p.kucuk ? 17 : 20} color={p.etkin ? t.tint : t.textSecondary} />
       {p.rozet ? (
         <View style={[s.rozet, { backgroundColor: t.tint }]} testID={`${p.testID}-rozet`}>
           <Text style={[s.rozetYazi, { color: t.onTint }]}>{p.rozet}</Text>
@@ -251,6 +252,7 @@ const useStyles = makeStyles((t) => ({
     borderColor: t.separator,
     backgroundColor: t.scheme === "dark" ? t.surfaceAlt : t.surface,
   },
+  aracKucuk: { width: 32, height: 32 },
   rozet: { position: "absolute" as const, top: -5, right: -5, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center" as const, justifyContent: "center" as const },
   rozetYazi: { fontSize: 11, lineHeight: 14, fontWeight: "700" as const, ...tabularNums },
   baslik: {

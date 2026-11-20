@@ -6,6 +6,8 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 
+// Kısa tablo sütun seçimini cihazda saklar (tesis + hesap kapsamlı anahtar) → oturum gerekir.
+jest.mock("../src/state/session", () => ({ useSession: () => ({ facility: null }) }));
 let mockWidth = 600;
 jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
   __esModule: true,
@@ -105,7 +107,7 @@ const esnek = (key: keyof Satir, agirlik: number, satir?: number): import("../sr
 const YEDI = [no, esnek("tarih", 1.1), esnek("ad", 1.6, 2), esnek("tur", 0.9), esnek("top", 0.7), esnek("metre", 1.1), esnek("durum", 1.3)];
 
 function ciz(alan: number) {
-  render(<KisaTablo sutunlar={YEDI} satirlar={SATIRLAR} testID="t" />);
+  render(<KisaTablo anahtar="tablo.test" sutunlar={YEDI} satirlar={SATIRLAR} testID="t" />);
   fireEvent(screen.getByTestId("t"), "layout", { nativeEvent: { layout: { width: alan, height: 300, x: 0, y: 0 } } });
 }
 const noMetni = (id: string) => screen.getByTestId(`kirpilmaz-no-t-satir-${id}`);
@@ -144,7 +146,7 @@ describe("numara sütunları kırpılmaz — çizim", () => {
 
   it("NEGATİF SONDA: bayrak kaldırılınca (eski düzen) denetim kırpmayı yakalar", () => {
     const bayraksiz = YEDI.map((c) => (c.key === "no" ? { ...c, kirpilmaz: undefined } : c));
-    render(<KisaTablo sutunlar={bayraksiz} satirlar={SATIRLAR} testID="t" />);
+    render(<KisaTablo anahtar="tablo.test" sutunlar={bayraksiz} satirlar={SATIRLAR} testID="t" />);
     fireEvent(screen.getByTestId("t"), "layout", { nativeEvent: { layout: { width: 510, height: 300, x: 0, y: 0 } } });
     const metin = screen.getByText("SVK1811260034");
     const sorun = kirpmaSorunlari(metin, metin.parent!.parent!, 13);

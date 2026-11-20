@@ -13,8 +13,8 @@ import { MODULE_ICON } from "../icons";
 import { BlokBasligi, BosDurum, HataDurumu, Iskelet, ListeBlogu, ListeSatiri, Rozet, StatCard, type StatDeger } from "../ortak";
 import { KOMPAKT_YUKSEKLIK, KompaktSecim } from "../KompaktSecim";
 import { CARI_SIPARIS_SUTUNLARI, SIPARIS_SUTUNLARI } from "../siparis/sutunlar";
-import { KisaTablo, sutunSec } from "../tablo/KisaTablo";
-import type { SutunTanimi } from "../tablo/model";
+import { KisaTablo } from "../tablo/KisaTablo";
+import { yerelSutunlar, type YerelSutun } from "../tablo/yerelTablo";
 import { asObj, str } from "../siparis/OrderRow";
 import { ListStates } from "../siparis/parts";
 import { useRemoteList, type RemoteList } from "../siparis/useRemoteList";
@@ -240,17 +240,19 @@ type Urun = CustomerSummaryPeriod["enCokUrun"][number] & { readonly id: string }
  * En çok alınan: Ürün · Renk · Sipariş adedi · Miktar (birim fabrikanın; birimler toplanmaz) · Son sipariş (fabrika
  * 2.13.1 `sonSiparisTarihi`; eski fabrika göndermez → sütun çizilmez, `urunSutunlari`).
  */
-export const URUN_SUTUNLARI: readonly SutunTanimi<Urun>[] = [
-  { key: "urun", baslik: "Ürün", agirlik: 2, satir: 2, hucre: (u) => u.urunAdi },
-  { key: "renk", baslik: "Renk", agirlik: 1.3, hucre: (u) => u.renkAdi ?? "—" },
-  { key: "siparis", baslik: "Sipariş", ad: "Sipariş adedi", agirlik: 0.8, sayi: true, hucre: (u) => sayi(u.siparisSayisi, 0) },
-  { key: "miktar", baslik: "Miktar", agirlik: 1.1, sayi: true, hucre: (u) => `${sayi(u.miktar)} ${birimEtiketi(u.birim)}` },
-  { key: "sonSiparis", baslik: "Son sipariş", agirlik: 1.1, hucre: (u) => (u.sonSiparisTarihi ? formatDate(u.sonSiparisTarihi) : "—") },
+export const URUN_SUTUNLARI: readonly YerelSutun<Urun>[] = [
+  { key: "urun", baslik: "Ürün", agirlik: 2, satir: 2, suzgec: true, hucre: (u) => u.urunAdi },
+  { key: "renk", baslik: "Renk", agirlik: 1.3, suzgec: true, hucre: (u) => u.renkAdi ?? "—" },
+  { key: "siparis", baslik: "Sipariş", ad: "Sipariş adedi", agirlik: 0.8, sayi: true, siraDegeri: (u) => u.siparisSayisi, hucre: (u) => sayi(u.siparisSayisi, 0) },
+  // Birimler toplanmaz/karşılaştırılmaz: süzgeç birimi ayırır; sıralama yalnız gösterim sırasıdır.
+  { key: "miktar", baslik: "Miktar", agirlik: 1.1, sayi: true, siraDegeri: (u) => u.miktar, suzgec: (u) => [birimEtiketi(u.birim)], suzgecEtiketi: "Birim", hucre: (u) => `${sayi(u.miktar)} ${birimEtiketi(u.birim)}` },
+  { key: "sonSiparis", baslik: "Son sipariş", agirlik: 1.1, siraDegeri: (u) => (u.sonSiparisTarihi ? Date.parse(u.sonSiparisTarihi) : null), hucre: (u) => (u.sonSiparisTarihi ? formatDate(u.sonSiparisTarihi) : "—") },
 ];
 /** Satırlardan biri `sonSiparisTarihi` alanını taşıyorsa (fabrika 2.13.1+) son sipariş sütunu; yoksa bugünkü dört sütun. */
-export const urunSutunlari = (xs: readonly Urun[]): readonly SutunTanimi<Urun>[] =>
+export const urunSutunlari = (xs: readonly Urun[]): readonly YerelSutun<Urun>[] =>
   xs.some((u) => u.sonSiparisTarihi !== undefined) ? URUN_SUTUNLARI : URUN_SUTUNLARI.filter((c) => c.key !== "sonSiparis");
-const ACIK_SUTUNLARI = sutunSec(SIPARIS_SUTUNLARI, CARI_SIPARIS_SUTUNLARI);
+/** Açık siparişler penceresi: müşteri dışındaki sipariş sütunları seçilebilir, varsayılan bugünkü beş sütun; Durum ve Yön süzgeç. */
+const ACIK_SUTUNLARI = yerelSutunlar(SIPARIS_SUTUNLARI, { haric: ["musteri"], suzgec: ["durum", "yon"] });
 
 export function EnCokUrunBolumu({ ozet, donem, onDonem }: { ozet: Remote<CustomerSummaryResponse>; donem: Donem; onDonem?: (d: Donem) => void }) {
   const s = useStyles();
@@ -278,7 +280,8 @@ export function EnCokUrunBolumu({ ozet, donem, onDonem }: { ozet: Remote<Custome
   return (
     <View style={s.bolum} testID="cari-urunler">
       <BlokBasligi baslik="En çok alınan · miktara göre" sag={sag} />
-      <KisaTablo sutunlar={urunSutunlari(satirlar)} satirlar={satirlar} testID="cari-urun" />
+      <KisaTablo sutunlar={urunSutunlari(satirlar)} satirlar={satirlar} anahtar="tablo.cari-urun" aramaIpucu="Ürün, renk ara" testID="cari-urun"
+        pencereNotu={!tumu && urunler.length > OZET_ILK ? `gösterilen ${OZET_ILK} ürün içinde; hepsi için Tümü` : undefined} />
     </View>
   );
 }
@@ -301,7 +304,10 @@ export function AcikSiparislerBolumu({ list, sayi: adet, onAc, onTumu }: { list:
   return (
     <View style={s.bolum} testID="cari-acik">
       <BlokBasligi baslik="Açık siparişler" sayi={adet} sag={sag} />
-      <KisaTablo sutunlar={ACIK_SUTUNLARI} satirlar={list.items.slice(0, OZET_ILK)} onPress={(o) => onAc(o.id)} testID="cari-acik-tablo" />
+      <KisaTablo
+        sutunlar={ACIK_SUTUNLARI} varsayilan={CARI_SIPARIS_SUTUNLARI} satirlar={list.items.slice(0, OZET_ILK)} anahtar="tablo.cari-acik" aramaIpucu="Sipariş no ara"
+        pencereNotu={`gösterilen ${OZET_ILK} sipariş içinde; hepsi için Tümü`} onPress={(o) => onAc(o.id)} testID="cari-acik-tablo"
+      />
     </View>
   );
 }
