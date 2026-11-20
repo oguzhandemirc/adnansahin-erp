@@ -13,6 +13,9 @@
 //     beklenen değerle çıkar.
 //  §6 Kapalıyken yeni kod çalışmaz: kurucu yalnız anlık turundan (`snapshots.ts`) çağrılır.
 //  §7 Aynı fabrika günü içinde iki kurulum aynı içerik özetini verir (dönem sınırı gün içinde kaymaz).
+//  §9 (2.13.2) Özel aralık `customer/summary`: hazır dönem günleriyle istenen aralık anlığın o dönem girdisine EŞİT (tek
+//     toplayıcı), başka cari yalnız kendi sayısını alır, katı parametre (ters aralık · tanınmayan · eksik · ISO an · olmayan
+//     cari → PARAMETRE_GECERSIZ), katalog ilanı, tek çağıran.
 //
 // NEGATİF SONDALAR (2026-11-12, elle bozulup koşuldu, hepsi KIRMIZI):
 //  S1 `snapshot-cari-ozeti.ts` girdiye `tutar: 0` eklendi → mühür fırlattı, anlık kurulamadı: 13 ✗ (§3–§4).
@@ -39,7 +42,11 @@ import { buildRecords } from "../src/cloud-sync/record-builder";
 import { getCustomerScorecard } from "../src/services/reports/customer-scorecard.report.service";
 import { getReturnScorecard } from "../src/services/reports/return-scorecard.report.service";
 import { getOpenOrderCoverage } from "../src/services/reports/open-order-coverage.report.service";
-import { factoryDayStart, factoryYmd } from "../src/constants/time";
+import { factoryDayStart, factoryYmd, resolveRangeEnd, resolveRangeStart } from "../src/constants/time";
+import { randomUUID } from "node:crypto";
+import { CUSTOMER_SUMMARY_REPORT, remoteReportCatalog } from "../src/cloud-sync/remote-reports";
+import { computeReportResult } from "../src/cloud-sync/report-requests";
+import { ReportResultRequestSchema } from "../src/cloud-sync/wire";
 import { CARI_PERIODS, cariPeriodRange, type CariPeriod } from "../src/cloud-sync/periods";
 import { ensureTestAdmin } from "./fixture-test-user";
 
@@ -259,6 +266,65 @@ async function main(): Promise<void> {
       (await buildSnapshots({ now: tB, productionOn: true, only: new Set(["cari-ozeti"]) })).snapshots[0]?.digest,
     ];
     check("aynı gün, 5 dk arayla iki kurulum → aynı içerik özeti", !!dA && dA === dB, `${dA?.slice(0, 12)} · ${dB?.slice(0, 12)}`);
+
+    console.log("\n§9 Özel aralık (2.13.2, rapor isteği `customer/summary`): aynı toplayıcı, tek müşteri, katı parametre");
+    const ask = async (params: Record<string, unknown>) =>
+      (await computeReportResult({ istekId: randomUUID(), key: CUSTOMER_SUMMARY_REPORT, params, nowMs: Date.now() })).result;
+    const today = factoryYmd(runNow);
+    const y12From = factoryYmd(cariSummaryPeriods(runNow).son12Ay.from);
+    const r12 = await ask({ cariKartId: ids.customerId, dateFrom: y12From, dateTo: today });
+    check("son 12 ayın günleriyle istek → HAZIR, tel şemasına uyar", r12.durum === "HAZIR" && r12.hataKodu === null && ReportResultRequestSchema.safeParse(r12).success, `${r12.durum}/${r12.hataKodu ?? "-"}`);
+    check("⭐ özel aralık = anlığın son 12 ay girdisi (sipariş · kalem · miktar · sevk · iade · en çok alınan; TEK kaynak)",
+      JSON.stringify(plain(field(r12.veri, "donem"))) === JSON.stringify(y12), `${JSON.stringify(plain(field(r12.veri, "donem"))).slice(0, 120)} ≠ ${JSON.stringify(y12).slice(0, 120)}`);
+    check("sonuç aralığı fabrika günleriyle döner (İstanbul gün başı/sonu)",
+      field(r12.veri, "baslangicGunu") === y12From && field(r12.veri, "bitisGunu") === today && field(r12.veri, "baslangic") === resolveRangeStart(y12From).toISOString() && field(r12.veri, "bitis") === resolveRangeEnd(today).toISOString(),
+      `${String(field(r12.veri, "baslangic"))} · ${String(field(r12.veri, "bitis"))}`);
+    const finKeys: string[] = [];
+    const walkKeys = (v: unknown): void => { if (Array.isArray(v)) v.forEach(walkKeys); else if (isRecord(v)) for (const [k, x] of Object.entries(v)) { if (FINANCE.test(k)) finKeys.push(k); walkKeys(x); } };
+    walkKeys(r12.veri);
+    check("sonuçta finans adlı alan yok", finKeys.length === 0, finKeys.join(","));
+    // Kısa dönemler: hazır `buAy` (açık uç = bugün) ve `gecenAy` (kapalı) sayıları + (anlıkta olmayan) en çok alınan listesi.
+    for (const k of ["buAy", "gecenAy"] as const) {
+      const pr = cariSummaryPeriods(runNow)[k];
+      const rk = await ask({ cariKartId: ids.customerId, dateFrom: factoryYmd(pr.from), dateTo: factoryYmd(pr.to) });
+      const snap = isRecord(field(entry, k)) ? (field(entry, k) as Record<string, unknown>) : {};
+      const { enCokUrun: topK, ...counts } = isRecord(field(rk.veri, "donem")) ? (plain(field(rk.veri, "donem")) as Record<string, unknown>) : {};
+      check(`özel aralık = anlığın ${k} sayıları; en çok alınan listesi de gelir`, JSON.stringify(counts) === JSON.stringify(snap) && Array.isArray(topK),
+        `${JSON.stringify(counts).slice(0, 100)} ≠ ${JSON.stringify(snap).slice(0, 100)}`);
+    }
+    const other = fx.customers[1] ?? "";
+    const ro = await ask({ cariKartId: other, dateFrom: "2000-01-01", dateTo: today });
+    check("⭐ başka cari: yalnız KENDİ sayıları (bu müşterinin siparişi/sevki ona sayılmaz)", ro.durum === "HAZIR" && field(ro.veri, "cariKartId") === other && field(ro.veri, "donem", "siparisSayisi") === 0 && field(ro.veri, "donem", "sevk", "metre") === 0,
+      JSON.stringify(plain(field(ro.veri, "donem"))).slice(0, 120));
+    const rAll = await ask({ cariKartId: ids.customerId, dateFrom: "2000-01-01", dateTo: today });
+    check("366 günden uzun aralık kabul (tüm zamanlarla aynı sipariş/sevk)", rAll.durum === "HAZIR" && field(rAll.veri, "donem", "siparisSayisi") === field(all, "siparisSayisi") && field(rAll.veri, "donem", "sevk", "metre") === field(all, "sevk", "metre"));
+    const bad: Array<[string, Record<string, unknown>]> = [
+      ["bitiş < başlangıç", { cariKartId: ids.customerId, dateFrom: today, dateTo: y12From }],
+      ["tanınmayan parametre", { cariKartId: ids.customerId, dateFrom: y12From, dateTo: today, compare: "prev" }],
+      ["cari yok", { dateFrom: y12From, dateTo: today }],
+      ["bitiş yok", { cariKartId: ids.customerId, dateFrom: y12From }],
+      ["ISO an (gün değil)", { cariKartId: ids.customerId, dateFrom: resolveRangeStart(y12From).toISOString(), dateTo: today }],
+      ["taşan gün", { cariKartId: ids.customerId, dateFrom: "2026-02-30", dateTo: today }],
+      ["biçimsiz cari", { cariKartId: "x", dateFrom: y12From, dateTo: today }],
+      ["olmayan cari kartı", { cariKartId: randomUUID(), dateFrom: y12From, dateTo: today }],
+    ];
+    for (const [ad, p] of bad) {
+      const r = await ask(p);
+      check(`${ad} → HATA PARAMETRE_GECERSIZ`, r.durum === "HATA" && r.hataKodu === "PARAMETRE_GECERSIZ" && r.veri === null, `${r.durum}/${r.hataKodu ?? "-"}`);
+    }
+    const catRow = (await remoteReportCatalog()).find((c) => c.anahtar === CUSTOMER_SUMMARY_REPORT);
+    check("yetenek ilanı: `rapor-katalogu`nda izin `bulut:siparis:oku`, parametreler cari + aralık, standart dönem yok",
+      catRow?.izin === "bulut:siparis:oku" && JSON.stringify(catRow.parametreler) === JSON.stringify(["cariKartId", "dateFrom", "dateTo"]) && catRow.standartDonemler.length === 0, JSON.stringify(catRow));
+    const rangeCallers: string[] = [];
+    const walk2 = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walk2(p);
+        else if (p.endsWith(".ts") && !p.endsWith("snapshot-cari-ozeti.ts") && readFileSync(p, "utf8").includes("buildCustomerRangeSummary")) rangeCallers.push(path.relative(srcDir, p));
+      }
+    };
+    walk2(srcDir);
+    check("özel aralık kurucusunun tek çağıranı rapor kataloğu (`remote-reports.ts`; kapalıyken rapor işi yok)", rangeCallers.length === 1 && rangeCallers[0] === path.join("cloud-sync", "remote-reports.ts"), rangeCallers.join(","));
   } finally {
     await prisma.rollReturn.deleteMany({ where: { id: { in: fx.returns } } });
     await prisma.roll.deleteMany({ where: { id: { in: fx.rolls } } });

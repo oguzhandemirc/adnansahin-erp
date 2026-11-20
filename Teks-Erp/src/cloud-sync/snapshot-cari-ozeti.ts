@@ -8,6 +8,8 @@
 // açık siparişin en eskisi (tarih + fabrika takvim günü yaşı); etiket müşterisinin depodaki hazır malı (`labelOwnedStock`,
 // `stok-kalem` ile aynı küme ve katkılar); en çok alınan kalemin son sipariş tarihi; üretim günü + dönem sınırları.
 // Termin/gecikme türevi YOK (anlık kuralı, `test_patron_bulut_anliklar` §1).
+// 2.13.2 (2026-11-20): ÖZEL ARALIK — `buildCustomerRangeSummary` aynı toplayıcıları tek müşteri + tek aralıkla koşar
+// (rapor isteği `customer/summary`, `remote-reports.ts`); bulut/uygulama aralık hesaplamaz.
 import { OrderStatus, Prisma } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { isActiveLine, isMeasuredLine } from "../services/helpers/order-line-scope.helper";
@@ -44,7 +46,7 @@ interface PeriodAcc {
   iade: { adet: number; metre: number };
 }
 interface CustomerAcc {
-  periods: Record<CariPeriod, PeriodAcc>;
+  periods: Record<string, PeriodAcc>;
   openOrders: Set<string>;
   openLines: number;
   openByUnit: Map<string, Prisma.Decimal>;
@@ -109,21 +111,12 @@ export interface CustomerSummaryData {
  */
 export async function buildCustomerSummaryData(now: Date, stock?: StockKalemSource): Promise<CustomerSummaryData> {
   const ranges = cariSummaryPeriods(now);
-  const byCustomer = new Map<string, CustomerAcc>();
-  const acc = (id: string): CustomerAcc => {
-    let a = byCustomer.get(id);
-    if (!a) {
-      a = {
-        periods: Object.fromEntries(CARI_PERIODS.map((k) => [k, emptyPeriod()])) as Record<CariPeriod, PeriodAcc>,
-        openOrders: new Set(), openLines: 0, openByUnit: new Map(), oldestOpen: null, lastOrder: null, lastShipment: null,
-      };
-      byCustomer.set(id, a);
-    }
-    return a;
-  };
+  const specs: PeriodSpec[] = CARI_PERIODS.map((k) => ({ key: k, range: ranges[k], products: CARI_PRODUCT_PERIODS.has(k) }));
+  const { byCustomer, acc } = accumulator(specs);
 
-  await collectOrders(ranges, acc);
-  await collectShipping(ranges, acc);
+  await collectOrders(specs, acc, null);
+  await collectShipping(specs, acc, null);
+  await collectLastShipment(acc);
 
   // Depodaki hazır mal: sahiplik YALNIZ etiket (`stok-kalem` ile aynı küme ve katkılar — tek kaynak).
   const owned = labelOwnedStock(stock ?? (await loadStockKalemSource()));
@@ -140,11 +133,67 @@ export async function buildCustomerSummaryData(now: Date, stock?: StockKalemSour
 }
 
 type AccOf = (id: string) => CustomerAcc;
-type Ranges = Readonly<Record<CariPeriod, DateRange>>;
+/** Toplanacak dönem: anahtar · aralık · "en çok alınan" listesi tutulsun mu. Sıra = toplama sırası (sorgular SIRAYLA). */
+interface PeriodSpec { readonly key: string; readonly range: DateRange; readonly products: boolean }
+
+function accumulator(specs: readonly PeriodSpec[]): { byCustomer: Map<string, CustomerAcc>; acc: AccOf } {
+  const byCustomer = new Map<string, CustomerAcc>();
+  const acc = (id: string): CustomerAcc => {
+    let a = byCustomer.get(id);
+    if (!a) {
+      a = {
+        periods: Object.fromEntries(specs.map((s) => [s.key, emptyPeriod()])),
+        openOrders: new Set(), openLines: 0, openByUnit: new Map(), oldestOpen: null, lastOrder: null, lastShipment: null,
+      };
+      byCustomer.set(id, a);
+    }
+    return a;
+  };
+  return { byCustomer, acc };
+}
+
+/** Özel aralığın kimliği: rapor isteğinin `customer/summary` anahtarı (`remote-reports.ts`). */
+const CUSTOM_KEY = "aralik";
+
+export interface CustomerRangeSummary {
+  cariKartId: string;
+  /** Aralığın fabrika günleri (dahil) ve çözülmüş anları. */
+  baslangicGunu: string;
+  bitisGunu: string;
+  baslangic: string;
+  bitis: string;
+  uretimGunu: string;
+  /** Hazır dönem girdisiyle AYNI biçim (`periodWire`, "en çok alınan" dahil). */
+  donem: Record<string, unknown>;
+}
+
+/**
+ * Cari özetinin ÖZEL ARALIĞI (2.13.2, patron rapor isteği `customer/summary`): hazır dönemlerle AYNI toplayıcılar
+ * (`collectOrders` · `collectShipping`, tek tanım) tek müşteri + tek aralıkla koşar; yalnız dönem sayıları ve en çok
+ * alınan döner (açık/depodaki mal/son tarihler "şimdi"dir, anlıkta zaten var). Kart yoksa fırlatır (istek RET'i).
+ */
+export async function buildCustomerRangeSummary(cariKartId: string, range: DateRange, now: Date): Promise<CustomerRangeSummary> {
+  const card = await prisma.customer.findUnique({ where: { id: cariKartId }, select: { id: true } });
+  if (!card) throw new Error("cari kartı yok");
+  const specs: PeriodSpec[] = [{ key: CUSTOM_KEY, range, products: true }];
+  const { acc } = accumulator(specs);
+  const own = acc(cariKartId);
+  await collectOrders(specs, acc, cariKartId);
+  await collectShipping(specs, acc, cariKartId);
+  return {
+    cariKartId,
+    baslangicGunu: factoryYmd(range.from),
+    bitisGunu: factoryYmd(range.to),
+    baslangic: range.from.toISOString(),
+    bitis: range.to.toISOString(),
+    uretimGunu: factoryYmd(now),
+    donem: periodWire(own.periods[CUSTOM_KEY]!, true),
+  };
+}
 
 function customerWire(c: CustomerAcc, stock: StockContribution, now: Date): Record<string, unknown> {
   const entry: Record<string, unknown> = {};
-  for (const k of CARI_PERIODS) entry[k] = periodWire(c.periods[k], CARI_PRODUCT_PERIODS.has(k));
+  for (const k of CARI_PERIODS) entry[k] = periodWire(c.periods[k]!, CARI_PRODUCT_PERIODS.has(k));
   entry.acik = {
     siparisSayisi: c.openOrders.size, kalemSayisi: c.openLines, acikMiktar: unitRows(c.openByUnit),
     enEskiSiparisTarihi: isoOrNull(c.oldestOpen),
@@ -156,10 +205,13 @@ function customerWire(c: CustomerAcc, stock: StockContribution, now: Date): Reco
   return entry;
 }
 
-/** Sipariş tarafı: müşteri karnesinin kapsamı — iptal sipariş "verilmemiş", iptal kalem işe sayılmaz. */
-async function collectOrders(ranges: Ranges, acc: AccOf): Promise<void> {
+/**
+ * Sipariş tarafı: müşteri karnesinin kapsamı — iptal sipariş "verilmemiş", iptal kalem işe sayılmaz. `only` verilirse
+ * yalnız o müşterinin siparişleri okunur (özel aralık); kapsam koşulu aynıdır.
+ */
+async function collectOrders(specs: readonly PeriodSpec[], acc: AccOf, only: string | null): Promise<void> {
   const orders = await prisma.order.findMany({
-    where: { status: { not: OrderStatus.CANCELLED }, customer: { mergedIntoId: null } },
+    where: { status: { not: OrderStatus.CANCELLED }, customer: { mergedIntoId: null }, ...(only ? { customerId: only } : {}) },
     select: {
       id: true, customerId: true, status: true, orderDate: true,
       lines: { select: { itemId: true, colorId: true, unit: true, quantity: true, shippedQty: true, cancelledAt: true, item: { select: { name: true } }, color: { select: { name: true } } } },
@@ -174,8 +226,8 @@ async function collectOrders(ranges: Ranges, acc: AccOf): Promise<void> {
       c.openOrders.add(o.id);
       c.oldestOpen = earlierOf(c.oldestOpen, o.orderDate);
     }
-    const inPeriods = CARI_PERIODS.filter((k) => o.orderDate >= ranges[k].from && o.orderDate <= ranges[k].to);
-    for (const k of inPeriods) c.periods[k].orders.add(o.id);
+    const inPeriods = specs.filter((s) => o.orderDate >= s.range.from && o.orderDate <= s.range.to);
+    for (const s of inPeriods) c.periods[s.key]!.orders.add(o.id);
     for (const l of o.lines) {
       if (!isActiveLine(l)) continue;
       const unit = String(l.unit);
@@ -185,11 +237,11 @@ async function collectOrders(ranges: Ranges, acc: AccOf): Promise<void> {
         const rest = qty.minus(new Prisma.Decimal(l.shippedQty));
         if (isMeasuredLine(l) && rest.gt(0)) c.openByUnit.set(unit, (c.openByUnit.get(unit) ?? D0()).plus(rest));
       }
-      for (const k of inPeriods) {
-        const p = c.periods[k];
+      for (const s of inPeriods) {
+        const p = c.periods[s.key]!;
         p.lines++;
         p.qtyByUnit.set(unit, (p.qtyByUnit.get(unit) ?? D0()).plus(qty));
-        if (!CARI_PRODUCT_PERIODS.has(k)) continue;
+        if (!s.products) continue;
         const key = `${l.itemId}|${l.colorId ?? ""}|${unit}`;
         const prod = p.products.get(key) ?? { urunId: l.itemId, urunAdi: l.item.name, renkId: l.colorId, renkAdi: l.color?.name ?? null, birim: unit, miktar: D0(), orders: new Set<string>(), last: null };
         prod.miktar = prod.miktar.plus(qty);
@@ -201,29 +253,39 @@ async function collectOrders(ranges: Ranges, acc: AccOf): Promise<void> {
   }
 }
 
-/** Dönem başına brüt sevk + iade; son sevk tarihi. Sorgular SIRAYLA. */
-async function collectShipping(ranges: Ranges, acc: AccOf): Promise<void> {
-  for (const k of CARI_PERIODS) {
+/**
+ * Dönem başına brüt sevk + iade. Sorgular SIRAYLA. `only` verilirse yalnız o müşterinin hücreleri toplanır (kaynaklar
+ * panel karneleriyle aynı, süzme hücrede — ikinci tanım yok).
+ */
+async function collectShipping(specs: readonly PeriodSpec[], acc: AccOf, only: string | null): Promise<void> {
+  const mine = (id: string): boolean => only === null || id === only;
+  for (const { key: k, range } of specs) {
     // Sevk BRÜT, tek tanım (`_shipped.ts`): canlı sevk + iade geri-eklemesi + doğrudan sevk; müşteri karnesiyle aynı.
-    for (const cell of await collectShipped(ranges[k])) {
-      const s = acc(cell.customerId).periods[k].sevk;
+    for (const cell of await collectShipped(range)) {
+      if (!mine(cell.customerId)) continue;
+      const s = acc(cell.customerId).periods[k]!.sevk;
       s.metre += cell.qty;
       s.top += cell.rollCount;
     }
-    for (const cell of await collectShippedWeight(ranges[k])) {
-      const s = acc(cell.customerId).periods[k].sevk;
+    for (const cell of await collectShippedWeight(range)) {
+      if (!mine(cell.customerId)) continue;
+      const s = acc(cell.customerId).periods[k]!.sevk;
       s.kg += cell.kg;
       s.tartiliCuval += cell.weighedSacks;
       s.cuval += cell.totalSacks;
     }
     // İade ayrı belgedir: iade karnesinin müşteri kırılımı (iptal edilen iade dışarıda); sevkten düşülmez.
-    for (const row of (await getReturnScorecard(ranges[k])).byCustomer) {
-      const i = acc(row.key).periods[k].iade;
+    for (const row of (await getReturnScorecard(range)).byCustomer) {
+      if (!mine(row.key)) continue;
+      const i = acc(row.key).periods[k]!.iade;
       i.adet += row.count;
       i.metre += row.qty;
     }
   }
+}
 
+/** Müşteri başına son sevk tarihi (yalnız anlık). */
+async function collectLastShipment(acc: AccOf): Promise<void> {
   const lastDispatch = await prisma.shipment.groupBy({ by: ["customerId"], where: { status: "DISPATCHED", dispatchedAt: { not: null } }, _max: { dispatchedAt: true } });
   for (const r of lastDispatch) acc(r.customerId).lastShipment = laterOf(acc(r.customerId).lastShipment, r._max.dispatchedAt);
   const lastDirect = await prisma.directShipment.groupBy({ by: ["customerId"], _max: { shippedAt: true } });

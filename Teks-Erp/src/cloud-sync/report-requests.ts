@@ -3,13 +3,15 @@
 // Kaynak: ana ürün 19aa48a9 `cloud-sync/report-requests.ts`. Adnan farkları: yalnız 6 karne (rapor v2, finans ve
 // standart dönem görüntüleri YOK); sonuçtan finans adlı alan ayıklanır; zaman aşımında hesap bitene dek yeni rapor
 // başlamaz (iş `cloud-report.job.ts`); tanınmayan/geçersiz istek tel sözleşmesinin hata koduyla RET döner.
+// 2.13.2: 6 karneye ek fabrikaya özgü `customer/summary` (cari özeti özel aralığı; parametre kuralı `parseCustomerRange`).
 import { gzipSync } from "node:zlib";
+import { z } from "zod";
 import { factoryYmd, resolveRangeEnd, resolveRangeStart } from "../constants/time";
 import { REPORT_BY_KEY } from "../constants/report-catalog";
 import { readReportsClosedKeys } from "../services/system-setting.service";
 import { dateRangeSchema, resolveDateRange, type DateRange } from "../services/reports/_shared";
 import { cloudPost, type CloudCallContext } from "./cloud-client";
-import { findRemoteReport } from "./remote-reports";
+import { findRemoteReport, type RemoteReportRunner } from "./remote-reports";
 import { MAX_COMPRESSED_BYTES, ReportResultRequestSchema, SYNC_PATHS, toWireValue, type ReportResult } from "./wire";
 
 /** Rapor başına hesap tavanı (§7 "60 sn"); aşan istek `ZAMAN_ASIMI` ile kapanır. */
@@ -28,14 +30,32 @@ function isFactoryDay(v: unknown): v is string {
   return typeof v === "string" && FACTORY_DAY.test(v) && factoryYmd(resolveRangeStart(v)) === v;
 }
 
-export type ParsedParams = { readonly ok: true; readonly range: DateRange | null } | { readonly ok: false };
+export type ParsedParams = { readonly ok: true; readonly range: DateRange | null; readonly cariKartId?: string } | { readonly ok: false };
+
+/** Cari özeti özel aralığı: üç anahtar da ZORUNLU, başka anahtar yok; tarih yalnız fabrika GÜNÜ (uygulama gün yollar). */
+const customerRangeSchema = z.strictObject({
+  cariKartId: z.string().uuid(),
+  dateFrom: z.string().refine(isFactoryDay),
+  dateTo: z.string().refine(isFactoryDay),
+});
+
+/**
+ * Özel aralık kuralı: başlangıç ≤ bitiş (iki uç dahil, fabrika günü sınırı `constants/time`); panel karnelerinin 366 gün
+ * tavanı YOK — hazır `tumZamanlar` zaten sınırsız aralıkla aynı toplayıcıyı her turda koşar.
+ */
+function parseCustomerRange(raw: Readonly<Record<string, unknown>>): ParsedParams {
+  const p = customerRangeSchema.safeParse(raw);
+  if (!p.success || p.data.dateFrom > p.data.dateTo) return { ok: false };
+  return { ok: true, range: { from: resolveRangeStart(p.data.dateFrom), to: resolveRangeEnd(p.data.dateTo) }, cariKartId: p.data.cariKartId.toLowerCase() };
+}
 
 /**
  * Parametre kabulü: uygulama özel aralığı fabrika GÜNÜ (`YYYY-MM-DD`) yollar — gün sınırı yalnız burada
  * (`constants/time`) ana çevrilir; ISO an aynen geçer; sonra panel ucunun şeması (KATI) ve aralık kuralı
  * (`resolveDateRange`: başlangıç ≤ bitiş, ≤ 366 gün) AYNEN uygulanır. Tanınmayan anahtar ⇒ geçersiz.
  */
-export function parseReportParams(kind: "RANGE" | "NONE", raw: Readonly<Record<string, unknown>>): ParsedParams {
+export function parseReportParams(kind: RemoteReportRunner["kind"], raw: Readonly<Record<string, unknown>>): ParsedParams {
+  if (kind === "CUSTOMER_RANGE") return parseCustomerRange(raw);
   if (kind === "NONE") return Object.keys(raw).length === 0 ? { ok: true, range: null } : { ok: false };
   const o: Record<string, unknown> = { ...raw };
   if (isFactoryDay(o.dateFrom)) o.dateFrom = resolveRangeStart(o.dateFrom).toISOString();
@@ -103,14 +123,20 @@ export async function computeReportResult(g: {
   });
   try {
     const spec = findRemoteReport(g.key);
-    if (!spec || !REPORT_BY_KEY.get(spec.key)) return fail("RAPOR_BILINMIYOR");
-    // Panelde KAPALI rapor buluta da kapalıdır; liste okunamazsa da kapalı (panel kapısı gibi fail-closed).
+    if (!spec || (!spec.own && !REPORT_BY_KEY.get(spec.key))) return fail("RAPOR_BILINMIYOR");
+    // Panelde KAPALI rapor buluta da kapalıdır; liste okunamazsa da kapalı (panel kapısı gibi fail-closed). Fabrikaya
+    // özgü (`own`) hesabın panelde karşılığı yok: kapama listesi ona uygulanmaz, okunamazsa yine kapalı.
     const vis = await readReportsClosedKeys();
-    if (vis.durum === "olculemedi" || vis.kapali.includes(spec.key)) return fail("RAPOR_KAPALI");
+    if (vis.durum === "olculemedi" || (!spec.own && vis.kapali.includes(spec.key))) return fail("RAPOR_KAPALI");
     const parsed = parseReportParams(spec.runner.kind, g.params);
     if (!parsed.ok) return fail("PARAMETRE_GECERSIZ");
     const runner = spec.runner;
-    const work: Promise<unknown> = runner.kind === "RANGE" ? runner.run(parsed.range ?? resolveDateRange({})) : runner.run();
+    const work: Promise<unknown> =
+      runner.kind === "RANGE"
+        ? runner.run(parsed.range ?? resolveDateRange({}))
+        : runner.kind === "CUSTOMER_RANGE"
+          ? runner.run(parsed.range!, parsed.cariKartId!)
+          : runner.run();
     const settled = work.then(() => undefined, () => undefined);
     let timer: NodeJS.Timeout | null = null;
     const timeout = new Promise<"ZAMAN_ASIMI">((resolve) => {

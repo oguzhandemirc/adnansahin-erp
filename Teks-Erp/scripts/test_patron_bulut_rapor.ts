@@ -180,8 +180,9 @@ async function main(): Promise<void> {
 
     // ── §1 katalog ───────────────────────────────────────────────────────────
     console.log("\n§1 katalog: tam 6 karne, finans/rapor v2 yok");
-    const keys = REMOTE_REPORTS.map((r) => r.key).sort();
-    check("istenebilir küme = 6 karne", canonical(keys) === canonical(Object.keys(PANEL_PATH).sort()), keys.join(","));
+    const keys = REMOTE_REPORTS.filter((r) => !r.own).map((r) => r.key).sort();
+    const ownKeys = REMOTE_REPORTS.filter((r) => r.own).map((r) => r.key);
+    check("istenebilir panel raporları = 6 karne; fabrikaya özgü yalnız `customer/summary` (2.13.2)", canonical(keys) === canonical(Object.keys(PANEL_PATH).sort()) && canonical(ownKeys) === canonical(["customer/summary"]), `${keys.join(",")} + ${ownKeys.join(",")}`);
     check("finans raporu yok", !keys.some((k) => k.startsWith("finance/")));
     const cat = await remoteReportCatalog();
     const dropped: string[] = [];
@@ -189,13 +190,13 @@ async function main(): Promise<void> {
     check("ayıklama finans adlı anahtarı (iç içe) düşürür, sayıya dokunmaz", canonical(stripped) === canonical({ qty: 5, satirlar: [{ m: 1 }] }) && dropped.length === 3, dropped.join(","));
     const plain = { summary: { shippedQty: 12.5, otifRatio: 0.9 }, rows: [{ customerName: "A", qty: 3 }] };
     check("finanssız sonuçta ayıklama hiçbir şey düşürmez", canonical(stripFinanceFields(plain)) === canonical(plain));
-    check("`rapor-katalogu` anlığı aynı 6 anahtarı taşır", canonical(cat.map((c) => c.anahtar).sort()) === canonical(keys), `${cat.length}`);
+    check("`rapor-katalogu` anlığı 6 karne + `customer/summary`ı taşır", canonical(cat.map((c) => c.anahtar).sort()) === canonical([...keys, ...ownKeys].sort()), `${cat.length}`);
 
     // ── §2 6 rapor: sözleşme · finanssız · panel eşitliği ────────────────────
     console.log("\n§2 her rapor: istek → sonuç sözleşmede, finans alanı yok, panel ucuyla EŞİT");
     const today = factoryYmd(new Date());
     const from = factoryYmd(new Date(Date.now() - 200 * 86_400_000));
-    for (const spec of REMOTE_REPORTS) {
+    for (const spec of REMOTE_REPORTS.filter((r) => !r.own)) {
       const params: Record<string, unknown> = spec.runner.kind === "RANGE" ? { dateFrom: from, dateTo: today } : {};
       const res = await ask(spec.key, params);
       check(`${spec.key}: sonuç gönderildi, tel şemasına uyar, HAZIR`, res !== null && res.durum === "HAZIR" && res.hataKodu === null && res.donem === null, res ? `${res.durum}/${res.hataKodu ?? "-"}` : "sonuç yok");

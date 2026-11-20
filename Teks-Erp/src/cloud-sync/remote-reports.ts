@@ -12,22 +12,34 @@ import { getQualityScorecard } from "../services/reports/quality-scorecard.repor
 import { getSubcontractScorecard } from "../services/reports/subcontract-scorecard.report.service";
 import { getStockScorecard } from "../services/reports/stock-scorecard.report.service";
 import { REPORT_PERIODS } from "./wire";
+import { buildCustomerRangeSummary } from "./snapshot-cari-ozeti";
 
-/** RANGE: `dateFrom`/`dateTo` (ISO an ya da fabrika günü) · NONE: parametresiz kesit. */
+/**
+ * RANGE: `dateFrom`/`dateTo` (ISO an ya da fabrika günü) · NONE: parametresiz kesit · CUSTOMER_RANGE (2.13.2): ZORUNLU
+ * `cariKartId` + fabrika GÜNÜ `dateFrom`/`dateTo` (iki uç dahil; `parseReportParams`).
+ */
 export type RemoteReportRunner =
   | { readonly kind: "RANGE"; readonly run: (range: DateRange) => Promise<unknown> }
-  | { readonly kind: "NONE"; readonly run: () => Promise<unknown> };
+  | { readonly kind: "NONE"; readonly run: () => Promise<unknown> }
+  | { readonly kind: "CUSTOMER_RANGE"; readonly run: (range: DateRange, cariKartId: string) => Promise<unknown> };
 
 export interface RemoteReportSpec {
   readonly key: string;
   readonly permission: string;
   readonly paramNames: readonly string[];
-  /** DONEMLI: standart dönemlerle önceden hesaplanabilir · KESIT: tarihsiz anlık kesit. */
-  readonly standard: "DONEMLI" | "KESIT";
+  /** DONEMLI: standart dönemlerle önceden hesaplanabilir · KESIT: tarihsiz anlık kesit · OZEL: yalnız istekle (dönemsiz). */
+  readonly standard: "DONEMLI" | "KESIT" | "OZEL";
   readonly runner: RemoteReportRunner;
+  /**
+   * Panel kataloğunda OLMAYAN, yalnız patron uygulamasına hizmet eden fabrika hesabı (başlık burada). Panelin rapor
+   * kapama listesi buna uygulanmaz (panelde karşılığı yok); kapalı liste okunamazsa yine fail-closed.
+   */
+  readonly own?: { readonly baslik: string; readonly soru: string };
 }
 
 const RANGE = ["dateFrom", "dateTo"] as const;
+/** Cari özeti özel aralığı — uygulamanın "Özel aralık" seçimi bu anahtarı ister (yetenek ilanı: `rapor-katalogu`). */
+export const CUSTOMER_SUMMARY_REPORT = "customer/summary";
 
 export const REMOTE_REPORTS: readonly RemoteReportSpec[] = [
   { key: "sales/order-intake", permission: "bulut:siparis:oku", paramNames: RANGE, standard: "DONEMLI",
@@ -42,6 +54,10 @@ export const REMOTE_REPORTS: readonly RemoteReportSpec[] = [
     runner: { kind: "RANGE", run: async (r) => splitOptions(await getSubcontractScorecard(r, null, {})).data } },
   { key: "inventory/scorecard", permission: "bulut:stok:oku", paramNames: [], standard: "KESIT",
     runner: { kind: "NONE", run: () => getStockScorecard() } },
+  // Cari özeti anlığının hazır dönemleriyle AYNI toplayıcı, tek müşteri + istenen aralık (`snapshot-cari-ozeti.ts`).
+  { key: CUSTOMER_SUMMARY_REPORT, permission: "bulut:siparis:oku", paramNames: ["cariKartId", ...RANGE], standard: "OZEL",
+    own: { baslik: "Cari Özeti (Özel Aralık)", soru: "Bu müşteri seçtiğim tarihler arasında ne sipariş verdi, ne kadar sevk aldı, ne iade etti?" },
+    runner: { kind: "CUSTOMER_RANGE", run: (r, id) => buildCustomerRangeSummary(id, r, new Date()) } },
 ];
 
 export function findRemoteReport(key: string): RemoteReportSpec | undefined {
@@ -67,8 +83,8 @@ export async function remoteReportCatalog(): Promise<RemoteReportCatalogRow[]> {
   if (vis.durum === "olculemedi") return [];
   const out: RemoteReportCatalogRow[] = [];
   for (const r of REMOTE_REPORTS) {
-    const entry = REPORT_BY_KEY.get(r.key);
-    if (!entry || vis.kapali.includes(r.key)) continue;
+    const entry = r.own ?? REPORT_BY_KEY.get(r.key);
+    if (!entry || (!r.own && vis.kapali.includes(r.key))) continue;
     out.push({
       anahtar: r.key,
       baslik: entry.baslik,
