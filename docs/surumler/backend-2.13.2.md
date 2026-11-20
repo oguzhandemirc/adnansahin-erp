@@ -1,9 +1,9 @@
 # Backend `2.13.2`
 
-**Paket:** `tekserp-backend-20261120_041454-215c7010.zip`
-**SHA256:** `C438FA09638B97012B5201FAE4EF85FA2206C10B47A879CD16B4F00FE67A361D`
-**Commit:** `215c7010`
-**İçerik:** 2.13.1 paketinin bütün içeriği + patron telefonuna giden çuval verisinde sevk partisi (ad · kod · durum), ambalaj no ve topların üretim parti no'su (kullanıcı isteği 2026-11-20). Panel kodunda değişiklik yok.
+**Paket:** `tekserp-backend-20261120_045408-202cdc65.zip`
+**SHA256:** `27BE4DC9531C153F3CE79946A3A2F4E4F83BA50852AA550E5D251000FE2179FF`
+**Commit:** `202cdc65` (ilk paket `tekserp-backend-20261120_041454-215c7010.zip` · `C438FA09…361D` · `215c7010` — yalnız web paneli farklı; KURULMAZ, yerine bu)
+**İçerik:** 2.13.1 paketinin bütün içeriği + patron telefonuna giden çuval verisinde sevk partisi (ad · kod · durum), ambalaj no ve topların üretim parti no'su (kullanıcı isteği 2026-11-20). Paketteki WEB PANELİ (`dist-web`) değişti: yeni iş emri formunda "Siparişlere Paylaştırma" bölümü (`143817e5`) ve paylaştırma satırlarında açık-metre aşımı uyarısı + biçim cümlesi (`202cdc65`). Masaüstü panel 1.3.22 ayrıca, kendi sürüm notuyla yayınlanır.
 **Önceki saha sürümü:** **2.13.1** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.13.1 ve 371 migration olduğunu ÖLÇER — farklıysa DUR).
 
 Paketleme **`-Surum 2.13.2`** ile koşulur.
