@@ -242,8 +242,9 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
     ekSuzgecler: [YON_SUZGECI],
   },
   // Veri tablosu (Sevkiyat): no + müşteri araması, durum ve yön süzgeci; sıra `LIST_SORT.sevkiyat`.
+  // 2026-11-20: parti adı/kodu ve sipariş no da (fabrika 2.13.2+ dizileri; eski satırda alan yok → yalnız no/müşteri).
   sevkiyat: {
-    alanlar: ["sevkNo", "musteriAdi"],
+    alanlar: ["sevkNo", "musteriAdi", "partiAdlari", "partiKodlari", "siparisNolari"],
     suzgec: {
       etiket: "Durum",
       varsayilan: null,
@@ -296,9 +297,16 @@ export const LIST_SORT_DIRS: readonly ListSortDir[] = ["artan", "azalan"];
  * alan fabrikanın gönderdiği hâliyle karşılaştırılır. Beyansız istek eski sırayı (`sort_at` azalan) korur.
  */
 export const LIST_SORT: Readonly<Record<string, Readonly<Record<string, ListSortKind>>>> = {
-  siparis: { siparisNo: "metin", musteriAdi: "metin", siparisTarihi: "tarih", acikMiktar: "sayi", sevkMiktari: "sayi", kalemSayisi: "sayi" },
+  // 2026-11-20: her sütun başlıktan sıralansın — termin, toplam, durum/yön (kod sırası), tarih sütunları eklendi.
+  siparis: {
+    siparisNo: "metin", musteriAdi: "metin", siparisTarihi: "tarih", acikMiktar: "sayi", sevkMiktari: "sayi", kalemSayisi: "sayi",
+    toplamMiktar: "sayi", termin: "tarih", durum: "metin", yon: "metin", tamamlanma: "tarih", iptalTarihi: "tarih", olusturulma: "tarih",
+  },
   "cari-kart": { ad: "metin", kod: "metin", il: "metin", ilce: "metin", ulke: "metin" },
-  sevkiyat: { sevkNo: "metin", musteriAdi: "metin", cikisTarihi: "tarih", toplamMetre: "sayi", topSayisi: "sayi", cuvalSayisi: "sayi", toplamKg: "sayi" },
+  sevkiyat: {
+    sevkNo: "metin", musteriAdi: "metin", cikisTarihi: "tarih", toplamMetre: "sayi", topSayisi: "sayi", cuvalSayisi: "sayi", toplamKg: "sayi",
+    durum: "metin", yon: "metin", disFaturaNo: "metin", faturalanma: "tarih", olusturulma: "tarih", iptalTarihi: "tarih",
+  },
   "is-emri": { isEmriNo: "metin", musteriAdi: "metin", urunAdi: "metin", topSayisi: "sayi", metre: "sayi", olusturulma: "tarih", kapanisTarihi: "tarih" },
 };
 
@@ -344,6 +352,88 @@ export const LIST_MEMBER_FILTERS: Readonly<Record<ListMemberFilterKey, Readonly<
   fasonFirmaId: { "is-emri": "fasonFirmaIdleri" },
 };
 
+// ---------------------------------------------------------------- liste değer + tarih süzgeçleri (2026-11-20)
+/**
+ * Değer süzgeci alanı: `dizi: false` ⇒ kayıttaki metin alanının eşitliği, `dizi: true` ⇒ fabrikanın türettiği tekil
+ * değer DİZİSİ seçilenlerden birini içeriyor mu. Karşılaştırma metindir (sayı `150` ⇔ "150"); bulut hesap yapmaz.
+ */
+export interface ListValueFilter {
+  readonly alan: string;
+  readonly etiket: string;
+  readonly dizi: boolean;
+}
+
+/**
+ * `GET /veri/:projeksiyon?secim=<JSON {alan: [değer, …]}>` — alan içinde değerler VEYA, alanlar (ve öteki süzgeçler)
+ * VE ile birleşir. Yalnız burada beyanlı alan kabul edilir (diğeri 400). Seçenekler `GET /liste/:projeksiyon/secenekler`.
+ * Alanı taşımayan satır (eski fabrika) hiçbir değere uymaz; seçenek listesi boş gelir ⇒ istemci alanı çizmez.
+ */
+export const LIST_VALUE_FILTERS: Readonly<Record<string, readonly ListValueFilter[]>> = {
+  sevkiyat: [
+    { alan: "musteriAdi", etiket: "Müşteri", dizi: false },
+    { alan: "urunAdlari", etiket: "Kumaş", dizi: true },
+    { alan: "renkAdlari", etiket: "Renk", dizi: true },
+    { alan: "enler", etiket: "En", dizi: true },
+    { alan: "partiAdlari", etiket: "Sevk partisi", dizi: true },
+    { alan: "partiKodlari", etiket: "Parti kodu", dizi: true },
+    { alan: "uretimPartileri", etiket: "Üretim parti no", dizi: true },
+    { alan: "etiketMusterileri", etiket: "Etiket müşterisi", dizi: true },
+    { alan: "siparisNolari", etiket: "Sipariş no", dizi: true },
+    { alan: "depolar", etiket: "Depo", dizi: true },
+  ],
+  siparis: [
+    { alan: "musteriAdi", etiket: "Müşteri", dizi: false },
+    { alan: "urunAdlari", etiket: "Kumaş", dizi: true },
+    { alan: "renkAdlari", etiket: "Renk", dizi: true },
+    { alan: "enler", etiket: "En", dizi: true },
+  ],
+};
+
+/** `secim` sınırları: JSON metni, alan başına değer, değer uzunluğu. */
+export const SECIM_AZAMI = { metin: 4000, deger: 50, uzunluk: 200 } as const;
+/** `GET /liste/:projeksiyon/secenekler` alan başına en çok bu kadar değer (fazlası `kesildi: true`). */
+export const SECENEK_AZAMI = 500;
+
+/** Tarih aralığı alanı: kayıttaki ISO an ya da `YYYY-MM-DD` günü. */
+export interface ListDateRange {
+  readonly alan: string;
+  readonly etiket: string;
+}
+
+/**
+ * `GET /veri/:projeksiyon?aralik=<JSON {alan: [baslangic|null, bitis|null]}>` — sınırlar `YYYY-MM-DD`, İKİSİ DE DAHİL,
+ * fabrika günüyle (Europe/Istanbul) karşılaştırılır; ISO an o dilimdeki güne çevrilir. En az bir sınır dolu; başlangıç >
+ * bitiş 400. Alanı boş satır (ör. çıkmamış sevkiyatın çıkış tarihi) aralığa girmez. Hazır dönemleri istemci çevirir.
+ */
+export const LIST_DATE_RANGES: Readonly<Record<string, readonly ListDateRange[]>> = {
+  sevkiyat: [{ alan: "cikisTarihi", etiket: "Çıkış tarihi" }],
+  siparis: [
+    { alan: "siparisTarihi", etiket: "Sipariş tarihi" },
+    { alan: "termin", etiket: "Termin" },
+  ],
+};
+
+/**
+ * `GET /liste/:projeksiyon/toplam?<liste süzgeçleri>` — süzülen kümenin satır sayısı ve fabrikanın SATIR BAŞINA verdiği
+ * sayıların toplamı (yalnız burada beyanlı alanlar; yeni türev yok). Sipariş miktarı birim karışık olabileceği için
+ * toplanmaz (yalnız sayı). Liste ile AYNI where'den doğar.
+ */
+export const LIST_TOTALS: Readonly<Record<string, readonly string[]>> = {
+  sevkiyat: ["topSayisi", "toplamMetre"],
+  siparis: [],
+};
+
+/** `GET /liste/:projeksiyon/toplam` yanıtı: `toplamlar` alan → kesin ondalık metin (sayı yoksa null). */
+export interface ListTotals {
+  readonly adet: number;
+  readonly toplamlar: Readonly<Record<string, string | null>>;
+}
+
+/** `GET /liste/:projeksiyon/secenekler` yanıtı: beyanlı her alanın tekil değerleri (Türkçe katlamalı sıralı). */
+export interface ListOptions {
+  readonly alanlar: Readonly<Record<string, { readonly degerler: readonly string[]; readonly kesildi: boolean }>>;
+}
+
 /** `GET /oturum` `liste` — bu sunucunun liste yetenekleri; eski sunucu göndermez (istemci süzgeçli görünümü gizler). */
 export interface ListCapabilities {
   readonly kimlikSuzgecleri: Readonly<Partial<Record<ListIdFilterKey, readonly string[]>>>;
@@ -360,6 +450,12 @@ export interface ListCapabilities {
    * göndermez ⇒ istemci yalnız eski değerleri (ör. `IPTAL_HARIC` HARİÇ) gönderir; tanınmayan değer FAIL-CLOSED 400'dür.
    */
   readonly suzgecDegerleri?: Readonly<Record<string, readonly string[]>>;
+  /** (2026-11-20) Projeksiyon → `?secim=` alanları (`LIST_VALUE_FILTERS`) + seçenek ucu. Eski sunucu göndermez ⇒ istemci çizmez. */
+  readonly degerSuzgecleri?: Readonly<Record<string, readonly string[]>>;
+  /** (2026-11-20) Projeksiyon → `?aralik=` alanları (`LIST_DATE_RANGES`). Eski sunucu göndermez ⇒ istemci çizmez. */
+  readonly tarihAraliklari?: Readonly<Record<string, readonly string[]>>;
+  /** (2026-11-20) Projeksiyon → toplam ucunun alanları (`LIST_TOTALS`; boş dizi = yalnız sayı). Eski sunucu göndermez ⇒ şerit yok. */
+  readonly toplamlar?: Readonly<Record<string, readonly string[]>>;
 }
 
 // ---------------------------------------------------------------- iş emri sevke hazırlığı (D4-J5)

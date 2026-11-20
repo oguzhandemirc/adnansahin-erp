@@ -8,8 +8,9 @@ import { loginFactoryAccount } from "../auth/factory-login";
 import { logout, resolveSession, type OpenedSession, type SessionContext } from "../auth/session.service";
 import { CloudError, badRequest } from "../lib/errors";
 import type { CloudContext } from "../services/context";
-import { LIST_ID_FILTER_KEYS, LIST_MEMBER_FILTER_KEYS, LIST_SORT_DIRS, type ListSortDir, type LoginResponse } from "../wire/api";
-import { facilityStatus, getCustomerSummary, getProjectionRecord, getSnapshot, listProjection } from "../services/data.service";
+import { LIST_ID_FILTER_KEYS, LIST_MEMBER_FILTER_KEYS, LIST_SORT_DIRS, SECIM_AZAMI, type ListSortDir, type LoginResponse } from "../wire/api";
+import { facilityStatus, getCustomerSummary, getProjectionRecord, getSnapshot, listProjection, type ListFilterQuery } from "../services/data.service";
+import { listOptions, listTotals } from "../services/list-totals";
 import { deactivateDevice, listDevices, registerDevice } from "../services/device.service";
 import { requestSnapshotRefresh } from "../services/doorbell";
 import { cancelInbox, createInboxMessage, getInbox, listInbox } from "../services/inbox.service";
@@ -33,6 +34,26 @@ function sortDir(v: string | undefined): ListSortDir | undefined {
   if (v === undefined) return undefined;
   if (!(LIST_SORT_DIRS as readonly string[]).includes(v)) throw badRequest("yon artan ya da azalan");
   return v as ListSortDir;
+}
+
+/** JSON süzgeç parametresi (`secim`/`aralik`): kesilmez — uzun, tekrarlı ya da metin olmayan değer 400 (fail-closed). */
+function jsonParam(c: ApiCall, name: string, max: number): string | undefined {
+  const v = c.req.query[name];
+  if (v === undefined) return undefined;
+  if (typeof v !== "string" || v.length > max) throw badRequest(`${name} biçimsiz`);
+  return v.trim() || undefined;
+}
+
+/** Liste ve toplam ucunun ORTAK süzgeç okuması (aynı where). */
+function filterQuery(c: ApiCall): ListFilterQuery {
+  return {
+    durum: text(c, "durum", 40),
+    kimlik: Object.fromEntries([...new Set([...LIST_ID_FILTER_KEYS, ...LIST_MEMBER_FILTER_KEYS])].map((k) => [k, text(c, k, 40)])),
+    ara: text(c, "ara", 200),
+    suzgec: text(c, "suzgec", 120),
+    secim: jsonParam(c, "secim", SECIM_AZAMI.metin),
+    aralik: jsonParam(c, "aralik", 400),
+  };
 }
 
 /** Giriş gövdesi: fabrika kullanıcı adı + fabrika parolası (tel `LoginRequest`). Katı: `eposta` ve öteki alanlar 400. */
@@ -82,9 +103,12 @@ export const API_ROUTES: readonly ApiRouteDef[] = [
     kimlik: "OKUMA",
     handler: async (c) => {
       const { cursor, limit } = page(c);
-      return { data: await listProjection(c.ctx, s(c), String(c.req.params[PROJECTION]), { cursor, limit, durum: text(c, "durum", 40), kimlik: Object.fromEntries([...new Set([...LIST_ID_FILTER_KEYS, ...LIST_MEMBER_FILTER_KEYS])].map((k) => [k, text(c, k, 40)])), ara: text(c, "ara", 200), suzgec: text(c, "suzgec", 120), sirala: text(c, "sirala", 40), yon: sortDir(text(c, "yon", 10)) }) };
+      return { data: await listProjection(c.ctx, s(c), String(c.req.params[PROJECTION]), { cursor, limit, ...filterQuery(c), sirala: text(c, "sirala", 40), yon: sortDir(text(c, "yon", 10)) }) };
     },
   },
+  // 2026-11-20: süzülen kümenin sayısı + satır sayılarının toplamı (liste ile aynı where) · değer süzgeci seçenekleri.
+  { method: "get", path: `/liste/:${PROJECTION}/toplam`, auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await listTotals(c.ctx, s(c), String(c.req.params[PROJECTION]), filterQuery(c)) }) },
+  { method: "get", path: `/liste/:${PROJECTION}/secenekler`, auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await listOptions(c.ctx, s(c), String(c.req.params[PROJECTION])) }) },
   { method: "get", path: `/veri/:${PROJECTION}/:id`, auth: "OTURUM", kimlik: "OKUMA", handler: async (c) => ({ data: await getProjectionRecord(c.ctx, s(c), String(c.req.params[PROJECTION]), String(c.req.params.id)) }) },
   // Ekran açıkken tazeleme: `ozet` zili (§14 S47); içerik taşımaz, tesis başına 30 sn'de bir.
   { method: "post", path: "/tazele", auth: "OTURUM", kimlik: { muaf: "zil içerik taşımaz; tekrar yalnız fazladan anlık tur yaptırır (§6.5)" }, handler: async (c) => ({ data: requestSnapshotRefresh(c.ctx.doorbell, s(c).tesisId, c.ctx.now()) }) },

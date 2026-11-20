@@ -8,13 +8,14 @@ import { projectionDef, type ProjectionDef } from "../catalog/projections";
 import { badRequest, forbidden, notFound } from "../lib/errors";
 import { foldSql, searchCondition } from "../lib/search";
 import { NO_TENANT, withTesis } from "../lib/tenant";
-import { ARAMA_AZAMI, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_MEMBER_FILTER_KEYS, LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, SUZGEC_AZAMI, type CustomerSummary, type ListFilterOption, type ListSortDir, type ListSortKind, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListMemberFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
+import { ARAMA_AZAMI, LIST_DATE_RANGES, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_MEMBER_FILTER_KEYS, LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, LIST_TOTALS, LIST_VALUE_FILTERS, SUZGEC_AZAMI, type CustomerSummary, type ListFilterOption, type ListSortDir, type ListSortKind, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListMemberFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
 import type { CloudContext } from "./context";
 import { OPEN_SERVICE } from "./facility-gate";
+import { dateFilters, valueFilters } from "./list-filters";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function readableDef(s: SessionContext, name: string, kind: "KAYIT" | "ANLIK"): ProjectionDef {
+export function readableDef(s: SessionContext, name: string, kind: "KAYIT" | "ANLIK"): ProjectionDef {
   const def = projectionDef(name);
   if (!def || def.subRow) throw notFound("Projeksiyon");
   if ((kind === "ANLIK") !== (def.root.kind === "ANLIK")) throw notFound("Projeksiyon");
@@ -27,9 +28,16 @@ export function visibleSubRows(s: SessionContext, def: ProjectionDef): { kisisel
   return { kisisel: (def.root.subRows ?? []).includes("kisisel") && s.projections.includes(`${def.name}.kisisel`) };
 }
 
+/** Listenin süzgeç kısmı (liste + toplam ucu ortak); imleç/sayfa/sıra `ListQuery`de. */
+export type ListFilterQuery = Omit<ListQuery, "cursor" | "limit" | "sirala" | "yon">;
+
 export interface ListQuery {
   readonly cursor?: string;
   readonly limit: number;
+  /** (2026-11-20) Değer süzgeci JSON'u (`LIST_VALUE_FILTERS`). */
+  readonly secim?: string;
+  /** (2026-11-20) Tarih aralığı JSON'u (`LIST_DATE_RANGES`). */
+  readonly aralik?: string;
   readonly durum?: string;
   /** Kimlik süzgeçleri (`LIST_ID_FILTERS` beyanı); beyansız projeksiyonda 400. */
   readonly kimlik?: Partial<Readonly<Record<ListIdFilterKey | ListMemberFilterKey, string>>>;
@@ -43,7 +51,7 @@ export interface ListQuery {
 }
 
 /** `ara`/`suzgec` koşulları: arama beyanı olmayan listede ya da tanınmayan süzgeçte 400 (fail-closed). */
-function searchFilters(name: string, q: ListQuery): Prisma.Sql[] {
+function searchFilters(name: string, q: ListFilterQuery): Prisma.Sql[] {
   if (q.ara === undefined && q.suzgec === undefined) return [];
   const spec = Object.hasOwn(LIST_SEARCH, name) ? LIST_SEARCH[name] : undefined;
   if (!spec) throw badRequest("Bu listede arama yok");
@@ -88,7 +96,7 @@ const MEMBER_FIELD_SQL: Readonly<Record<string, Prisma.Sql>> = {
 };
 
 /** Kimlik süzgeçleri: anahtar projeksiyonun (eşitlik ya da üyelik) beyanında değilse ya da değer UUID değilse 400 (fail-closed). */
-function idFilters(name: string, q: ListQuery): Prisma.Sql[] {
+function idFilters(name: string, q: ListFilterQuery): Prisma.Sql[] {
   const out: Prisma.Sql[] = [];
   for (const key of new Set<ListIdFilterKey | ListMemberFilterKey>([...LIST_ID_FILTER_KEYS, ...LIST_MEMBER_FILTER_KEYS])) {
     const v = q.kimlik?.[key];
@@ -103,6 +111,14 @@ function idFilters(name: string, q: ListQuery): Prisma.Sql[] {
   return out;
 }
 
+/** Liste, toplam ve dışa bakan her okuma AYNI süzgeç koşullarından doğar (imleç/sıra hariç). */
+export function listFilters(name: string, q: ListFilterQuery): Prisma.Sql[] {
+  if (q.durum !== undefined && !/^[A-Z][A-Z0-9_]{0,39}$/.test(q.durum)) throw badRequest("durum biçimsiz");
+  const filters: Prisma.Sql[] = [...idFilters(name, q), ...searchFilters(name, q), ...valueFilters(name, q.secim), ...dateFilters(name, q.aralik)];
+  if (q.durum) filters.push(Prisma.sql`AND r.data->>'durum' = ${q.durum}`);
+  return filters;
+}
+
 /** İstemcinin özellik kapısı: eski sunucu bu alanı göndermez, tanımadığı parametreyi de yok sayar. */
 export const LIST_CAPABILITIES: ListCapabilities = {
   kimlikSuzgecleri: LIST_ID_FILTERS,
@@ -110,9 +126,12 @@ export const LIST_CAPABILITIES: ListCapabilities = {
   siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)])),
   uyelikSuzgecleri: Object.fromEntries(Object.entries(LIST_MEMBER_FILTERS).map(([k, p]) => [k, Object.keys(p)])),
   suzgecDegerleri: Object.fromEntries(Object.entries(LIST_SEARCH).map(([p, sp]) => [p, [...(sp.suzgec?.secenekler ?? []), ...(sp.ekSuzgecler ?? []).flatMap((g) => g.secenekler)].map((o) => o.deger)])),
+  degerSuzgecleri: Object.fromEntries(Object.entries(LIST_VALUE_FILTERS).map(([p, fs]) => [p, fs.map((f) => f.alan)])),
+  tarihAraliklari: Object.fromEntries(Object.entries(LIST_DATE_RANGES).map(([p, fs]) => [p, fs.map((f) => f.alan)])),
+  toplamlar: LIST_TOTALS,
 };
 
-const NUMERIC = "^-?[0-9]+(\\.[0-9]+)?$";
+export const NUMERIC = "^-?[0-9]+(\\.[0-9]+)?$";
 
 /** Sıralama anahtarı: boş değer (yok · JSON null · boş metin · sayı olmayan) SQL NULL'dur ve HEP sonda kalır. */
 function sortKeySql(field: string, kind: ListSortKind): Prisma.Sql {
@@ -221,9 +240,7 @@ export function selectRows(s: SessionContext, def: ProjectionDef, q: { readonly 
 
 export async function listProjection(ctx: CloudContext, s: SessionContext, name: string, q: ListQuery): Promise<Page<ProjectionRecord>> {
   const def = readableDef(s, name, "KAYIT");
-  if (q.durum !== undefined && !/^[A-Z][A-Z0-9_]{0,39}$/.test(q.durum)) throw badRequest("durum biçimsiz");
-  const filters: Prisma.Sql[] = [...idFilters(def.name, q), ...searchFilters(def.name, q)];
-  if (q.durum) filters.push(Prisma.sql`AND r.data->>'durum' = ${q.durum}`);
+  const filters = listFilters(def.name, q);
   const sort = sortSpec(def.name, q);
   if (q.cursor && sort) filters.push(sortCursorFilter(sort, decodeSortCursor(q.cursor)));
   else if (q.cursor) {
