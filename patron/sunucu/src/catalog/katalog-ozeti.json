@@ -399,7 +399,8 @@
     "customer/scorecard": "bulut:siparis:oku",
     "quality/scorecard": "bulut:uretim:oku",
     "subcontract/scorecard": "bulut:uretim:oku",
-    "inventory/scorecard": "bulut:stok:oku"
+    "inventory/scorecard": "bulut:stok:oku",
+    "customer/summary": "bulut:siparis:oku"
   },
   "REPORTS_NOT_IN_CLOUD": [
     "audit/*",

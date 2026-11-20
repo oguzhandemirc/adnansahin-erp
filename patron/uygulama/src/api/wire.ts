@@ -88,6 +88,11 @@ export interface FacilityStatus {
   readonly liste?: ListCapabilities;
   /** `POST /esitleme/simdi` ucunun beyanı ("Şimdi güncelle", 2026-11-13); eski sunucu göndermez ⇒ istemci eylemi gizler. */
   readonly simdiGuncelle?: boolean;
+  /**
+   * (2.13.2) Bulutun `POST /raporlar` ile kabul ettiği rapor anahtarları (izinden bağımsız; izin uygulamada ayrıca).
+   * Eski sunucu göndermez ⇒ istemci yeni anahtara dayanan eylemi (cari özeti "Özel aralık" = `customer/summary`) gizler.
+   */
+  readonly raporAnahtarlari?: readonly string[];
 }
 
 /**

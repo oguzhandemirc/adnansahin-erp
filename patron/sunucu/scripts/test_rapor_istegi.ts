@@ -17,6 +17,8 @@
 //   §7 (2026-10-25) 6 karne × uygulamanın özel aralığı (`YYYY-MM-DD`, kesitte `asOf` günü): bulut 201 ile kabul eder
 //      ve fabrikaya parametreyi AYNEN iletir (gün sınırını yalnız fabrika çözer; fabrika ayağı `test_bulut_projeksiyon_allowlist §10`).
 //      NEGATİF SONDA: report.service.ts parametreyi `toPlainJson` yerine `{}` ile sakladı → §7b ❌; geri alındı → ✅.
+//   §8 (2.13.2) cari özeti özel aralığı `customer/summary`: `/oturum` anahtar ilanı · izinsiz (rapor ya da sipariş izni
+//      yok) 403 · eski fabrika (katalogda yok) 404 · parametre AYNEN · başka cari aynı aralıkla öbürünün sonucunu ALMAZ.
 // Koşum: npx tsx scripts/test_rapor_istegi.ts
 // =============================================================================
 import { randomUUID } from "node:crypto";
@@ -264,8 +266,48 @@ async function main(): Promise<void> {
       const al = (await imzali(o, eski, "/v1/rapor/al", { govde: { v: 1, enFazla: 10 } })).json as unknown as { istekler: { raporAnahtari: string; parametreler: Record<string, unknown> }[] };
       const bozuk = Object.entries(ESKI).filter(([a, p]) => JSON.stringify(Object.entries(al.istekler?.find((x) => x.raporAnahtari === a)?.parametreler ?? { yok: 1 }).sort()) !== JSON.stringify(Object.entries(p).sort())).map(([a]) => a);
       kontrol("§7b ⭐ fabrikaya parametre AYNEN gider (bulut tarih dönüşümü yapmaz)", (al.istekler?.length ?? 0) === 6 && bozuk.length === 0, bozuk.join(",") || `${al.istekler?.length} istek`);
+      // §8c eski fabrika: kataloğunda `customer/summary` yok → 404 (uygulama bu yüzden katalog ilanına bakar).
+      const eskiCari = await iste(o, hepsi, "customer/summary", { cariKartId: randomUUID(), dateFrom: "2026-09-01", dateTo: "2026-09-30" });
+      kontrol("§8c eski fabrika (katalogda `customer/summary` yok) → 404 RAPOR_BILINMIYOR", eskiCari.status === 404 && eskiCari.json.details?.code === "RAPOR_BILINMIYOR", `${eskiCari.status} ${eskiCari.json.details?.code ?? "-"}`);
     } finally {
       await temizleTesis(o, eski.tesisId);
+    }
+
+    console.log("\n§8 (2.13.2) cari özeti özel aralığı `customer/summary`");
+    const yeni = await tesisKur(o, { ad: "Özel aralık tesisi" });
+    try {
+      const kat8 = await imzali(o, yeni, "/v1/esitle", { govde: paket(yeni, { ufuk: new Date(o.saat.simdi() - 10_000), anliklar: [{ projeksiyon: "rapor-katalogu", icerikOzeti: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", veri: { raporlar: [{ anahtar: "customer/summary", izin: "bulut:siparis:oku", parametreler: ["cariKartId", "dateFrom", "dateTo"] }] } }] }) });
+      if (kat8.status !== 200) throw new Error(`özel aralık katalog: ${kat8.status}`);
+      const siparisci = await hesapKur(o, yeni.tesisId, ["bulut:rapor:oku", "bulut:siparis:oku"]);
+      const raporsuz = await hesapKur(o, yeni.tesisId, ["bulut:siparis:oku"]);
+      const sevkci = await hesapKur(o, yeni.tesisId, ["bulut:rapor:oku", "bulut:sevkiyat:oku"]);
+      const oturum = await api(o, "GET", "/api/oturum", { belirtec: siparisci.belirtec });
+      const ilan = (oturum.json as { data?: { raporAnahtarlari?: unknown } }).data?.raporAnahtarlari;
+      kontrol("§8a `/oturum` kabul edilen rapor anahtarlarını ilan eder (`customer/summary` dahil)", Array.isArray(ilan) && ilan.includes("customer/summary"), JSON.stringify(ilan));
+      const A = randomUUID();
+      const B = randomUUID();
+      const pA = { cariKartId: A, dateFrom: "2026-09-01", dateTo: "2026-09-30" };
+      const r1 = await iste(o, raporsuz, "customer/summary", pA);
+      const r2 = await iste(o, sevkci, "customer/summary", pA);
+      kontrol("§8b ⭐ izinsiz hesap: `bulut:rapor:oku` yok → 403 · `bulut:siparis:oku` yok → 403", r1.status === 403 && r2.status === 403, `${r1.status} · ${r2.status}`);
+      const iA = await iste(o, siparisci, "customer/summary", pA);
+      kontrol("§8d izinli hesap → 201 BEKLIYOR", iA.status === 201 && (iA.json as { data?: { durum?: string } }).data?.durum === "BEKLIYOR", `${iA.status}`);
+      const al8 = (await imzali(o, yeni, "/v1/rapor/al", { govde: { v: 1, enFazla: 10 } })).json as unknown as { istekler: { istekId: string; raporAnahtari: string; parametreler: Record<string, unknown> }[] };
+      const gelen = al8.istekler?.find((x) => x.raporAnahtari === "customer/summary");
+      kontrol("§8e ⭐ fabrikaya parametre AYNEN (cari + iki gün) gider", !!gelen && JSON.stringify(Object.entries(gelen.parametreler).sort()) === JSON.stringify(Object.entries(pA).sort()), JSON.stringify(gelen?.parametreler));
+      const hes = new Date(o.saat.simdi()).toISOString();
+      const veriA = { cariKartId: A, donem: { siparisSayisi: 3 } };
+      const s8 = await imzali(o, yeni, "/v1/rapor/sonuc", { govde: sonucGovdesi(gelen?.istekId ?? null, "customer/summary", hes, { veri: veriA, parametreler: pA }) });
+      kontrol("§8f fabrika sonucu kabul edildi", s8.status === 200, `${s8.status}`);
+      const iB = await iste(o, siparisci, "customer/summary", { ...pA, cariKartId: B });
+      kontrol("§8g ⭐ başka cari aynı aralıkla: A'nın sonucu KULLANILMAZ (yeni istek BEKLIYOR)", iB.status === 201 && (iB.json as { data?: { durum?: string } }).data?.durum === "BEKLIYOR", `${iB.status} ${(iB.json as { data?: { durum?: string } }).data?.durum ?? "-"}`);
+      const iA2 = await iste(o, siparisci, "customer/summary", pA);
+      const idA2 = (iA2.json as { data?: { id?: string; durum?: string } }).data;
+      const okuA2 = await api(o, "GET", `/api/raporlar/${idA2?.id ?? ""}`, { belirtec: siparisci.belirtec });
+      const sonucA2 = (okuA2.json as { data?: { sonuc?: { veri?: unknown } | null } }).data?.sonuc?.veri;
+      kontrol("§8h aynı cari + aynı aralık 5 dk içinde → HAZIR, sonuç fabrikanınki AYNEN", idA2?.durum === "HAZIR" && JSON.stringify(kanonik(sonucA2)) === JSON.stringify(kanonik(veriA)), `${idA2?.durum ?? "-"} ${JSON.stringify(sonucA2)}`);
+    } finally {
+      await temizleTesis(o, yeni.tesisId);
     }
   } finally {
     await temizleTesis(o, k.tesisId);

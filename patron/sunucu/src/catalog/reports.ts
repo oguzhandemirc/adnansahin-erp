@@ -13,6 +13,9 @@ export const REPORT_KEY_PERMISSION: Readonly<Record<string, CloudPermission>> = 
   "quality/scorecard": "bulut:uretim:oku",
   "subcontract/scorecard": "bulut:uretim:oku",
   "inventory/scorecard": "bulut:stok:oku",
+  // 2.13.2: cari özetinin özel aralığı (fabrikaya özgü; `cari-ozeti` anlığıyla aynı izin). Parametre `cariKartId` +
+  // `dateFrom`/`dateTo` fabrika günü; doğrulama fabrikada, bulut AYNEN iletir.
+  "customer/summary": "bulut:siparis:oku",
 };
 
 /** Buluttan İSTENEMEYEN raporlar (aile ya da tam anahtar). */

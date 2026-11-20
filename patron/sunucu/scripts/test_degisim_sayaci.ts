@@ -143,7 +143,7 @@ async function eskiIstemci(o: Ortam, k: TestKurulumu, h: TestHesabi): Promise<vo
   const d = r.json.data as Record<string, unknown>;
   // `liste` (liste yetenekleri, P6) ve `simdiGuncelle` ("Şimdi güncelle" beyanı, 2026-11-13) bilinçli EK alanlardır —
   // opsiyonel, eski istemci yok sayar; sayaç alanı yine yok.
-  kontrol("§6a /api/oturum alan kümesi aynı (+ P6 `liste`, + `simdiGuncelle`)", anahtarlar(d) === "esitleme,hesap,hizmet,liste,projeksiyonlar,simdiGuncelle,tesis", anahtarlar(d));
+  kontrol("§6a /api/oturum alan kümesi aynı (+ P6 `liste`, + `simdiGuncelle`, + 2.13.2 `raporAnahtarlari`)", anahtarlar(d) === "esitleme,hesap,hizmet,liste,projeksiyonlar,raporAnahtarlari,simdiGuncelle,tesis", anahtarlar(d));
   kontrol("§6b /api/oturum esitleme alan kümesi aynı (sayaç SIZMAZ)", anahtarlar(d.esitleme) === "fabrikaSurumu,sonEsitleme,sozlesmeUyarisi,ufuk,ufukTakildi", anahtarlar(d.esitleme));
   const s = await gonder(o, k, kayitPaketi(o, k));
   kontrol("§6c /v1/esitle makbuz alan kümesi aynı", anahtarlar(s.json) === "istenen,kabul,paketId,ret,sozlesmeUyarisi,ufukTarihi,v", anahtarlar(s.json));

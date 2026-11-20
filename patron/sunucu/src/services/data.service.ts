@@ -5,6 +5,7 @@
 import { Prisma } from "@prisma/client";
 import type { SessionContext } from "../auth/session.service";
 import { projectionDef, type ProjectionDef } from "../catalog/projections";
+import { REPORT_KEY_PERMISSION } from "../catalog/reports";
 import { badRequest, forbidden, notFound } from "../lib/errors";
 import { foldSql, searchCondition } from "../lib/search";
 import { NO_TENANT, withTesis } from "../lib/tenant";
@@ -363,5 +364,7 @@ export async function facilityStatus(ctx: CloudContext, s: SessionContext): Prom
     hizmet: OPEN_SERVICE,
     liste: listCapabilities(s),
     simdiGuncelle: true,
+    // 2.13.2: kabul edilen rapor anahtarları (yetenek ilanı; eski sunucu göndermez ⇒ istemci yeni rapora dayanan eylemi gizler).
+    raporAnahtarlari: Object.keys(REPORT_KEY_PERMISSION).sort(),
   };
 }
