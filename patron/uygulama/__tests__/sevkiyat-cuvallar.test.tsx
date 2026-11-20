@@ -200,7 +200,7 @@ describe("§5 uzun liste", () => {
     await act(async () => { fireEvent.press(screen.getByTestId(`sevk-cuval-satir-${sid(100)}`)); });
     const ic = screen.getByTestId(`sevk-icerik-${sid(100)}`);
     expect(within(ic).getAllByTestId(/^sevk-top-4444/)).toHaveLength(50);
-    await act(async () => { fireEvent.press(screen.getByTestId(`sevk-top-daha-${sid(100)}`)); });
+    await act(async () => { fireEvent.press(screen.getByTestId(`sevk-toplar-${sid(100)}-daha`)); });
     expect(within(screen.getByTestId(`sevk-icerik-${sid(100)}`)).getAllByTestId(/^sevk-top-4444/)).toHaveLength(100);
   });
 });

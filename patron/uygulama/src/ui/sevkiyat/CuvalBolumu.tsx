@@ -6,16 +6,14 @@
 // toplar tablonun altında ayrı "Çuvalsız" grubunda. İade alınmış top "İade", hayalet top "Çuvalda yok" işaretlidir (brüt:
 // sayılır ve görünür). Kayıt yoksa (eski fabrika/bulut, 404) hata değil sakin boş durum; iptal edilen sevkiyatın
 // çuvalları depoya döner → kayıt boş gelir ve bunu söyler. Uzun liste: ilk `SEVK_CUVAL_SAYFA` çuval, "Daha fazla".
-// 2026-11-20 (fabrika 2.13.2+): Parti (sevk partisi adı) ve Ambalaj no sütunları — veride yoksa çizilmez; çuval sayısı
-// `SEVK_CUVAL_ARAC_ESIGI`ni bulunca arama (çuval no, parti adı/kodu, ambalaj, top no, kumaş) + Parti süzgeci (yalnız bu açılışta).
+// 2026-11-20 (fabrika 2.13.2+): Parti (sevk partisi adı) ve Ambalaj no sütunları — veride yoksa çizilmez. Dört özellik
+// ortak kısa tablodan: sütun seçimi + başlıktan sıralama cihazda (`tablo.sevk-cuval`), arama (çuval no, parti adı/kodu,
+// ambalaj, top no, kumaş) + Parti süzgeci bu açılışta; `SEVK_CUVAL_ARAC_ESIGI`nden az çuvalda araçlar küçük simge satırı.
 import { useMemo, useState, type ReactNode } from "react";
 import { partiAnahtari, partiGrubu } from "../../lib/cuval-deposu";
 import { eslesir } from "../../lib/stok-kalem";
-import { SearchField } from "../siparis/parts";
-import { etkinSuzgecSayisi, secimDegerleri, suzgecAta } from "../tablo/model";
-import { EtkinSuzgecler, SuzgecSayfasi } from "../tablo/Suzgec";
-import { AracDugmesi } from "../tablo/VeriTablosu";
-import { Pressable, Text, View } from "react-native";
+import { secimDegerleri } from "../tablo/model";
+import { Text, View } from "react-native";
 import { can } from "../../lib/access";
 import { formatDate, formatNumber } from "../../lib/format";
 import { icerikBos, icerikOzeti, sevkIcerigi, type SevkCuvali, type SevkIcerigi, type SevkTopu } from "../../lib/sevkiyat-icerigi";
@@ -28,13 +26,13 @@ import { BlokBasligi, Iskelet } from "../ortak";
 import { qty } from "../pano/read";
 import { KisaTablo } from "../tablo/KisaTablo";
 import type { SutunTanimi } from "../tablo/model";
-import { makeStyles, useTokens } from "../theme-context";
+import { makeStyles } from "../theme-context";
 import { space, typography } from "../tokens";
 
 export const SEVK_ICERIGI = "sevkiyat-icerigi";
 export const SEVK_ICERIGI_IZNI = "bulut:sevkiyat:oku";
 export const SEVK_CUVAL_SAYFA = 50;
-/** Bu kadar çuvaldan itibaren arama + Parti süzgeci çizilir. */
+/** Bu kadar çuvaldan itibaren tam araç şeridi (arama kutusu açık); altında küçük simge satırı. */
 export const SEVK_CUVAL_ARAC_ESIGI = 8;
 export const SEVK_ICERIK_YOK = "Bu sevkiyatın çuval ayrıntısı fabrikadan henüz gelmedi.";
 export const SEVK_ICERIK_IPTAL = "Sevkiyat iptal edildi; çuvalları depoya döndü.";
@@ -109,46 +107,26 @@ export function CuvalBolumu({ remote }: { readonly remote: Remote<ProjectionReco
 
 function Icerik({ d }: { readonly d: SevkIcerigi }) {
   const s = useStyles();
-  const t = useTokens();
   const [acik, setAcik] = useState<string | null>(null);
-  const [adet, setAdet] = useState(SEVK_CUVAL_SAYFA);
-  const [ara, setAra] = useState("");
-  const [suzgec, setSuzgec] = useState<Readonly<Record<string, string>>>({});
-  const [suzgecAcik, setSuzgecAcik] = useState(false);
   const ozet = useMemo(() => icerikOzeti(d), [d]);
   const sutunlar = useMemo(() => sevkCuvalSutunlari(d.cuvallar), [d.cuvallar]);
-  const parti = useMemo(() => partiGrubu(d.cuvallar), [d.cuvallar]);
-  const gruplar = useMemo(() => (parti ? [parti] : []), [parti]);
-  const satirlar = useMemo(() => gorunenSevkCuvallari(d.cuvallar, ara, suzgec), [d.cuvallar, ara, suzgec]);
-  const araclar = d.cuvallar.length >= SEVK_CUVAL_ARAC_ESIGI;
+  const ozel = useMemo(() => {
+    const parti = partiGrubu(d.cuvallar);
+    return { gruplar: parti ? [parti] : [], suz: gorunenSevkCuvallari };
+  }, [d.cuvallar]);
   if (icerikBos(d)) {
     return <Text style={s.sakin} testID="sevk-cuval-bos">{d.durum === "CANCELLED" ? SEVK_ICERIK_IPTAL : SEVK_ICERIK_BOS}</Text>;
   }
-  const kalan = satirlar.length - adet;
   return (
     <View testID="sevk-cuval-icerik">
       {ozet.length > 0 ? <Text style={s.ozet} testID="sevk-cuval-ozet">{ozet.join("  ·  ")}</Text> : null}
       {d.cuvallar.length > 0 ? (
         <>
           <Text style={s.ipucu}>Çuvala dokunun, içindeki toplar açılır.</Text>
-          {araclar ? (
-            <>
-              <View style={s.araclar}>
-                <View style={s.aramaKutu}><SearchField value={ara} onChangeText={setAra} placeholder="Çuval no, parti, top no ara" testID="sevk-cuval-ara" /></View>
-                {parti ? <AracDugmesi icon="funnel-outline" label="Çuvalları süz" rozet={etkinSuzgecSayisi(suzgec)} etkin={etkinSuzgecSayisi(suzgec) > 0} onPress={() => setSuzgecAcik(true)} testID="sevk-cuval-suzgec" /> : null}
-              </View>
-              <EtkinSuzgecler gruplar={gruplar} secim={suzgec} onKaldir={(g) => setSuzgec((v) => suzgecAta(v, g, []))} onTemizle={() => setSuzgec({})} testID="sevk-cuval-suzgec" />
-              {satirlar.length === 0 ? <Text style={s.sakin} testID="sevk-cuval-bos-arama">Aramaya ya da süzgece uyan çuval yok</Text> : null}
-              {parti ? (
-                <SuzgecSayfasi visible={suzgecAcik} testID="sevk-cuval-suzgec-sayfa" gruplar={gruplar} secim={suzgec} onUygula={(yeni) => setSuzgec(yeni)}
-                  sayac={(taslak) => gorunenSevkCuvallari(d.cuvallar, ara, taslak).length} onClose={() => setSuzgecAcik(false)} />
-              ) : null}
-            </>
-          ) : null}
           <KisaTablo
-            testID="sevk-cuval" anahtar="tablo.sevk-cuval"
-            sutunlar={sutunlar}
-            satirlar={satirlar.slice(0, adet)}
+            testID="sevk-cuval" anahtar="tablo.sevk-cuval" aramaIpucu="Çuval no, parti, top no ara"
+            sutunlar={sutunlar} satirlar={d.cuvallar} ozel={ozel} sayfa={SEVK_CUVAL_SAYFA} birim="çuval"
+            kompakt={d.cuvallar.length < SEVK_CUVAL_ARAC_ESIGI}
             onPress={(c) => setAcik((a) => (a === c.id ? null : c.id))}
             acilir={(c) => (acik === c.id ? (
               <CuvalToplari
@@ -156,11 +134,6 @@ function Icerik({ d }: { readonly d: SevkIcerigi }) {
                 baslik={[c.sira ? `Sıra ${c.sira}` : null, c.partiAdi ? `Parti ${c.partiAdi}${c.ambalajNo !== null ? ` · ambalaj ${c.ambalajNo}` : ""}` : null, c.kg !== null ? `${qty(c.kg)} kg brüt` : "Tartılmadı"].filter(Boolean).join(" · ")}
               />
             ) : null)}
-            alt={kalan > 0 ? (
-              <Pressable onPress={() => setAdet((n) => n + SEVK_CUVAL_SAYFA)} style={s.dahaFazla} accessibilityRole="button" testID="sevk-cuval-daha">
-                <Text style={[s.dahaYazi, { color: t.tint }]}>{`Daha fazla çuval (${kalan} kaldı)`}</Text>
-              </Pressable>
-            ) : null}
           />
         </>
       ) : null}
@@ -178,10 +151,6 @@ const useStyles = makeStyles((t) => ({
   sakin: { ...typography.footnote, color: t.color.textMuted, paddingVertical: space.m },
   ozet: { ...typography.footnote, color: t.color.text, marginBottom: 2 },
   ipucu: { ...typography.caption, color: t.color.textMuted, marginBottom: space.xs },
-  dahaFazla: { minHeight: 44, alignItems: "center" as const, justifyContent: "center" as const },
-  dahaYazi: { ...typography.callout, fontWeight: "600" as const },
   cuvalsiz: { marginTop: space.m },
-  araclar: { flexDirection: "row" as const, alignItems: "center" as const, gap: space.s, paddingBottom: space.xs },
-  aramaKutu: { flex: 1, minWidth: 0 },
   grupBasligi: { ...typography.footnote, fontWeight: "600" as const, color: t.color.text, marginBottom: space.xs },
 }));

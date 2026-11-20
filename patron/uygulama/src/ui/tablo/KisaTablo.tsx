@@ -26,6 +26,8 @@ export function KisaTablo<R extends { readonly id: string }>(p: {
   readonly ozel?: { readonly gruplar: readonly SuzgecGrubu[]; readonly suz: (satirlar: readonly R[], ara: string, secim: Readonly<Record<string, string>>) => R[] };
   readonly ekMetin?: (r: R) => string;
   readonly sayfa?: number;
+  readonly birim?: string;
+  readonly kompakt?: boolean | "oto";
   readonly onPress?: (r: R) => void;
   readonly testID: string;
   /** Satırın hemen altında yerinde açılan içerik (ör. çuvalın topları); null = kapalı. */
@@ -36,7 +38,7 @@ export function KisaTablo<R extends { readonly id: string }>(p: {
   const tablo = useYerelTablo(
     {
       anahtar: p.anahtar, sutunlar: p.sutunlar, varsayilan: p.varsayilan, aramaIpucu: p.aramaIpucu ?? "Tabloda ara", testID: p.testID,
-      pencereNotu: p.pencereNotu, ozel: p.ozel, ekMetin: p.ekMetin, sayfa: p.sayfa,
+      pencereNotu: p.pencereNotu, ozel: p.ozel, ekMetin: p.ekMetin, sayfa: p.sayfa, birim: p.birim, kompakt: p.kompakt,
     },
     p.satirlar,
   );

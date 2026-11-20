@@ -47,6 +47,8 @@ export interface YerelTabloAyari<R> {
   readonly sutunDeposu?: { readonly sutunlar: readonly string[]; readonly yaz: (f: (s: readonly string[]) => readonly string[]) => void };
   /** Süzülünce gösterilen kapsam notu (ör. "Gösterilen son 5 sipariş içinde"). */
   readonly pencereNotu?: string;
+  /** Satırın adı (ör. "top", "çuval"): "3 / 6 top", "Daha fazla top (N kaldı)"; yoksa "satır" / "Daha fazla göster". */
+  readonly birim?: string;
 }
 
 export interface YerelTablo<R> {
@@ -217,7 +219,7 @@ export function YerelTabloAraclari<R>({ tablo }: { readonly tablo: YerelTablo<R>
       <EtkinSuzgecler gruplar={tablo.gruplar} secim={tablo.secim} onKaldir={(g) => tablo.setSecim(suzgecAta(tablo.secim, g, []))} onTemizle={() => tablo.setSecim({})} testID={`${testID}-suzgec`} />
       {tablo.suzuldu ? (
         <Text style={s.not} testID={`${testID}-sayi`}>
-          {[`${formatNumber(tablo.satirlar.length, 0)} / ${formatNumber(tablo.toplamSayi, 0)} satır`, tablo.ayar.pencereNotu].filter(Boolean).join(" · ")}
+          {[`${formatNumber(tablo.satirlar.length, 0)} / ${formatNumber(tablo.toplamSayi, 0)} ${tablo.ayar.birim ?? "satır"}`, tablo.ayar.pencereNotu].filter(Boolean).join(" · ")}
         </Text>
       ) : null}
     </View>
@@ -273,7 +275,7 @@ export function YerelTabloAlti<R>({ tablo, bosArama }: { readonly tablo: YerelTa
       ) : null}
       {tablo.kalan > 0 ? (
         <Pressable onPress={tablo.dahaFazla} style={s.dahaFazla} accessibilityRole="button" testID={`${testID}-daha`}>
-          <Text style={[s.dahaYazi, { color: t.tint }]}>{`Daha fazla göster (${formatNumber(tablo.kalan, 0)} kaldı)`}</Text>
+          <Text style={[s.dahaYazi, { color: t.tint }]}>{`Daha fazla ${tablo.ayar.birim ?? "göster"} (${formatNumber(tablo.kalan, 0)} kaldı)`}</Text>
         </Pressable>
       ) : null}
     </>

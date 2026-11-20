@@ -198,9 +198,9 @@ describe("§4 ekran", () => {
     const ic = screen.getByTestId(`cuval-icerik-${sid(1)}`);
     expect(within(ic).getByTestId(`cuval-toplar-${sid(1)}-sutun-parti`)).toBeTruthy();
     expect(within(ic).getAllByTestId(/^cuval-topsatir-/)).toHaveLength(6);
-    await act(async () => { fireEvent.changeText(screen.getByTestId(`cuval-top-ara-${sid(1)}`), "p58"); });
+    await act(async () => { fireEvent.changeText(screen.getByTestId(`cuval-toplar-${sid(1)}-ara`), "p58"); });
     expect(within(screen.getByTestId(`cuval-icerik-${sid(1)}`)).getAllByTestId(/^cuval-topsatir-/)).toHaveLength(3);
-    expect(screen.getByTestId(`cuval-top-sayi-${sid(1)}`)).toHaveTextContent("3 / 6 top");
+    expect(screen.getByTestId(`cuval-toplar-${sid(1)}-sayi`)).toHaveTextContent("3 / 6 top");
   });
   it("eski fabrika verisi: Parti sütunu yok, ekran çalışır", async () => {
     mockApi.snapshot.mockImplementation(veriIle(ESKI));
