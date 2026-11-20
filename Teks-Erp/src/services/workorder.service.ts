@@ -134,7 +134,11 @@ import {
   repointPendingBypassAssignmentsTx,
 } from "./helpers/kursun-bypass-guard.helper";
 import { computeWoInput } from "./helpers/coverage.helper";
-import { summarizeAllocation } from "./helpers/order-link-allocation.helper";
+import {
+  ORDER_ALLOCATION_TRIGGER,
+  applyOrderLinkAllocationsTx,
+  summarizeAllocation,
+} from "./helpers/order-link-allocation.helper";
 import {
   buildHiddenStatusWhere,
   HIDE_CANCELLED_FILTER,
@@ -541,8 +545,10 @@ export interface WorkOrderCreateInput {
     dispatchWithoutColor?: boolean;
   }[];
   /**
-   * Tercih edilen: her satıra tahsis miktarı.
+   * Tercih edilen: her satıra tahsis miktarı (öğe biçimi "Sipariş Bağla" `allocations` ile aynı).
    * Eski API ile uyum için `orderLineIds` da kabul edilir (allocatedQty=0 olur).
+   * create (2026-11-20): `allocatedQty` > 0 aynı tx'te `order-link-allocation.helper` ile
+   * doğrulanıp yazılır (tavan, MT dışı 400); gelmezse/0 ise bağ 0 doğar (eski davranış).
    */
   orderLineAllocations?: { orderLineId: string; allocatedQty?: number }[];
   orderLineIds?: string[] | null;
@@ -858,7 +864,8 @@ export class WorkOrderService {
    *   - routeTemplateId verilirse RouteStep'ler WorkOrderStep'e kopyalanır (copy-on-write snapshot).
    *     Bu durumda `steps` verilmemelidir; verilirse reddedilir.
    *   - routeTemplateId verilmezse `steps` zorunlu.
-   *   - sipariş bağı (orderLineIds/orderLineAllocations) link-only; metraj taşımaz.
+   *   - sipariş bağı (orderLineIds/orderLineAllocations) karşılama taşımaz; `allocatedQty` > 0
+   *     yalnız PLAN paylaştırmasıdır (aynı tx, `order-link-allocation.helper`).
    *   - type=ORDER_PRODUCTION ise en az bir sipariş bağı zorunlu.
    *   - batchNumber (Parti Kodu) verilmezse otomatik üretilir (P+GGAAYY+NNNN);
    *     verilirse benzersizliği doğrulanır.
@@ -1219,12 +1226,16 @@ export class WorkOrderService {
 
     // Otomatik iş emri no sequence çakışırsa (P2002) tx'i baştan dene. Tx'in İLK ifadesi
     // kart kilidi: 8030 SHARED → FOR SHARE (eşzamanlı "Pasif'e geç" bu iş emrini görür).
+    // Paylaştırma (plan) — yalnız > 0 girişler; tek kaynak `applyOrderLinkAllocationsTx` (aşağıda, aynı tx).
+    const allocEntries = allocations.filter((a) => a.allocatedQty > 0);
+    let allocResult: Awaited<ReturnType<typeof applyOrderLinkAllocationsTx>> | null = null;
     const workOrder = await withBarcodeRetry(() => prisma.$transaction(async (tx) => {
+      allocResult = null;
       if (resolvedTargetItemId) await assertItemUsableTx(tx, resolvedTargetItemId, woItemUsage);
       const workOrderNumber = manualWorkOrderNumber ?? (await this.generateWorkOrderNumber());
-      // Gevşek model: per-kalem aşırı-tahsis kontrolü YOK. Sipariş bağı yalnız
-      // "bu iş emri hangi siparişler için" niyetidir (metraj taşımaz); fazla
-      // üretim Tambur'da stoğa düşer. Yalnız satırların varlığını doğrula.
+      // Gevşek model: per-kalem aşırı-tahsis (sipariş açığı) kontrolü YOK — yalnız uyarı.
+      // Sipariş bağı "bu iş emri hangi siparişler için" niyetidir; fazla üretim Tambur'da
+      // stoğa düşer. Paylaştırma metresi bağdan SONRA, tek kaynaktan yazılır (tavan 400).
       if (allocations.length > 0) {
         const found = await tx.orderLine.count({ where: { id: { in: allocations.map((a) => a.orderLineId) } } });
         if (found !== allocations.length) {
@@ -1273,9 +1284,11 @@ export class WorkOrderService {
           ...(allocations.length > 0
             ? {
                 orderLinks: {
+                  // Bağ HEP 0 doğar; > 0 miktar aşağıda `applyOrderLinkAllocationsTx` ile yazılır
+                  // (doğrudan yazım tavan/MT kuralını atlardı — 2026-11-20 öncesi delik).
                   create: allocations.map((a) => ({
                     orderLineId:  a.orderLineId,
-                    allocatedQty: a.allocatedQty,
+                    allocatedQty: 0,
                   })),
                 },
               }
@@ -1314,6 +1327,21 @@ export class WorkOrderService {
       // Kartsız WO olmaz → mobil fason sevkte ilk sevkten önce bile okutulabilir.
       await travelerCardService.createForWorkOrder(tx, wo.id, userId);
 
+      // Yaratmada paylaştırma (2026-11-20): "Sipariş Bağla" ile AYNI boğaz — tavan (top yok →
+      // hedef metre), MT dışı 400, defter FIELD_CHANGED. Hata tx'i geri alır: iş emri doğmaz.
+      if (allocEntries.length > 0) {
+        const done = await applyOrderLinkAllocationsTx(tx, wo.id, allocEntries, {
+          trigger: ORDER_ALLOCATION_TRIGGER,
+          userId,
+        });
+        allocResult = done;
+        const to = new Map(done.changes.map((c) => [c.orderLineId, c.to]));
+        for (const l of wo.orderLinks) {
+          const v = to.get(l.orderLineId);
+          if (v !== undefined) l.allocatedQty = new Prisma.Decimal(v);
+        }
+      }
+
       return wo;
     }), undefined, (err) => {
       // İdempotent replay: clientToken P2002'si retry EDİLMEZ (retry hep aynı
@@ -1326,6 +1354,7 @@ export class WorkOrderService {
       }
       return true;
     });
+    const allocDone = allocResult as Awaited<ReturnType<typeof applyOrderLinkAllocationsTx>> | null;
 
     await AuditService.log({
       userId,
@@ -1340,20 +1369,23 @@ export class WorkOrderService {
         stepCount:          finalSteps.length,
         routeTemplateId:    workOrder.routeTemplateId,
         allocationCount:    allocations.length,
+        ...(allocDone && allocDone.changes.length > 0
+          ? { allocationChanges: allocDone.changes, allocation: allocDone.summary }
+          : {}),
         targetItemId:       workOrder.targetItemId,
         targetColorId:      workOrder.targetColorId,
         targetPropertyIds,
       },
     });
 
+    const warnings = [...routeWarnings, ...(allocDone?.warnings ?? [])];
     return {
       success: true,
       data: workOrder,
       message: `İş emri oluşturuldu: ${workOrder.workOrderNumber}`,
-      // Engel olmayan planlama notları (örn. "rotada renk veren adım yok").
-      // `update` yolu bunu 2026-08-21'den beri döndürüyordu; oluşturma yolu
-      // aynı durumu 400 ile reddettiği için hiç ihtiyaç duymamıştı.
-      ...(routeWarnings.length > 0 ? { warnings: routeWarnings } : {}),
+      // Engel olmayan planlama notları (örn. "rotada renk veren adım yok"; paylaştırmada
+      // "siparişin açığı aşıldı"). `update` yolu bunu 2026-08-21'den beri döndürüyordu.
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
   }
 

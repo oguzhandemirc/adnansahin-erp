@@ -16,6 +16,9 @@
 //  §10 CANCELLED iş emri → 409 WO_PLAN_FROZEN
 //  §11 `shippedQty` · bulut `siparisMetre` (= `orderedMeters`, aynı türetme) + İE (`siparisPaylari` hariç)/sipariş bulut
 //      satırı önce-sonra AYNI; 2.13.2: `siparisPaylari` planlanan metresi Tambur `plannedQty` ile aynı (§11e)
+//  §12 (2026-11-20) YARATMADA paylaştırma (`create` `orderLineAllocations[].allocatedQty`): aynı tx, aynı boğaz —
+//      yazılır + defter · replay aynı kayıt, defter bir kez · tavan aşımı / KG satır 400 ve iş emri DOĞMAZ ·
+//      eski gövde (`orderLineIds`, tablet) bağ 0 · tavan yok → serbest
 //
 // NEGATİF SONDALAR (2026-11-16, elle bozulup koşuldu, geri alındı):
 //  S1 helper'da `assertAllocationWithinBasisTx` içindeki `allocated.gt(basis)` → `false` → §2b/§7 kırmızı.
@@ -23,7 +26,10 @@
 //  S3 tambur `plannedQty` yerine `Number(ol.quantity)` yazıldı → §5 kırmızı.
 //  S4 klonda `allocatedQty: 0` yerine kaynak miktarı kopyalandı → §9 kırmızı.
 //  S5 (2026-11-20) `shareMeters` paylastirilanMetre'yi `Number(allocatedQty)` ile yazdı (0 → 0, null değil) → §11e kırmızı.
+//  S6 (2026-11-20) create'te `applyOrderLinkAllocationsTx` çağrısı atlandı → §12a-d/f-h/j kırmızı (9).
+//  S7 (2026-11-20) create eski doğrudan yazıma döndü (`allocatedQty: a.allocatedQty`, boğaz yok) → §12c/e-h kırmızı.
 // =============================================================================
+import { randomUUID } from "node:crypto";
 import prisma from "../src/lib/prisma";
 import { WorkOrderService } from "../src/services/workorder.service";
 import { workOrderLinkService } from "../src/services/workorder-link.service";
@@ -246,12 +252,68 @@ async function main(): Promise<void> {
     await prisma.workOrder.update({ where: { id: wo2 }, data: { status: "CANCELLED" } });
     const h10 = await hata(() => link.setOrderLinkAllocations(wo2, [{ orderLineId: L5, allocatedQty: 100 }], ADMIN));
     check("§10 CANCELLED → 409 WO_PLAN_FROZEN", h10?.status === 409 && h10.code === "WO_PLAN_FROZEN", JSON.stringify(h10));
+
+    await yaratmadaPaylastirma();
   } finally {
     await temizle();
   }
   console.log(`\n=== Sonuç: ${pass} geçti, ${fail} başarısız ===`);
   await prisma.$disconnect();
   process.exit(fail > 0 ? 1 : 0);
+}
+
+// ── §12 YARATMADA paylaştırma (2026-11-20): `POST /work-orders` `orderLineAllocations[].allocatedQty` ──
+type CreateBody = Parameters<typeof svc.create>[0];
+async function siparisliWo(extra: Partial<CreateBody> & { clientToken: string }) {
+  const res = await svc.create(
+    { type: "ORDER_PRODUCTION", targetItemId: ITEM, width: 180, steps: [{ stationId: ST_TAMBUR }, { stationId: ST_FASON }], ...extra } as CreateBody,
+    ADMIN,
+  );
+  const id = (res.data as { id: string }).id;
+  if (!woIds.includes(id)) woIds.push(id);
+  return { id, res: res as typeof res & { idempotentReplay?: boolean; warnings?: string[] } };
+}
+const tokenWo = (t: string) => prisma.workOrder.count({ where: { clientToken: t } });
+const allocEvents = (woId: string) => prisma.workOrderEvent.count({ where: { workOrderId: woId, field: "orderAllocation" } });
+
+async function yaratmadaPaylastirma(): Promise<void> {
+  console.log("\n§12 Yaratmada paylaştırma");
+  const [A, B] = await yeniSiparis([{ quantity: 600 }, { quantity: 250 }]);
+  const T1 = randomUUID();
+  const body = { clientToken: T1, targetQuantity: 500, orderLineAllocations: [{ orderLineId: A, allocatedQty: 300 }, { orderLineId: B }] };
+  const c1 = await siparisliWo(body);
+  check("§12a yaratmada A 300 yazıldı, miktarsız B 0 doğdu", (await qtyOf(c1.id, A)) === 300 && (await qtyOf(c1.id, B)) === 0, `${await qtyOf(c1.id, A)} / ${await qtyOf(c1.id, B)}`);
+  const a12 = await allocOf(c1.id);
+  check("§12b özet: tavan hedef 500 (TARGET), paylaştırılan 300", a12.basisKind === "TARGET" && a12.basis === 500 && a12.allocated === 300, JSON.stringify(a12));
+  check("§12c defterde 1 FIELD_CHANGED orderAllocation satırı", (await allocEvents(c1.id)) === 1);
+  const respLink = (c1.res.data as unknown as { orderLinks: { orderLineId: string; allocatedQty: unknown }[] }).orderLinks.find((l) => l.orderLineId === A);
+  check("§12d yanıttaki bağ güncel miktarı taşır (300)", Number(respLink?.allocatedQty) === 300, String(respLink?.allocatedQty));
+
+  const c1r = await siparisliWo(body);
+  check("§12e aynı clientToken replay → aynı iş emri, idempotentReplay, defter ikinci kez yazılmaz",
+    c1r.id === c1.id && c1r.res.idempotentReplay === true && (await allocEvents(c1.id)) === 1 && (await qtyOf(c1.id, A)) === 300);
+
+  const [C, D2] = await yeniSiparis([{ quantity: 600 }, { quantity: 300 }]);
+  const T2 = randomUUID();
+  const h12 = await hata(() => siparisliWo({ clientToken: T2, targetQuantity: 500, orderLineAllocations: [{ orderLineId: C, allocatedQty: 400 }, { orderLineId: D2, allocatedQty: 200 }] }));
+  check("§12f 400+200 > hedef 500 → 400 ALLOCATION_OVER_BASIS", h12?.code === "ALLOCATION_OVER_BASIS" && h12.status === 400, JSON.stringify(h12));
+  check("§12g red → iş emri DOĞMADI (tx geri alındı)", (await tokenWo(T2)) === 0);
+
+  const [K] = await yeniSiparis([{ quantity: 50, unit: "KG" }]);
+  const T3 = randomUUID();
+  const h12k = await hata(() => siparisliWo({ clientToken: T3, targetQuantity: 500, orderLineAllocations: [{ orderLineId: K, allocatedQty: 5 }] }));
+  check("§12h KG satıra metre → 400 ALLOCATION_UNIT_NOT_MEASURED, iş emri doğmadı", h12k?.code === "ALLOCATION_UNIT_NOT_MEASURED" && (await tokenWo(T3)) === 0, JSON.stringify(h12k));
+
+  // Eski istemci (tablet hızlı iş emri ve 2.13.2 öncesi panel): yalnız `orderLineIds` → bağ 0, defter satırı yok.
+  const c4 = await siparisliWo({ clientToken: randomUUID(), targetQuantity: 500, orderLineIds: [C, D2] });
+  check("§12i eski gövde (orderLineIds) → iki bağ 0, orderAllocation olayı yok",
+    (await qtyOf(c4.id, C)) === 0 && (await qtyOf(c4.id, D2)) === 0 && (await allocEvents(c4.id)) === 0);
+
+  // Tavan yok (top da hedef de yok) → paylaştırma serbest.
+  const [E] = await yeniSiparis([{ quantity: 2000 }]);
+  const c5 = await siparisliWo({ clientToken: randomUUID(), orderLineAllocations: [{ orderLineId: E, allocatedQty: 1500 }] });
+  const a5 = await allocOf(c5.id);
+  check("§12j tavan yok (NONE) → 1500 kabul", a5.basisKind === "NONE" && (await qtyOf(c5.id, E)) === 1500, JSON.stringify(a5));
 }
 
 async function temizle(): Promise<void> {
