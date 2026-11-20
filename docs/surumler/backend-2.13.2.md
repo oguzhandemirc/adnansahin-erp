@@ -1,8 +1,8 @@
 # Backend `2.13.2`
 
-**Paket:** `tekserp-backend-20261120_045408-202cdc65.zip`
-**SHA256:** `27BE4DC9531C153F3CE79946A3A2F4E4F83BA50852AA550E5D251000FE2179FF`
-**Commit:** `202cdc65` (ilk paket `tekserp-backend-20261120_041454-215c7010.zip` · `C438FA09…361D` · `215c7010` — yalnız web paneli farklı; KURULMAZ, yerine bu)
+**Paket:** `tekserp-backend-20261120_194844-b6fa6dc3.zip`
+**SHA256:** `F0C97ADBDDCC5A32BAE78DBC54FCB21ADB13BB423058353A36A9C71A6A0E1620`
+**Commit:** `b6fa6dc3` (önceki paketler `tekserp-backend-20261120_045408-202cdc65.zip` · `27BE4DC9…2179FF` ve `tekserp-backend-20261120_041454-215c7010.zip` · `C438FA09…361D` — Düzenle doğrulaması ve özel aralık raporu YOK; KURULMAZ, yerine bu. Aynı gecenin bulut imajı `adnan-patron:b6fa6dc33001`)
 **İçerik:** 2.13.1 paketinin bütün içeriği + patron telefonuna giden çuval verisinde sevk partisi (ad · kod · durum), ambalaj no ve topların üretim parti no'su (kullanıcı isteği 2026-11-20). Paketteki WEB PANELİ (`dist-web`) değişti: yeni iş emri formunda "Siparişlere Paylaştırma" bölümü (`143817e5`) ve paylaştırma satırlarında açık-metre aşımı uyarısı + biçim cümlesi (`202cdc65`). Masaüstü panel 1.3.22 ayrıca, kendi sürüm notuyla yayınlanır.
 **Önceki saha sürümü:** **2.13.1** (kuran, kurulumdan önce `/health` ve `app\PAKET.json` ile 2.13.1 ve 371 migration olduğunu ÖLÇER — farklıysa DUR).
 
@@ -199,6 +199,7 @@ Kullanıcı (2026-11-20): yönetim uygulamasında cari özetinin 8 hazır dönem
 - **Uygulama (`83cbf649`):** dönem seçicide "Özel aralık…" → iki tarih → rapor isteği, sonuç gelene dek kart yok. Seçenek
   yalnız bulut ilanı ∧ hesap izni ∧ fabrika kataloğu birlikteyken çizilir: eski bulut/fabrika/izinsiz hesapta bugünkü
   seçici. [bekçi: patron/uygulama __tests__/cari-ozel-aralik.test.tsx]
-- **Paket notu:** bu ek `202cdc65` paketinde ve `ed9d4a8cc664` imajında YOK; kurulacaksa backend paketi ve bulut imajı
-  yeniden derlenip provadan geçmeli (sıra: bulut → fabrika; tersinde katalog ilanı gelir ama bulut 404 verir, uygulama
-  seçeneği yine gizler).
+- **Paket notu:** bu ek `b6fa6dc3` paketinde ve `adnan-patron:b6fa6dc33001` imajında VAR (`202cdc65` paketinde ve
+  `ed9d4a8cc664` imajında yok). Sıra: bulut → fabrika; tersinde katalog ilanı gelir ama eski bulut 404 verir, uygulama
+  seçeneği yine gizler. Geri dönüşte ek risk yok: 2.13.1 anahtarı bilmez → istek `HATA RAPOR_BILINMIYOR` ile kapanır,
+  kuyrukta kalmaz; katalog ilanı kalkınca bulut yeni isteği kuyruğa almadan 404 verir.
