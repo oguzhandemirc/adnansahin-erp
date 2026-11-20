@@ -5,6 +5,8 @@
 //   §3 kapılar: beyansız alan 400 · tek başına `yon` 400 · bilinmeyen `yon` 400 · sıralamasız istek eski sırada
 //   §4 ⭐ çoklu süzgeç: gruplar VE ile birleşir · aynı gruptan iki değer 400 · tanınmayan 400 · tek değer eskisi gibi · ters eşitlik `IPTAL_HARIC` (§4i–§4l)
 //      NEGATİF SONDA (2026-11-19): `degil` dalı düz eşitliğe çevrildi → §4i/§4j/§4l ✗; geri alındı.
+//   §1g–§1l (2026-11-20) Cariler: rol/durum (bayrak) · yön · yetkili/telefon (kişisel alt satır) · kayıt tarihi
+//   §3h–§3m (2026-11-20) NEGATİF: tanınmayan alan 400 · kişisel izni olmayana yetkili/telefon 403 ve `/oturum`da beyansız
 //   §5 beyan: `LIST_SORT` + süzgeç alanları fabrika kataloğunda var · `deger` projeksiyonda tekil · `/oturum` `siralama`
 //   §6 ⭐ görünüm tercihi: yazılmamış null · yaz/geri oku · hesap yalnız KENDİ tercihini görür · başka tesis görmez ·
 //      beyaz liste dışı anahtar 404 · nesne olmayan / büyük değer 400 · oturumsuz 401
@@ -12,7 +14,7 @@
 // =============================================================================
 import { randomUUID } from "node:crypto";
 import { ROLE_TEMPLATES } from "../src/catalog/permissions";
-import { LIST_SEARCH, LIST_SORT, VIEW_PREF_MAX_BYTES, type FacilityStatus, type ViewPreference } from "../src/wire/api";
+import { LIST_SEARCH, LIST_SORT, LIST_SORT_FLAGS, LIST_SORT_SUBROW, VIEW_PREF_MAX_BYTES, type FacilityStatus, type ViewPreference } from "../src/wire/api";
 import { fabrikaDosyasi } from "./lib/fabrika-karsiligi";
 import { api, girdi, hesapKur, imzali, kontrol, ortamKur, paket, sonuc, temizleTesis, tesisKur, type Ortam, type TestHesabi, type TestKurulumu } from "./lib/test-ortam";
 
@@ -58,8 +60,8 @@ async function fikstur(o: Ortam, k: TestKurulumu): Promise<Fikstur> {
   const sevk = (id: string, no: string, durum: string, yon: string) => ({ id, sevkNo: no, musteriAdi: "Bora Dokuma", durum, yon, olusturulma: gun(1), cariKartId: c.ozgur });
   const sip = (id: string, no: string, ad: string, durum: string, yon: string, acikMiktar: unknown, tarih: string) =>
     ({ id, siparisNo: no, musteriAdi: ad, durum, yon, acikMiktar, siparisTarihi: tarih, cariKartId: c.ozgur });
-  const cari = (id: string, ad: string, il: string | null, musteri: boolean, aktif: boolean) =>
-    ({ id, kod: `K-${ad.slice(0, 3)}`, ad, il, musteriRolu: musteri, tedarikciRolu: !musteri, fasonRolu: false, aktif });
+  const cari = (id: string, ad: string, il: string | null, musteri: boolean, aktif: boolean, ek: Record<string, unknown> = {}) =>
+    ({ id, kod: `K-${ad.slice(0, 3)}`, ad, il, musteriRolu: musteri, tedarikciRolu: !musteri, fasonRolu: false, aktif, ...ek });
   const kayitlar = [
     girdi("siparis", {
       yaz: [
@@ -74,11 +76,22 @@ async function fikstur(o: Ortam, k: TestKurulumu): Promise<Fikstur> {
     }),
     girdi("cari-kart", {
       yaz: [
-        cari(c.ozgur, "Özgür Tekstil", "İzmir", true, true),
-        cari(c.cagri, "Çağrı Örme", "Bursa", true, true),
-        cari(c.bora, "Bora Dokuma", "İzmir", false, true),
-        cari(c.ilsiz, "Ilgaz İplik", null, true, true),
-        cari(c.pasif, "Pasif Firma", "Adana", true, false),
+        // 2026-11-20 (§1g–§1l): yön, kayıt tarihi, çağrı ayrıca fason (rol bayrak eşitliği ikinci alanla bozulur).
+        cari(c.ozgur, "Özgür Tekstil", "İzmir", true, true, { varsayilanYon: "DOMESTIC", olusturulma: gun(3) }),
+        cari(c.cagri, "Çağrı Örme", "Bursa", true, true, { fasonRolu: true, varsayilanYon: "EXPORT", olusturulma: gun(1) }),
+        cari(c.bora, "Bora Dokuma", "İzmir", false, true, { olusturulma: gun(5) }),
+        cari(c.ilsiz, "Ilgaz İplik", null, true, true, { varsayilanYon: "DOMESTIC" }),
+        cari(c.pasif, "Pasif Firma", "Adana", true, false, { varsayilanYon: "EXPORT", olusturulma: gun(2) }),
+      ],
+      yeni: w,
+    }),
+    // Kişisel alt satır: yetkili Türkçe katlamalı (Ç), boş metin = boş; ilsiz'in alt satırı yok.
+    girdi("cari-kart.kisisel", {
+      yaz: [
+        { id: c.ozgur, yetkili: "Zeynep Kaya", telefon: "0532 111 00 00" },
+        { id: c.cagri, yetkili: "Çetin Ak" },
+        { id: c.bora, yetkili: "Ahmet Su", telefon: "0212 222 00 00" },
+        { id: c.pasif, yetkili: "" },
       ],
       yeni: w,
     }),
@@ -115,6 +128,27 @@ async function siralama(o: Ortam, h: TestHesabi, f: Fikstur): Promise<void> {
   kontrol("§1e tarih azalan (en yeni önce)", esit(tarih.ids, sira(f.siparis, "b", "d", "c", "e", "a")), tarih.kayit.map((x) => x.siparisNo).join(","));
   const yonsuz = await liste(o, h, "siparis", { sirala: "siparisNo" });
   kontrol("§1f yönsüz sıralama artandır", esit(yonsuz.ids, sira(f.siparis, "b", "d", "c", "e", "a")), yonsuz.kayit.map((x) => x.siparisNo).join(","));
+  // 2026-11-20 — Cariler'in kalan sütunları.
+  const ad = (l: Liste) => l.kayit.map((x) => x.ad).join(" · ");
+  const rolA = await liste(o, h, "cari-kart", { sirala: "rol", yon: "artan" });
+  const rolZ = await liste(o, h, "cari-kart", { sirala: "rol", yon: "azalan" });
+  kontrol("§1g ⭐ rol (bayrak) artan: müşteri+fason → yalnız müşteri → tedarikçi; azalan tam tersi",
+    rolA.status === 200 && rolA.ids[0] === f.cari.cagri && rolA.ids.at(-1) === f.cari.bora && esit(rolZ.ids, [...rolA.ids].reverse()), `${rolA.status} ${ad(rolA)}`);
+  const aktifA = await liste(o, h, "cari-kart", { sirala: "aktif", yon: "artan" });
+  const aktifZ = await liste(o, h, "cari-kart", { sirala: "aktif", yon: "azalan" });
+  kontrol("§1h durum (aktif bayrağı): artan aktifler önce, azalan pasif önce", aktifA.ids.at(-1) === f.cari.pasif && aktifZ.ids[0] === f.cari.pasif, `${ad(aktifA)} | ${ad(aktifZ)}`);
+  const yonA = await liste(o, h, "cari-kart", { sirala: "varsayilanYon", yon: "artan" });
+  const yonZ = await liste(o, h, "cari-kart", { sirala: "varsayilanYon", yon: "azalan" });
+  const yonlar = (l: Liste) => l.kayit.map((x) => String(x.varsayilanYon ?? "-")).join(",");
+  kontrol("§1i sevk yönü kod sırası, yönsüz iki yönde de SONDA", yonlar(yonA) === "DOMESTIC,DOMESTIC,EXPORT,EXPORT,-" && yonlar(yonZ) === "EXPORT,EXPORT,DOMESTIC,DOMESTIC,-", `${yonlar(yonA)} | ${yonlar(yonZ)}`);
+  const yetA = await liste(o, h, "cari-kart", { sirala: "yetkili", yon: "artan" });
+  const yetZ = await liste(o, h, "cari-kart", { sirala: "yetkili", yon: "azalan" });
+  kontrol("§1j ⭐ yetkili (kişisel alt satır) Türkçe katlamalı: Ahmet < Çetin < Zeynep, boş + alt satırsız SONDA",
+    esit(yetA.ids.slice(0, 3), sira(f.cari, "bora", "cagri", "ozgur")) && esit(yetZ.ids.slice(0, 3), sira(f.cari, "ozgur", "cagri", "bora")) && new Set(yetA.ids.slice(3)).size === 2 && yetA.ids.slice(3).every((x) => x === f.cari.ilsiz || x === f.cari.pasif), `${ad(yetA)} | ${ad(yetZ)}`);
+  const telA = await liste(o, h, "cari-kart", { sirala: "telefon", yon: "artan" });
+  kontrol("§1k telefon (kişisel) artan, telefonsuzlar sonda", esit(telA.ids.slice(0, 2), sira(f.cari, "bora", "ozgur")), ad(telA));
+  const kayit = await liste(o, h, "cari-kart", { sirala: "olusturulma", yon: "azalan" });
+  kontrol("§1l kayıt tarihi azalan, tarihsiz sonda", esit(kayit.ids, sira(f.cari, "cagri", "pasif", "ozgur", "bora", "ilsiz")), ad(kayit));
 }
 
 async function imlecler(o: Ortam, h: TestHesabi, f: Fikstur): Promise<void> {
@@ -123,12 +157,32 @@ async function imlecler(o: Ortam, h: TestHesabi, f: Fikstur): Promise<void> {
     ["siparis", "musteriAdi", "artan", await liste(o, h, "siparis", { sirala: "musteriAdi", yon: "artan" })],
     ["siparis", "acikMiktar", "azalan", await liste(o, h, "siparis", { sirala: "acikMiktar", yon: "azalan" })],
     ["cari-kart", "il", "artan", await liste(o, h, "cari-kart", { sirala: "il", yon: "artan" })],
+    // 2026-11-20: bayrak anahtarı (eşit anahtarlar) ve alt satır alanı (boş anahtarlar) imleçle.
+    ["cari-kart", "rol", "azalan", await liste(o, h, "cari-kart", { sirala: "rol", yon: "azalan" })],
+    ["cari-kart", "yetkili", "artan", await liste(o, h, "cari-kart", { sirala: "yetkili", yon: "artan" })],
   ] as const) {
     const s = await hepsi(o, h, p, { sirala: alan, yon });
     kontrol(`§2 ⭐ ${p}.${alan} ${yon}: 2'şerli sayfalar tek sayfayla AYNI sırada, kesişmez, eksiksiz`, s.durum.every((x) => x === 200) && esit(s.ids, tam.ids) && new Set(s.ids).size === s.ids.length && s.sayfa >= 3, `${s.sayfa} sayfa · ${s.ids.length}/${tam.ids.length}`);
   }
   const suzgecli = await hepsi(o, h, "siparis", { sirala: "musteriAdi", yon: "azalan", suzgec: "ONAYLANDI" }, 1);
   kontrol("§2d imleç süzgeçle devam eder", esit([...suzgecli.ids].sort(), sira(f.siparis, "b", "c", "e").sort()), `${suzgecli.ids.length}`);
+}
+
+/** Kişisel alt satırı göremeyen hesap (cari okuma izni yok): alt satır alanıyla sıralama ne beyan edilir ne çalışır. */
+async function kisiselKapisi(o: Ortam, h: TestHesabi, izinsiz: TestHesabi): Promise<void> {
+  console.log("\n§3 kişisel alan kapısı (2026-11-20)");
+  // NEGATİF SONDALAR: tanınmayan / tek başına beyansız alan FAIL-CLOSED 400.
+  kontrol("§3h ⭐ tanınmayan cari sıralama alanı 400", (await liste(o, h, "cari-kart", { sirala: "bakiye" })).status === 400);
+  kontrol("§3i bayrak alanı tek başına beyansız 400 (musteriRolu)", (await liste(o, h, "cari-kart", { sirala: "musteriRolu" })).status === 400);
+  kontrol("§3j katalogda olan ama beyansız alan 400 (tur)", (await liste(o, h, "cari-kart", { sirala: "tur" })).status === 400);
+  const yet = await liste(o, izinsiz, "cari-kart", { sirala: "yetkili", yon: "artan" });
+  const tel = await liste(o, izinsiz, "cari-kart", { sirala: "telefon" });
+  kontrol("§3k ⭐ kişisel izni yok: yetkili/telefon sıralaması 403", yet.status === 403 && tel.status === 403, `${yet.status} ${tel.status}`);
+  const rol = await liste(o, izinsiz, "cari-kart", { sirala: "rol" });
+  kontrol("§3l kişisel izni yok: kök alan (rol) sıralanır", rol.status === 200 && rol.ids.length === 5, `${rol.status}`);
+  const r = await api(o, "GET", "/api/oturum", { belirtec: izinsiz.belirtec });
+  const s = (r.json.data as FacilityStatus | undefined)?.liste?.siralama?.["cari-kart"] ?? [];
+  kontrol("§3m ⭐ kişisel izni yok: `/oturum` yetkili/telefonu beyan etmez, gerisini eder", !s.includes("yetkili") && !s.includes("telefon") && s.includes("rol") && s.includes("olusturulma"), s.join(","));
 }
 
 async function kapilar(o: Ortam, h: TestHesabi): Promise<void> {
@@ -186,7 +240,9 @@ async function beyan(o: Ortam, h: TestHesabi): Promise<void> {
   const kat = katalogAlanlari();
   if (kat) {
     kontrol("§5a tarayıcı körleşmedi (siparis.acikMiktar bulundu)", !!kat.get("siparis")?.has("acikMiktar"));
-    const eksik = Object.entries(LIST_SORT).flatMap(([p, alanlar]) => Object.keys(alanlar).filter((a) => !kat.get(p)?.has(a)).map((a) => `${p}.${a}`));
+    // Bayrak anahtarı (ör. `rol`) alan değildir: onun yerine bayrak alanları katalogda aranır.
+    const eksik = Object.entries(LIST_SORT).flatMap(([p, alanlar]) =>
+      Object.entries(alanlar).flatMap(([a, tur]) => (tur === "bayrak" ? [...(LIST_SORT_FLAGS[p]?.[a] ?? [])] : [a])).filter((a) => !kat.get(p)?.has(a)).map((a) => `${p}.${a}`));
     kontrol("§5b ⭐ her sıralama alanı fabrika kataloğunda", eksik.length === 0, eksik.join(", ") || "temiz");
     const suzEksik = Object.entries(LIST_SEARCH).flatMap(([p, sp]) =>
       [...(sp.suzgec?.secenekler ?? []), ...(sp.ekSuzgecler ?? []).flatMap((g) => g.secenekler)].filter((x) => !kat.get(p)?.has(x.alan)).map((x) => `${p}.${x.alan}`));
@@ -197,6 +253,13 @@ async function beyan(o: Ortam, h: TestHesabi): Promise<void> {
     return d.length === new Set(d).size && d.every((x) => !x.includes(",")) ? [] : [p];
   });
   kontrol("§5d ⭐ süzgeç değeri projeksiyonda tekil ve virgülsüz", tekil.length === 0, tekil.join(", ") || "temiz");
+  // 2026-11-20: bayrak beyanı iki yönlü (her bayrak türünün alan listesi var, her liste bir bayrak türüne bağlı) ve
+  // alt satır beyanındaki her alan `LIST_SORT`ta.
+  const bayrakTur = Object.entries(LIST_SORT).flatMap(([p, f]) => Object.entries(f).filter(([, t]) => t === "bayrak").map(([a]) => `${p}.${a}`)).sort();
+  const bayrakListe = Object.entries(LIST_SORT_FLAGS).flatMap(([p, f]) => Object.entries(f).filter(([, l]) => l.length > 0).map(([a]) => `${p}.${a}`)).sort();
+  kontrol("§5g bayrak türü ⇔ `LIST_SORT_FLAGS` iki yönlü", esit(bayrakTur, bayrakListe), `${bayrakTur.join(",")} | ${bayrakListe.join(",")}`);
+  const altsiz = Object.entries(LIST_SORT_SUBROW).flatMap(([p, f]) => Object.keys(f).filter((a) => !Object.hasOwn(LIST_SORT[p] ?? {}, a)).map((a) => `${p}.${a}`));
+  kontrol("§5h alt satır alanı `LIST_SORT`ta beyanlı", altsiz.length === 0, altsiz.join(",") || "temiz");
   const r = await api(o, "GET", "/api/oturum", { belirtec: h.belirtec });
   const s = (r.json.data as FacilityStatus | undefined)?.liste?.siralama;
   kontrol("§5e `/oturum` `siralama` beyanın kendisi", JSON.stringify(s) === JSON.stringify(Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f)]))));
@@ -241,6 +304,7 @@ async function main(): Promise<void> {
     await siralama(o, h, f);
     await imlecler(o, h, f);
     await kapilar(o, h);
+    await kisiselKapisi(o, h, await hesapKur(o, k.tesisId, ROLE_TEMPLATES.PATRON.filter((p) => p !== "bulut:cari:oku")));
     await cokluSuzgec(o, h, f);
     await beyan(o, h);
     await tercihler(o, h, await hesapKur(o, k.tesisId, ROLE_TEMPLATES.PATRON), await hesapKur(o, k2.tesisId, ROLE_TEMPLATES.PATRON));

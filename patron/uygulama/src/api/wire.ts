@@ -286,8 +286,11 @@ export const LIST_SEARCH: Readonly<Record<string, ListSearchSpec>> = {
 };
 
 // ---------------------------------------------------------------- liste sıralaması (veri tablosu)
-/** Sıralama anahtarının türü: metin Türkçe katlamalı (arama ile aynı katlama), sayı sayısal, tarih ISO metni. */
-export type ListSortKind = "metin" | "sayi" | "tarih";
+/**
+ * Sıralama anahtarının türü: metin Türkçe katlamalı (arama ile aynı katlama), sayı sayısal, tarih ISO metni;
+ * (2026-11-20) bayrak = `LIST_SORT_FLAGS`taki mantıksal alanlar sırayla, her biri `true` önce (artan).
+ */
+export type ListSortKind = "metin" | "sayi" | "tarih" | "bayrak";
 export type ListSortDir = "artan" | "azalan";
 export const LIST_SORT_DIRS: readonly ListSortDir[] = ["artan", "azalan"];
 
@@ -302,12 +305,30 @@ export const LIST_SORT: Readonly<Record<string, Readonly<Record<string, ListSort
     siparisNo: "metin", musteriAdi: "metin", siparisTarihi: "tarih", acikMiktar: "sayi", sevkMiktari: "sayi", kalemSayisi: "sayi",
     toplamMiktar: "sayi", termin: "tarih", durum: "metin", yon: "metin", tamamlanma: "tarih", iptalTarihi: "tarih", olusturulma: "tarih",
   },
-  "cari-kart": { ad: "metin", kod: "metin", il: "metin", ilce: "metin", ulke: "metin" },
+  // 2026-11-20: Cariler tablosunun her sütunu — rol ve durum fabrikanın bayraklarından, yön kod sırası, yetkili/telefon
+  // kişisel alt satırdan (`LIST_SORT_SUBROW`; alt satırı göremeyen hesaba beyan edilmez, isteği 403).
+  "cari-kart": {
+    ad: "metin", kod: "metin", il: "metin", ilce: "metin", ulke: "metin", rol: "bayrak", aktif: "bayrak", varsayilanYon: "metin",
+    yetkili: "metin", telefon: "metin", olusturulma: "tarih",
+  },
   sevkiyat: {
     sevkNo: "metin", musteriAdi: "metin", cikisTarihi: "tarih", toplamMetre: "sayi", topSayisi: "sayi", cuvalSayisi: "sayi", toplamKg: "sayi",
     durum: "metin", yon: "metin", disFaturaNo: "metin", faturalanma: "tarih", olusturulma: "tarih", iptalTarihi: "tarih",
   },
   "is-emri": { isEmriNo: "metin", musteriAdi: "metin", urunAdi: "metin", topSayisi: "sayi", metre: "sayi", olusturulma: "tarih", kapanisTarihi: "tarih" },
+};
+
+/**
+ * `bayrak` türlü sıralama anahtarı → fabrikanın gönderdiği mantıksal alanlar (sırayla). Artan: ilk alanı `true` olanlar
+ * önce, eşitlikte sonraki alan; alanı `true` olmayan (false · yok) `false` sayılır. Hesap değil, yalnız sıra.
+ */
+export const LIST_SORT_FLAGS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  "cari-kart": { rol: ["musteriRolu", "tedarikciRolu", "fasonRolu"], aktif: ["aktif"] },
+};
+
+/** Alt satırdan sıralanan alanlar (projeksiyon → alan → alt satır). Alt satırı göremeyen hesaba beyan yok, istek 403. */
+export const LIST_SORT_SUBROW: Readonly<Record<string, Readonly<Record<string, "kisisel">>>> = {
+  "cari-kart": { yetkili: "kisisel", telefon: "kisisel" },
 };
 
 // ---------------------------------------------------------------- görünüm tercihleri (veri tablosu)
@@ -441,6 +462,7 @@ export interface ListCapabilities {
   /**
    * Veri tablosu: projeksiyon → sıralanabilir alanlar (`LIST_SORT`); varlığı aynı zamanda çoklu `suzgec` ve görünüm
    * tercihi ucunun beyanıdır. Eski sunucu göndermez ⇒ istemci sıralamayı kapatır, tek süzgeç gönderir, tercihi yerelde tutar.
+   * (2026-11-20) Oturuma göre: alt satırı (`LIST_SORT_SUBROW`) göremeyen hesaba o alanlar listelenmez.
    */
   readonly siralama?: Readonly<Record<string, readonly string[]>>;
   /** Üyelik süzgeçleri (`LIST_MEMBER_FILTERS`, anahtar → projeksiyonlar); eski sunucu göndermez ⇒ istemci süzgeci gizler. */

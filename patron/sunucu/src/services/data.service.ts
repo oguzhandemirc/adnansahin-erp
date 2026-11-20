@@ -8,7 +8,7 @@ import { projectionDef, type ProjectionDef } from "../catalog/projections";
 import { badRequest, forbidden, notFound } from "../lib/errors";
 import { foldSql, searchCondition } from "../lib/search";
 import { NO_TENANT, withTesis } from "../lib/tenant";
-import { ARAMA_AZAMI, LIST_DATE_RANGES, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_MEMBER_FILTER_KEYS, LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, LIST_TOTALS, LIST_VALUE_FILTERS, SUZGEC_AZAMI, type CustomerSummary, type ListFilterOption, type ListSortDir, type ListSortKind, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListMemberFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
+import { ARAMA_AZAMI, LIST_DATE_RANGES, LIST_ID_FILTER_KEYS, LIST_ID_FILTERS, LIST_MEMBER_FILTER_KEYS, LIST_MEMBER_FILTERS, LIST_SEARCH, LIST_SORT, LIST_SORT_FLAGS, LIST_SORT_SUBROW, LIST_TOTALS, LIST_VALUE_FILTERS, SUZGEC_AZAMI, type CustomerSummary, type ListFilterOption, type ListSortDir, type ListSortKind, type CustomerSummaryResponse, type FacilityStatus, type ListCapabilities, type ListIdFilterKey, type ListMemberFilterKey, type Page, type ProjectionRecord, type Snapshot } from "../wire/api";
 import type { CloudContext } from "./context";
 import { OPEN_SERVICE } from "./facility-gate";
 import { dateFilters, valueFilters } from "./list-filters";
@@ -119,6 +119,18 @@ export function listFilters(name: string, q: ListFilterQuery): Prisma.Sql[] {
   return filters;
 }
 
+/** Sıralama alanının alt satırı (`LIST_SORT_SUBROW`); kök alan için null. */
+function sortSubRow(name: string, field: string): "kisisel" | null {
+  const m = Object.hasOwn(LIST_SORT_SUBROW, name) ? LIST_SORT_SUBROW[name]! : {};
+  return Object.hasOwn(m, field) ? m[field]! : null;
+}
+
+/** Hesap bu sıralama alanını görebilir mi: kök alan hep, alt satır alanı yalnız o alt satır okunabiliyorsa. */
+function sortVisible(s: Pick<SessionContext, "projections">, name: string, field: string): boolean {
+  const sub = sortSubRow(name, field);
+  return sub === null || s.projections.includes(`${name}.${sub}`);
+}
+
 /** İstemcinin özellik kapısı: eski sunucu bu alanı göndermez, tanımadığı parametreyi de yok sayar. */
 export const LIST_CAPABILITIES: ListCapabilities = {
   kimlikSuzgecleri: LIST_ID_FILTERS,
@@ -131,13 +143,28 @@ export const LIST_CAPABILITIES: ListCapabilities = {
   toplamlar: LIST_TOTALS,
 };
 
+/** `/oturum` beyanı oturuma göre: göremediği alt satır alanı sıralama listesine girmez (2026-11-20). */
+export function listCapabilities(s: Pick<SessionContext, "projections">): ListCapabilities {
+  return {
+    ...LIST_CAPABILITIES,
+    siralama: Object.fromEntries(Object.entries(LIST_SORT).map(([p, f]) => [p, Object.keys(f).filter((a) => sortVisible(s, p, a))])),
+  };
+}
+
 export const NUMERIC = "^-?[0-9]+(\\.[0-9]+)?$";
 
-/** Sıralama anahtarı: boş değer (yok · JSON null · boş metin · sayı olmayan) SQL NULL'dur ve HEP sonda kalır. */
-function sortKeySql(field: string, kind: ListSortKind): Prisma.Sql {
-  const text = Prisma.sql`NULLIF(r.data->>${field}, '')`;
-  if (kind === "sayi") return Prisma.sql`(CASE WHEN ${text} ~ ${NUMERIC} THEN ${text}::numeric END)`;
-  if (kind === "metin") return foldSql(text);
+/**
+ * Sıralama anahtarı: boş değer (yok · JSON null · boş metin · sayı olmayan) SQL NULL'dur ve HEP sonda kalır.
+ * `bayrak`: her alan için `true` → '0', diğeri → '1' birleşimi (hiç boş değildir); alt satır alanı `k.data`dan okunur.
+ */
+function sortKeySql(sort: Pick<SortSpec, "field" | "kind" | "flags" | "subRow">): Prisma.Sql {
+  if (sort.kind === "bayrak") {
+    const parts = sort.flags.map((f) => Prisma.sql`(CASE WHEN r.data->>${f} = 'true' THEN '0' ELSE '1' END)`);
+    return Prisma.sql`((${Prisma.join(parts, " || ")}) COLLATE "C")`;
+  }
+  const text = sort.subRow ? Prisma.sql`NULLIF(k.data->>${sort.field}, '')` : Prisma.sql`NULLIF(r.data->>${sort.field}, '')`;
+  if (sort.kind === "sayi") return Prisma.sql`(CASE WHEN ${text} ~ ${NUMERIC} THEN ${text}::numeric END)`;
+  if (sort.kind === "metin") return foldSql(text);
   return Prisma.sql`(${text} COLLATE "C")`;
 }
 
@@ -145,10 +172,17 @@ export interface SortSpec {
   readonly field: string;
   readonly kind: ListSortKind;
   readonly dir: ListSortDir;
+  /** `bayrak` türünde sırayla mantıksal alanlar (`LIST_SORT_FLAGS`); diğerinde boş. */
+  readonly flags: readonly string[];
+  /** Alan alt satırdaysa (`LIST_SORT_SUBROW`) adı; kök alanda null. */
+  readonly subRow: "kisisel" | null;
 }
 
-/** `sirala`/`yon`: beyansız alan ya da tek başına `yon` 400 (fail-closed); ikisi de yoksa null (eski sıra). */
-export function sortSpec(name: string, q: Pick<ListQuery, "sirala" | "yon">): SortSpec | null {
+/**
+ * `sirala`/`yon`: beyansız alan ya da tek başına `yon` 400 (fail-closed); ikisi de yoksa null (eski sıra).
+ * Alt satır alanı, alt satırı göremeyen hesaba 403 (sıra da kişisel veriyi sızdırır).
+ */
+export function sortSpec(name: string, q: Pick<ListQuery, "sirala" | "yon">, s?: Pick<SessionContext, "projections">): SortSpec | null {
   if (q.sirala === undefined) {
     if (q.yon !== undefined) throw badRequest("yon yalnız sirala ile");
     return null;
@@ -156,7 +190,12 @@ export function sortSpec(name: string, q: Pick<ListQuery, "sirala" | "yon">): So
   const fields = Object.hasOwn(LIST_SORT, name) ? LIST_SORT[name]! : {};
   const kind = Object.hasOwn(fields, q.sirala) ? fields[q.sirala] : undefined;
   if (!kind) throw badRequest(`Bu listede ${q.sirala} sıralaması yok`);
-  return { field: q.sirala, kind, dir: q.yon ?? "artan" };
+  const flagMap = Object.hasOwn(LIST_SORT_FLAGS, name) ? LIST_SORT_FLAGS[name]! : {};
+  const flags = kind === "bayrak" && Object.hasOwn(flagMap, q.sirala) ? flagMap[q.sirala]! : [];
+  if (kind === "bayrak" && flags.length === 0) throw badRequest(`Bu listede ${q.sirala} sıralaması yok`);
+  const subRow = sortSubRow(name, q.sirala);
+  if (subRow && (!s || !sortVisible(s, name, q.sirala))) throw forbidden("Bu alana göre sıralama yetkiniz yok");
+  return { field: q.sirala, kind, dir: q.yon ?? "artan", flags, subRow };
 }
 
 /** Sıralı imleç: `[anahtar metni | null, kayıt kimliği]` (anahtar SQL'de aynı türe geri çevrilir). */
@@ -180,7 +219,7 @@ function keyParam(key: string, kind: ListSortKind): Prisma.Sql {
 
 /** Sıralı imleç koşulu: (boş mu, anahtar yönlü, kimlik yönlü) sırasında imlecin ardından gelenler. */
 function sortCursorFilter(sort: SortSpec, c: { key: string | null; id: string }): Prisma.Sql {
-  const k = sortKeySql(sort.field, sort.kind);
+  const k = sortKeySql(sort);
   const cmp = sort.dir === "artan" ? Prisma.sql`>` : Prisma.sql`<`;
   if (c.key === null) return Prisma.sql`AND ${k} IS NULL AND r.record_id ${cmp} ${c.id}::uuid`;
   const p = keyParam(c.key, sort.kind);
@@ -190,7 +229,7 @@ function sortCursorFilter(sort: SortSpec, c: { key: string | null; id: string })
 function sortOrderSql(sort: SortSpec | null): Prisma.Sql {
   if (!sort) return Prisma.sql`r.sort_at DESC, r.record_id DESC`;
   const d = sort.dir === "artan" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-  return Prisma.sql`${sortKeySql(sort.field, sort.kind)} ${d} NULLS LAST, r.record_id ${d}`;
+  return Prisma.sql`${sortKeySql(sort)} ${d} NULLS LAST, r.record_id ${d}`;
 }
 
 function decodeCursor(cursor: string): { sortAt: Date; id: string } {
@@ -228,7 +267,7 @@ export function rowView(r: Row, sub: { kisisel: boolean }): ProjectionRecord {
 /** Kök + (izinliyse) alt satırlar tek sorguda; imleç `(sort_at, record_id)` azalan (liste ve dışa aktarma aynı sıra). */
 export function selectRows(s: SessionContext, def: ProjectionDef, q: { readonly where: Prisma.Sql; readonly limit: number; readonly sort?: SortSpec | null }): Prisma.Sql {
   const { where, limit, sort = null } = q;
-  const key = sort ? Prisma.sql`, (${sortKeySql(sort.field, sort.kind)})::text AS sort_key` : Prisma.empty;
+  const key = sort ? Prisma.sql`, (${sortKeySql(sort)})::text AS sort_key` : Prisma.empty;
   return Prisma.sql`
     SELECT r.record_id, r.data, r.version_at, r.sort_at, k.data AS kisisel${key}
       FROM projection_rows r
@@ -241,7 +280,7 @@ export function selectRows(s: SessionContext, def: ProjectionDef, q: { readonly 
 export async function listProjection(ctx: CloudContext, s: SessionContext, name: string, q: ListQuery): Promise<Page<ProjectionRecord>> {
   const def = readableDef(s, name, "KAYIT");
   const filters = listFilters(def.name, q);
-  const sort = sortSpec(def.name, q);
+  const sort = sortSpec(def.name, q, s);
   if (q.cursor && sort) filters.push(sortCursorFilter(sort, decodeSortCursor(q.cursor)));
   else if (q.cursor) {
     const c = decodeCursor(q.cursor);
@@ -322,7 +361,7 @@ export async function facilityStatus(ctx: CloudContext, s: SessionContext): Prom
         }
       : null,
     hizmet: OPEN_SERVICE,
-    liste: LIST_CAPABILITIES,
+    liste: listCapabilities(s),
     simdiGuncelle: true,
   };
 }
