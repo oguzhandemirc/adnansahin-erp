@@ -2,6 +2,7 @@ import { WorkOrderType } from "@/types/enums";
 import type { WorkOrderFormValues } from "./schema";
 import type { FasonStepPlan } from "./FasonPlanningDialog";
 import type { CustomRouteStep } from "./RouteDesignerDialog";
+import type { OrderLinkAllocationInput } from "./types";
 
 // İş emri form değerlerini backend create/replace payload'ına çevirir. Hem
 // liste (WorkOrdersPage) hem tam sayfa detay (Düzenle) bunu kullanır.
@@ -46,6 +47,12 @@ export interface CreatePayload {
   targetColorId: string | null;
   targetPropertyIds: string[];
   orderLineIds?: string[];
+  /**
+   * YALNIZ yaratmada ve en az bir satıra metre yazıldıysa: bağlanan HER satır, metre girilenlerde
+   * `allocatedQty` (backend aynı tx'te tavanla doğrular). Elle kurulan gövde = sessiz allowlist:
+   * alan burada yoksa formda yazılan metre sunucuya HİÇ gitmez.
+   */
+  orderLineAllocations?: { orderLineId: string; allocatedQty?: number }[];
   stepPlanning?: StepPlanPayload[];
   width: number | null;
   targetQuantity: number | null;
@@ -58,6 +65,21 @@ export interface CreatePayload {
 export interface WorkOrderFormMeta {
   fasonPlans: FasonStepPlan[];
   customSteps: CustomRouteStep[];
+  /** Yeni iş emri formunda satır başına bağlanacak metre (> 0 olanlar). Düzenle'de verilmez. */
+  allocations?: OrderLinkAllocationInput[];
+}
+
+/** Metre girilmiş satır varsa her bağlı satır için öğe; yoksa alan hiç gönderilmez (bugünkü gövde). */
+function orderLineAllocationsOf(
+  orderLineIds: string[],
+  allocations: OrderLinkAllocationInput[] | undefined,
+): CreatePayload["orderLineAllocations"] {
+  const qty = new Map((allocations ?? []).filter((a) => a.allocatedQty > 0).map((a) => [a.orderLineId, a.allocatedQty]));
+  if (qty.size === 0) return undefined;
+  return orderLineIds.map((orderLineId) => {
+    const q = qty.get(orderLineId);
+    return q === undefined ? { orderLineId } : { orderLineId, allocatedQty: q };
+  });
 }
 
 export function buildPayload(
@@ -100,6 +122,7 @@ export function buildPayload(
   // Parti kodu: doluysa gönder (manuel/override/düzenleme); boşsa hiç gönderme
   // → backend otomatik üretir (otomatik mod).
   const batchNumber = trimOrNull(v.batchNumber);
+  const orderLineAllocations = hasLines ? orderLineAllocationsOf(orderLineIds, meta.allocations) : undefined;
 
   return {
     // Tip artık formda seçilmez — bağlı kalem varsa siparişe özel, yoksa stoğa.
@@ -110,6 +133,7 @@ export function buildPayload(
     targetColorId: v.targetColorId ?? null,
     targetPropertyIds: v.targetPropertyIds ?? [],
     ...(hasLines ? { orderLineIds } : {}),
+    ...(orderLineAllocations ? { orderLineAllocations } : {}),
     width: v.width ?? null,
     targetQuantity: targetQuantityEnabled ? (v.targetQuantity ?? null) : null,
     targetWeight: targetQuantityEnabled ? (v.targetWeight ?? null) : null,

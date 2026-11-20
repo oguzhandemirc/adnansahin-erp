@@ -2,6 +2,7 @@ import { formatNumber } from "@/lib/format";
 import { isMeasuredUnit } from "@/lib/item-unit";
 import { parseCountedQty } from "@/pages/Operations/StockCounts/stockCountRules";
 import type { LinkableOrderLine, OrderAllocationSummary, OrderLinkAllocationInput, WorkOrder } from "./types";
+import type { PickedOrderLine } from "./OrderPickerDialog";
 
 /**
  * İş emri metresini sipariş satırlarına PAYLAŞTIRMA — panel tarafının saf kuralları.
@@ -108,6 +109,53 @@ export function buildLinkAllocations(
     }
   }
   return { allocations, entered, invalid };
+}
+
+/** "Tamamı" kısayolunun yazacağı metin: siparişin AÇIĞI (istenen − sevk); açık yoksa/ölçülmüyorsa boş (kısayol gizli). */
+export function fullQtyText(line: Pick<LinkableOrderLine, "openQty" | "measured">): string {
+  if (!line.measured || line.openQty == null) return "";
+  return qtyToInputText(line.openQty);
+}
+
+/**
+ * YENİ iş emri formunda seçilen kalem → "Sipariş Bağla" tablosunun satırı (aynı tabloyu
+ * yeniden kullanmak için). Ölçülüyor mu = picker'ın `openQty`si null değil (KG/ADET null).
+ */
+export function pickedToLinkable(l: PickedOrderLine): LinkableOrderLine {
+  return {
+    id: l.lineId,
+    orderId: l.orderId,
+    orderNumber: l.orderNumber,
+    customerName: l.customerName,
+    itemId: l.itemId,
+    itemName: l.itemName,
+    colorId: l.colorId,
+    colorName: l.itemColorName,
+    width: l.width,
+    quantity: Number(l.quantity),
+    shippedQty: l.openQty == null ? 0 : Math.max(0, Number(l.quantity) - Number(l.openQty)),
+    openQty: l.openQty == null ? null : Number(l.openQty),
+    measured: l.openQty != null,
+    deadline: l.orderDeadline,
+    warnings: [],
+  };
+}
+
+/**
+ * YENİ iş emrinde tavan: henüz top yok → hedef metre (sunucu kuralının aynısı; kayıtta
+ * sunucu yeniden ölçer). Hedef boş/0 → tavan yok.
+ */
+export function createBasisSummary(targetQuantity: number | string | null | undefined): OrderAllocationSummary {
+  const n = targetQuantity == null || targetQuantity === "" ? 0 : Number(targetQuantity);
+  return Number.isFinite(n) && n > 0
+    ? { basis: n, basisKind: "TARGET", allocated: 0, remaining: n }
+    : { basis: null, basisKind: "NONE", allocated: 0, remaining: null };
+}
+
+/** Paylaştırma isteğinin sunucu reddi mi (`details.code`) — formda satır içi gösterilir. */
+export function isAllocationRejection(err: unknown): boolean {
+  const code = (err as ApiErrorShape | null)?.response?.data?.details?.code;
+  return code === ALLOCATION_OVER_BASIS || code === "ALLOCATION_UNIT_NOT_MEASURED";
 }
 
 /** "Paylaştır" düğmesi: açık bağ var · iptal/devredilmiş değil · `workorder:write`. */

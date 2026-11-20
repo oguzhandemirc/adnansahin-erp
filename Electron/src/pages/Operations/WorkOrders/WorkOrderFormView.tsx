@@ -44,8 +44,6 @@ import { RouteEditor } from "./RouteEditor";
 import { TargetItemPicker } from "./TargetItemPicker";
 import { useFoldValues } from "@/hooks/useFoldValues";
 import { useDesignerSteps } from "./useDesignerSteps";
-import type { FasonStepPlan } from "./FasonPlanningDialog";
-import type { CustomRouteStep } from "./RouteDesignerDialog";
 import { useLinkedLinesAutoFill } from "./useLinkedLinesAutoFill";
 import {
   workOrderFormDefaults,
@@ -62,6 +60,9 @@ import {
 } from "./workOrderPrefill";
 import type { WorkOrder } from "./types";
 import { LastBatchBadge } from "./LastBatchBadge";
+import { CreateAllocationSection, useCreateAllocation } from "./CreateAllocationSection";
+import { allocationErrorText, isAllocationRejection } from "./order-allocation";
+import type { WorkOrderFormMeta } from "./workOrderPayload";
 
 /**
  * react-hook-form hata ağacından tüm mesajları toplar (toast özeti için). Her
@@ -97,10 +98,7 @@ interface Props {
     width: number | null;
     targetQuantity: number | null;
   };
-  onSubmit: (
-    values: WorkOrderFormValues,
-    meta: { fasonPlans: FasonStepPlan[]; customSteps: CustomRouteStep[] },
-  ) => Promise<void>;
+  onSubmit: (values: WorkOrderFormValues, meta: WorkOrderFormMeta) => Promise<void>;
   isSubmitting?: boolean;
   /** İptal / vazgeç — sayfayı kapatıp listeye (veya detaya) döner. */
   onCancel: () => void;
@@ -399,6 +397,19 @@ export function WorkOrderFormView({
 
   // "Sevk edilen > yeni hedef" uyarısı için canlı izleme.
   const watchedQuantity = form.watch("targetQuantity");
+
+  // Yeni iş emrinde siparişlere paylaştırma (2026-11-20): satır başına metre; tavan hedef metre.
+  const [allocQty, setAllocQty] = useState<Record<string, string>>({});
+  const [allocError, setAllocError] = useState<string | null>(null);
+  const createAlloc = useCreateAllocation(
+    isEdit ? [] : pickedLines,
+    allocQty,
+    targetQuantityEnabled ? watchedQuantity : null,
+  );
+  const setLineAllocQty = (lineId: string, v: string) => {
+    setAllocQty((prev) => ({ ...prev, [lineId]: v }));
+    setAllocError(null);
+  };
   const dispatchedQty = workOrder?.dispatchedTotalQty ?? 0;
   const quantityShortfall =
     locks?.materialCommitted &&
@@ -459,6 +470,11 @@ export function WorkOrderFormView({
               });
               manualErrors.push("Kat tipi seçilmeli.");
             }
+            if (createAlloc.invalid) {
+              manualErrors.push("Paylaştırma metresi geçersiz — virgül ondalıktır, binlik ayracı kullanmayın.");
+            } else if (createAlloc.preview.over) {
+              manualErrors.push("Siparişlere paylaştırılan toplam hedef metreyi aşıyor.");
+            }
             if (manualErrors.length > 0) {
               toast.error("İş emri oluşturulamadı — eksik/hatalı alanlar var", {
                 description: manualErrors.join(" · "),
@@ -466,11 +482,24 @@ export function WorkOrderFormView({
               });
               return;
             }
-            await onSubmit(
-              // Tambur yoksa kat tipi anlamsız — payload'a sızmasın.
-              { ...v, foldType: hasTambur ? v.foldType : "" },
-              { fasonPlans: [], customSteps: stepsToCustom(routeSteps) },
-            );
+            try {
+              await onSubmit(
+                // Tambur yoksa kat tipi anlamsız — payload'a sızmasın.
+                { ...v, foldType: hasTambur ? v.foldType : "" },
+                {
+                  fasonPlans: [],
+                  customSteps: stepsToCustom(routeSteps),
+                  ...(isEdit ? {} : { allocations: createAlloc.allocations }),
+                },
+              );
+            } catch (err) {
+              // Sunucu tavan/birim reddi (`details.code`) bölümün altında da yazılır; genel
+              // toast'ı apiClient zaten bastı (ikinci toast yok).
+              if (isAllocationRejection(err)) {
+                setAllocError(allocationErrorText(err, createAlloc.preview.allocated));
+              }
+              throw err;
+            }
           },
           (errors) => {
             // Zod doğrulama hataları: satır içi gösterim duruyor, üstüne özet toast.
@@ -572,6 +601,14 @@ export function WorkOrderFormView({
 
           {/* Orta panel — form içeriği */}
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-muted/20 px-6 py-4">
+            {!isEdit && pickedLines.length > 0 && (
+              <CreateAllocationSection
+                state={createAlloc}
+                qty={allocQty}
+                onQty={setLineAllocQty}
+                error={allocError}
+              />
+            )}
             {/* Sipariş bağlantısı — YALNIZ edit modunda bölüm. Create'te başlıktaki
                 "Sipariş Bağla" butonu + picker'dan bağlanır (bölüm kaldırıldı). */}
             {isEdit && (

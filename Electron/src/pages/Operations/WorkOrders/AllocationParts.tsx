@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { fmtM, parseAllocationInput, type AllocationPreview } from "./order-allocation";
@@ -8,21 +9,40 @@ import { fmtM, parseAllocationInput, type AllocationPreview } from "./order-allo
  * kutusu ve canlı özet şeridi. Özet YAZARKEN ÖNİZLEMEDİR; tavan sunucudan gelir.
  */
 
-/** Satırdaki metre kutusu — boş = paylaştırma yok; geçersiz biçim kırmızı çerçeve. */
+/**
+ * Satırdaki metre kutusu — boş = paylaştırma yok; geçersiz biçim kırmızı çerçeve.
+ * `fullValue` verilirse kutunun solunda "Tamamı" kısayolu (siparişin açığını yazar).
+ */
 export function AllocationInput({
   value,
   onChange,
   disabled,
   label,
+  fullValue,
 }: {
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
   label: string;
+  fullValue?: string;
 }) {
   const invalid = parseAllocationInput(value) === null;
   return (
     <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+      {fullValue ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-xs text-primary"
+          disabled={disabled || value === fullValue}
+          title={`Siparişin açığının tamamı: ${fullValue} m`}
+          aria-label={`${label}: tamamı`}
+          onClick={() => onChange(fullValue)}
+        >
+          Tamamı
+        </Button>
+      ) : null}
       <Input
         type="text"
         inputMode="decimal"

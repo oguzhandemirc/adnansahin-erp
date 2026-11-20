@@ -187,7 +187,8 @@ export function LinkOrderDialog({
           <DialogDescription>
             Yalnız bu iş emrinin ürettiği kumaş ve renkle uyumlu sipariş satırları
             listelenir. Bağlamak iş emrinin hedefini <strong>değiştirmez</strong>.
-            İsterseniz satıra metre yazarak iş emrinin kumaşını siparişlere paylaştırın (boş = paylaştırma yok).
+            Siparişin ne kadarını bu iş emrine bağlayacağınızı <strong>"Bu iş emrine (m)"</strong> sütununa
+            yazın ya da <strong>Tamamı</strong>'na basın (boş = paylaştırma yok).
           </DialogDescription>
         </DialogHeader>
 

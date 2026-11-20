@@ -62,8 +62,8 @@ describe("LinkOrderDialog — bağlarken paylaştırma", () => {
     linkOrderLines.mockResolvedValue({ success: true, data: { linked: 2, alreadyLinked: 0, warnings: [] } });
     renderDialog();
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText("SIP-X paylaştırılan metre"), "800");
-    await user.type(screen.getByLabelText("SIP-Y paylaştırılan metre"), "200");
+    await user.type(await screen.findByLabelText("SIP-X bu iş emrine bağlanacak metre"), "800");
+    await user.type(screen.getByLabelText("SIP-Y bu iş emrine bağlanacak metre"), "200");
     const bar = screen.getByTestId("allocation-summary");
     expect(bar).toHaveTextContent("Giren 1000 m");
     expect(bar).toHaveTextContent("Kalan 0 m");
@@ -85,11 +85,24 @@ describe("LinkOrderDialog — bağlarken paylaştırma", () => {
   it("mevcut paylaştırma önizlemeye eklenir; TARGET'ta etiket 'Hedef'", async () => {
     renderDialog({ basis: 500, basisKind: "TARGET" as never, allocated: 300, remaining: 200 });
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText("SIP-X paylaştırılan metre"), "250");
+    await user.type(await screen.findByLabelText("SIP-X bu iş emrine bağlanacak metre"), "250");
     const bar = screen.getByTestId("allocation-summary");
     expect(bar).toHaveTextContent("Hedef 500 m");
     expect(bar).toHaveTextContent("Paylaştırılan 550 m");
     expect(bar).toHaveTextContent("50 m fazla");
+  });
+
+  it("'Tamamı' siparişin açığını yazar ve satırı seçer; başlık 'Bu iş emrine (m)'", async () => {
+    linkOrderLines.mockResolvedValue({ success: true, data: { linked: 1, alreadyLinked: 0, warnings: [] } });
+    renderDialog();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "SIP-X bu iş emrine bağlanacak metre: tamamı" }));
+    expect(screen.getByLabelText("SIP-X bu iş emrine bağlanacak metre")).toHaveValue("600");
+    expect(screen.getByText("Bu iş emrine (m)")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Bağla (1)" }));
+    await waitFor(() =>
+      expect(linkOrderLines).toHaveBeenCalledWith("wo1", ["a"], { allocations: [{ orderLineId: "a", allocatedQty: 600 }], quiet: true }),
+    );
   });
 
   it("metresiz bağlama: allocations boş gider (yalnız bağ)", async () => {

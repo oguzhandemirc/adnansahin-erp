@@ -3,13 +3,18 @@ import {
   allocationErrorText,
   buildLinkAllocations,
   canShowAllocate,
+  createBasisSummary,
+  fullQtyText,
+  isAllocationRejection,
   parseAllocationInput,
+  pickedToLinkable,
   previewAllocation,
   qtyFromServer,
   qtyToInputText,
 } from "./order-allocation";
 import { buildPayload } from "./workOrderPayload";
 import type { LinkableOrderLine, OrderAllocationSummary, WorkOrder } from "./types";
+import type { PickedOrderLine } from "./OrderPickerDialog";
 
 const INPUT_1000: OrderAllocationSummary = { basis: 1000, basisKind: "INPUT", allocated: 0, remaining: 1000 };
 
@@ -112,16 +117,62 @@ describe("canShowAllocate", () => {
   });
 });
 
-describe("Düzenle/açılış yükü eski paylaştırma alanını GÖNDERMEZ", () => {
-  it("buildPayload çıktısında orderLineAllocations / allocatedQty yok", () => {
+describe("buildPayload — yaratmada paylaştırma (orderLineAllocations)", () => {
+  const values = { orderLineIds: ["ol1", "ol2"], targetItemId: "i1", targetColorId: null, targetPropertyIds: [] } as never;
+  it("metre girilmediyse (Düzenle dahil) gövde BUGÜNKÜ gibi: orderLineAllocations / allocatedQty yok", () => {
+    for (const meta of [{ fasonPlans: [], customSteps: [] }, { fasonPlans: [], customSteps: [], allocations: [] }]) {
+      const payload = buildPayload(values, meta, true);
+      const json = JSON.stringify(payload);
+      expect(payload).toHaveProperty("orderLineIds", ["ol1", "ol2"]);
+      expect(json).not.toContain("orderLineAllocations");
+      expect(json).not.toContain("allocatedQty");
+    }
+  });
+  it("metre girildiyse HER bağlı satır gider, yalnız girilende allocatedQty (allowlist'e alan eklendi)", () => {
     const payload = buildPayload(
-      { orderLineIds: ["ol1", "ol2"], targetItemId: "i1", targetColorId: null, targetPropertyIds: [] } as never,
-      { fasonPlans: [], customSteps: [] },
+      values,
+      { fasonPlans: [], customSteps: [], allocations: [{ orderLineId: "ol2", allocatedQty: 300 }] },
       true,
     );
-    const json = JSON.stringify(payload);
-    expect(payload).toHaveProperty("orderLineIds", ["ol1", "ol2"]);
-    expect(json).not.toContain("orderLineAllocations");
-    expect(json).not.toContain("allocatedQty");
+    expect(payload.orderLineAllocations).toEqual([{ orderLineId: "ol1" }, { orderLineId: "ol2", allocatedQty: 300 }]);
+    expect(payload.orderLineIds).toEqual(["ol1", "ol2"]);
+  });
+  it("NEGATİF SONDA: bağlı olmayan satırın metresi gövdeye sızmaz; satır yoksa alan yok", () => {
+    const stray = buildPayload(values, { fasonPlans: [], customSteps: [], allocations: [{ orderLineId: "x", allocatedQty: 5 }] }, true);
+    expect(JSON.stringify(stray)).not.toContain('"x"');
+    const noLines = buildPayload(
+      { orderLineIds: [], targetItemId: "i1", targetColorId: null, targetPropertyIds: [] } as never,
+      { fasonPlans: [], customSteps: [], allocations: [{ orderLineId: "ol1", allocatedQty: 5 }] },
+      true,
+    );
+    expect(noLines).not.toHaveProperty("orderLineAllocations");
+  });
+});
+
+describe("yeni iş emri formu yardımcıları", () => {
+  const picked = (openQty: number | null) =>
+    ({
+      lineId: "l1", orderId: "o1", orderNumber: "SIP-1", orderDeadline: null, customerId: "c1", customerName: "Firma",
+      branchName: null, branchCode: null, itemId: "i1", itemName: "Patos", colorId: null, itemColorHex: null,
+      itemColorName: "Ekru", quantity: 1000, openQty, width: 180, requiredProperties: [],
+    }) as PickedOrderLine;
+  it("pickedToLinkable: MT satır ölçülür (sevk = istenen − açık); KG (openQty null) metre dışı", () => {
+    expect(pickedToLinkable(picked(600))).toMatchObject({ id: "l1", measured: true, openQty: 600, shippedQty: 400, colorName: "Ekru" });
+    expect(pickedToLinkable(picked(null))).toMatchObject({ measured: false, openQty: null });
+  });
+  it("createBasisSummary: hedef > 0 → TARGET, boş/0 → tavan yok", () => {
+    expect(createBasisSummary(500)).toMatchObject({ basis: 500, basisKind: "TARGET" });
+    expect(createBasisSummary("")).toMatchObject({ basis: null, basisKind: "NONE" });
+    expect(createBasisSummary(0).basisKind).toBe("NONE");
+  });
+  it("fullQtyText: 'Tamamı' siparişin açığı; metre dışı/açıksız boş", () => {
+    expect(fullQtyText({ openQty: 250.5, measured: true })).toBe("250,5");
+    expect(fullQtyText({ openQty: 0, measured: true })).toBe("");
+    expect(fullQtyText({ openQty: null, measured: false })).toBe("");
+  });
+  it("isAllocationRejection: details.code okunur, body.code DEĞİL", () => {
+    expect(isAllocationRejection({ response: { data: { details: { code: "ALLOCATION_OVER_BASIS" } } } })).toBe(true);
+    expect(isAllocationRejection({ response: { data: { details: { code: "ALLOCATION_UNIT_NOT_MEASURED" } } } })).toBe(true);
+    expect(isAllocationRejection({ response: { data: { code: "ALLOCATION_OVER_BASIS" } } })).toBe(false);
   });
 });
