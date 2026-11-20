@@ -5,12 +5,13 @@
 //      altta sabit "Sonuçları göster (N)" (N yalnız sayı bilinirse: istemcide süzülen tam belge) ya da "Uygula".
 //   2. düzey — alanın SEÇENEKLERİ aynı sayfada: geri oku, otomatik odaklı arama (Türkçe harf katlamalı `katla`), seçili
 //      olanlar başta, uzun liste sanallaştırılır (FlatList). Tek seçimli alanda seçim alan listesine döner.
-// Seçim TASLAKTIR: "Uygula"/"Sonuçları göster" işler; dışarı dokunmak/geri tuşu vazgeçer. Süzme sayfanın işi değildir
+// Seçim TASLAKTIR: "Uygula"/"Sonuçları göster" işler; dışarı dokunmak/aşağı çekmek/geri tuşu vazgeçer. Süzme sayfanın işi değildir
 // (sunucu listesi `?suzgec=`, anlık belge istemcide). Etkin süzgeçler tablonun üstünde çip (`EtkinSuzgecler`), sonuç
 // yoksa `SuzgecBos`. Geçiş animasyonsuz (Hareketi azalt'a kendiliğinden uyar).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, FlatList, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Tutamak, useAsagiCekKapat } from "../AsagiCekKapat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { katla } from "../../ses/metin";
 import { haptic } from "../haptics";
@@ -42,6 +43,8 @@ export function SuzgecSayfasi(p: {
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
+  // Tutma çubuğu + başlıktan aşağı çekince kapanır (liste kaydırması bozulmaz).
+  const cek = useAsagiCekKapat(p.onClose, p.visible);
   const [taslak, setTaslak] = useState<Readonly<Record<string, string>>>({});
   const [alan, setAlan] = useState<string | null>(null);
   const [ara, setAra] = useState("");
@@ -69,9 +72,9 @@ export function SuzgecSayfasi(p: {
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={grup ? geri : p.onClose}>
       <View style={s.backdrop}>
         <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Vazgeç" testID={`${p.testID}-kapat`} />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + space.m }]} accessibilityViewIsModal testID={p.testID}>
-          <View style={s.grabber} />
-          <View style={s.head}>
+        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.m }]} accessibilityViewIsModal testID={p.testID}>
+          <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID={`${p.testID}-tutamak`} /></View>
+          <View style={s.head} {...cek.panHandlers}>
             {grup ? (
               <Pressable onPress={geri} hitSlop={8} style={s.geri} accessibilityRole="button" accessibilityLabel="Alanlara dön" testID={`${p.testID}-geri`}>
                 <Ionicons name="chevron-back" size={24} color={t.tint} />
@@ -138,7 +141,7 @@ export function SuzgecSayfasi(p: {
           <Pressable onPress={uygula} style={({ pressed }) => [s.uygula, { backgroundColor: t.tint }, pressed && { opacity: BASMA.opaklik }]} accessibilityRole="button" testID={`${p.testID}-uygula`}>
             <Text style={[s.uygulaYazi, { color: t.onTint }]} maxFontSizeMultiplier={FONT_SCALE.title}>{n === null ? "Uygula" : `Sonuçları göster (${n})`}</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

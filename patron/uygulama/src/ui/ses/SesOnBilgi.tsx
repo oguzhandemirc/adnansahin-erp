@@ -2,7 +2,8 @@
 // kuralı; metin ve bayrak `src/ses/onbilgi.ts`). "Devam" yerinde dinlemeyi başlatır (izin o an istenir);
 // "Vazgeç" kapatır, izin istenmez. Gizlilik politikası bağlantısı bulut adresi varsa çizilir.
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Animated, Modal, Pressable, Text, View } from "react-native";
+import { Tutamak, useAsagiCekKapat } from "../AsagiCekKapat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { gizlilikAc, gizlilikAdresi } from "../../lib/gizlilik";
 import { ONBILGI_METNI } from "../../ses/onbilgi";
@@ -15,11 +16,14 @@ export function SesOnBilgi(p: { readonly visible: boolean; readonly onDevam: () 
   const s = useStyles();
   const insets = useSafeAreaInsets();
   const gizlilik = gizlilikAdresi();
+  // Aşağı çekmek "Vazgeç" ile aynı (izin istenmez).
+  const cek = useAsagiCekKapat(p.onVazgec, p.visible);
   return (
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={p.onVazgec}>
       <View style={s.backdrop}>
         <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onVazgec} accessibilityRole="button" accessibilityLabel="Vazgeç" />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="ses-onbilgi">
+        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="ses-onbilgi" {...cek.panHandlers}>
+          <Tutamak onClose={p.onVazgec} testID="ses-onbilgi-tutamak" />
           <View style={s.head}>
             <View style={[s.ikon, { backgroundColor: t.tint }]}><Ionicons name="mic" size={22} color={t.onTint} /></View>
             <Text style={s.baslik} accessibilityRole="header">Sesle söyle</Text>
@@ -35,7 +39,7 @@ export function SesOnBilgi(p: { readonly visible: boolean; readonly onDevam: () 
             <View style={s.esnek}><Button label="Vazgeç" tone="secondary" onPress={p.onVazgec} testID="ses-onbilgi-vazgec" /></View>
             <View style={s.esnek}><Button label="Devam" onPress={p.onDevam} testID="ses-onbilgi-devam" /></View>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -49,7 +53,7 @@ const useStyles = makeStyles((t) => ({
     borderTopLeftRadius: t.radius.sheet,
     borderTopRightRadius: t.radius.sheet,
     paddingHorizontal: space.l,
-    paddingTop: space.l,
+    paddingTop: space.xs,
     width: "100%" as const,
     maxWidth: 560,
     alignSelf: "center" as const,

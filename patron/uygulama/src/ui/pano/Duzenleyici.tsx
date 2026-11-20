@@ -1,7 +1,8 @@
 // Pano düzenleme kipi (şartname §4.1 ekle/çıkar): kutular VERİ İSTEMEDEN önizleme satırına döner; ⊖ çıkarır, ↑/↓
 // sıralar (yer değişimi animasyonlu; sürükle-bırak yok). "Kutu ekle" tam ekran sayfa: gruplu katalog, ⊕/✓ ile ekle/çıkar.
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Modal, ScrollView, Text, View } from "react-native";
+import { Animated as RNAnimated, Modal, ScrollView, Text, View } from "react-native";
+import { SISTEM_CEKMESI, Tutamak, useAsagiCekKapat } from "../AsagiCekKapat";
 import Animated, { LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Basilabilir, SURE, useHareketAzalt } from "../hareket";
@@ -89,10 +90,13 @@ export function KutuEkleSayfasi({ acik, katalog, ekli, onDegis, onKapat }: {
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
+  // Android: tutma çubuğu + başlıktan aşağı çekince kapanır (iOS'ta sistemin sayfa çekmesi).
+  const cek = useAsagiCekKapat(onKapat, acik, !SISTEM_CEKMESI);
   return (
-    <Modal visible={acik} animationType="slide" presentationStyle="pageSheet" onRequestClose={onKapat}>
-      <View style={s.sayfa} testID="kutu-ekle-sayfasi">
-        <View style={s.sayfaBas}>
+    <Modal visible={acik} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal={SISTEM_CEKMESI} onRequestClose={onKapat}>
+      <RNAnimated.View style={[s.sayfa, cek.kayma]} testID="kutu-ekle-sayfasi">
+        <View style={s.tutamakKabi} {...cek.panHandlers}><Tutamak onClose={onKapat} testID="kutu-ekle-tutamak" /></View>
+        <View style={s.sayfaBas} {...cek.panHandlers}>
           <Text style={s.sayfaBaslik} accessibilityRole="header">Kutu ekle</Text>
           <Basilabilir onPress={onKapat} style={s.kapat} accessibilityRole="button" accessibilityLabel="Kapat" testID="kutu-ekle-kapat">
             <Text style={[s.kapatYazi, { color: t.color.link }]}>Bitti</Text>
@@ -141,7 +145,7 @@ export function KutuEkleSayfasi({ acik, katalog, ekli, onDegis, onKapat }: {
         </ScrollView>
         {/* Modal kök rozetin üstünü örter; sayfa kendi rozetini taşır. */}
         <OrnekVeriRozeti alt={insets.bottom + space.s} />
-      </View>
+      </RNAnimated.View>
     </Modal>
   );
 }
@@ -161,6 +165,7 @@ const useStyles = makeStyles((t) => ({
   dugme: { flex: 1, minHeight: TOUCH, borderRadius: t.radius.control, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "center" as const, gap: space.xs },
   dugmeYazi: { fontSize: 16, lineHeight: 21, fontWeight: "600" as const },
   sayfa: { flex: 1, backgroundColor: t.color.background },
+  tutamakKabi: { backgroundColor: t.color.chrome },
   sayfaBas: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: space.l, minHeight: 56, backgroundColor: t.color.chrome, borderBottomWidth: 1, borderBottomColor: t.color.chromeBorder },
   sayfaBaslik: { ...typography.headline, color: t.color.text },
   kapat: { minHeight: TOUCH, minWidth: TOUCH, alignItems: "flex-end" as const, justifyContent: "center" as const },

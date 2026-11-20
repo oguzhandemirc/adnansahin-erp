@@ -2,7 +2,8 @@
 // sınırsız; `azami` yalnız tek öğeli tercihlerde) ve görünürlük seçimi. Değişiklik anında uygulanır. Süzgeç ayrı: `Suzgec.tsx`.
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ReactNode } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Tutamak, useAsagiCekKapat } from "../AsagiCekKapat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptic } from "../haptics";
 import { BASMA } from "../hareket/sabitler";
@@ -14,13 +15,15 @@ function AltSayfa(p: { visible: boolean; title: string; onClose: () => void; tes
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
+  // Tutma çubuğu + başlıktan aşağı çekince kapanır (liste kaydırması bozulmaz).
+  const cek = useAsagiCekKapat(p.onClose, p.visible);
   return (
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={p.onClose}>
       <View style={s.backdrop}>
         <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Kapat" testID={`${p.testID}-kapat`} />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID={p.testID}>
-          <View style={s.grabber} />
-          <View style={s.head}>
+        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID={p.testID}>
+          <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID={`${p.testID}-tutamak`} /></View>
+          <View style={s.head} {...cek.panHandlers}>
             <Text style={s.title} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{p.title}</Text>
             <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Bitti" style={({ pressed }) => [s.bitti, pressed && { opacity: BASMA.opaklik }]} testID={`${p.testID}-bitti`}>
               <Text style={[s.bittiYazi, { color: t.tint }]}>Bitti</Text>
@@ -28,7 +31,7 @@ function AltSayfa(p: { visible: boolean; title: string; onClose: () => void; tes
           </View>
           <ScrollView style={s.list} contentContainerStyle={s.listInner}>{p.children}</ScrollView>
           {p.alt}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

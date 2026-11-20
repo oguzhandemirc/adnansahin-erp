@@ -3,7 +3,8 @@
 import { BASMA } from "./hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
-import { Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { SISTEM_CEKMESI, Tutamak, useAsagiCekKapat } from "./AsagiCekKapat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LIST_SEARCH, type ListSearchSpec } from "../api/wire";
 import { recordSubtitle, recordTitle } from "../lib/present";
@@ -74,15 +75,18 @@ function Sheet(p: { label: string; projection: string; spec: ListSearchSpec | un
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
+  // Android: tutma çubuğu + başlıktan aşağı çekince kapanır (iOS'ta sistemin sayfa çekmesi).
+  const cek = useAsagiCekKapat(p.onClose, true, !SISTEM_CEKMESI);
   const [term, setTerm] = useState("");
   const [filter, setFilter] = useState<string | null>(p.spec?.suzgec?.varsayilan ?? null);
   const ara = useDebounced(term.trim(), ARAMA_BEKLEME_MS);
   const list = useRemoteList(p.projection, { ara: ara || undefined, suzgec: filter ?? undefined });
   return (
     // iOS pageSheet durum çubuğunun ALTINDA açılır: üst güvenli alanı ikinci kez eklemek boş bir bant bırakıyordu.
-    <View style={[s.sheet, { paddingTop: Platform.OS === "ios" ? space.m : Math.max(insets.top, space.m) }]}>
+    <Animated.View style={[s.sheet, cek.kayma, { paddingTop: Platform.OS === "ios" ? space.xs : Math.max(insets.top, space.xs) }]}>
+      <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID="secici-tutamak" /></View>
       <View style={s.inner}>
-        <View style={s.head}>
+        <View style={s.head} {...cek.panHandlers}>
           <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" testID="secici-kapat" style={({ pressed }) => [s.headBtn, pressed && { opacity: BASMA.opaklik }]}>
             <Text style={s.headBtnText}>Kapat</Text>
           </Pressable>
@@ -116,7 +120,7 @@ function Sheet(p: { label: string; projection: string; spec: ListSearchSpec | un
         ) : null}
         <ListStates list={list} empty={ara ? "Eşleşen kayıt yok" : "Kayıt yok"} domain="genel" icon={ara ? EMPTY_ICON.arama : undefined} />
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -136,7 +140,7 @@ export function Picker(p: { label: string; projection: string; value: Picked | n
         </Text>
         <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
       </Pressable>
-      <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
+      <Modal visible={open} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal={SISTEM_CEKMESI} onRequestClose={close}>
         {open ? <Sheet label={p.label} projection={p.projection} spec={spec} optional={p.optional} value={p.value} onClose={close} onPick={(v) => { p.onChange(v); close(); }} /> : null}
       </Modal>
     </View>

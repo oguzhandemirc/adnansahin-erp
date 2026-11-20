@@ -2,7 +2,8 @@
 // 2 pt tema rengi halkası + ✓. "Özel" DOĞRUDAN modal açar (12 öneri + hex girdisi + canlı önizleme; renk tekeri yok).
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, Text, TextInput, View } from "react-native";
+import { Animated, Modal, Pressable, Text, TextInput, View } from "react-native";
+import { Tutamak, useAsagiCekKapat } from "../AsagiCekKapat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PRESET_KEYS, PRESET_LABEL, type ThemePreset } from "../appearance";
 import { isHex, pickForeground } from "../color";
@@ -70,6 +71,7 @@ export function OzelRenkSayfasi(p: { readonly visible: boolean; readonly baslang
   const s = useStyles();
   const insets = useSafeAreaInsets();
   const [girdi, setGirdi] = useState(p.baslangic);
+  const cek = useAsagiCekKapat(p.onClose, p.visible);
   useEffect(() => {
     if (p.visible) setGirdi(p.baslangic);
   }, [p.visible, p.baslangic]);
@@ -78,9 +80,9 @@ export function OzelRenkSayfasi(p: { readonly visible: boolean; readonly baslang
     <Modal visible={p.visible} transparent animationType="slide" onRequestClose={p.onClose}>
       <View style={s.zemin}>
         <Pressable style={[s.ortu, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Kapat" />
-        <View style={[s.sayfa, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="ozel-renk-sayfasi">
-          <View style={s.tutamak} />
-          <View style={s.bas}>
+        <Animated.View style={[s.sayfa, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal testID="ozel-renk-sayfasi">
+          <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID="ozel-renk-tutamak" /></View>
+          <View style={s.bas} {...cek.panHandlers}>
             <Text style={s.baslik} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>Özel renk</Text>
             <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" style={s.kapat} testID="ozel-renk-kapat">
               <Ionicons name="close" size={20} color={t.color.textMuted} />
@@ -110,7 +112,7 @@ export function OzelRenkSayfasi(p: { readonly visible: boolean; readonly baslang
           </View>
           {girdi !== "" && !hex ? <Text style={[s.not, { color: t.color.danger.fg }]}>{`Altı haneli renk kodu girin (ör. ${BRAND_PRIMARY}).`}</Text> : null}
           <Button label="Kaydet" icon="checkmark" disabled={!hex} onPress={() => hex && p.onSave(hex)} testID="ozel-renk-kaydet" />
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

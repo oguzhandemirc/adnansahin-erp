@@ -1,7 +1,8 @@
 // Süzgeç çipinin açtığı alt sayfa: tek seçim, seçili satırda onay işareti (combobox yok; çip DOĞRUDAN bunu açar).
 import { BASMA } from "../hareket/sabitler";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Tutamak, useAsagiCekKapat } from "../AsagiCekKapat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptic } from "../haptics";
 import { makeStyles, useTokens } from "../theme-context";
@@ -25,13 +26,15 @@ export function ChoiceSheet<K extends string>(p: {
   const t = useTokens();
   const s = useStyles();
   const insets = useSafeAreaInsets();
+  // Tutma çubuğu + başlıktan aşağı çekince kapanır (liste kaydırması bozulmaz).
+  const cek = useAsagiCekKapat(p.onClose, p.visible);
   return (
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={p.onClose}>
       <View style={s.backdrop}>
         <Pressable style={[s.scrim, { backgroundColor: t.color.scrim, opacity: t.scheme === "dark" ? 0.7 : 0.4 }]} onPress={p.onClose} accessibilityRole="button" accessibilityLabel="Kapat" testID={`${p.testIDPrefix}kapat`} />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal>
-          <View style={s.grabber} />
-          <View style={s.head}>
+        <Animated.View style={[s.sheet, cek.kayma, { paddingBottom: insets.bottom + space.l }]} accessibilityViewIsModal>
+          <View {...cek.panHandlers}><Tutamak onClose={p.onClose} testID={`${p.testIDPrefix}tutamak`} /></View>
+          <View style={s.head} {...cek.panHandlers}>
             <Text style={s.title} accessibilityRole="header" maxFontSizeMultiplier={FONT_SCALE.title}>{p.title}</Text>
             <Pressable onPress={p.onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Kapat" style={({ pressed }) => [s.close, pressed && { opacity: BASMA.opaklik }]}>
               <Ionicons name="close" size={20} color={t.textSecondary} />
@@ -59,7 +62,7 @@ export function ChoiceSheet<K extends string>(p: {
               );
             })}
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
