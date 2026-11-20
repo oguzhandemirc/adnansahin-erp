@@ -183,3 +183,22 @@ durum fabrikanın mevcut bayraklarından (`musteriRolu`·`tedarikciRolu`·`fason
 kişisel alt satırdan yetkili/telefon — ikincisi yalnız kişisel izinli hesaba beyan edilir, izinsize 403. Bulut hesap
 yapmaz, yeni alan/projeksiyon ve bulut göçü YOK; fabrika gönderdiği alanları değiştirmez. Uygulama (`ed9d4a8c`) başlığı
 yalnız bulut alanı beyan ediyorsa açar (eski bulutta kapalı). [bekçi: patron/sunucu test_veri_tablosu §1g–§3m]
+
+### Ek — cari özeti "Özel aralık" (fabrika + bulut + uygulama; migration ve yeni izin YOK)
+
+Kullanıcı (2026-11-20): yönetim uygulamasında cari özetinin 8 hazır döneminin yanına başlangıç–bitiş günü.
+
+- **Fabrika (`14845391`):** yeni uzak rapor `customer/summary` (`cloud-sync/remote-reports.ts`): `cariKartId` + fabrika günü
+  `dateFrom`/`dateTo`, üçü zorunlu, başlangıç ≤ bitiş (366 gün tavanı yok), tanınmayan anahtar/ISO an/olmayan cari
+  `PARAMETRE_GECERSIZ`. Hesap hazır dönemlerle AYNI toplayıcı (`snapshot-cari-ozeti.ts` `buildCustomerRangeSummary`; tek
+  müşteri + tek aralık, "en çok alınan" dahil). `rapor-katalogu`nda ilan edilir; panel raporu değildir (kapama listesi
+  uygulanmaz). Yalnız rapor işi koşarken (eşitleme açık) çalışır; kapalıyken davranış aynı. [bekçi: test_patron_bulut_cari_ozeti §9 · test_patron_bulut_rapor §1]
+- **Bulut (`54a2201e`, YENİ İMAJ gerekir):** `REPORT_KEY_PERMISSION`a `customer/summary` → `bulut:siparis:oku` (+ her rapor
+  gibi `bulut:rapor:oku`); parametre AYNEN iletilir; `/oturum` `raporAnahtarlari` ilanı. Bulut göçü YOK (sonuç RLS adı
+  `rapor.customer-summary` mevcut CHECK/politikaya uyar). [bekçi: patron/sunucu test_rapor_istegi §8 · test_degisim_sayaci §6a]
+- **Uygulama (`83cbf649`):** dönem seçicide "Özel aralık…" → iki tarih → rapor isteği, sonuç gelene dek kart yok. Seçenek
+  yalnız bulut ilanı ∧ hesap izni ∧ fabrika kataloğu birlikteyken çizilir: eski bulut/fabrika/izinsiz hesapta bugünkü
+  seçici. [bekçi: patron/uygulama __tests__/cari-ozel-aralik.test.tsx]
+- **Paket notu:** bu ek `202cdc65` paketinde ve `ed9d4a8cc664` imajında YOK; kurulacaksa backend paketi ve bulut imajı
+  yeniden derlenip provadan geçmeli (sıra: bulut → fabrika; tersinde katalog ilanı gelir ama bulut 404 verir, uygulama
+  seçeneği yine gizler).
