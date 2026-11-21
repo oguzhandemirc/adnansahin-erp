@@ -17,6 +17,30 @@
   ],
   "yayinlar": [
     {
+      "id": "2026-11-20",
+      "baslik": "Yeni iş emrinde siparişe metre ayırma",
+      "surumler": {
+        "panel": "1.3.22"
+      },
+      "maddeler": [
+        {
+          "kapsam": "panel",
+          "tip": "yeni",
+          "metin": "Yeni iş emri açarken sipariş seçince \"Siparişlere Paylaştırma\" bölümü çıkar: her siparişten bu iş emrine kaç metre ayıracağınızı yazın ya da \"Tamamı\"na basın (siparişin kalan açık metresini yazar). Hedef metre girdiyseniz toplam onu aşamaz, aşarsa kayıt yapılmaz ve nedeni yazılır; hedef metre yoksa toplam sınırı yoktur. Boş bırakılan sipariş yine bağlanır; metresini sonra iş emri detayındaki Paylaştır ile verebilirsiniz."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "İş emri detayındaki \"Sipariş Bağla\" penceresinde metre sütununun adı \"Bu iş emrine (m)\" oldu; siparişin metresi yanında görünür ve \"Tamamı\" kısayolu eklendi."
+        },
+        {
+          "kapsam": "panel",
+          "tip": "iyilestirme",
+          "metin": "Metre kutusuna siparişin açık metresinden fazlasını yazarsanız kutunun altında sarı uyarı çıkar (\"Siparişin açık miktarı 1500 m; 5000 m yazdınız\"); kayıt yine yapılır. Metreyi binlik noktasıyla yazarsanız (\"1.500\") kutu kırmızı olur ve doğru yazımı söyler: 1500 ya da 1500,5 (virgül ondalıktır). \"12.5\" gibi noktalı yazımda okunan değer altta görünür (\"12,5 m olarak okundu\")."
+        }
+      ]
+    },
+    {
       "id": "2026-11-18b",
       "baslik": "Bildirimleri açıp kapatan anahtar",
       "surumler": {
