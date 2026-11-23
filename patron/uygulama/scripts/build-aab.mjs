@@ -116,6 +116,10 @@ if (manifestAday) {
   sorunlar.push(...d.sorunlar);
   izinler = d.izinler;
   bildirimBilesenleri = d.bildirimBilesenleri;
+  // Mağaza uygunluğu (plugins/withAcikMetinKapali.js): release'te düz metin trafiği kapalı, paket hata ayıklanamaz.
+  const uygEtiket = m.match(/<application\b[^>]*>/)?.[0] ?? "";
+  if (!/android:usesCleartextTraffic="false"/.test(uygEtiket)) sorunlar.push("release manifestinde usesCleartextTraffic=false yok");
+  if (/android:debuggable="true"/.test(uygEtiket)) sorunlar.push("release manifesti debuggable=true");
   // Görünen ad: uygulama etiketi @string/app_name → prebuild'in yazdığı strings.xml (kaynak app.json expo.name).
   const etiketRef = m.match(/<application\b[^>]*android:label="([^"]+)"/)?.[1];
   const strings = path.join(ANDROID, "app/src/main/res/values/strings.xml");

@@ -89,6 +89,9 @@ const yapi = plistOku(infoPlist, "CFBundleVersion");
 if (surum !== app.version && surum !== "$(MARKETING_VERSION)") sorunlar.push(`CFBundleShortVersionString ${surum} ≠ ${app.version}`);
 if (yapi !== String(app.ios.buildNumber) && yapi !== "$(CURRENT_PROJECT_VERSION)") sorunlar.push(`CFBundleVersion ${yapi} ≠ ${app.ios.buildNumber}`);
 if (plistOku(infoPlist, "ITSAppUsesNonExemptEncryption") !== "false") sorunlar.push("ITSAppUsesNonExemptEncryption=false yok (her yüklemede şifreleme sorusu çıkar)");
+// Mağaza uygunluğu (2026-11-23): Face ID kullanılmaz (expo-secure-store faceIDPermission:false) ve yalnız iPhone.
+if (plistOku(infoPlist, "NSFaceIDUsageDescription") !== undefined) sorunlar.push("Info.plist'te NSFaceIDUsageDescription var (kullanılmıyor)");
+if (/\bTARGETED_DEVICE_FAMILY = "?1,2"?;/.test(fs.readFileSync(path.join(IOS, `${ad}.xcodeproj`, "project.pbxproj"), "utf8"))) sorunlar.push("TARGETED_DEVICE_FAMILY iPad içeriyor (supportsTablet:false olmalı)");
 // iOS 27 SDK: UIScene benimsenmezse uygulama açılışta sonlandırılır (TN3187) → plugins/withSahneYasamDongusu.js
 if (plistOku(infoPlist, "UIApplicationSceneManifest:UISceneConfigurations:UIWindowSceneSessionRoleApplication:0:UISceneDelegateClassName") !== "$(PRODUCT_MODULE_NAME).SceneDelegate") sorunlar.push("Info.plist UIApplicationSceneManifest (SceneDelegate) yok — iOS 27'de açılışta sonlandırılır");
 const appDelegateYolu = path.join(IOS, ad, "AppDelegate.swift");
