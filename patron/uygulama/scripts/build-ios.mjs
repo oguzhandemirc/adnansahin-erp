@@ -90,6 +90,8 @@ if (surum !== app.version && surum !== "$(MARKETING_VERSION)") sorunlar.push(`CF
 if (yapi !== String(app.ios.buildNumber) && yapi !== "$(CURRENT_PROJECT_VERSION)") sorunlar.push(`CFBundleVersion ${yapi} ≠ ${app.ios.buildNumber}`);
 if (plistOku(infoPlist, "ITSAppUsesNonExemptEncryption") !== "false") sorunlar.push("ITSAppUsesNonExemptEncryption=false yok (her yüklemede şifreleme sorusu çıkar)");
 // Mağaza uygunluğu (2026-11-23): Face ID kullanılmaz (expo-secure-store faceIDPermission:false) ve yalnız iPhone.
+// expo-file-system Photos çatısını bağlar → metinsiz yükleme ITMS-90683 ile işlenmeden düşer (ölçüldü 2026-11-23).
+if (!plistOku(infoPlist, "NSPhotoLibraryUsageDescription")) sorunlar.push("Info.plist'te NSPhotoLibraryUsageDescription yok (ITMS-90683)");
 if (plistOku(infoPlist, "NSFaceIDUsageDescription") !== undefined) sorunlar.push("Info.plist'te NSFaceIDUsageDescription var (kullanılmıyor)");
 if (/\bTARGETED_DEVICE_FAMILY = "?1,2"?;/.test(fs.readFileSync(path.join(IOS, `${ad}.xcodeproj`, "project.pbxproj"), "utf8"))) sorunlar.push("TARGETED_DEVICE_FAMILY iPad içeriyor (supportsTablet:false olmalı)");
 // iOS 27 SDK: UIScene benimsenmezse uygulama açılışta sonlandırılır (TN3187) → plugins/withSahneYasamDongusu.js

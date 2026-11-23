@@ -16,11 +16,14 @@
     },
     "ios": {
       "bundleIdentifier": "com.etkiliyazilim.adnansahin.yonetim",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "appleTeamId": "Z2348KHLXK",
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Uygulama fotoğraf arşivinizi kullanmaz ve bu izni sizden istemez; bu açıklama yalnız uygulamanın içerdiği dosya kitaplığının teknik gereği olarak yer alır."
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
