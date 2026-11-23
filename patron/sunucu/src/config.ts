@@ -84,6 +84,15 @@ const EnvSchema = z
     BILDIRIM_VAPID_KONU: z.preprocess((v) => (v === "" ? undefined : v), z.string().regex(/^(mailto:|https:\/\/)\S+$/).optional()),
     EXPO_PUSH_URL: z.url().default("https://exp.host/--/api/v2/push/send"),
     EXPO_MAKBUZ_URL: z.url().default("https://exp.host/--/api/v2/push/getReceipts"),
+    /** App Store inceleme demo hesapları (virgüllü fabrika kullanıcı adları; büyük/küçük harf duyarsız, locale'siz). Boş/yok =
+     *  özellik KAPALI (bugünkü davranış). Listedeki hesabın gelen kutusu mesajı fabrikaya GİTMEZ; bulut kendisi işlendi
+     *  sayar (`services/inceleme-demo.ts`). Geri dönüş: değişkeni sil + yeniden başlat. */
+    INCELEME_DEMO_HESAPLARI: z
+      .string()
+      .default("")
+      .transform((v) => [...new Set(v.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean))] as readonly string[]),
+    /** Demo mesajın "işlendi"ye geçmeden önce bekleme süresi (sn). */
+    INCELEME_DEMO_GECIKME_SN: z.coerce.number().int().min(0).max(60).default(4),
     /** Expo erişim belirteci (isteğe bağlı "enhanced push security") — SIRdır, günlüğe yazılmaz. */
     EXPO_ERISIM_BELIRTECI: z.string().min(16).optional(),
   })

@@ -68,6 +68,8 @@ async function main(): Promise<void> {
   notifier?.start();
   console.log(`PATRON_BILDIRIM kip=${config.BILDIRIM_KIPI} kaynak=${config.BILDIRIM_KAYNAGI}`);
   console.log(`[patron] ${ctx.destek!.summary}`);
+  // Adlar günlüğe girmez, yalnız sayı; kapalıyken satır yok (bugünkü günlük birebir).
+  if (config.INCELEME_DEMO_HESAPLARI.length > 0) console.log(`[patron] inceleme demo hesapları: ${config.INCELEME_DEMO_HESAPLARI.length}`);
   const security = securityChannelFrom(process.env);
   const stopSecurityAlerts = startSecurityAlerts(security);
   (security.ok ? console.log : console.warn)(`[patron] ${securityChannelSummary(security)}`);

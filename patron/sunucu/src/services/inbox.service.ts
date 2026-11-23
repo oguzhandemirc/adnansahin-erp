@@ -10,6 +10,7 @@
 //   (`rejectLockedAuthorPending`). Yarış: yazım tx'i yazarın etken satırını kilitleyerek okur (`lockAuthorFactors`),
 //   kilit tx'i aynı satırı yazar — biri ötekini bekler; kilitli yazar yazamaz, kilitten önce yazılan mesaj kapanır.
 // `mesajId` istemcinin işlem kimliğidir (clientToken) — tekrarı makbuzdan cevaplanır.
+// İnceleme demo hesabı (`INCELEME_DEMO_HESAPLARI`, varsayılan boş): BEKLIYOR ─(bulut, birkaç sn)→ ISLENDI; fabrika görmez.
 import { Prisma, type InboxMessage } from "@prisma/client";
 import { accountActor, recordAudit } from "../lib/audit";
 import { CloudError, forbidden, notFound, stateConflict } from "../lib/errors";
@@ -21,6 +22,7 @@ import type { z } from "zod";
 import type { SessionContext } from "../auth/session.service";
 import type { CloudContext } from "./context";
 import { assertFacilityCloudOpen } from "./facility-gate";
+import { demoAuthorExcludedSql, isReviewDemoAccount, scheduleReviewDemo } from "./inceleme-demo";
 import type { FactoryCaller } from "./installation-auth";
 
 export const INBOX_WRITE_PERMISSION = { SIPARIS: "bulut:siparis:yaz", CARI: "bulut:cari:yaz" } as const;
@@ -120,7 +122,10 @@ export async function createInboxMessage(ctx: CloudContext, s: SessionContext, i
     respond: (m) => ({ status: 201, data: messageView(m) }),
     audit: (m) => [{ actor: accountActor(s.accountId), event: "GELEN_KUTUSU_YAZILDI", entity: "InboxMessage", entityId: m.messageId, summary: { tur: m.kind } }],
   });
-  if (!result.replayed) ctx.doorbell.ring(s.tesisId, "gelen-kutusu");
+  if (result.replayed) return result;
+  // İnceleme demo hesabı (bayrak kapalıyken hiç doğru olmaz): fabrikaya zil yok, bulut kendisi işler.
+  if (isReviewDemoAccount(ctx.config, s.kullaniciAdi)) scheduleReviewDemo(ctx, s.tesisId, input.mesajId);
+  else ctx.doorbell.ring(s.tesisId, "gelen-kutusu");
   return result;
 }
 
@@ -183,11 +188,13 @@ interface ClaimedRow {
 export async function claimInbox(ctx: CloudContext, caller: FactoryCaller, req: z.infer<typeof InboxClaimRequestSchema>, nowMs: number): Promise<InboxClaimResponse> {
   const until = new Date(nowMs + ctx.config.GELEN_KUTUSU_CLAIM_DK * 60_000);
   const eligible = authorEligibleSql();
+  // İnceleme demo hesaplarının mesajı fabrikaya ne alınır ne reddedilir (bayrak kapalıyken boş parça).
+  const notDemo = demoAuthorExcludedSql(ctx.config);
   const { rejected, rows } = await withTesis(ctx.sync, { tesisId: caller.tesisId }, async (tx) => {
     const rejected = await tx.$queryRaw<{ message_id: string; kind: InboxMessage["kind"] }[]>`
       WITH bad AS MATERIALIZED (
         SELECT t.id FROM inbox_messages t
-         WHERE t.tesis_id = ${caller.tesisId}::uuid AND t.status = 'BEKLIYOR' AND t.claim_count = 0 AND NOT ${eligible}
+         WHERE t.tesis_id = ${caller.tesisId}::uuid AND t.status = 'BEKLIYOR' AND t.claim_count = 0 AND NOT ${eligible}${notDemo}
          FOR UPDATE OF t SKIP LOCKED)
       UPDATE inbox_messages AS m
          SET status = 'REDDEDILDI', result = ${JSON.stringify(AUTHOR_INELIGIBLE_RESULT)}::jsonb,
@@ -197,7 +204,7 @@ export async function claimInbox(ctx: CloudContext, caller: FactoryCaller, req: 
     const rows = await tx.$queryRaw<ClaimedRow[]>`
       WITH picked AS MATERIALIZED (
         SELECT t.id FROM inbox_messages t
-         WHERE t.tesis_id = ${caller.tesisId}::uuid AND t.status = 'BEKLIYOR' AND (t.claim_count > 0 OR ${eligible})
+         WHERE t.tesis_id = ${caller.tesisId}::uuid AND t.status = 'BEKLIYOR' AND (t.claim_count > 0 OR ${eligible})${notDemo}
          ORDER BY t.created_at, t.id LIMIT ${req.enFazla}
          FOR UPDATE OF t SKIP LOCKED)
       UPDATE inbox_messages AS t

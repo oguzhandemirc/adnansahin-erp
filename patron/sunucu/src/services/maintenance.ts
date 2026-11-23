@@ -15,6 +15,7 @@ import { recordAudit } from "../lib/audit";
 import type { Tx } from "../lib/db";
 import { listReadyFacilities, withTesis } from "../lib/tenant";
 import type { CloudContext } from "./context";
+import { finalizeReviewDemo, reviewDemoEnabled } from "./inceleme-demo";
 
 /** Yaşa göre hard delete izni olan tablolar (beyan) → gerekçe. Başka her silme yasak. */
 export const PRUNED_TABLES = {
@@ -349,6 +350,10 @@ export class MaintenanceScheduler {
         purged += (await perFacility(f.tesisId, "kimlik silme", () => purgeClosedIdentities(this.ctx, f.tesisId, nowMs))) ?? 0;
         await perFacility(f.tesisId, "IP alanı", () => stripAgedIps(this.ctx, f.tesisId, nowMs));
         await perFacility(f.tesisId, "kapanan hesabın cihazları", () => deactivateClosedAccountDevices(this.ctx, f.tesisId));
+        // İnceleme demo: zamanlayıcısı kaybolan (yeniden başlatma) mesajı yakalar; bayrak kapalıyken iş yok.
+        if (reviewDemoEnabled(this.ctx.config)) {
+          await perFacility(f.tesisId, "inceleme demo", () => finalizeReviewDemo(this.ctx, f.tesisId, { minAgeMs: this.ctx.config.INCELEME_DEMO_GECIKME_SN * 1000 }));
+        }
       }
       if (purged > 0) console.log(`[patron] bakım: ${purged} kapanmış hesabın kimliği silindi (Ek-6/A §2.5)`);
       const day = new Date(nowMs).toISOString().slice(0, 10);
