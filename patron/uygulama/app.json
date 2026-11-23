@@ -16,7 +16,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.etkiliyazilim.adnansahin.yonetim",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "appleTeamId": "Z2348KHLXK",
       "supportsTablet": true,
       "config": {
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.etkiliyazilim.adnansahin.yonetim",
-      "versionCode": 3,
+      "versionCode": 4,
       "allowBackup": false,
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
