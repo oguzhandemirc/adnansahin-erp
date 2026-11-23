@@ -100,7 +100,15 @@ const appDelegateYolu = path.join(IOS, ad, "AppDelegate.swift");
 const appDelegate = fs.existsSync(appDelegateYolu) ? fs.readFileSync(appDelegateYolu, "utf8") : "";
 if (!/class SceneDelegate\b/.test(appDelegate)) sorunlar.push("AppDelegate.swift'te SceneDelegate yok");
 if (appDelegate.includes("UIWindow(frame:")) sorunlar.push("AppDelegate.swift hâlâ UIWindow(frame:) ile pencere kuruyor");
+// Türkçe dil tanımı (2026-11-23, plugins/withTurkceDil.js): yoksa Türkiye bölgeli iPhone'da "Sesle söyle" görünmez.
+const plistJson = (dosya) => {
+  const r = spawnSync("plutil", ["-convert", "json", "-o", "-", dosya], { encoding: "utf8" });
+  return r.status === 0 ? JSON.parse(r.stdout) : undefined;
+};
+const trLproj = fs.existsSync(path.join(IOS, ad, "Supporting", "tr.lproj", "InfoPlist.strings")) ? ["tr.lproj"] : [];
+sorunlar.push(...denetim.iosDilDenetle(plistJson(infoPlist), trLproj));
 const pbx = fs.readFileSync(path.join(IOS, `${ad}.xcodeproj`, "project.pbxproj"), "utf8");
+if (!/developmentRegion = tr;/.test(pbx)) sorunlar.push("pbxproj developmentRegion ≠ tr");
 if (!pbx.includes(`PRODUCT_BUNDLE_IDENTIFIER = ${KIMLIK.uygulamaKimligi};`)) sorunlar.push("pbxproj bundle kimliği uyuşmuyor");
 if (!pbx.includes(`DEVELOPMENT_TEAM = ${KIMLIK.appleEkipKimligi};`)) sorunlar.push("pbxproj DEVELOPMENT_TEAM (Apple ekip kimliği) yok");
 const yetki = path.join(IOS, ad, `${ad}.entitlements`);
@@ -121,6 +129,13 @@ const arsivYolu = path.join(CIKTI_DIZINI, `${etiket}.xcarchive`);
 baslik("(3) xcodebuild archive");
 const ar = calistir("xcodebuild", ["-workspace", path.join(IOS, calisma), "-scheme", ad, "-configuration", "Release", "-destination", "generic/platform=iOS", "-archivePath", arsivYolu, "-allowProvisioningUpdates", "archive"], { cwd: IOS, env: derlemeEnv });
 if (ar.status !== 0) dur("archive başarısız", "Xcode → Settings → Accounts: ekip hesabı ekli mi; Apple Distribution sertifikası var mı");
+// Arşivdeki .app'in kendisi: Info.plist CFBundleLocalizations ⊇ tr + tr.lproj (prebuild doğrulaması derlenmiş pakette de).
+const uygulamalar = path.join(arsivYolu, "Products", "Applications");
+const app_ = fs.existsSync(uygulamalar) ? fs.readdirSync(uygulamalar).find((a) => a.endsWith(".app")) : undefined;
+if (!app_) dur(`arşivde .app yok: ${uygulamalar}`);
+const arsivDil = denetim.iosDilDenetle(plistJson(path.join(uygulamalar, app_, "Info.plist")), fs.readdirSync(path.join(uygulamalar, app_)).filter((a) => a.endsWith(".lproj")));
+if (arsivDil.length) dur("ARŞİV DİL DENETİMİ KIRMIZI", ...arsivDil);
+console.log("✓ arşiv: CFBundleLocalizations ⊇ tr · CFBundleDevelopmentRegion tr · tr.lproj");
 const secenekler = path.join(metroTmp, "ExportOptions.plist");
 fs.writeFileSync(secenekler, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

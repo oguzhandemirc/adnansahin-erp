@@ -16,13 +16,17 @@
     },
     "ios": {
       "bundleIdentifier": "com.etkiliyazilim.adnansahin.yonetim",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "appleTeamId": "Z2348KHLXK",
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
+        "CFBundleDevelopmentRegion": "tr",
+        "CFBundleLocalizations": [
+          "tr"
+        ],
         "NSPhotoLibraryUsageDescription": "Uygulama fotoğraf arşivinizi kullanmaz ve bu izni sizden istemez; bu açıklama yalnız uygulamanın içerdiği dosya kitaplığının teknik gereği olarak yer alır."
       },
       "privacyManifests": {
@@ -137,6 +141,7 @@
       "./plugins/withBildirimBaglantisi.js",
       "./plugins/withSahneYasamDongusu.js",
       "./plugins/withAcikMetinKapali.js",
+      "./plugins/withTurkceDil.js",
       [
         "expo-speech-recognition",
         {

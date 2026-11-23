@@ -83,6 +83,20 @@ function gomuluYapilandirmaDenetle(metin, { bildirimli, projeKimligi }) {
   return sorunlar;
 }
 
+/**
+ * iOS paketinin Türkçe dil tanımı (2026-11-23, plugins/withTurkceDil.js): Türkçe yoksa Türkiye bölgeli iPhone'da uygulama
+ * dili `en_TR` olur ve "Sesle söyle" düğmesi görünmez. `plist` = Info.plist nesnesi (plutil JSON), `lprojlar` = .app
+ * içindeki `*.lproj` dizin adları (bilinmiyorsa undefined → denetlenmez). Dönen dizi boşsa geçer.
+ */
+function iosDilDenetle(plist, lprojlar) {
+  const sorunlar = [];
+  const diller = Array.isArray(plist?.CFBundleLocalizations) ? plist.CFBundleLocalizations : [];
+  if (!diller.includes("tr")) sorunlar.push(`CFBundleLocalizations tr içermiyor (${JSON.stringify(plist?.CFBundleLocalizations ?? null)})`);
+  if (plist?.CFBundleDevelopmentRegion !== "tr") sorunlar.push(`CFBundleDevelopmentRegion ${plist?.CFBundleDevelopmentRegion ?? "YOK"} ≠ tr`);
+  if (lprojlar !== undefined && !lprojlar.includes("tr.lproj")) sorunlar.push("paket içinde tr.lproj yok");
+  return sorunlar;
+}
+
 /** Firebase istemci dosyasında bu paketin istemcisi var mı (içerik başka hiçbir yere yazılmaz). */
 function firebasePaketiVarMi(json, paket) {
   try {
@@ -103,4 +117,5 @@ module.exports = {
   manifestDenetle,
   gomuluYapilandirmaDenetle,
   firebasePaketiVarMi,
+  iosDilDenetle,
 };
